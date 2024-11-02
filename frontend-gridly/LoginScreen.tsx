@@ -7,6 +7,11 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  TouchableWithoutFeedback,
+  Keyboard,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -38,8 +43,6 @@ const LoginScreen: React.FC = () => {
   const handleLogin = async () => {
     try {
       const result = await signIn(email, password);
-      console.log("SignIn Result:", result);
-
       if (result?.localId) {
         const userId = result.localId;
         const userRef = doc(firestore, "users", userId);
@@ -51,26 +54,23 @@ const LoginScreen: React.FC = () => {
         }
 
         const userData = userDoc.data();
-        console.log("User Data:", userData);
-
         if (userData) {
           const { firstName } = userData;
           Alert.alert(
             "Login Successful",
-            `Welcome to the Gridly, ${firstName}!`
+            `Welcome to The Gridly, ${firstName}!`
           );
           navigation.navigate("Dashboard", { firstName });
         } else {
           Alert.alert("Login Error", "Failed to retrieve user data.");
         }
       } else {
-        Alert.alert("Login Error", "No user data returned.");
+        Alert.alert("Login Error", "Incorrect username or password.");
       }
     } catch (error) {
-      console.error("Error in login:", error);
       Alert.alert(
         "Login Error",
-        error instanceof Error ? error.message : "An unknown error occurred."
+        "Incorrect username or password. Please try again."
       );
     }
   };
@@ -81,14 +81,9 @@ const LoginScreen: React.FC = () => {
       return;
     }
     try {
-      // Call the signup function
       const userCredential = await signUp(email, password);
-      console.log("User successfully signed up:", userCredential);
-
       const userId = userCredential.localId || userCredential.user?.uid;
-      console.log("User ID:", userId);
 
-      // Add user data to Firestore
       if (userId) {
         await addUserToFirestore(userId, {
           university,
@@ -96,13 +91,10 @@ const LoginScreen: React.FC = () => {
           firstName,
           lastName,
         });
-        console.log("User data added to Firestore successfully.");
       }
-
       Alert.alert("Signup Successful");
       setIsLogin(true);
     } catch (error) {
-      console.error("Error in signup:", error);
       Alert.alert(
         "Signup Error",
         error instanceof Error ? error.message : "An unknown error occurred."
@@ -111,118 +103,134 @@ const LoginScreen: React.FC = () => {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>The Gridly</Text>
-      {isLogin ? (
-        <View style={styles.box}>
-          <TextInput
-            style={styles.input}
-            placeholder="Email"
-            value={email}
-            onChangeText={setEmail}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Password"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-          />
-          <Button title="Login" onPress={handleLogin} />
-          <TouchableOpacity onPress={toggleForm}>
-            <Text style={styles.toggleText}>Signup instead</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <View style={styles.box}>
-          <TextInput
-            style={styles.input}
-            placeholder="First Name"
-            value={firstName}
-            onChangeText={setFirstName}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Last Name"
-            value={lastName}
-            onChangeText={setLastName}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Email"
-            value={email}
-            onChangeText={setEmail}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Password"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Confirm Password"
-            value={confirmPassword}
-            onChangeText={setConfirmPassword}
-            secureTextEntry
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="University Name"
-            value={university}
-            onChangeText={setUniversity}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Major (Optional)"
-            value={major}
-            onChangeText={setMajor}
-          />
-          <Button title="Signup" onPress={handleSignup} />
-          <TouchableOpacity onPress={toggleForm}>
-            <Text style={styles.toggleText}>Login instead</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-    </View>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+    >
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <ScrollView contentContainerStyle={styles.scrollViewContent}>
+          <View style={styles.innerContainer}>
+            <Text style={styles.title}>The Gridly</Text>
+            {isLogin ? (
+              <View style={styles.box}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Email"
+                  value={email}
+                  onChangeText={setEmail}
+                  keyboardType="email-address"
+                />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Password"
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry
+                />
+                <Button title="Login" onPress={handleLogin} />
+                <TouchableOpacity onPress={toggleForm}>
+                  <Text style={styles.toggleText}>Signup instead</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.box}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="First Name"
+                  value={firstName}
+                  onChangeText={setFirstName}
+                />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Last Name"
+                  value={lastName}
+                  onChangeText={setLastName}
+                />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Email"
+                  value={email}
+                  onChangeText={setEmail}
+                  keyboardType="email-address"
+                />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Password"
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry
+                />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Confirm Password"
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  secureTextEntry
+                />
+                <TextInput
+                  style={styles.input}
+                  placeholder="University Name"
+                  value={university}
+                  onChangeText={setUniversity}
+                />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Major (Optional)"
+                  value={major}
+                  onChangeText={setMajor}
+                />
+                <Button title="Signup" onPress={handleSignup} />
+                <TouchableOpacity onPress={toggleForm}>
+                  <Text style={styles.toggleText}>Login instead</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </ScrollView>
+      </TouchableWithoutFeedback>
+    </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  scrollViewContent: {
+    flexGrow: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#f2f2f2",
+  },
+  innerContainer: {
+    width: "100%",
+    maxWidth: 400,
     padding: 20,
+    backgroundColor: "#f8f9fa",
+    borderRadius: 10,
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 5,
   },
   title: {
     fontSize: 32,
     fontWeight: "bold",
+    color: "#333",
     marginBottom: 20,
   },
   box: {
     width: "100%",
-    maxWidth: 400,
-    padding: 20,
-    backgroundColor: "white",
-    borderRadius: 8,
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 5,
   },
   input: {
-    height: 40,
-    borderColor: "#ccc",
+    height: 45,
+    borderColor: "#ddd",
     borderWidth: 1,
-    marginBottom: 10,
-    paddingHorizontal: 10,
-    borderRadius: 4,
+    borderRadius: 5,
+    paddingHorizontal: 15,
+    marginBottom: 15,
   },
   toggleText: {
-    color: "#007bff",
+    color: "#0066cc",
     textAlign: "center",
     marginTop: 10,
   },
