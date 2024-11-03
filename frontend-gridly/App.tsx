@@ -1,8 +1,15 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
-import { TouchableOpacity, View, Text, Modal, StyleSheet } from "react-native";
-import Icon from "react-native-vector-icons/MaterialIcons"; // Keep the original import
+import {
+  TouchableOpacity,
+  View,
+  Text,
+  Modal,
+  StyleSheet,
+} from "react-native";
+import Icon from "react-native-vector-icons/MaterialIcons";
+import SplashScreen from "./SplashScreen"; // Import the SplashScreen component
 import LoginScreen from "./LoginScreen";
 import Dashboard from "./Dashboard";
 import AddProductScreen from "./AddProductScreen";
@@ -12,6 +19,15 @@ const Stack = createStackNavigator<RootStackParamList>();
 
 export default function App() {
   const [modalVisible, setModalVisible] = useState(false);
+  const [isLoading, setIsLoading] = useState(true); // State to manage splash screen
+
+  const handleAnimationEnd = () => {
+    setIsLoading(false);
+  };
+
+  if (isLoading) {
+    return <SplashScreen onAnimationEnd={handleAnimationEnd} />;
+  }
 
   return (
     <NavigationContainer>
