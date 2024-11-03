@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -7,9 +7,15 @@ import {
   Image,
   TextInput,
   Switch,
+  Modal,
 } from "react-native";
-import { RouteProp } from "@react-navigation/native";
-import Icon from "react-native-vector-icons/Ionicons";
+import {
+  RouteProp,
+  useNavigation,
+  NavigationProp,
+} from "@react-navigation/native";
+import Ionicons from "react-native-vector-icons/Ionicons";
+
 import { RootStackParamList } from "./navigationTypes";
 
 type DashboardProps = {
@@ -19,10 +25,14 @@ type DashboardProps = {
 const Dashboard: React.FC<DashboardProps> = ({ route }) => {
   const { firstName } = route.params;
   const [isMarketplace, setIsMarketplace] = React.useState(true);
-
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const toggleMarketplace = () => {
     setIsMarketplace((previousState) => !previousState);
-    // Add functionality to switch marketplaces here
+  };
+
+  const toggleModal = () => {
+    setIsModalVisible(!isModalVisible);
   };
 
   return (
@@ -30,8 +40,6 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.greetingText}>Welcome, {firstName}</Text>
-
-        {/* Active Gigs Button */}
         <TouchableOpacity style={styles.postJobButton}>
           <Text style={styles.postJobText}>Active Gigs</Text>
         </TouchableOpacity>
@@ -40,7 +48,12 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
       {/* Search Bar with Toggle */}
       <View style={styles.searchToggleContainer}>
         <View style={styles.searchContainer}>
-          <Icon name="search" size={20} color="#000" style={styles.searchIcon} />
+          <Ionicons
+            name="search"
+            size={20}
+            color="#000"
+            style={styles.searchIcon}
+          />
           <TextInput
             style={styles.searchInput}
             placeholder="Search..."
@@ -50,11 +63,13 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
 
         {/* Small Toggle Button */}
         <View style={styles.toggleContainer}>
-          {/* View All Products Text */}
-          <TouchableOpacity onPress={() => {/* Navigate to all products */}}>
+          <TouchableOpacity
+            onPress={() => {
+              /* Navigate to all products */
+            }}
+          >
             <Text style={styles.viewAllText}>View All</Text>
           </TouchableOpacity>
-
           <Switch
             trackColor={{ false: "#ccc", true: "#000" }}
             thumbColor="#fff"
@@ -67,19 +82,14 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
 
       {/* Refined Product Card */}
       <View style={styles.productCard}>
-        {/* Product Image */}
         <Image
           source={{ uri: "https://via.placeholder.com/400" }}
           style={styles.productImage}
-          resizeMode="cover" // Ensures the image covers the container
+          resizeMode="cover"
         />
-
-        {/* Price Overlay */}
         <View style={styles.priceOverlay}>
           <Text style={styles.productPrice}>$100</Text>
         </View>
-
-        {/* Description */}
         <Text style={styles.productDescription}>
           Brief description of the item.
         </Text>
@@ -88,17 +98,50 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
       {/* Bottom Navigation */}
       <View style={styles.bottomNav}>
         <TouchableOpacity style={styles.navItem}>
-          <Icon name="home-outline" size={28} color="#000" />
+          <Ionicons name="home-outline" size={28} color="#000" />
         </TouchableOpacity>
-
-        <TouchableOpacity style={styles.navItem}>
-          <Icon name="add-circle" size={56} color="#000" />
+        <TouchableOpacity style={styles.navItem} onPress={toggleModal}>
+          <Ionicons name="add-circle" size={56} color="#000" />
         </TouchableOpacity>
-
         <TouchableOpacity style={styles.navItem}>
-          <Icon name="stats-chart-outline" size={28} color="#000" />
+          <Ionicons name="stats-chart-outline" size={28} color="#000" />
         </TouchableOpacity>
       </View>
+
+      {/* Modal for Add Options */}
+      <Modal
+        visible={isModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={toggleModal}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Add Options</Text>
+            <TouchableOpacity
+              style={styles.modalButton}
+              onPress={() => {
+                toggleModal();
+                navigation.navigate("AddProduct"); // Use the correct route name as a string
+              }}
+            >
+              <Text style={styles.modalButtonText}>Add Product</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.modalButton}
+              onPress={() => {
+                toggleModal();
+                navigation.navigate(""); // Correct route name
+              }}
+            >
+              <Text style={styles.modalButtonText}>Add Gig</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={toggleModal} style={styles.modalClose}>
+              <Ionicons name="close-outline" size={24} color="#000" />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -113,10 +156,10 @@ const styles = StyleSheet.create({
     paddingTop: 40,
   },
   header: {
-    flexDirection: "row", // Arrange items horizontally
-    alignItems: "center", // Center items vertically
-    justifyContent: "space-between", // Space between items
-    marginBottom: 20, // Shift everything else up
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 20,
   },
   greetingText: {
     fontSize: 24,
@@ -137,7 +180,7 @@ const styles = StyleSheet.create({
   searchToggleContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 15, // Adjusted to shift components up
+    marginBottom: 15,
   },
   searchContainer: {
     flex: 1,
@@ -171,12 +214,12 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 20,
     overflow: "hidden",
-    marginVertical: 15, // Reduced to shift components up
+    marginVertical: 15,
   },
   productImage: {
-    width: "95%", // Decreased the image width slightly
-    height: "105%", // Increased the image height slightly
-    alignSelf: "center", // Center the image horizontally
+    width: "95%",
+    height: "105%",
+    alignSelf: "center",
   },
   priceOverlay: {
     position: "absolute",
@@ -212,5 +255,40 @@ const styles = StyleSheet.create({
   },
   navItem: {
     alignItems: "center",
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContent: {
+    width: "80%",
+    backgroundColor: "#fff",
+    padding: 20,
+    borderRadius: 15,
+    alignItems: "center",
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "600",
+    marginBottom: 15,
+  },
+  modalButton: {
+    backgroundColor: "#000",
+    paddingVertical: 10,
+    paddingHorizontal: 30,
+    borderRadius: 20,
+    marginVertical: 5,
+  },
+  modalButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "500",
+  },
+  modalClose: {
+    position: "absolute",
+    top: 10,
+    right: 10,
   },
 });

@@ -2,9 +2,10 @@ import { useState } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
 import { TouchableOpacity, View, Text, Modal, StyleSheet } from "react-native";
-import Icon from "react-native-vector-icons/MaterialIcons";  // Keep the original import
+import Icon from "react-native-vector-icons/MaterialIcons"; // Keep the original import
 import LoginScreen from "./LoginScreen";
 import Dashboard from "./Dashboard";
+import AddProductScreen from "./AddProductScreen";
 import { RootStackParamList } from "./navigationTypes";
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -44,6 +45,11 @@ export default function App() {
             ),
             headerTitle: "The Gridly",
           }}
+        />
+        <Stack.Screen
+          name="AddProduct"
+          component={AddProductScreen}
+          options={{ headerTitle: "Add Product" }}
         />
       </Stack.Navigator>
 

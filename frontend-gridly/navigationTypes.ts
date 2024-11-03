@@ -1,6 +1,5 @@
-// navigationTypes.ts
 export type RootStackParamList = {
-    Login: undefined;
-    Dashboard: { firstName: string };
-  };
-  
+  Login: undefined;
+  Dashboard: { firstName: string };
+  AddProduct: undefined; 
+};
