@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { NavigationContainer } from "@react-navigation/native";
+import React, { useState, useRef } from "react";
+import { NavigationContainer, NavigationContainerRef } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
 import {
   TouchableOpacity,
@@ -7,19 +7,22 @@ import {
   Text,
   Modal,
   StyleSheet,
+  ScrollView,
 } from "react-native";
 import Icon from "react-native-vector-icons/MaterialIcons";
-import SplashScreen from "./SplashScreen"; // Import the SplashScreen component
+import SplashScreen from "./SplashScreen";
 import LoginScreen from "./LoginScreen";
 import Dashboard from "./Dashboard";
 import AddProductScreen from "./AddProductScreen";
 import { RootStackParamList } from "./navigationTypes";
 
 const Stack = createStackNavigator<RootStackParamList>();
+const navigationRef = useRef<NavigationContainerRef<RootStackParamList>>(null);
 
 export default function App() {
   const [modalVisible, setModalVisible] = useState(false);
-  const [isLoading, setIsLoading] = useState(true); // State to manage splash screen
+  const [showTerms, setShowTerms] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   const handleAnimationEnd = () => {
     setIsLoading(false);
@@ -30,7 +33,7 @@ export default function App() {
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       <Stack.Navigator initialRouteName="Login">
         <Stack.Screen
           name="Login"
@@ -47,16 +50,6 @@ export default function App() {
                 style={{ marginLeft: 10 }}
               >
                 <Icon name="person" size={30} color="#000" />
-              </TouchableOpacity>
-            ),
-            headerRight: () => (
-              <TouchableOpacity
-                onPress={() => {
-                  console.log("Messaging icon pressed!");
-                }}
-                style={{ marginRight: 30 }}
-              >
-                <Icon name="chat" size={24} color="#006400" />
               </TouchableOpacity>
             ),
             headerTitle: "The Gridly",
@@ -79,9 +72,15 @@ export default function App() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <TouchableOpacity
+              onPress={() => setModalVisible(false)}
+              style={styles.closeButton}
+            >
+              <Icon name="close" size={24} color="#000" />
+            </TouchableOpacity>
+            <TouchableOpacity
               onPress={() => {
                 setModalVisible(false);
-                console.log("Logout pressed!");
+                navigationRef.current?.navigate('Login');
               }}
               style={styles.option}
             >
@@ -89,13 +88,39 @@ export default function App() {
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => {
+                setShowTerms(true);
                 setModalVisible(false);
-                console.log("View Terms of Service pressed!");
               }}
               style={styles.option}
             >
               <Text style={styles.optionText}>View Terms of Service</Text>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal for Terms of Service */}
+      <Modal
+        transparent={true}
+        visible={showTerms}
+        animationType="slide"
+        onRequestClose={() => setShowTerms(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.termsContent}>
+            <TouchableOpacity
+              onPress={() => setShowTerms(false)}
+              style={styles.closeButton}
+            >
+              <Icon name="close" size={24} color="#000" />
+            </TouchableOpacity>
+            <ScrollView>
+              <Text style={styles.termsText}>
+                Terms of Service: {"\n\n"}Welcome to The Gridly. By using our
+                platform, you agree to the following terms... [Add more terms
+                here as needed for your service.]
+              </Text>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -115,6 +140,12 @@ const styles = StyleSheet.create({
     padding: 20,
     borderRadius: 10,
     width: "80%",
+    position: "relative",
+  },
+  closeButton: {
+    position: "absolute",
+    top: 10,
+    right: 10,
   },
   option: {
     padding: 10,
@@ -123,5 +154,17 @@ const styles = StyleSheet.create({
   },
   optionText: {
     fontSize: 16,
+  },
+  termsContent: {
+    backgroundColor: "white",
+    padding: 20,
+    borderRadius: 10,
+    width: "90%",
+    height: "80%",
+    position: "relative",
+  },
+  termsText: {
+    fontSize: 14,
+    color: "#333",
   },
 });
