@@ -1,5 +1,8 @@
-import React, { useState } from "react";
-import { NavigationContainer } from "@react-navigation/native";
+import { useState, createRef } from "react";
+import {
+  NavigationContainer,
+  NavigationContainerRef,
+} from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
 import {
   TouchableOpacity,
@@ -7,30 +10,33 @@ import {
   Text,
   Modal,
   StyleSheet,
+  Alert,
 } from "react-native";
 import Icon from "react-native-vector-icons/MaterialIcons";
-import SplashScreen from "./SplashScreen"; // Import the SplashScreen component
 import LoginScreen from "./LoginScreen";
 import Dashboard from "./Dashboard";
 import AddProductScreen from "./AddProductScreen";
 import { RootStackParamList } from "./navigationTypes";
 
+// Define navigation ref for use in handleLogout
+export const navigationRef =
+  createRef<NavigationContainerRef<RootStackParamList>>();
+
 const Stack = createStackNavigator<RootStackParamList>();
 
 export default function App() {
   const [modalVisible, setModalVisible] = useState(false);
-  const [isLoading, setIsLoading] = useState(true); // State to manage splash screen
 
-  const handleAnimationEnd = () => {
-    setIsLoading(false);
+  // Logout handler
+  const handleLogout = () => {
+    // Log the user out by clearing their session, token, or navigating back to Login
+    setModalVisible(false);
+    Alert.alert("Logout Successful", "You have been logged out.");
+    navigationRef.current?.navigate("Login");
   };
 
-  if (isLoading) {
-    return <SplashScreen onAnimationEnd={handleAnimationEnd} />;
-  }
-
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       <Stack.Navigator initialRouteName="Login">
         <Stack.Screen
           name="Login"
@@ -51,9 +57,7 @@ export default function App() {
             ),
             headerRight: () => (
               <TouchableOpacity
-                onPress={() => {
-                  console.log("Messaging icon pressed!");
-                }}
+                onPress={() => console.log("Messaging icon pressed!")}
                 style={{ marginRight: 30 }}
               >
                 <Icon name="chat" size={24} color="#006400" />
@@ -78,13 +82,7 @@ export default function App() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <TouchableOpacity
-              onPress={() => {
-                setModalVisible(false);
-                console.log("Logout pressed!");
-              }}
-              style={styles.option}
-            >
+            <TouchableOpacity onPress={handleLogout} style={styles.option}>
               <Text style={styles.optionText}>Logout</Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -116,12 +114,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     width: "80%",
   },
-  option: {
-    padding: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "#ccc",
-  },
-  optionText: {
-    fontSize: 16,
-  },
+  option: { padding: 10, borderBottomWidth: 1, borderBottomColor: "#ccc" },
+  optionText: { fontSize: 16 },
 });

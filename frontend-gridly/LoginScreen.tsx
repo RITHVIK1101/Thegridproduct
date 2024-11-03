@@ -13,14 +13,15 @@ import {
   Keyboard,
   Animated,
 } from "react-native";
+import { Picker } from "@react-native-picker/picker";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "./navigationTypes";
 import {
   signIn,
-  firestore,
   signUp,
   addUserToFirestore,
+  firestore,
 } from "./firebaseConfig";
 import { doc, getDoc } from "firebase/firestore";
 
@@ -28,14 +29,14 @@ type NavigationProp = NativeStackNavigationProp<RootStackParamList, "Login">;
 
 const LoginScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
-
   const [isLogin, setIsLogin] = useState(true);
   const [toggleAnim] = useState(new Animated.Value(0));
 
+  // Form Fields
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [university, setUniversity] = useState("");
+  const [university, setUniversity] = useState("University of Washington");
   const [major, setMajor] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -237,13 +238,17 @@ const LoginScreen: React.FC = () => {
                       onChangeText={setConfirmPassword}
                       secureTextEntry
                     />
-                    <TextInput
-                      style={styles.input}
-                      placeholder="University Name"
-                      placeholderTextColor="#999"
-                      value={university}
-                      onChangeText={setUniversity}
-                    />
+                    <View style={styles.input}>
+                      <Picker
+                        selectedValue={university}
+                        onValueChange={setUniversity}
+                      >
+                        <Picker.Item
+                          label="University of Washington"
+                          value="University of Washington"
+                        />
+                      </Picker>
+                    </View>
                     <TextInput
                       style={styles.input}
                       placeholder="Major (Optional)"
@@ -269,10 +274,7 @@ const LoginScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#f5f5f5",
-  },
+  container: { flex: 1, backgroundColor: "#f5f5f5" },
   scrollViewContent: {
     flexGrow: 1,
     justifyContent: "center",
@@ -304,29 +306,12 @@ const styles = StyleSheet.create({
     backgroundColor: "#e0e0e0",
     overflow: "hidden",
   },
-  toggleButton: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: "center",
-  },
-  toggleButtonText: {
-    fontSize: 16,
-    color: "#777",
-    fontWeight: "600",
-  },
-  activeToggle: {
-    backgroundColor: "#ffffff",
-    elevation: 2,
-  },
-  activeToggleText: {
-    color: "#333",
-  },
-  formContainer: {
-    overflow: "hidden",
-  },
-  box: {
-    width: "100%",
-  },
+  toggleButton: { flex: 1, paddingVertical: 12, alignItems: "center" },
+  toggleButtonText: { fontSize: 16, color: "#777", fontWeight: "600" },
+  activeToggle: { backgroundColor: "#ffffff", elevation: 2 },
+  activeToggleText: { color: "#333" },
+  formContainer: { overflow: "hidden" },
+  box: { width: "100%" },
   input: {
     height: 50,
     borderColor: "#ddd",
@@ -348,11 +333,7 @@ const styles = StyleSheet.create({
     shadowRadius: 5,
     elevation: 3,
   },
-  buttonText: {
-    color: "#fff",
-    fontWeight: "600",
-    fontSize: 16,
-  },
+  buttonText: { color: "#fff", fontWeight: "600", fontSize: 16 },
 });
 
 export default LoginScreen;

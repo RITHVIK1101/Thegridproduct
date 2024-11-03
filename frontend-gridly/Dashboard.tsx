@@ -14,6 +14,7 @@ import {
   useNavigation,
   NavigationProp,
 } from "@react-navigation/native";
+import { Picker } from "@react-native-picker/picker";
 import Ionicons from "react-native-vector-icons/Ionicons";
 
 import { RootStackParamList } from "./navigationTypes";
