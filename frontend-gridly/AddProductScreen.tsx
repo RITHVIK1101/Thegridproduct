@@ -7,14 +7,41 @@ import {
   StyleSheet,
   TouchableOpacity,
 } from "react-native";
-import { useNavigation } from "@react-navigation/native"; // Import useNavigation hook
+import { useNavigation } from "@react-navigation/native";
 import Icon from "react-native-vector-icons/Ionicons";
 
 const AddProductScreen: React.FC = () => {
-  const navigation = useNavigation(); // Access navigation
+  const navigation = useNavigation();
   const [productName, setProductName] = useState("");
   const [price, setPrice] = useState("");
   const [tags, setTags] = useState("");
+  const [image, setImage] = useState("");
+
+  const addProduct = async () => {
+    try {
+      const response = await fetch("http://10.0.0.174:8080/products", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: productName,
+          price: price,
+          tags: tags,
+          image: image,
+        }),
+      });
+
+      if (response.ok) {
+        console.log("Product added successfully");
+        navigation.goBack();
+      } else {
+        console.error("Failed to add product");
+      }
+    } catch (error) {
+      console.error("Error adding product:", error);
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -49,10 +76,7 @@ const AddProductScreen: React.FC = () => {
         onChangeText={setTags}
       />
 
-      <Button
-        title="Add Product"
-        onPress={() => console.log("Product added")}
-      />
+      <Button title="Add Product" onPress={addProduct} />
     </View>
   );
 };
