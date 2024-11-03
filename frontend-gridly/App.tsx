@@ -2,7 +2,7 @@ import { useState } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
 import { TouchableOpacity, View, Text, Modal, StyleSheet } from "react-native";
-import Icon from "react-native-vector-icons/MaterialIcons";
+import Icon from "react-native-vector-icons/MaterialIcons";  // Keep the original import
 import LoginScreen from "./LoginScreen";
 import Dashboard from "./Dashboard";
 import { RootStackParamList } from "./navigationTypes";
@@ -26,10 +26,20 @@ export default function App() {
           options={{
             headerLeft: () => (
               <TouchableOpacity
-                onPress={() => setModalVisible(true)} // Open the modal on press
+                onPress={() => setModalVisible(true)}
                 style={{ marginLeft: 10 }}
               >
                 <Icon name="person" size={30} color="#000" />
+              </TouchableOpacity>
+            ),
+            headerRight: () => (
+              <TouchableOpacity
+                onPress={() => {
+                  console.log("Messaging icon pressed!");
+                }}
+                style={{ marginRight: 30 }}
+              >
+                <Icon name="chat" size={24} color="#006400" />
               </TouchableOpacity>
             ),
             headerTitle: "The Gridly",
@@ -48,7 +58,6 @@ export default function App() {
           <View style={styles.modalContent}>
             <TouchableOpacity
               onPress={() => {
-                // Handle logout
                 setModalVisible(false);
                 console.log("Logout pressed!");
               }}
@@ -58,7 +67,6 @@ export default function App() {
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => {
-                // Handle view terms of service
                 setModalVisible(false);
                 console.log("View Terms of Service pressed!");
               }}

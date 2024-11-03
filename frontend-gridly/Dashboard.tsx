@@ -1,8 +1,8 @@
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { RouteProp } from "@react-navigation/native";
-import Icon from "react-native-vector-icons/Ionicons"; // Importing icons
-import { RootStackParamList } from "./navigationTypes"; // Import unchanged
+import Icon from "react-native-vector-icons/Ionicons";
+import { RootStackParamList } from "./navigationTypes";
 
 type DashboardProps = {
   route: RouteProp<RootStackParamList, "Dashboard">;
@@ -31,13 +31,29 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
       {/* Horizontal Divider */}
       <View style={styles.divider} />
 
-      {/* Plus Button at the Bottom Center */}
-      <TouchableOpacity style={styles.addButton}>
-        <Icon name="add-outline" size={24} color="#fff" />
-      </TouchableOpacity>
+      {/* Bottom Icons: Home, Plus, and Activity */}
+      <View style={styles.bottomIcons}>
+        {/* Home Icon (Left) */}
+        <TouchableOpacity style={styles.iconButton}>
+          <Icon name="home" size={30} color="#006400" />
+        </TouchableOpacity>
+
+        {/* Plus Icon (Center) */}
+        <TouchableOpacity style={[styles.iconButton, styles.plusButton]}>
+          <Icon name="add-circle-outline" size={40} color="#000" />
+        </TouchableOpacity>
+
+        {/* Activity Icon (Right) */}
+        <TouchableOpacity style={styles.iconButton}>
+          <Icon name="stats-chart-outline" size={30} color="#000" />
+        </TouchableOpacity>
+      </View>
     </View>
   );
 };
+
+// Default export
+export default Dashboard;
 
 const styles = StyleSheet.create({
   container: {
@@ -46,13 +62,15 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   header: {
-    alignItems: "flex-start",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 10,
   },
   greetingText: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#006400", // Dark green
+    color: "#006400",
   },
   sectionsContainer: {
     flexDirection: "row",
@@ -62,11 +80,11 @@ const styles = StyleSheet.create({
   sectionCard: {
     backgroundColor: "#E6F7FF",
     flex: 1,
-    padding: 25, // Increased padding for bigger buttons
+    padding: 25,
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
-    marginHorizontal: 0, // Removed space between buttons
+    marginHorizontal: 0,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -75,35 +93,41 @@ const styles = StyleSheet.create({
   },
   activeSection: {
     borderWidth: 2,
-    borderColor: "#006400", // Dark green highlight for active tab
+    borderColor: "#006400",
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: "700",
-    color: "#006400", // Dark green
+    color: "#006400",
   },
   activeText: {
-    color: "#006400", // Dark green for active text
+    color: "#006400",
   },
   divider: {
     height: 1,
-    backgroundColor: "#ccc", // Light gray for the divider line
+    backgroundColor: "#ccc",
     position: "absolute",
-    bottom: 100, // Adjust this value to place the divider just above the plus button
-    width: "80%", // Adjust the width to make it narrower
-    alignSelf: "center", // Center the divider horizontally
+    bottom: 100,
+    width: "80%",
+    alignSelf: "center",
   },
-  addButton: {
+  bottomIcons: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     position: "absolute",
-    bottom: 30,
-    alignSelf: "center", // Use alignSelf to center horizontally
-    backgroundColor: "#006400", // Dark green
-    width: 50, // Reduced button size
-    height: 50, // Reduced button size
-    borderRadius: 25, // Adjusted borderRadius for smaller size
+    bottom: 20,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 40,
+  },
+  iconButton: {
+    width: 50,
+    height: 50,
     justifyContent: "center",
     alignItems: "center",
   },
+  plusButton: {
+    transform: [{ scale: 1.1 }],
+  },
 });
-
-export default Dashboard;
