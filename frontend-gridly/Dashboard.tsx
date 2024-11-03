@@ -1,5 +1,13 @@
 import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Image,
+  TextInput,
+  Switch,
+} from "react-native";
 import { RouteProp } from "@react-navigation/native";
 import Icon from "react-native-vector-icons/Ionicons";
 import { RootStackParamList } from "./navigationTypes";
@@ -10,124 +18,199 @@ type DashboardProps = {
 
 const Dashboard: React.FC<DashboardProps> = ({ route }) => {
   const { firstName } = route.params;
+  const [isMarketplace, setIsMarketplace] = React.useState(true);
+
+  const toggleMarketplace = () => {
+    setIsMarketplace((previousState) => !previousState);
+    // Add functionality to switch marketplaces here
+  };
 
   return (
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.greetingText}>Hi, {firstName}!</Text>
-      </View>
+        <Text style={styles.greetingText}>Welcome, {firstName}</Text>
 
-      {/* Marketplace and Campus Gigs */}
-      <View style={styles.sectionsContainer}>
-        <TouchableOpacity style={[styles.sectionCard, styles.activeSection]}>
-          <Text style={[styles.sectionTitle, styles.activeText]}>Marketplace</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>Campus Gigs</Text>
+        {/* Active Gigs Button */}
+        <TouchableOpacity style={styles.postJobButton}>
+          <Text style={styles.postJobText}>Active Gigs</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Horizontal Divider */}
-      <View style={styles.divider} />
+      {/* Search Bar with Toggle */}
+      <View style={styles.searchToggleContainer}>
+        <View style={styles.searchContainer}>
+          <Icon name="search" size={20} color="#000" style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search..."
+            placeholderTextColor="#999"
+          />
+        </View>
 
-      {/* Bottom Icons: Home, Plus, and Activity */}
-      <View style={styles.bottomIcons}>
-        {/* Home Icon (Left) */}
-        <TouchableOpacity style={styles.iconButton}>
-          <Icon name="home" size={30} color="#006400" />
+        {/* Small Toggle Button */}
+        <View style={styles.toggleContainer}>
+          {/* View All Products Text */}
+          <TouchableOpacity onPress={() => {/* Navigate to all products */}}>
+            <Text style={styles.viewAllText}>View All</Text>
+          </TouchableOpacity>
+
+          <Switch
+            trackColor={{ false: "#ccc", true: "#000" }}
+            thumbColor="#fff"
+            ios_backgroundColor="#ccc"
+            onValueChange={toggleMarketplace}
+            value={!isMarketplace}
+          />
+        </View>
+      </View>
+
+      {/* Refined Product Card */}
+      <View style={styles.productCard}>
+        {/* Product Image */}
+        <Image
+          source={{ uri: "https://via.placeholder.com/400" }}
+          style={styles.productImage}
+          resizeMode="cover" // Ensures the image covers the container
+        />
+
+        {/* Price Overlay */}
+        <View style={styles.priceOverlay}>
+          <Text style={styles.productPrice}>$100</Text>
+        </View>
+
+        {/* Description */}
+        <Text style={styles.productDescription}>
+          Brief description of the item.
+        </Text>
+      </View>
+
+      {/* Bottom Navigation */}
+      <View style={styles.bottomNav}>
+        <TouchableOpacity style={styles.navItem}>
+          <Icon name="home-outline" size={28} color="#000" />
         </TouchableOpacity>
 
-        {/* Plus Icon (Center) */}
-        <TouchableOpacity style={[styles.iconButton, styles.plusButton]}>
-          <Icon name="add-circle-outline" size={40} color="#000" />
+        <TouchableOpacity style={styles.navItem}>
+          <Icon name="add-circle" size={56} color="#000" />
         </TouchableOpacity>
 
-        {/* Activity Icon (Right) */}
-        <TouchableOpacity style={styles.iconButton}>
-          <Icon name="stats-chart-outline" size={30} color="#000" />
+        <TouchableOpacity style={styles.navItem}>
+          <Icon name="stats-chart-outline" size={28} color="#000" />
         </TouchableOpacity>
       </View>
     </View>
   );
 };
 
-// Default export
 export default Dashboard;
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#fff",
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingTop: 40,
   },
   header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 10,
+    flexDirection: "row", // Arrange items horizontally
+    alignItems: "center", // Center items vertically
+    justifyContent: "space-between", // Space between items
+    marginBottom: 20, // Shift everything else up
   },
   greetingText: {
-    fontSize: 18,
+    fontSize: 24,
     fontWeight: "600",
-    color: "#006400",
+    color: "#000",
   },
-  sectionsContainer: {
+  postJobButton: {
+    backgroundColor: "#000",
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 30,
+  },
+  postJobText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "500",
+  },
+  searchToggleContainer: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    marginVertical: 20,
+    alignItems: "center",
+    marginBottom: 15, // Adjusted to shift components up
   },
-  sectionCard: {
-    backgroundColor: "#E6F7FF",
+  searchContainer: {
     flex: 1,
-    padding: 25,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    marginHorizontal: 0,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  activeSection: {
-    borderWidth: 2,
-    borderColor: "#006400",
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#006400",
-  },
-  activeText: {
-    color: "#006400",
-  },
-  divider: {
-    height: 1,
-    backgroundColor: "#ccc",
-    position: "absolute",
-    bottom: 100,
-    width: "80%",
-    alignSelf: "center",
-  },
-  bottomIcons: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
+    backgroundColor: "#f2f2f2",
+    borderRadius: 30,
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+  },
+  searchIcon: {
+    marginRight: 10,
+    color: "#000",
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: "#000",
+  },
+  toggleContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginLeft: 15,
+  },
+  viewAllText: {
+    fontSize: 12,
+    color: "#000",
+    marginRight: 10,
+  },
+  productCard: {
+    flex: 1,
+    borderRadius: 20,
+    overflow: "hidden",
+    marginVertical: 15, // Reduced to shift components up
+  },
+  productImage: {
+    width: "95%", // Decreased the image width slightly
+    height: "105%", // Increased the image height slightly
+    alignSelf: "center", // Center the image horizontally
+  },
+  priceOverlay: {
+    position: "absolute",
+    top: 15,
+    right: 15,
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+  },
+  productPrice: {
+    fontSize: 20,
+    fontWeight: "600",
+    color: "#fff",
+  },
+  productDescription: {
     position: "absolute",
     bottom: 20,
-    left: 0,
-    right: 0,
-    paddingHorizontal: 40,
+    left: 20,
+    right: 20,
+    fontSize: 16,
+    color: "#fff",
+    textAlign: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    padding: 10,
+    borderRadius: 10,
   },
-  iconButton: {
-    width: 50,
-    height: 50,
-    justifyContent: "center",
+  bottomNav: {
+    flexDirection: "row",
+    justifyContent: "space-around",
     alignItems: "center",
+    paddingVertical: 15,
   },
-  plusButton: {
-    transform: [{ scale: 1.1 }],
+  navItem: {
+    alignItems: "center",
   },
 });
