@@ -32,6 +32,8 @@ export default function App() {
   const [showTerms, setShowTerms] = useState(false);
 
   const handleLogout = () => {
+    // Close the modal before logging out
+    setModalVisible(false);
     logout(); // Clears the auth token
     Alert.alert("Logout Successful", "You have been logged out.");
     navigationRef.current?.navigate("Login"); // Redirect to login screen
@@ -55,14 +57,6 @@ export default function App() {
                 style={{ marginLeft: 10 }}
               >
                 <Icon name="person" size={30} color="#000" />
-              </TouchableOpacity>
-            ),
-            headerRight: () => (
-              <TouchableOpacity
-                onPress={() => console.log("Messaging icon pressed!")}
-                style={{ marginRight: 30 }}
-              >
-                <Icon name="chat" size={24} color="#006400" />
               </TouchableOpacity>
             ),
             headerTitle: "The Gridly",

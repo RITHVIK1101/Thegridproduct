@@ -8,7 +8,6 @@ import {
   TextInput,
   ScrollView,
   FlatList,
-  Alert,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import Ionicons from "react-native-vector-icons/Ionicons";
@@ -32,8 +31,11 @@ const AddProduct: React.FC = () => {
     "#Beauty",
   ];
 
-  // Function to pick multiple images
   const pickImage = async () => {
+    if (images.length >= 3) {
+      alert("You can only upload up to 3 images.");
+      return;
+    }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsMultipleSelection: true,
@@ -41,8 +43,16 @@ const AddProduct: React.FC = () => {
     });
     if (!result.canceled) {
       const newImages = result.assets.map((asset) => asset.uri);
-      setImages((prevImages) => [...prevImages, ...newImages]);
+      if (images.length + newImages.length > 3) {
+        alert("You can only upload up to 3 images.");
+      } else {
+        setImages((prevImages) => [...prevImages, ...newImages]);
+      }
     }
+  };
+
+  const removeImage = (index: number) => {
+    setImages((prevImages) => prevImages.filter((_, i) => i !== index));
   };
 
   const toggleTag = (tag: string) => {
@@ -53,42 +63,12 @@ const AddProduct: React.FC = () => {
     );
   };
 
-  // Submit function to send data to the backend
-  const handleSubmit = async () => {
-    if (!title || !price || !description) {
-      Alert.alert("Please fill in all required fields");
-      return;
-    }
-
-    try {
-      const response = await fetch("http://localhost:8080/products", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: title,
-          price: price,
-          description: description,
-          tags: selectedTags,
-          images: images,
-        }),
-      });
-
-      if (response.ok) {
-        Alert.alert("Product added successfully");
-      } else {
-        Alert.alert("Failed to add product");
-      }
-    } catch (error) {
-      console.error("Error adding product:", error);
-      Alert.alert("An error occurred while adding the product");
-    }
-  };
-
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.heading}>Add a New Product</Text>
+
+      {/* Image Counter */}
+      <Text style={styles.imageCounter}>{`${images.length}/3 Images`}</Text>
 
       {/* Upload Images Section */}
       <View style={styles.imageUploadContainer}>
@@ -98,7 +78,15 @@ const AddProduct: React.FC = () => {
         </TouchableOpacity>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           {images.map((image, index) => (
-            <Image key={index} source={{ uri: image }} style={styles.image} />
+            <View key={index} style={styles.imageContainer}>
+              <Image source={{ uri: image }} style={styles.image} />
+              <TouchableOpacity
+                style={styles.removeButton}
+                onPress={() => removeImage(index)}
+              >
+                <Ionicons name="close-circle-outline" size={24} color="#444" />
+              </TouchableOpacity>
+            </View>
           ))}
         </ScrollView>
       </View>
@@ -156,7 +144,7 @@ const AddProduct: React.FC = () => {
       />
 
       {/* Submit Button */}
-      <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
+      <TouchableOpacity style={styles.submitButton}>
         <Text style={styles.submitButtonText}>Add Product</Text>
       </TouchableOpacity>
     </ScrollView>
@@ -177,6 +165,11 @@ const styles = StyleSheet.create({
     color: "#333",
     marginBottom: 20,
   },
+  imageCounter: {
+    fontSize: 14,
+    color: "#666",
+    marginBottom: 10,
+  },
   imageUploadContainer: {
     marginBottom: 20,
   },
@@ -194,11 +187,21 @@ const styles = StyleSheet.create({
     color: "#555",
     marginLeft: 10,
   },
+  imageContainer: {
+    position: "relative",
+    marginRight: 10,
+  },
   image: {
     width: 80,
     height: 80,
     borderRadius: 10,
-    marginRight: 10,
+  },
+  removeButton: {
+    position: "absolute",
+    top: -5,
+    right: -5,
+    backgroundColor: "rgba(255, 255, 255, 0.8)",
+    borderRadius: 12,
   },
   input: {
     backgroundColor: "#fff",
