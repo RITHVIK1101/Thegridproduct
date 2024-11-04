@@ -323,6 +323,7 @@ const styles = StyleSheet.create({
   },
   formContainer: {
     overflow: "hidden",
+    marginTop: 0,
   },
   box: {
     width: "100%",

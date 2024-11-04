@@ -7,9 +7,9 @@ import {
   Image,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
 } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
+import BottomNavBar from "./components/BottomNavbar";
 
 type Product = {
   _id: string;
@@ -32,7 +32,7 @@ const AnalyticsScreen: React.FC = () => {
         );
 
         if (!response.ok) {
-          const errorText = await response.text(); // Read the error response text
+          const errorText = await response.text();
           console.error("Error fetching products:", errorText);
           setError("Failed to fetch products. Please try again later.");
           return;
@@ -74,12 +74,19 @@ const AnalyticsScreen: React.FC = () => {
         <Ionicons name="pencil-outline" size={20} color="#555" />
       </TouchableOpacity>
       <Image
-        source={{ uri: item.images[0] || "https://via.placeholder.com/150" }}
+        source={{
+          uri:
+            item.images && item.images[0]
+              ? item.images[0]
+              : "https://via.placeholder.com/150",
+        }}
         style={styles.productImage}
       />
-      <Text style={styles.productName}>{item.name}</Text>
-      <Text style={styles.productPrice}>${item.price}</Text>
-      <Text style={styles.productDescription}>{item.description}</Text>
+      <Text style={styles.productName}>{item.name || "No Name"}</Text>
+      <Text style={styles.productPrice}>${item.price || "No Price"}</Text>
+      <Text style={styles.productDescription}>
+        {item.description || "No Description"}
+      </Text>
     </View>
   );
 
@@ -88,10 +95,11 @@ const AnalyticsScreen: React.FC = () => {
       <Text style={styles.title}>Your Products</Text>
       <FlatList
         data={products}
-        keyExtractor={(item) => item._id}
+        keyExtractor={(item, index) => item._id || index.toString()}
         renderItem={renderProduct}
         contentContainerStyle={styles.productList}
       />
+      <BottomNavBar />
     </View>
   );
 };
@@ -102,7 +110,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#f5f5f5",
-    padding: 20,
+    padding: 30,
+    paddingBottom: 80,
+    paddingTop: 70, // Ensures space at the bottom for the navbar
   },
   title: {
     fontSize: 24,
@@ -111,7 +121,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   productList: {
-    paddingBottom: 20,
+    paddingBottom: 80, // Extra padding to avoid overlap with navbar
   },
   productContainer: {
     backgroundColor: "#fff",

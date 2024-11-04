@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -14,23 +14,29 @@ import {
   useNavigation,
   NavigationProp,
 } from "@react-navigation/native";
-import {
-  StackNavigationProp,
-} from "@react-navigation/stack";
 import Ionicons from "react-native-vector-icons/Ionicons";
-
+import BottomNavBar from "./components/BottomNavbar";
 import { RootStackParamList } from "./navigationTypes";
+import { useUser } from "./UserContext";
 
 type DashboardProps = {
   route: RouteProp<RootStackParamList, "Dashboard">;
 };
 
 const Dashboard: React.FC<DashboardProps> = ({ route }) => {
-  const { firstName } = route.params;
+  const { firstName: paramFirstName } = route.params || {}; // Get firstName from route params if available
+  const { firstName, setFirstName } = useUser(); // Get firstName from context
+
+  useEffect(() => {
+    // Update context only if paramFirstName exists and is different from context firstName
+    if (paramFirstName && paramFirstName !== firstName) {
+      setFirstName(paramFirstName);
+    }
+  }, [paramFirstName, firstName, setFirstName]);
+
   const [isMarketplace, setIsMarketplace] = useState(true);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
-
 
   const toggleMarketplace = () => {
     setIsMarketplace((previousState) => !previousState);
@@ -93,32 +99,6 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
         </Text>
       </View>
 
-      {/* Bottom Navigation with 5 Icons and Text Labels */}
-      <View style={styles.bottomNav}>
-        <TouchableOpacity style={styles.navItem}>
-          <Ionicons name="home-outline" size={28} color="#000" />
-          <Text style={styles.navText}>Home</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
-          <Ionicons name="briefcase-outline" size={28} color="#000" />
-          <Text style={styles.navText}>Gigs</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={toggleModal}>
-          <Ionicons name="add-circle" size={56} color="#000" />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
-          <Ionicons name="chatbubble-outline" size={28} color="#000" />
-          <Text style={styles.navText}>Messaging</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.navItem}
-          onPress={() => navigation.replace("Analytics")}
-        >
-          <Ionicons name="stats-chart-outline" size={28} color="#000" />
-          <Text style={styles.navText}>Analytics</Text>
-        </TouchableOpacity>
-      </View>
-
       {/* Modal for Add Options */}
       <Modal
         visible={isModalVisible}
@@ -153,6 +133,9 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
           </View>
         </View>
       </Modal>
+
+      {/* Bottom Navigation */}
+      <BottomNavBar firstName={firstName} />
     </View>
   );
 };
@@ -215,7 +198,10 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     overflow: "hidden",
     marginVertical: 15,
+    height: 50, // Adjust this value to make the card shorter
+    marginBottom: 95,
   },
+
   productImage: {
     width: "95%",
     height: "105%",
@@ -246,22 +232,6 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0, 0, 0, 0.7)",
     padding: 10,
     borderRadius: 10,
-  },
-  bottomNav: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 15,
-  },
-  navItem: {
-    alignItems: "center",
-    justifyContent: "center",
-    flex: 1,
-  },
-  navText: {
-    fontSize: 10,
-    color: "#000",
-    marginTop: 2,
   },
   modalContainer: {
     flex: 1,

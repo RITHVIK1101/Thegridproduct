@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import Ionicons from "react-native-vector-icons/Ionicons";
+
 const BACKEND_URL =
   "https://a18c-2601-600-9000-50-8875-1b80-3f88-576a.ngrok-free.app";
 const AddProduct: React.FC = () => {

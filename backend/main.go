@@ -62,6 +62,7 @@ func addProductHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 
 	// Handle preflight OPTIONS request
+
 	if r.Method == "OPTIONS" {
 		w.WriteHeader(http.StatusOK)
 		return
@@ -85,6 +86,10 @@ func addProductHandler(w http.ResponseWriter, r *http.Request) {
 	// Validate required fields
 	if product.Name == "" || product.Price == "" || product.Description == "" {
 		http.Error(w, "Missing required fields", http.StatusBadRequest)
+		return
+	}
+	if len(product.Tags) == 0 || len(product.Images) == 0 {
+		http.Error(w, "Tags and images cannot be empty", http.StatusBadRequest)
 		return
 	}
 

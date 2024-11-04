@@ -1,7 +1,10 @@
+// navigationTypes.ts
 export type RootStackParamList = {
   Login: undefined;
   Dashboard: { firstName: string };
   AddProduct: undefined;
-  AddGig: undefined; // Add this line for AddGigScreen
-  Analytics: undefined;
+  Analytics: { firstName: string };
+  Gigs: undefined;
+  Messaging: undefined;
+  AddGig: undefined; 
 };

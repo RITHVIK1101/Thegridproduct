@@ -22,6 +22,7 @@ import AddGigScreen from "./AddGigScreen"; // Import AddGigScreen
 import { RootStackParamList } from "./navigationTypes";
 import { logout } from "./firebaseConfig";
 import AnalyticsScreen from "./AnalyticsScreen";
+import { UserProvider, useUser } from "./UserContext"; // Import UserProvider and useUser
 
 // Define navigation ref for use in handleLogout
 export const navigationRef =
@@ -50,102 +51,119 @@ export default function App() {
   }
 
   return (
-    <NavigationContainer ref={navigationRef}>
-      <Stack.Navigator initialRouteName="Login">
-        <Stack.Screen
-          name="Login"
-          component={LoginScreen}
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen
-          name="Dashboard"
-          component={Dashboard}
-          options={{
-            headerLeft: () => (
+    <UserProvider>
+      <NavigationContainer ref={navigationRef}>
+        <Stack.Navigator initialRouteName="Login">
+          <Stack.Screen
+            name="Login"
+            component={LoginScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="Dashboard"
+            component={Dashboard}
+            options={{
+              headerLeft: () => (
+                <TouchableOpacity
+                  onPress={() => setModalVisible(true)}
+                  style={{ marginLeft: 10 }}
+                >
+                  <Icon name="person" size={30} color="#000" />
+                </TouchableOpacity>
+              ),
+              headerTitle: "The Gridly",
+              gestureEnabled: false, // Disable swipe back gesture
+            }}
+          />
+          <Stack.Screen
+            name="AddProduct"
+            component={AddProductScreen}
+            options={({ navigation }) => ({
+              headerLeft: () => (
+                <TouchableOpacity
+                  onPress={() => navigation.goBack()}
+                  style={{ paddingLeft: 15 }}
+                >
+                  <Icon name="arrow-back" size={24} color="#000" />
+                </TouchableOpacity>
+              ),
+              headerTitle: "", // Remove the title
+              headerStyle: {
+                elevation: 0, // For Android, to remove shadow
+                shadowOpacity: 0, // For iOS, to remove shadow
+              },
+            })}
+          />
+          <Stack.Screen
+            name="AddGig"
+            component={AddGigScreen}
+            options={{ headerTitle: "Add Gig" }}
+          />
+          <Stack.Screen
+            name="Analytics"
+            component={AnalyticsScreen}
+            options={{ headerShown: false }} // Hide the header for AnalyticsScreen
+          />
+        </Stack.Navigator>
+
+        {/* Modal for options */}
+        <Modal
+          transparent={true}
+          visible={modalVisible}
+          animationType="fade"
+          onRequestClose={() => setModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
               <TouchableOpacity
-                onPress={() => setModalVisible(true)}
-                style={{ marginLeft: 10 }}
+                onPress={() => setModalVisible(false)}
+                style={styles.closeButton}
               >
-                <Icon name="person" size={30} color="#000" />
+                <Icon name="close" size={24} color="#000" />
               </TouchableOpacity>
-            ),
-            headerTitle: "The Gridly",
-          }}
-        />
-        <Stack.Screen
-          name="AddProduct"
-          component={AddProductScreen}
-          options={{ headerTitle: "Add Product" }}
-        />
-        <Stack.Screen
-          name="AddGig"
-          component={AddGigScreen} // Add the AddGigScreen to the stack
-          options={{ headerTitle: "Add Gig" }}
-        />
-        <Stack.Screen
-          name="Analytics"
-          component={AnalyticsScreen}
-          options={{ headerTitle: "Analytics" }}
-        />
-      </Stack.Navigator>
-
-      {/* Modal for options */}
-      <Modal
-        transparent={true}
-        visible={modalVisible}
-        animationType="fade"
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <TouchableOpacity
-              onPress={() => setModalVisible(false)}
-              style={styles.closeButton}
-            >
-              <Icon name="close" size={24} color="#000" />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={handleLogout} style={styles.option}>
-              <Text style={styles.optionText}>Logout</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => {
-                setShowTerms(true);
-                setModalVisible(false);
-              }}
-              style={styles.option}
-            >
-              <Text style={styles.optionText}>View Terms of Service</Text>
-            </TouchableOpacity>
+              <TouchableOpacity onPress={handleLogout} style={styles.option}>
+                <Text style={styles.optionText}>Logout</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => {
+                  setShowTerms(true);
+                  setModalVisible(false);
+                }}
+                style={styles.option}
+              >
+                <Text style={styles.optionText}>View Terms of Service</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
 
-      {/* Modal for Terms of Service */}
-      <Modal
-        transparent={true}
-        visible={showTerms}
-        animationType="slide"
-        onRequestClose={() => setShowTerms(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.termsContent}>
-            <TouchableOpacity
-              onPress={() => setShowTerms(false)}
-              style={styles.closeButton}
-            >
-              <Icon name="close" size={24} color="#000" />
-            </TouchableOpacity>
-            <ScrollView>
-              <Text style={styles.termsText}>
-                Terms of Service: {"\n\n"}Welcome to The Gridly. By using our
-                platform, you agree to the following terms... [Add more terms
-                here as needed for your service.]
-              </Text>
-            </ScrollView>
+        {/* Modal for Terms of Service */}
+        <Modal
+          transparent={true}
+          visible={showTerms}
+          animationType="slide"
+          onRequestClose={() => setShowTerms(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.termsContent}>
+              <TouchableOpacity
+                onPress={() => setShowTerms(false)}
+                style={styles.closeButton}
+              >
+                <Icon name="close" size={24} color="#000" />
+              </TouchableOpacity>
+              <ScrollView>
+                <Text style={styles.termsText}>
+                  Terms of Service: {"\n\n"}Welcome to The Gridly. By using our
+                  platform, you agree to the following terms... [Add more terms
+                  here as needed for your service.]
+                </Text>
+              </ScrollView>
+            </View>
           </View>
-        </View>
-      </Modal>
-    </NavigationContainer>
+        </Modal>
+      </NavigationContainer>
+    </UserProvider>
   );
 }
 
