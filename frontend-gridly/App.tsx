@@ -1,4 +1,4 @@
-import { useState, createRef } from "react";
+import { useState, createRef, useEffect } from "react";
 import {
   NavigationContainer,
   NavigationContainerRef,
@@ -30,14 +30,22 @@ const Stack = createStackNavigator<RootStackParamList>();
 export default function App() {
   const [modalVisible, setModalVisible] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
+  const [showSplash, setShowSplash] = useState(true);
 
   const handleLogout = () => {
-    // Close the modal before logging out
     setModalVisible(false);
-    logout(); // Clears the auth token
+    logout();
     Alert.alert("Logout Successful", "You have been logged out.");
-    navigationRef.current?.navigate("Login"); // Redirect to login screen
+    navigationRef.current?.navigate("Login");
   };
+
+  const handleSplashEnd = () => {
+    setShowSplash(false);
+  };
+
+  if (showSplash) {
+    return <SplashScreen onAnimationEnd={handleSplashEnd} />;
+  }
 
   return (
     <NavigationContainer ref={navigationRef}>
