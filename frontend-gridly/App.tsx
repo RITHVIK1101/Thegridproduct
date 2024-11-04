@@ -1,4 +1,4 @@
-import { useState, createRef, useEffect } from "react";
+import React, { useState, createRef, useEffect } from "react";
 import {
   NavigationContainer,
   NavigationContainerRef,
@@ -18,6 +18,7 @@ import SplashScreen from "./SplashScreen";
 import LoginScreen from "./LoginScreen";
 import Dashboard from "./Dashboard";
 import AddProductScreen from "./AddProductScreen";
+import AddGigScreen from "./AddGigScreen"; // Import AddGigScreen
 import { RootStackParamList } from "./navigationTypes";
 import { logout } from "./firebaseConfig";
 import AnalyticsScreen from "./AnalyticsScreen";
@@ -75,6 +76,11 @@ export default function App() {
           name="AddProduct"
           component={AddProductScreen}
           options={{ headerTitle: "Add Product" }}
+        />
+        <Stack.Screen
+          name="AddGig"
+          component={AddGigScreen} // Add the AddGigScreen to the stack
+          options={{ headerTitle: "Add Gig" }}
         />
         <Stack.Screen
           name="Analytics"

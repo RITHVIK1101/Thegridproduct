@@ -14,7 +14,6 @@ import {
   useNavigation,
   NavigationProp,
 } from "@react-navigation/native";
-import { Picker } from "@react-native-picker/picker";
 import Ionicons from "react-native-vector-icons/Ionicons";
 
 import { RootStackParamList } from "./navigationTypes";
@@ -139,7 +138,7 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
               style={styles.modalButton}
               onPress={() => {
                 toggleModal();
-                navigation.navigate("");
+                navigation.navigate("AddGig"); // Updated to navigate to AddGig
               }}
             >
               <Text style={styles.modalButtonText}>Add Gig</Text>
