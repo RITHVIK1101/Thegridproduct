@@ -69,7 +69,7 @@ const LoginScreen: React.FC = () => {
             "Login Successful",
             `Welcome to The Gridly, ${firstName}!`
           );
-          navigation.navigate("Dashboard", { firstName });
+          navigation.replace("Dashboard", { firstName });
         } else {
           Alert.alert("Login Error", "Failed to retrieve user data.");
         }
