@@ -11,12 +11,15 @@ import {
   Modal,
   StyleSheet,
   Alert,
+  ScrollView,
 } from "react-native";
 import Icon from "react-native-vector-icons/MaterialIcons";
+import SplashScreen from "./SplashScreen";
 import LoginScreen from "./LoginScreen";
 import Dashboard from "./Dashboard";
 import AddProductScreen from "./AddProductScreen";
 import { RootStackParamList } from "./navigationTypes";
+import { logout } from "./firebaseConfig";
 
 // Define navigation ref for use in handleLogout
 export const navigationRef =
@@ -26,13 +29,12 @@ const Stack = createStackNavigator<RootStackParamList>();
 
 export default function App() {
   const [modalVisible, setModalVisible] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
 
-  // Logout handler
   const handleLogout = () => {
-    // Log the user out by clearing their session, token, or navigating back to Login
-    setModalVisible(false);
+    logout(); // Clears the auth token
     Alert.alert("Logout Successful", "You have been logged out.");
-    navigationRef.current?.navigate("Login");
+    navigationRef.current?.navigate("Login"); // Redirect to login screen
   };
 
   return (
@@ -82,18 +84,50 @@ export default function App() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
+            <TouchableOpacity
+              onPress={() => setModalVisible(false)}
+              style={styles.closeButton}
+            >
+              <Icon name="close" size={24} color="#000" />
+            </TouchableOpacity>
             <TouchableOpacity onPress={handleLogout} style={styles.option}>
               <Text style={styles.optionText}>Logout</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => {
+                setShowTerms(true);
                 setModalVisible(false);
-                console.log("View Terms of Service pressed!");
               }}
               style={styles.option}
             >
               <Text style={styles.optionText}>View Terms of Service</Text>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal for Terms of Service */}
+      <Modal
+        transparent={true}
+        visible={showTerms}
+        animationType="slide"
+        onRequestClose={() => setShowTerms(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.termsContent}>
+            <TouchableOpacity
+              onPress={() => setShowTerms(false)}
+              style={styles.closeButton}
+            >
+              <Icon name="close" size={24} color="#000" />
+            </TouchableOpacity>
+            <ScrollView>
+              <Text style={styles.termsText}>
+                Terms of Service: {"\n\n"}Welcome to The Gridly. By using our
+                platform, you agree to the following terms... [Add more terms
+                here as needed for your service.]
+              </Text>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -113,7 +147,31 @@ const styles = StyleSheet.create({
     padding: 20,
     borderRadius: 10,
     width: "80%",
+    position: "relative",
   },
-  option: { padding: 10, borderBottomWidth: 1, borderBottomColor: "#ccc" },
-  optionText: { fontSize: 16 },
+  closeButton: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+  },
+  option: {
+    padding: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#ccc",
+  },
+  optionText: {
+    fontSize: 16,
+  },
+  termsContent: {
+    backgroundColor: "white",
+    padding: 20,
+    borderRadius: 10,
+    width: "90%",
+    height: "80%",
+    position: "relative",
+  },
+  termsText: {
+    fontSize: 14,
+    color: "#333",
+  },
 });

@@ -25,9 +25,10 @@ type DashboardProps = {
 
 const Dashboard: React.FC<DashboardProps> = ({ route }) => {
   const { firstName } = route.params;
-  const [isMarketplace, setIsMarketplace] = React.useState(true);
+  const [isMarketplace, setIsMarketplace] = useState(true);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+
   const toggleMarketplace = () => {
     setIsMarketplace((previousState) => !previousState);
   };
@@ -41,9 +42,6 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.greetingText}>Welcome, {firstName}</Text>
-        <TouchableOpacity style={styles.postJobButton}>
-          <Text style={styles.postJobText}>Active Gigs</Text>
-        </TouchableOpacity>
       </View>
 
       {/* Search Bar with Toggle */}
@@ -64,11 +62,7 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
 
         {/* Small Toggle Button */}
         <View style={styles.toggleContainer}>
-          <TouchableOpacity
-            onPress={() => {
-              /* Navigate to all products */
-            }}
-          >
+          <TouchableOpacity>
             <Text style={styles.viewAllText}>View All</Text>
           </TouchableOpacity>
           <Switch
@@ -96,16 +90,26 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
         </Text>
       </View>
 
-      {/* Bottom Navigation */}
+      {/* Bottom Navigation with 5 Icons and Text Labels */}
       <View style={styles.bottomNav}>
         <TouchableOpacity style={styles.navItem}>
           <Ionicons name="home-outline" size={28} color="#000" />
+          <Text style={styles.navText}>Home</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.navItem}>
+          <Ionicons name="briefcase-outline" size={28} color="#000" />
+          <Text style={styles.navText}>Gigs</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.navItem} onPress={toggleModal}>
           <Ionicons name="add-circle" size={56} color="#000" />
         </TouchableOpacity>
         <TouchableOpacity style={styles.navItem}>
+          <Ionicons name="chatbubble-outline" size={28} color="#000" />
+          <Text style={styles.navText}>Messaging</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.navItem}>
           <Ionicons name="stats-chart-outline" size={28} color="#000" />
+          <Text style={styles.navText}>Analytics</Text>
         </TouchableOpacity>
       </View>
 
@@ -123,7 +127,7 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
               style={styles.modalButton}
               onPress={() => {
                 toggleModal();
-                navigation.navigate("AddProduct"); // Use the correct route name as a string
+                navigation.navigate("AddProduct");
               }}
             >
               <Text style={styles.modalButtonText}>Add Product</Text>
@@ -132,7 +136,7 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
               style={styles.modalButton}
               onPress={() => {
                 toggleModal();
-                navigation.navigate(""); // Correct route name
+                navigation.navigate("");
               }}
             >
               <Text style={styles.modalButtonText}>Add Gig</Text>
@@ -166,17 +170,6 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "600",
     color: "#000",
-  },
-  postJobButton: {
-    backgroundColor: "#000",
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 30,
-  },
-  postJobText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "500",
   },
   searchToggleContainer: {
     flexDirection: "row",
@@ -250,12 +243,19 @@ const styles = StyleSheet.create({
   },
   bottomNav: {
     flexDirection: "row",
-    justifyContent: "space-around",
+    justifyContent: "space-between",
     alignItems: "center",
     paddingVertical: 15,
   },
   navItem: {
     alignItems: "center",
+    justifyContent: "center",
+    flex: 1,
+  },
+  navText: {
+    fontSize: 10,
+    color: "#000",
+    marginTop: 2,
   },
   modalContainer: {
     flex: 1,
