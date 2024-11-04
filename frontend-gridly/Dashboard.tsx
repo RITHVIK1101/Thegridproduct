@@ -36,7 +36,7 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
 
   const [isMarketplace, setIsMarketplace] = useState(true);
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+  const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
 
   const toggleMarketplace = () => {
     setIsMarketplace((previousState) => !previousState);
@@ -113,7 +113,7 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
               style={styles.modalButton}
               onPress={() => {
                 toggleModal();
-                navigation.navigate("AddProduct");
+                navigation.replace("AddProduct");
               }}
             >
               <Text style={styles.modalButtonText}>Add Product</Text>
@@ -122,7 +122,7 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
               style={styles.modalButton}
               onPress={() => {
                 toggleModal();
-                navigation.navigate("Gigs");
+                navigation.replace("AddGig"); // Updated to navigate to AddGig
               }}
             >
               <Text style={styles.modalButtonText}>Add Gig</Text>

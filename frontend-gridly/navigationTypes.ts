@@ -6,4 +6,5 @@ export type RootStackParamList = {
   Analytics: { firstName: string };
   Gigs: undefined;
   Messaging: undefined;
+  AddGig: undefined; 
 };
