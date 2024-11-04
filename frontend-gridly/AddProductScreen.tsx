@@ -9,6 +9,7 @@ import {
   ScrollView,
   FlatList,
   Alert,
+  Modal,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import Ionicons from "react-native-vector-icons/Ionicons";
@@ -19,6 +20,8 @@ const AddProduct: React.FC = () => {
   const [price, setPrice] = useState("");
   const [description, setDescription] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [isModalVisible, setIsModalVisible] = useState(false);
+
   const availableTags = [
     "#Electronics",
     "#FemaleClothing",
@@ -61,22 +64,26 @@ const AddProduct: React.FC = () => {
     }
 
     try {
-      const response = await fetch("http://localhost:8080/products", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: title,
-          price: price,
-          description: description,
-          tags: selectedTags,
-          images: images,
-        }),
-      });
+      const response = await fetch(
+        "https://a18c-2601-600-9000-50-8875-1b80-3f88-576a.ngrok-free.app/products",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: title,
+            price: price,
+            description: description,
+            tags: selectedTags,
+            images: images,
+          }),
+        }
+      );
 
       if (response.ok) {
-        Alert.alert("Product added successfully");
+        setIsModalVisible(true); // Show success modal
+        setTimeout(() => setIsModalVisible(false), 1500); // Hide modal after 1.5 seconds
       } else {
         Alert.alert("Failed to add product");
       }
@@ -159,6 +166,21 @@ const AddProduct: React.FC = () => {
       <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
         <Text style={styles.submitButtonText}>Add Product</Text>
       </TouchableOpacity>
+
+      {/* Success Modal */}
+      <Modal
+        transparent
+        visible={isModalVisible}
+        animationType="fade"
+        onRequestClose={() => setIsModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.successContainer}>
+            <Ionicons name="checkmark-circle" size={80} color="green" />
+            <Text style={styles.successText}>Product Posted!</Text>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 };
@@ -247,6 +269,30 @@ const styles = StyleSheet.create({
   submitButtonText: {
     fontSize: 16,
     color: "#fff",
+    fontWeight: "600",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  successContainer: {
+    backgroundColor: "#fff",
+    padding: 20,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  successText: {
+    marginTop: 10,
+    fontSize: 18,
+    color: "#333",
     fontWeight: "600",
   },
 });
