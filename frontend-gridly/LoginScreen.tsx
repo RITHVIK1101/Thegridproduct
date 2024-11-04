@@ -271,7 +271,7 @@ const LoginScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f5f5f5",
+    backgroundColor: "black",
   },
   scrollViewContent: {
     flexGrow: 1,
@@ -281,10 +281,10 @@ const styles = StyleSheet.create({
   },
   innerContainer: {
     width: "90%",
-    maxWidth: 400,
+    maxWidth: 350,
     padding: 25,
     backgroundColor: "#ffffff",
-    borderRadius: 20,
+    borderRadius: 40,
     shadowColor: "#aaa",
     shadowOpacity: 0.3,
     shadowRadius: 10,
@@ -338,11 +338,11 @@ const styles = StyleSheet.create({
     backgroundColor: "#fafafa",
   },
   button: {
-    backgroundColor: "#4CAF50",
-    borderRadius: 10,
+    backgroundColor: "black",
+    borderRadius: 50,
     paddingVertical: 15,
     alignItems: "center",
-    marginTop: 10,
+    marginTop: 40,
     shadowColor: "#4CAF50",
     shadowOpacity: 0.3,
     shadowRadius: 5,

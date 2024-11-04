@@ -13,7 +13,8 @@ import {
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import Ionicons from "react-native-vector-icons/Ionicons";
-
+const BACKEND_URL =
+  "https://a18c-2601-600-9000-50-8875-1b80-3f88-576a.ngrok-free.app";
 const AddProduct: React.FC = () => {
   const [images, setImages] = useState<string[]>([]);
   const [title, setTitle] = useState("");
@@ -21,6 +22,7 @@ const AddProduct: React.FC = () => {
   const [description, setDescription] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const availableTags = [
     "#Electronics",
@@ -35,8 +37,11 @@ const AddProduct: React.FC = () => {
     "#Beauty",
   ];
 
-  // Function to pick multiple images
   const pickImage = async () => {
+    if (images.length >= 3) {
+      alert("You can only upload up to 3 images.");
+      return;
+    }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsMultipleSelection: true,
@@ -44,8 +49,16 @@ const AddProduct: React.FC = () => {
     });
     if (!result.canceled) {
       const newImages = result.assets.map((asset) => asset.uri);
-      setImages((prevImages) => [...prevImages, ...newImages]);
+      if (images.length + newImages.length > 3) {
+        alert("You can only upload up to 3 images.");
+      } else {
+        setImages((prevImages) => [...prevImages, ...newImages]);
+      }
     }
+  };
+
+  const removeImage = (index: number) => {
+    setImages((prevImages) => prevImages.filter((_, i) => i !== index));
   };
 
   const toggleTag = (tag: string) => {
@@ -58,44 +71,75 @@ const AddProduct: React.FC = () => {
 
   // Submit function to send data to the backend
   const handleSubmit = async () => {
-    if (!title || !price || !description) {
-      Alert.alert("Please fill in all required fields");
+    // Input validation
+    if (!title.trim()) {
+      Alert.alert("Error", "Please enter a product title");
+      return;
+    }
+    if (!price.trim()) {
+      Alert.alert("Error", "Please enter a price");
+      return;
+    }
+    if (!description.trim()) {
+      Alert.alert("Error", "Please enter a description");
+      return;
+    }
+    if (images.length === 0) {
+      Alert.alert("Error", "Please add at least one image");
       return;
     }
 
-    try {
-      const response = await fetch(
-        "https://a18c-2601-600-9000-50-8875-1b80-3f88-576a.ngrok-free.app/products",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            name: title,
-            price: price,
-            description: description,
-            tags: selectedTags,
-            images: images,
-          }),
-        }
-      );
+    setIsLoading(true);
 
-      if (response.ok) {
-        setIsModalVisible(true); // Show success modal
-        setTimeout(() => setIsModalVisible(false), 1500); // Hide modal after 1.5 seconds
-      } else {
-        Alert.alert("Failed to add product");
+    try {
+      const response = await fetch(`${BACKEND_URL}/products`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: title.trim(),
+          price: price.trim(),
+          description: description.trim(),
+          tags: selectedTags,
+          images: images,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
+
+      const data = await response.json();
+      console.log("Success:", data);
+
+      // Reset form
+      setTitle("");
+      setPrice("");
+      setDescription("");
+      setSelectedTags([]);
+      setImages([]);
+
+      // Show success modal
+      setIsModalVisible(true);
+      setTimeout(() => setIsModalVisible(false), 1500);
     } catch (error) {
-      console.error("Error adding product:", error);
-      Alert.alert("An error occurred while adding the product");
+      console.error("Error:", error);
+      Alert.alert(
+        "Error",
+        "Failed to add product. Please check your connection and try again."
+      );
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.heading}>Add a New Product</Text>
+
+      {/* Image Counter */}
+      <Text style={styles.imageCounter}>{`${images.length}/3 Images`}</Text>
 
       {/* Upload Images Section */}
       <View style={styles.imageUploadContainer}>
@@ -105,7 +149,15 @@ const AddProduct: React.FC = () => {
         </TouchableOpacity>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           {images.map((image, index) => (
-            <Image key={index} source={{ uri: image }} style={styles.image} />
+            <View key={index} style={styles.imageContainer}>
+              <Image source={{ uri: image }} style={styles.image} />
+              <TouchableOpacity
+                style={styles.removeButton}
+                onPress={() => removeImage(index)}
+              >
+                <Ionicons name="close-circle-outline" size={24} color="#444" />
+              </TouchableOpacity>
+            </View>
           ))}
         </ScrollView>
       </View>
@@ -162,9 +214,14 @@ const AddProduct: React.FC = () => {
         )}
       />
 
-      {/* Submit Button */}
-      <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-        <Text style={styles.submitButtonText}>Add Product</Text>
+      <TouchableOpacity
+        style={[styles.submitButton, isLoading && styles.submitButtonDisabled]}
+        onPress={handleSubmit}
+        disabled={isLoading}
+      >
+        <Text style={styles.submitButtonText}>
+          {isLoading ? "Adding Product..." : "Add Product"}
+        </Text>
       </TouchableOpacity>
 
       {/* Success Modal */}
@@ -199,6 +256,11 @@ const styles = StyleSheet.create({
     color: "#333",
     marginBottom: 20,
   },
+  imageCounter: {
+    fontSize: 14,
+    color: "#666",
+    marginBottom: 10,
+  },
   imageUploadContainer: {
     marginBottom: 20,
   },
@@ -216,11 +278,21 @@ const styles = StyleSheet.create({
     color: "#555",
     marginLeft: 10,
   },
+  imageContainer: {
+    position: "relative",
+    marginRight: 10,
+  },
   image: {
     width: 80,
     height: 80,
     borderRadius: 10,
-    marginRight: 10,
+  },
+  removeButton: {
+    position: "absolute",
+    top: -5,
+    right: -5,
+    backgroundColor: "rgba(255, 255, 255, 0.8)",
+    borderRadius: 12,
   },
   input: {
     backgroundColor: "#fff",
@@ -241,6 +313,9 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#555",
     marginBottom: 10,
+  },
+  submitButtonDisabled: {
+    backgroundColor: "#666",
   },
   tag: {
     paddingVertical: 8,

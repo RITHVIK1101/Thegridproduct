@@ -1,4 +1,4 @@
-import { useState, createRef } from "react";
+import { useState, createRef, useEffect } from "react";
 import {
   NavigationContainer,
   NavigationContainerRef,
@@ -20,6 +20,7 @@ import Dashboard from "./Dashboard";
 import AddProductScreen from "./AddProductScreen";
 import { RootStackParamList } from "./navigationTypes";
 import { logout } from "./firebaseConfig";
+import AnalyticsScreen from "./AnalyticsScreen";
 
 // Define navigation ref for use in handleLogout
 export const navigationRef =
@@ -30,12 +31,22 @@ const Stack = createStackNavigator<RootStackParamList>();
 export default function App() {
   const [modalVisible, setModalVisible] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
+  const [showSplash, setShowSplash] = useState(true);
 
   const handleLogout = () => {
-    logout(); // Clears the auth token
+    setModalVisible(false);
+    logout();
     Alert.alert("Logout Successful", "You have been logged out.");
-    navigationRef.current?.navigate("Login"); // Redirect to login screen
+    navigationRef.current?.navigate("Login");
   };
+
+  const handleSplashEnd = () => {
+    setShowSplash(false);
+  };
+
+  if (showSplash) {
+    return <SplashScreen onAnimationEnd={handleSplashEnd} />;
+  }
 
   return (
     <NavigationContainer ref={navigationRef}>
@@ -57,14 +68,6 @@ export default function App() {
                 <Icon name="person" size={30} color="#000" />
               </TouchableOpacity>
             ),
-            headerRight: () => (
-              <TouchableOpacity
-                onPress={() => console.log("Messaging icon pressed!")}
-                style={{ marginRight: 30 }}
-              >
-                <Icon name="chat" size={24} color="#006400" />
-              </TouchableOpacity>
-            ),
             headerTitle: "The Gridly",
           }}
         />
@@ -72,6 +75,11 @@ export default function App() {
           name="AddProduct"
           component={AddProductScreen}
           options={{ headerTitle: "Add Product" }}
+        />
+        <Stack.Screen
+          name="Analytics"
+          component={AnalyticsScreen}
+          options={{ headerTitle: "Analytics" }}
         />
       </Stack.Navigator>
 

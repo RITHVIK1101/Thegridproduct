@@ -107,7 +107,10 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
           <Ionicons name="chatbubble-outline" size={28} color="#000" />
           <Text style={styles.navText}>Messaging</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
+        <TouchableOpacity
+          style={styles.navItem}
+          onPress={() => navigation.navigate("Analytics")}
+        >
           <Ionicons name="stats-chart-outline" size={28} color="#000" />
           <Text style={styles.navText}>Analytics</Text>
         </TouchableOpacity>
