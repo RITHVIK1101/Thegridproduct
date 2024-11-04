@@ -14,6 +14,7 @@ import {
   useNavigation,
   NavigationProp,
 } from "@react-navigation/native";
+import { StackNavigationProp } from "@react-navigation/stack";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import BottomNavBar from "./components/BottomNavbar";
 import { RootStackParamList } from "./navigationTypes";
@@ -198,13 +199,12 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     overflow: "hidden",
     marginVertical: 15,
-    height: 50, // Adjust this value to make the card shorter
+    height: 200, // Adjusted height for the product card
     marginBottom: 95,
   },
-
   productImage: {
     width: "95%",
-    height: "105%",
+    height: "100%", // Adjusted to fit the product card's height
     alignSelf: "center",
   },
   priceOverlay: {

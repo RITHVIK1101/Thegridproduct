@@ -18,11 +18,11 @@ import SplashScreen from "./SplashScreen";
 import LoginScreen from "./LoginScreen";
 import Dashboard from "./Dashboard";
 import AddProductScreen from "./AddProductScreen";
-import AddGigScreen from "./AddGigScreen"; // Import AddGigScreen
+import AddGigScreen from "./AddGigScreen";
 import { RootStackParamList } from "./navigationTypes";
 import { logout } from "./firebaseConfig";
 import AnalyticsScreen from "./AnalyticsScreen";
-import { UserProvider, useUser } from "./UserContext"; // Import UserProvider and useUser
+import { UserProvider, useUser } from "./UserContext";
 
 // Define navigation ref for use in handleLogout
 export const navigationRef =
@@ -87,7 +87,7 @@ export default function App() {
                   <Icon name="arrow-back" size={24} color="#000" />
                 </TouchableOpacity>
               ),
-              headerTitle: "", // Remove the title
+              headerTitle: "Add Product",
               headerStyle: {
                 elevation: 0, // For Android, to remove shadow
                 shadowOpacity: 0, // For iOS, to remove shadow
@@ -102,7 +102,7 @@ export default function App() {
           <Stack.Screen
             name="Analytics"
             component={AnalyticsScreen}
-            options={{ headerShown: false }} // Hide the header for AnalyticsScreen
+            options={{ headerShown: false }}
           />
         </Stack.Navigator>
 
