@@ -12,7 +12,6 @@ import {
   ActivityIndicator,
   Alert,
   ScrollView,
-  PanResponder,
   Animated,
   Dimensions,
 } from "react-native";
@@ -23,11 +22,15 @@ import {
 } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import Ionicons from "react-native-vector-icons/Ionicons"; // For Ionicons
-import Feather from "react-native-vector-icons/Feather"; // For Feather Icons
 import BottomNavBar from "./components/BottomNavbar";
 import { NGROK_URL } from "@env";
 import { UserContext } from "./UserContext";
 import { RootStackParamList } from "./navigationTypes"; // Import RootStackParamList
+import {
+  PanGestureHandler,
+  TapGestureHandler,
+  GestureHandlerRootView,
+} from "react-native-gesture-handler";
 
 type DashboardProps = {
   route: RouteProp<RootStackParamList, "Dashboard">;
@@ -43,15 +46,21 @@ type Product = {
   university: string; // Assuming backend uses 'university'
   ownerId: string;
   postedDate: string;
+  rating?: number; // Added rating
+  quality?: string; // Added quality
 };
 
-const { height: SCREEN_HEIGHT } = Dimensions.get("window");
+const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
 
 const Dashboard: React.FC<DashboardProps> = ({ route }) => {
   const [isAddModalVisible, setIsAddModalVisible] = useState(false);
   const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
 
-  // New State for Campus Selection
+  // State for Product Details Modal
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [isDetailsModalVisible, setIsDetailsModalVisible] = useState(false);
+
+  // State for Campus Selection
   const [campusMode, setCampusMode] = useState<"In Campus" | "Both">(
     "In Campus"
   );
@@ -61,12 +70,7 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
   const { userId, token, institution, clearUser } = useContext(UserContext);
 
   // Available Filter Categories
-  const categories = [
-    "#Everything",
-    "#FemaleClothing",
-    "#MensClothing",
-    "#Other",
-  ];
+  const categories = ["#Everything", "#FemaleClothing", "#MensClothing", "#Other"];
 
   // Campus Options with Labels and Values
   const campusOptions: Array<{ label: string; value: "In Campus" | "Both" }> = [
@@ -76,39 +80,19 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
 
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
-  const [selectedCategory, setSelectedCategory] =
-    useState<string>("#Everything");
+  const [selectedCategory, setSelectedCategory] = useState<string>("#Everything");
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
   // States for Description Modal
-  const [isDescriptionModalVisible, setIsDescriptionModalVisible] =
-    useState(false);
-  const [selectedProductDescription, setSelectedProductDescription] =
-    useState<string>("");
+  const [isDescriptionModalVisible, setIsDescriptionModalVisible] = useState(false);
+  const [selectedProductDescription, setSelectedProductDescription] = useState<string>(
+    ""
+  );
 
-  // Logout Handler
-  const handleLogout = async () => {
-    try {
-      await clearUser(); // Clear user data from context and storage
-      Alert.alert("Logout Successful", "You have been logged out.", [
-        {
-          text: "OK",
-          onPress: () => {
-            navigation.dispatch(
-              CommonActions.reset({
-                index: 0,
-                routes: [{ name: "Login" }],
-              })
-            );
-          },
-        },
-      ]);
-    } catch (error) {
-      console.error("Logout Error:", error);
-      Alert.alert("Logout Error", "Failed to log out. Please try again.");
-    }
-  };
+  // FlatList Ref for Navigating to Next Product
+  const flatListRef = useRef<FlatList>(null);
+  const currentIndex = useRef<number>(0);
 
   // Fetch Products from Backend
   const fetchProducts = async () => {
@@ -158,9 +142,7 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
       if (!response.ok) {
         const responseText = await response.text();
         console.error("Error response text:", responseText);
-        throw new Error(
-          "Failed to fetch products. Server responded with an error."
-        );
+        throw new Error("Failed to fetch products. Server responded with an error.");
       }
 
       const contentType = response.headers.get("content-type");
@@ -215,9 +197,7 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
       const finalFiltered =
         selectedCategory === "#Everything"
           ? allProducts
-          : allProducts.filter(
-              (product) => product.category === selectedCategory
-            );
+          : allProducts.filter((product) => product.category === selectedCategory);
 
       setFilteredProducts(finalFiltered);
     }
@@ -257,341 +237,406 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
     setIsDescriptionModalVisible(true);
   };
 
-  // Render each product item with swipe up/down functionality
-  const renderProduct = ({ item }: { item: Product }) => {
-    return <ProductItem product={item} showDescription={showDescription} />;
+  // Handle Logout
+  const handleLogout = async () => {
+    try {
+      await clearUser(); // Clear user data from context and storage
+      Alert.alert("Logout Successful", "You have been logged out.", [
+        {
+          text: "OK",
+          onPress: () => {
+            navigation.dispatch(
+              CommonActions.reset({
+                index: 0,
+                routes: [{ name: "Login" }],
+              })
+            );
+          },
+        },
+      ]);
+    } catch (error) {
+      console.error("Logout Error:", error);
+      Alert.alert("Logout Error", "Failed to log out. Please try again.");
+    }
+  };
+
+  // Render each product item with gesture handling
+  const renderProduct = ({ item, index }: { item: Product; index: number }) => {
+    return (
+      <ProductItem
+        product={item}
+        onSwipeUp={() => {
+          setSelectedProduct(item);
+          setIsDetailsModalVisible(true);
+        }}
+        onSwipeLeft={() => {
+          if (index < filteredProducts.length - 1) {
+            flatListRef.current?.scrollToIndex({
+              index: index + 1,
+              animated: true,
+            });
+            currentIndex.current = index + 1;
+          } else {
+            Alert.alert("End of List", "No more products available.");
+          }
+        }}
+      />
+    );
   };
 
   // ProductItem Component
   const ProductItem: React.FC<{
     product: Product;
-    showDescription: (description: string) => void;
-  }> = ({ product, showDescription }) => {
-    const [showDetails, setShowDetails] = useState(false);
-    const animatedHeight = useRef(new Animated.Value(0)).current;
+    onSwipeUp: () => void;
+    onSwipeLeft: () => void;
+  }> = ({ product, onSwipeUp, onSwipeLeft }) => {
+    const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
-    const pan = useRef(new Animated.ValueXY()).current;
-
-    const panResponder = useRef(
-      PanResponder.create({
-        onMoveShouldSetPanResponder: (evt, gestureState) => {
-          const { dy } = gestureState;
-          return Math.abs(dy) > 20;
-        },
-        onPanResponderMove: (evt, gestureState) => {
-          const { dy } = gestureState;
-          if (dy < 0 && !showDetails) {
-            // Swiping Up
-            pan.setValue({ x: 0, y: dy });
-          } else if (dy > 0 && showDetails) {
-            // Swiping Down
-            pan.setValue({ x: 0, y: dy });
-          }
-        },
-        onPanResponderRelease: (evt, gestureState) => {
-          const { dy, vy } = gestureState;
-          if (dy < -50 && vy < -0.5 && !showDetails) {
-            // Swipe Up
-            Animated.timing(animatedHeight, {
-              toValue: 1,
-              duration: 300,
-              useNativeDriver: false,
-            }).start(() => {
-              setShowDetails(true);
-              pan.setValue({ x: 0, y: 0 });
-            });
-          } else if (dy > 50 && vy > 0.5 && showDetails) {
-            // Swipe Down
-            Animated.timing(animatedHeight, {
-              toValue: 0,
-              duration: 300,
-              useNativeDriver: false,
-            }).start(() => {
-              setShowDetails(false);
-              pan.setValue({ x: 0, y: 0 });
-            });
-          } else {
-            // Reset position
-            Animated.spring(pan, {
-              toValue: { x: 0, y: 0 },
-              useNativeDriver: false,
-            }).start();
-          }
-        },
-      })
-    ).current;
-
-    const detailHeight = animatedHeight.interpolate({
-      inputRange: [0, 1],
-      outputRange: [0, SCREEN_HEIGHT * 0.3], // 30% of screen height
-    });
+    // Handle image tap to cycle through images
+    const handleImageTap = () => {
+      if (currentImageIndex < product.images.length - 1) {
+        setCurrentImageIndex(currentImageIndex + 1);
+      } else {
+        setCurrentImageIndex(0);
+      }
+    };
 
     return (
-      <View style={styles.itemContainer}>
-        <View style={styles.imageContainer}>
-          <TouchableOpacity
-            onPress={() => showDescription(product.description)}
-          >
-            <Image
-              source={{
-                uri:
-                  product.images && product.images.length > 0
-                    ? product.images[0]
-                    : "https://via.placeholder.com/150",
-              }}
-              style={styles.productImage}
-              resizeMode="cover"
-            />
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => {
-              setShowDetails(!showDetails);
-            }}
-            style={styles.arrowContainer}
-            accessibilityLabel="Toggle Product Details"
-            {...panResponder.panHandlers} // Attach PanResponder to the arrow
-          >
-            <Feather
-              name={showDetails ? "arrow-down" : "arrow-up"}
-              size={24}
-              color="#BB86FC"
-            />
-          </TouchableOpacity>
-        </View>
-        {/* Animated Details */}
-        <Animated.View
-          style={[styles.detailsContainer, { height: detailHeight }]}
+      <GestureHandlerRootView style={styles.productItemContainer}>
+        <PanGestureHandler
+          onGestureEvent={({ nativeEvent }) => {
+            const { translationY, translationX, velocityY, velocityX } = nativeEvent;
+
+            // Swipe Up
+            if (translationY < -50 && velocityY < -0.5) {
+              onSwipeUp();
+            }
+
+            // Swipe Left
+            if (translationX < -50 && velocityX < -0.5) {
+              onSwipeLeft();
+            }
+          }}
         >
-          <Text style={styles.itemPrice}>${product.price.toFixed(2)}</Text>
-          <Text style={styles.categoryTag}>
-            {product.category === "#FemaleClothing"
-              ? "Selling"
-              : product.category === "#MensClothing"
-              ? "Renting"
-              : "Both"}
-          </Text>
-          <ScrollView>
-            <Text style={styles.itemDescription}>{product.description}</Text>
-          </ScrollView>
-        </Animated.View>
-      </View>
+          <Animated.View style={styles.productContainer}>
+            <TapGestureHandler onActivated={handleImageTap}>
+              <Image
+                source={{
+                  uri:
+                    product.images && product.images.length > 0
+                      ? product.images[currentImageIndex]
+                      : "https://via.placeholder.com/150",
+                }}
+                style={styles.productImage}
+                resizeMode="cover"
+              />
+            </TapGestureHandler>
+
+            {/* Added Like and Share Icons */}
+            <TouchableOpacity
+              style={styles.likeIcon}
+              onPress={() => {
+                // Handle like action
+                Alert.alert("Liked", `You liked ${product.title}`);
+              }}
+              accessibilityLabel="Like Product"
+            >
+              <Ionicons name="heart-outline" size={30} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.shareIcon}
+              onPress={() => {
+                // Handle share action
+                Alert.alert("Share", `You shared ${product.title}`);
+              }}
+              accessibilityLabel="Share Product"
+            >
+              <Ionicons name="share-social-outline" size={30} color="#fff" />
+            </TouchableOpacity>
+          </Animated.View>
+        </PanGestureHandler>
+      </GestureHandlerRootView>
     );
   };
 
   return (
-    <View style={styles.container}>
-      {/* Filter and Toggle Buttons Container */}
-      <View style={styles.filterToggleContainer}>
-        {/* Filter Button */}
-        <TouchableOpacity
-          style={styles.filterButton}
-          onPress={toggleFilterModal}
-          accessibilityLabel="Filter Products"
-        >
-          <Ionicons name="filter-outline" size={20} color="#fff" />
-          <Text style={styles.filterButtonText}>Filter</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Product List */}
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#BB86FC" />
-          <Text style={styles.loadingText}>Loading...</Text>
-        </View>
-      ) : error ? (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{error}</Text>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <View style={styles.container}>
+        {/* Filter and Toggle Buttons Container */}
+        <View style={styles.filterToggleContainer}>
+          {/* Filter Button */}
           <TouchableOpacity
-            style={styles.retryButton}
-            onPress={() => {
-              setLoading(true);
-              setError(null);
-              fetchProducts();
-            }}
-            accessibilityLabel="Retry Fetching Products"
+            style={styles.filterButton}
+            onPress={toggleFilterModal}
+            accessibilityLabel="Filter Products"
           >
-            <Text style={styles.retryButtonText}>Retry</Text>
+            <Ionicons name="filter-outline" size={20} color="#fff" />
+            <Text style={styles.filterButtonText}>Filter</Text>
           </TouchableOpacity>
         </View>
-      ) : filteredProducts.length === 0 ? (
-        <View style={styles.noProductsContainer}>
-          <Text style={styles.noProductsText}>No products available.</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={filteredProducts}
-          keyExtractor={(item) => item.id}
-          renderItem={renderProduct}
-          contentContainerStyle={styles.listContainer}
-          showsVerticalScrollIndicator={false}
-        />
-      )}
 
-      {/* Add Product/Gig Modal */}
-      <Modal
-        visible={isAddModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={toggleAddModal}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPressOut={toggleAddModal}
-        >
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Add Options</Text>
+        {/* Product List */}
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#BB86FC" />
+            <Text style={styles.loadingText}>Loading...</Text>
+          </View>
+        ) : error ? (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{error}</Text>
             <TouchableOpacity
-              style={styles.modalButton}
-              onPress={() => handleAddOption("Product")}
-              accessibilityLabel="Add Product"
+              style={styles.retryButton}
+              onPress={() => {
+                setLoading(true);
+                setError(null);
+                fetchProducts();
+              }}
+              accessibilityLabel="Retry Fetching Products"
             >
-              <Text style={styles.modalButtonText}>Add Product</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.modalButton}
-              onPress={() => handleAddOption("Gig")}
-              accessibilityLabel="Add Gig"
-            >
-              <Text style={styles.modalButtonText}>Add Gig</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={toggleAddModal}
-              style={styles.modalClose}
-              accessibilityLabel="Close Add Options Modal"
-            >
-              <Ionicons name="close-outline" size={24} color="#fff" />
+              <Text style={styles.retryButtonText}>Retry</Text>
             </TouchableOpacity>
           </View>
-        </TouchableOpacity>
-      </Modal>
+        ) : filteredProducts.length === 0 ? (
+          <View style={styles.noProductsContainer}>
+            <Text style={styles.noProductsText}>No products available.</Text>
+          </View>
+        ) : (
+          <FlatList
+            ref={flatListRef}
+            data={filteredProducts}
+            keyExtractor={(item) => item.id}
+            renderItem={renderProduct}
+            contentContainerStyle={styles.listContainer}
+            showsVerticalScrollIndicator={false}
+            pagingEnabled
+            snapToAlignment="start"
+            decelerationRate="fast"
+            snapToInterval={SCREEN_HEIGHT}
+            getItemLayout={(data, index) => ({
+              length: SCREEN_HEIGHT,
+              offset: SCREEN_HEIGHT * index,
+              index,
+            })}
+          />
+        )}
 
-      {/* Filter Modal */}
-      <Modal
-        visible={isFilterModalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={toggleFilterModal}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPressOut={toggleFilterModal}
+        {/* Add Product/Gig Modal */}
+        <Modal
+          visible={isAddModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={toggleAddModal}
         >
-          <View style={styles.filterModalContent}>
-            <Text style={styles.modalTitle}>Filter Options</Text>
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPressOut={toggleAddModal}
+          >
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Add Options</Text>
+              <TouchableOpacity
+                style={styles.modalButton}
+                onPress={() => handleAddOption("Product")}
+                accessibilityLabel="Add Product"
+              >
+                <Text style={styles.modalButtonText}>Add Product</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalButton}
+                onPress={() => handleAddOption("Gig")}
+                accessibilityLabel="Add Gig"
+              >
+                <Text style={styles.modalButtonText}>Add Gig</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={toggleAddModal}
+                style={styles.modalClose}
+                accessibilityLabel="Close Add Options Modal"
+              >
+                <Ionicons name="close-outline" size={24} color="#fff" />
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
 
-            {/* Category Selection */}
-            <Text style={styles.sectionTitle}>Category</Text>
-            <FlatList
-              data={categories}
-              keyExtractor={(item) => item}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={[
-                    styles.categoryItem,
-                    selectedCategory === item && styles.categoryItemSelected,
-                  ]}
-                  onPress={() => {
-                    setSelectedCategory(item);
-                  }}
-                  accessibilityLabel={`Filter by ${item}`}
-                >
-                  <Text
+        {/* Filter Modal */}
+        <Modal
+          visible={isFilterModalVisible}
+          transparent
+          animationType="slide"
+          onRequestClose={toggleFilterModal}
+        >
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPressOut={toggleFilterModal}
+          >
+            <View style={styles.filterModalContent}>
+              <Text style={styles.modalTitle}>Filter Options</Text>
+
+              {/* Category Selection */}
+              <Text style={styles.sectionTitle}>Category</Text>
+              <FlatList
+                data={categories}
+                keyExtractor={(item) => item}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
                     style={[
-                      styles.categoryText,
-                      selectedCategory === item && styles.categoryTextSelected,
+                      styles.categoryItem,
+                      selectedCategory === item && styles.categoryItemSelected,
                     ]}
+                    onPress={() => {
+                      setSelectedCategory(item);
+                    }}
+                    accessibilityLabel={`Filter by ${item}`}
                   >
-                    {item}
-                  </Text>
-                </TouchableOpacity>
-              )}
-            />
+                    <Text
+                      style={[
+                        styles.categoryText,
+                        selectedCategory === item && styles.categoryTextSelected,
+                      ]}
+                    >
+                      {item}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              />
 
-            {/* Campus Mode Selection */}
-            <Text style={styles.sectionTitle}>Campus Mode</Text>
-            <FlatList
-              data={campusOptions}
-              keyExtractor={(item) => item.value}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={[
-                    styles.campusItem,
-                    campusMode === item.value && styles.campusItemSelected,
-                  ]}
-                  onPress={() => {
-                    setCampusMode(item.value);
-                  }}
-                  accessibilityLabel={`Filter by ${item.label}`}
-                >
-                  <Text
+              {/* Campus Mode Selection */}
+              <Text style={styles.sectionTitle}>Campus Mode</Text>
+              <FlatList
+                data={campusOptions}
+                keyExtractor={(item) => item.value}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
                     style={[
-                      styles.categoryText,
-                      campusMode === item.value && styles.categoryTextSelected,
+                      styles.campusItem,
+                      campusMode === item.value && styles.campusItemSelected,
                     ]}
+                    onPress={() => {
+                      setCampusMode(item.value);
+                    }}
+                    accessibilityLabel={`Filter by ${item.label}`}
                   >
-                    {item.label}
-                  </Text>
-                </TouchableOpacity>
-              )}
-            />
+                    <Text
+                      style={[
+                        styles.categoryText,
+                        campusMode === item.value && styles.categoryTextSelected,
+                      ]}
+                    >
+                      {item.label}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              />
 
-            {/* Apply Filter Button */}
-            <TouchableOpacity
-              style={styles.applyButton}
-              onPress={toggleFilterModal}
-              accessibilityLabel="Apply Filters"
-            >
-              <Text style={styles.applyButtonText}>Apply Filters</Text>
-            </TouchableOpacity>
+              {/* Apply Filter Button */}
+              <TouchableOpacity
+                style={styles.applyButton}
+                onPress={toggleFilterModal}
+                accessibilityLabel="Apply Filters"
+              >
+                <Text style={styles.applyButtonText}>Apply Filters</Text>
+              </TouchableOpacity>
 
-            {/* Close Modal Button */}
-            <TouchableOpacity
-              onPress={toggleFilterModal}
-              style={styles.modalClose}
-              accessibilityLabel="Close Filter Modal"
-            >
-              <Ionicons name="close-outline" size={24} color="#fff" />
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      </Modal>
+              {/* Close Modal Button */}
+              <TouchableOpacity
+                onPress={toggleFilterModal}
+                style={styles.modalClose}
+                accessibilityLabel="Close Filter Modal"
+              >
+                <Ionicons name="close-outline" size={24} color="#fff" />
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
 
-      {/* Description Modal */}
-      <Modal
-        visible={isDescriptionModalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setIsDescriptionModalVisible(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPressOut={() => setIsDescriptionModalVisible(false)}
+        {/* Product Details Modal */}
+        <Modal
+          visible={isDetailsModalVisible}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setIsDetailsModalVisible(false)}
         >
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Product Description</Text>
-            <ScrollView>
-              <Text style={styles.descriptionText}>
-                {selectedProductDescription}
-              </Text>
-            </ScrollView>
-            <TouchableOpacity
-              onPress={() => setIsDescriptionModalVisible(false)}
-              style={styles.modalClose}
-              accessibilityLabel="Close Description Modal"
-            >
-              <Ionicons name="close-outline" size={24} color="#fff" />
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      </Modal>
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPressOut={() => setIsDetailsModalVisible(false)}
+          >
+            <View style={styles.detailsModalContent}>
+              {selectedProduct && (
+                <>
+                  <Text style={styles.detailsTitle}>{selectedProduct.title}</Text>
+                  <Image
+                    source={{
+                      uri:
+                        selectedProduct.images && selectedProduct.images.length > 0
+                          ? selectedProduct.images[0]
+                          : "https://via.placeholder.com/150",
+                    }}
+                    style={styles.detailsImage}
+                    resizeMode="cover"
+                  />
+                  <Text style={styles.detailsPrice}>
+                    Price: ${selectedProduct.price.toFixed(2)}
+                  </Text>
+                  <Text style={styles.detailsRating}>
+                    Rating: {selectedProduct.rating || "N/A"}
+                  </Text>
+                  <Text style={styles.detailsQuality}>
+                    Quality: {selectedProduct.quality || "N/A"}
+                  </Text>
+                  <ScrollView style={styles.detailsDescriptionContainer}>
+                    <Text style={styles.detailsDescription}>
+                      {selectedProduct.description}
+                    </Text>
+                  </ScrollView>
+                  <TouchableOpacity
+                    onPress={() => setIsDetailsModalVisible(false)}
+                    style={styles.modalClose}
+                    accessibilityLabel="Close Details Modal"
+                  >
+                    <Ionicons name="close-outline" size={24} color="#fff" />
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
+          </TouchableOpacity>
+        </Modal>
 
+        {/* Description Modal (Existing) */}
+        <Modal
+          visible={isDescriptionModalVisible}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setIsDescriptionModalVisible(false)}
+        >
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPressOut={() => setIsDescriptionModalVisible(false)}
+          >
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Product Description</Text>
+              <ScrollView>
+                <Text style={styles.descriptionText}>
+                  {selectedProductDescription}
+                </Text>
+              </ScrollView>
+              <TouchableOpacity
+                onPress={() => setIsDescriptionModalVisible(false)}
+                style={styles.modalClose}
+                accessibilityLabel="Close Description Modal"
+              >
+                <Ionicons name="close-outline" size={24} color="#fff" />
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+      </View>
       {/* Bottom Navigation Bar */}
       <BottomNavBar />
-    </View>
+    </GestureHandlerRootView>
   );
 };
 
@@ -624,83 +669,63 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     fontWeight: "500",
   },
-  listContainer: {
-    paddingBottom: 80, // Ensure content is above BottomNavBar
+  listContainer: {},
+  productItemContainer: {
+    height: SCREEN_HEIGHT,
   },
-  itemContainer: {
+  productContainer: {
+    flex: 1,
     backgroundColor: "#1E1E1E", // Darker card background
-    borderRadius: 12,
     padding: 15,
-    marginBottom: 15,
-    elevation: 5,
-    shadowColor: "#000",
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    shadowOffset: { width: 0, height: 2 },
-    paddingBottom: 0,
-  },
-  imageContainer: {
-    position: "relative",
-  },
-  arrowContainer: {
-    position: "absolute",
-    bottom: 10,
-    left: "50%",
-    transform: [{ translateX: -12 }], // Half of the icon size to center it
-    backgroundColor: "rgba(30, 30, 30, 0.6)",
-    padding: 6,
-    borderRadius: 12,
+    position: "relative", // To position icons absolutely within
   },
   productImage: {
-    width: "100%",
-    height: SCREEN_HEIGHT * 0.67, // 40% of screen height
-    borderRadius: 10,
-    marginBottom: 10,
+    width: SCREEN_WIDTH * 0.95, // Occupy 95% of the screen width
+    height: SCREEN_HEIGHT * 0.75, // Occupy 75% of the screen height
+    alignSelf: "center", // Center the image horizontally
+    borderRadius: 20, // Optional: Add rounded corners
+    resizeMode: "contain", // Ensure the entire image is visible
   },
-  detailsContainer: {
-    overflow: "hidden",
-    backgroundColor: "#2C2C2C",
-    borderRadius: 10,
-    padding: 10,
-  },
-  itemPrice: {
-    fontSize: 16,
-    color: "#fff", // White color
-    marginBottom: 4,
-    fontWeight: "600",
-  },
-  categoryTag: {
-    backgroundColor: "#BB86FC",
-    color: "#121212",
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 12,
-    alignSelf: "flex-start",
-    marginBottom: 8,
-    fontWeight: "600",
-    fontSize: 12,
-  },
-  itemDescription: {
-    color: "#ccc",
-    fontSize: 14,
-    textAlign: "left",
-  },
-  tagsContainer: {
-    flexDirection: "row",
-    marginTop: 5,
-  },
-  tagBadge: {
-    backgroundColor: "#BB86FC",
-    borderRadius: 12,
-    paddingVertical: 2,
-    paddingHorizontal: 8,
-    marginRight: 5,
-    marginTop: 4,
-  },
-  tagBadgeText: {
-    color: "#fff",
-    fontSize: 10,
-  },
+   
+likeIcon: {
+  position: "absolute",
+  right: 20,
+  top: SCREEN_HEIGHT * 0.45, // Slightly lower, closer to the share icon
+  width: 40,
+  height: 40,
+  justifyContent: "center",
+  alignItems: "center",
+  backgroundColor: "#FF4D4D", // Subtle red for the heart icon
+  borderRadius: 20, // Smaller circle
+  borderWidth: 2,
+  borderColor: "#FFF", // Thin white border for distinction
+  shadowColor: "#000", // Light shadow for depth
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.2,
+  shadowRadius: 3,
+  elevation: 3, // For Android shadow
+},
+
+shareIcon: {
+  position: "absolute",
+  right: 20,
+  top: SCREEN_HEIGHT * 0.52, // Positioned closer to the like icon
+  width: 40,
+  height: 40,
+  justifyContent: "center",
+  alignItems: "center",
+  backgroundColor: "#34C759", // Subtle green for the share icon
+  borderRadius: 20, // Smaller circle
+  borderWidth: 2,
+  borderColor: "#FFF", // Thin white border for distinction
+  shadowColor: "#000", // Light shadow for depth
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.2,
+  shadowRadius: 3,
+  elevation: 3, // For Android shadow
+},
+
+  
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
@@ -842,10 +867,48 @@ const styles = StyleSheet.create({
     marginBottom: 5,
     fontWeight: "600",
   },
-  descriptionText: {
+  detailsModalContent: {
+    width: "90%",
+    backgroundColor: "#1E1E1E",
+    borderRadius: 15,
+    padding: 20,
+    alignItems: "center",
+  },
+  detailsTitle: {
+    fontSize: 24,
+    fontWeight: "700",
+    color: "#BB86FC",
+    marginBottom: 15,
+  },
+  detailsImage: {
+    width: "100%",
+    height: SCREEN_HEIGHT * 0.3,
+    borderRadius: 15,
+    marginBottom: 15,
+  },
+  detailsPrice: {
+    fontSize: 20,
     color: "#fff",
-    fontSize: 14,
     marginBottom: 10,
+    fontWeight: "600",
+  },
+  detailsRating: {
+    fontSize: 16,
+    color: "#fff",
+    marginBottom: 5,
+  },
+  detailsQuality: {
+    fontSize: 16,
+    color: "#fff",
+    marginBottom: 15,
+  },
+  detailsDescriptionContainer: {
+    maxHeight: 100,
+    marginBottom: 15,
+  },
+  detailsDescription: {
+    color: "#ccc",
+    fontSize: 14,
     textAlign: "center",
   },
 });
