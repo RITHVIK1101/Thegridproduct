@@ -653,7 +653,9 @@ const styles = StyleSheet.create({
   },
   filterToggleContainer: {
     marginBottom: 15,
+    alignItems: "flex-end", // Move the filter button to the right
   },
+  
   filterButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -661,8 +663,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 15,
     borderRadius: 20,
-    alignSelf: "flex-start",
-  },
+  },  
   filterButtonText: {
     color: "#fff",
     fontSize: 14,
