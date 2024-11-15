@@ -17,6 +17,8 @@ import {
   ActivityIndicator,
 } from "react-native";
 import Icon from "react-native-vector-icons/MaterialIcons";
+import { CommonActions } from "@react-navigation/native";
+
 import SplashScreen from "./SplashScreen";
 import Ionicons from "react-native-vector-icons/Ionicons";
 
@@ -51,9 +53,11 @@ const AppNavigator: React.FC = () => {
     try {
       await clearUser(); // Clear user data from context and storage
       Alert.alert("Logout Successful", "You have been logged out.");
-      navigationRef.current?.reset({
-        index: 0,
-        routes: [{ name: "Login" }],
+      navigationRef.current?.dispatch({
+        ...CommonActions.reset({
+          index: 0,
+          routes: [{ name: "Login" }],
+        }),
       });
     } catch (error) {
       console.error("Logout Error:", error);

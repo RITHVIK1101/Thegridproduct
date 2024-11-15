@@ -16,9 +16,14 @@ import {
   Animated,
   Dimensions,
 } from "react-native";
-import { RouteProp, useNavigation } from "@react-navigation/native";
+import {
+  RouteProp,
+  useNavigation,
+  CommonActions,
+} from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import Ionicons from "react-native-vector-icons/Ionicons"; // For Ionicons
+import Feather from "react-native-vector-icons/Feather"; // For Feather Icons
 import BottomNavBar from "./components/BottomNavbar";
 import { NGROK_URL } from "@env";
 import { UserContext } from "./UserContext";
@@ -90,10 +95,12 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
         {
           text: "OK",
           onPress: () => {
-            navigation.reset({
-              index: 0,
-              routes: [{ name: "Login" }],
-            });
+            navigation.dispatch(
+              CommonActions.reset({
+                index: 0,
+                routes: [{ name: "Login" }],
+              })
+            );
           },
         },
       ]);
@@ -102,30 +109,6 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
       Alert.alert("Logout Error", "Failed to log out. Please try again.");
     }
   };
-
-  // **Remove or Comment Out the Following useLayoutEffect**
-  /*
-  useLayoutEffect(() => {
-    navigation.setOptions({
-      headerRight: () => (
-        <TouchableOpacity
-          onPress={handleLogout}
-          style={{ marginRight: 15 }}
-          accessibilityLabel="Logout"
-        >
-          <Ionicons name="log-out-outline" size={24} color="#fff" />
-        </TouchableOpacity>
-      ),
-      headerStyle: {
-        backgroundColor: "#121212", // Match your app's theme
-      },
-      headerTintColor: "#fff",
-      headerTitleStyle: {
-        fontWeight: "bold",
-      },
-    });
-  }, [navigation, handleLogout]);
-  */
 
   // Fetch Products from Backend
   const fetchProducts = async () => {
@@ -159,10 +142,12 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
               text: "OK",
               onPress: async () => {
                 await clearUser();
-                navigation.reset({
-                  index: 0,
-                  routes: [{ name: "Login" }],
-                });
+                navigation.dispatch(
+                  CommonActions.reset({
+                    index: 0,
+                    routes: [{ name: "Login" }],
+                  })
+                );
               },
             },
           ]
@@ -266,11 +251,6 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
     }
   };
 
-  // Navigate to EditProduct screen
-  const navigateToEditProduct = (productId: string) => {
-    navigation.navigate("EditProduct", { productId });
-  };
-
   // Show description modal
   const showDescription = (description: string) => {
     setSelectedProductDescription(description);
@@ -279,21 +259,14 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
 
   // Render each product item with swipe up/down functionality
   const renderProduct = ({ item }: { item: Product }) => {
-    return (
-      <ProductItem
-        product={item}
-        navigateToEditProduct={navigateToEditProduct}
-        showDescription={showDescription}
-      />
-    );
+    return <ProductItem product={item} showDescription={showDescription} />;
   };
 
   // ProductItem Component
   const ProductItem: React.FC<{
     product: Product;
-    navigateToEditProduct: (id: string) => void;
     showDescription: (description: string) => void;
-  }> = ({ product, navigateToEditProduct, showDescription }) => {
+  }> = ({ product, showDescription }) => {
     const [showDetails, setShowDetails] = useState(false);
     const animatedHeight = useRef(new Animated.Value(0)).current;
 
@@ -350,26 +323,12 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
 
     const detailHeight = animatedHeight.interpolate({
       inputRange: [0, 1],
-      outputRange: [0, 150], // Adjust as needed
+      outputRange: [0, SCREEN_HEIGHT * 0.3], // 30% of screen height
     });
 
     return (
       <View style={styles.itemContainer}>
-        {/* Edit Button */}
-        <TouchableOpacity
-          style={styles.editIcon}
-          onPress={() => navigateToEditProduct(product.id)}
-          accessibilityLabel={`Edit ${product.title}`}
-        >
-          <Ionicons name="pencil-outline" size={24} color="#fff" />
-        </TouchableOpacity>
-        {/* Product Image with Swipe Gesture */}
-        <Animated.View
-          style={{
-            transform: pan.getTranslateTransform(),
-          }}
-          {...panResponder.panHandlers}
-        >
+        <View style={styles.imageContainer}>
           <TouchableOpacity
             onPress={() => showDescription(product.description)}
           >
@@ -384,28 +343,37 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
               resizeMode="cover"
             />
           </TouchableOpacity>
-        </Animated.View>
+          <TouchableOpacity
+            onPress={() => {
+              setShowDetails(!showDetails);
+            }}
+            style={styles.arrowContainer}
+            accessibilityLabel="Toggle Product Details"
+            {...panResponder.panHandlers} // Attach PanResponder to the arrow
+          >
+            <Feather
+              name={showDetails ? "arrow-down" : "arrow-up"}
+              size={24}
+              color="#BB86FC"
+            />
+          </TouchableOpacity>
+        </View>
         {/* Animated Details */}
         <Animated.View
           style={[styles.detailsContainer, { height: detailHeight }]}
         >
           <Text style={styles.itemPrice}>${product.price.toFixed(2)}</Text>
+          <Text style={styles.categoryTag}>
+            {product.category === "#FemaleClothing"
+              ? "Selling"
+              : product.category === "#MensClothing"
+              ? "Renting"
+              : "Both"}
+          </Text>
           <ScrollView>
             <Text style={styles.itemDescription}>{product.description}</Text>
           </ScrollView>
         </Animated.View>
-        {/* Tags */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.tagsContainer}
-        >
-          {product.category && (
-            <View style={styles.tagBadge}>
-              <Text style={styles.tagBadgeText}>{product.category}</Text>
-            </View>
-          )}
-        </ScrollView>
       </View>
     );
   };
@@ -636,7 +604,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#121212", // Dark background
     paddingHorizontal: 20,
     paddingTop: 20,
-    paddingBottom: 60,
+    paddingBottom: 60, // Space for BottomNavBar
   },
   filterToggleContainer: {
     marginBottom: 15,
@@ -657,7 +625,7 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   listContainer: {
-    paddingBottom: 80,
+    paddingBottom: 80, // Ensure content is above BottomNavBar
   },
   itemContainer: {
     backgroundColor: "#1E1E1E", // Darker card background
@@ -670,18 +638,21 @@ const styles = StyleSheet.create({
     shadowRadius: 5,
     shadowOffset: { width: 0, height: 2 },
   },
-  editIcon: {
+  imageContainer: {
+    position: "relative",
+  },
+  arrowContainer: {
     position: "absolute",
-    top: 10,
-    right: 10,
-    backgroundColor: "rgba(187, 134, 252, 0.8)", // Semi-transparent purple
+    bottom: 10,
+    left: "50%",
+    transform: [{ translateX: -12 }], // Half of the icon size to center it
+    backgroundColor: "rgba(30, 30, 30, 0.6)",
     padding: 6,
     borderRadius: 12,
-    zIndex: 1,
   },
   productImage: {
     width: "100%",
-    height: 200,
+    height: SCREEN_HEIGHT * 0.4, // 40% of screen height
     borderRadius: 10,
     marginBottom: 10,
   },
@@ -696,6 +667,17 @@ const styles = StyleSheet.create({
     color: "#fff", // White color
     marginBottom: 4,
     fontWeight: "600",
+  },
+  categoryTag: {
+    backgroundColor: "#BB86FC",
+    color: "#121212",
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    alignSelf: "flex-start",
+    marginBottom: 8,
+    fontWeight: "600",
+    fontSize: 12,
   },
   itemDescription: {
     color: "#ccc",
@@ -864,20 +846,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginBottom: 10,
     textAlign: "center",
-  },
-  logoutButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#BB86FC",
-    padding: 10,
-    borderRadius: 20,
-    alignSelf: "flex-end",
-    marginBottom: 10,
-  },
-  logoutText: {
-    color: "#fff",
-    fontSize: 14,
-    marginLeft: 5,
-    fontWeight: "500",
   },
 });
