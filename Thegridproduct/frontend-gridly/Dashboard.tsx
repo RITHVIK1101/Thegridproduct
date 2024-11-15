@@ -637,6 +637,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 5,
     shadowOffset: { width: 0, height: 2 },
+    paddingBottom: 0,
   },
   imageContainer: {
     position: "relative",
@@ -652,7 +653,7 @@ const styles = StyleSheet.create({
   },
   productImage: {
     width: "100%",
-    height: SCREEN_HEIGHT * 0.4, // 40% of screen height
+    height: SCREEN_HEIGHT * 0.67, // 40% of screen height
     borderRadius: 10,
     marginBottom: 10,
   },
