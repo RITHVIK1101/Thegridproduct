@@ -1,6 +1,6 @@
 // LoginScreen.tsx
 
-import React, { useState, useContext, useEffect } from "react";
+import React, { useState, useContext, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import {
   KeyboardAvoidingView,
   Keyboard,
   TouchableWithoutFeedback,
+  Easing, // Import Easing separately
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -533,6 +534,25 @@ const LoginScreen: React.FC = () => {
     </View>
   );
 
+  // Animated rotation for the logo
+  const rotation = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.timing(rotation, {
+        toValue: 1,
+        duration: 10000, // 10 seconds for a full rotation
+        useNativeDriver: true,
+        easing: Easing.linear, // Correctly use Easing.linear
+      })
+    ).start();
+  }, [rotation]);
+
+  const spin = rotation.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "360deg"],
+  });
+
   return (
     <LinearGradient colors={["#121212", "#1E1E1E"]} style={styles.container}>
       <KeyboardAvoidingView
@@ -546,8 +566,20 @@ const LoginScreen: React.FC = () => {
             keyboardShouldPersistTaps="handled"
           >
             <View style={styles.innerContainer}>
-              <Text style={styles.title}>Gridly</Text>
+              {/* Header Section with Logo and Title */}
+              <View style={styles.headerContainer}>
+                <Animated.View style={{ transform: [{ rotate: spin }] }}>
+                  <Ionicons name="grid-outline" size={42} color="#ff7e5f" />
+                </Animated.View>
+                <Text style={styles.title}>Gridly</Text>
+              </View>
 
+              {/* Slogan */}
+              <Text style={styles.slogan}>
+                Connect Students. Build Communities.
+              </Text>
+
+              {/* Toggle between Login and Signup */}
               <View style={styles.toggleContainer}>
                 <TouchableOpacity
                   style={[
@@ -614,7 +646,6 @@ const LoginScreen: React.FC = () => {
 };
 
 export default LoginScreen;
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -630,20 +661,46 @@ const styles = StyleSheet.create({
     maxWidth: 400,
     alignSelf: "center",
     padding: 20,
-    backgroundColor: "rgba(30, 30, 30, 0.95)", // Dark semi-transparent background
     borderRadius: 25,
-    shadowColor: "#000",
-    shadowOpacity: 0.5,
-    shadowRadius: 10,
-    elevation: 10,
+  },
+  headerContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 10,
   },
   title: {
     fontSize: 32,
     fontFamily: Platform.OS === "ios" ? "HelveticaNeue-Bold" : "Roboto",
     fontWeight: "700",
     color: "#fff",
-    marginBottom: 20,
+    marginLeft: 10, // Space between logo and title
     textAlign: "center",
+  },
+  slogan: {
+    fontSize: 16,
+    color: "#ccc",
+    textAlign: "center",
+    marginBottom: 20,
+  },
+  spinningLogo: {
+    width: 30, // Smaller size for the logo
+    height: 30,
+    borderRadius: 18, // Fully round shape
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  logoGradient: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "transparent", // Transparent background for the gradient
+  },
+  icon: {
+    fontSize: 24, // Adjusted size for the icon
+    color: "#fff", // Icon color remains white for contrast
   },
   toggleContainer: {
     flexDirection: "row",
@@ -682,7 +739,7 @@ const styles = StyleSheet.create({
     left: 0,
     width: width / 2 - 40,
     height: 3,
-    backgroundColor: "#ff7e5f", // Accent color for slider
+    backgroundColor: "#8a2be2", // Purple color
     borderRadius: 2,
   },
   formContainer: {
@@ -699,39 +756,27 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 15,
     marginBottom: 12,
-    color: "#fff", // Text color set to white
-    backgroundColor: "#2c2c2c",
+    color: "#fff",
+    backgroundColor: "rgba(44, 44, 44, 0.8)",
     fontSize: 15,
     fontFamily: Platform.OS === "ios" ? "HelveticaNeue" : "Roboto",
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
-    elevation: 2,
   },
   dropdownContainer: {
     marginBottom: 12,
-    zIndex: 1000, // Ensure dropdown appears above other elements
+    zIndex: 1000,
   },
   dropdown: {
-    backgroundColor: "#2c2c2c",
+    backgroundColor: "rgba(44, 44, 44, 0.8)",
     borderColor: "#555",
     height: 50,
     borderRadius: 12,
     paddingHorizontal: 10,
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
-    elevation: 2,
   },
   dropdownList: {
-    backgroundColor: "#2c2c2c",
+    backgroundColor: "rgba(44, 44, 44, 0.95)",
     borderColor: "#555",
     borderRadius: 12,
     paddingHorizontal: 10,
-    shadowColor: "#000",
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 5,
   },
   dropdownLabel: {
     fontSize: 16,
@@ -739,10 +784,10 @@ const styles = StyleSheet.create({
   },
   dropdownPlaceholder: {
     fontSize: 16,
-    color: "#ffffff", // Changed to pure white for better visibility
+    color: "#ffffff",
   },
   dropdownSelectedLabel: {
-    color: "#ff7e5f",
+    color: "#8a2be2", // Purple color for selected items
     fontWeight: "600",
   },
   searchInput: {
@@ -759,10 +804,6 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     overflow: "hidden",
     marginTop: 10,
-    shadowColor: "#000",
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 3,
   },
   gradientButton: {
     flexDirection: "row",
@@ -777,17 +818,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   modalContentContainer: {
-    backgroundColor: "#2c2c2c",
+    backgroundColor: "rgba(44, 44, 44, 0.95)",
   },
   modalTitleStyle: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#ff7e5f",
+    color: "#8a2be2", // Purple color for modal title
     textAlign: "center",
     marginVertical: 10,
   },
   customItemContainerStyle: {
-    backgroundColor: "#3a3a3a",
+    backgroundColor: "rgba(58, 58, 58, 0.95)",
     borderRadius: 10,
     marginVertical: 5,
     padding: 10,

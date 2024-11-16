@@ -31,7 +31,7 @@ export default {
       favicon: "./assets/favicon.png"
     },
     extra: {
-      NGROK_URL: process.env.NGROK_URL, // Load the NGROK_URL from the .env file
+      NGROK_URL: process.env.NGROK_URL,
     },
   },
 };
