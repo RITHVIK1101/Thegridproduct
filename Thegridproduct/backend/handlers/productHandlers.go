@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"Thegridproduct/backend/db"
@@ -339,4 +340,64 @@ func UpdateProductHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"message": "Product updated successfully",
 	})
+}
+
+// GetProductsByIDsHandler retrieves multiple products by their IDs.
+// Endpoint: GET /products?ids=id1,id2,id3
+func GetProductsByIDsHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Ensure the request method is GET
+	if r.Method != http.MethodGet {
+		WriteJSONError(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Retrieve 'ids' query parameter
+	idsParam := r.URL.Query().Get("ids")
+	if idsParam == "" {
+		WriteJSONError(w, "No product IDs provided", http.StatusBadRequest)
+		return
+	}
+
+	// Split the IDs by comma
+	idStrings := strings.Split(idsParam, ",")
+
+	// Convert string IDs to primitive.ObjectID
+	var objectIDs []primitive.ObjectID
+	for _, idStr := range idStrings {
+		idStr = strings.TrimSpace(idStr)
+		objID, err := primitive.ObjectIDFromHex(idStr)
+		if err != nil {
+			WriteJSONError(w, "Invalid product ID format: "+idStr, http.StatusBadRequest)
+			return
+		}
+		objectIDs = append(objectIDs, objID)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	productCollection := db.GetCollection("gridlyapp", "products")
+
+	// Find all products with _id in objectIDs
+	filter := bson.M{"_id": bson.M{"$in": objectIDs}}
+
+	cursor, err := productCollection.Find(ctx, filter)
+	if err != nil {
+		log.Printf("Error fetching products: %v", err)
+		WriteJSONError(w, "Error fetching products", http.StatusInternalServerError)
+		return
+	}
+	defer cursor.Close(ctx)
+
+	var products []models.Product
+	if err = cursor.All(ctx, &products); err != nil {
+		log.Printf("Error decoding products: %v", err)
+		WriteJSONError(w, "Error decoding products", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(products)
 }

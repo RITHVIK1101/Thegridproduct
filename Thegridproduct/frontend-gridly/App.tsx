@@ -4,7 +4,9 @@ import React, { useState, createRef, useContext, useEffect } from "react";
 import {
   NavigationContainer,
   NavigationContainerRef,
+  CommonActions,
 } from "@react-navigation/native";
+
 import { createStackNavigator } from "@react-navigation/stack";
 import {
   TouchableOpacity,
@@ -17,11 +19,10 @@ import {
   ActivityIndicator,
 } from "react-native";
 import Icon from "react-native-vector-icons/MaterialIcons";
-import { CommonActions } from "@react-navigation/native";
+import Ionicons from "react-native-vector-icons/Ionicons"; // Ensure Ionicons is imported
+import BottomNavBar from "./components/BottomNavbar";
 
 import SplashScreen from "./SplashScreen";
-import Ionicons from "react-native-vector-icons/Ionicons";
-
 import LoginScreen from "./LoginScreen";
 import Dashboard from "./Dashboard";
 import AddProductScreen from "./AddProductScreen";
@@ -29,7 +30,9 @@ import AddGigScreen from "./AddGigScreen";
 import ActivityScreen from "./ActivityScreen";
 import EditProduct from "./EditProductScreen";
 import MessagingScreen from "./MessagingScreen";
-// import CartScreen from "./CartScreen"; // No routing needed for Cart Icon
+import CartScreen from "./CartScreen"; // Import CartScreen
+import AccountScreen from "./AccountScreen"; // If you have an edit account screen
+
 import { RootStackParamList } from "./navigationTypes";
 import { UserProvider, UserContext } from "./UserContext"; // Import UserContext
 
@@ -53,12 +56,12 @@ const AppNavigator: React.FC = () => {
     try {
       await clearUser(); // Clear user data from context and storage
       Alert.alert("Logout Successful", "You have been logged out.");
-      navigationRef.current?.dispatch({
-        ...CommonActions.reset({
+      navigationRef.current?.dispatch(
+        CommonActions.reset({
           index: 0,
           routes: [{ name: "Login" }],
-        }),
-      });
+        })
+      );
     } catch (error) {
       console.error("Logout Error:", error);
       Alert.alert("Logout Error", "Failed to log out. Please try again.");
@@ -106,13 +109,17 @@ const AppNavigator: React.FC = () => {
                   </TouchableOpacity>
                 ),
                 headerRight: () => (
-                  <Ionicons
-                    name="cart-outline"
-                    size={28}
-                    color="#fff"
+                  <TouchableOpacity
+                    onPress={() => navigationRef.current?.navigate("Cart")}
                     style={{ marginRight: 15 }}
-                    accessibilityLabel="Cart Icon"
-                  />
+                    accessibilityLabel="Go to Cart"
+                  >
+                    <Ionicons name="cart-outline" size={28} color="#fff" />
+                    {/* Optional: Add a badge for cart items count */}
+                    {/* <View style={styles.cartBadge}>
+                      <Text style={styles.cartBadgeText}>{cartItemCount}</Text>
+                    </View> */}
+                  </TouchableOpacity>
                 ),
                 headerTitle: "The Gridly",
                 gestureEnabled: false,
@@ -133,13 +140,13 @@ const AppNavigator: React.FC = () => {
                 ),
                 headerTitle: "Add Product",
                 headerRight: () => (
-                  <Ionicons
-                    name="cart-outline"
-                    size={28}
-                    color="#fff"
+                  <TouchableOpacity
+                    onPress={() => navigationRef.current?.navigate("Cart")}
                     style={{ marginRight: 15 }}
-                    accessibilityLabel="Cart Icon"
-                  />
+                    accessibilityLabel="Go to Cart"
+                  >
+                    <Ionicons name="cart-outline" size={28} color="#fff" />
+                  </TouchableOpacity>
                 ),
               })}
             />
@@ -158,13 +165,13 @@ const AppNavigator: React.FC = () => {
                 ),
                 headerTitle: "Add Gig",
                 headerRight: () => (
-                  <Ionicons
-                    name="cart-outline"
-                    size={28}
-                    color="#fff"
+                  <TouchableOpacity
+                    onPress={() => navigationRef.current?.navigate("Cart")}
                     style={{ marginRight: 15 }}
-                    accessibilityLabel="Cart Icon"
-                  />
+                    accessibilityLabel="Go to Cart"
+                  >
+                    <Ionicons name="cart-outline" size={28} color="#fff" />
+                  </TouchableOpacity>
                 ),
               })}
             />
@@ -182,13 +189,13 @@ const AppNavigator: React.FC = () => {
                   </TouchableOpacity>
                 ),
                 headerRight: () => (
-                  <Ionicons
-                    name="cart-outline"
-                    size={28}
-                    color="#fff"
+                  <TouchableOpacity
+                    onPress={() => navigationRef.current?.navigate("Cart")}
                     style={{ marginRight: 15 }}
-                    accessibilityLabel="Cart Icon"
-                  />
+                    accessibilityLabel="Go to Cart"
+                  >
+                    <Ionicons name="cart-outline" size={28} color="#fff" />
+                  </TouchableOpacity>
                 ),
                 headerTitle: "The Gridly",
                 headerStyle: {
@@ -219,13 +226,13 @@ const AppNavigator: React.FC = () => {
                 ),
                 headerTitle: "Edit Product",
                 headerRight: () => (
-                  <Ionicons
-                    name="cart-outline"
-                    size={28}
-                    color="#fff"
+                  <TouchableOpacity
+                    onPress={() => navigationRef.current?.navigate("Cart")}
                     style={{ marginRight: 15 }}
-                    accessibilityLabel="Cart Icon"
-                  />
+                    accessibilityLabel="Go to Cart"
+                  >
+                    <Ionicons name="cart-outline" size={28} color="#fff" />
+                  </TouchableOpacity>
                 ),
                 headerStyle: {
                   backgroundColor: "#1E1E1E", // Consistent header style
@@ -254,16 +261,88 @@ const AppNavigator: React.FC = () => {
                   </TouchableOpacity>
                 ),
                 headerRight: () => (
-                  <Ionicons
-                    name="cart-outline"
-                    size={28}
-                    color="#fff"
+                  <TouchableOpacity
+                    onPress={() => navigationRef.current?.navigate("Cart")}
                     style={{ marginRight: 15 }}
-                    accessibilityLabel="Cart Icon"
-                  />
+                    accessibilityLabel="Go to Cart"
+                  >
+                    <Ionicons name="cart-outline" size={28} color="#fff" />
+                  </TouchableOpacity>
                 ),
                 headerTitle: "Messaging",
                 gestureEnabled: false,
+              }}
+            />
+            {/* Add CartScreen to the Stack */}
+            <Stack.Screen
+              name="Cart"
+              component={CartScreen}
+              options={{
+                headerLeft: () => (
+                  <TouchableOpacity
+                    onPress={() => navigationRef.current?.goBack()}
+                    style={{ paddingLeft: 15 }}
+                    accessibilityLabel="Go Back"
+                  >
+                    <Icon name="arrow-back" size={24} color="#fff" />
+                  </TouchableOpacity>
+                ),
+                headerTitle: "Your Cart",
+                headerRight: () => (
+                  <TouchableOpacity
+                    onPress={() => navigationRef.current?.navigate("Cart")} // Optional: Can be omitted or used for additional functionality
+                    style={{ marginRight: 15 }}
+                    accessibilityLabel="Cart Icon"
+                  >
+                    <Ionicons name="cart-outline" size={28} color="#fff" />
+                  </TouchableOpacity>
+                ),
+                headerStyle: {
+                  backgroundColor: "#1E1E1E",
+                  shadowOpacity: 0,
+                  elevation: 0,
+                },
+                headerTintColor: "#fff",
+                headerTitleStyle: {
+                  fontWeight: "700",
+                  color: "#BB86FC",
+                },
+              }}
+            />
+            {/* Add AccountScreen to the Stack */}
+            <Stack.Screen
+              name="Account"
+              component={AccountScreen}
+              options={{
+                headerLeft: () => (
+                  <TouchableOpacity
+                    onPress={() => navigationRef.current?.goBack()}
+                    style={{ paddingLeft: 15 }}
+                    accessibilityLabel="Go Back"
+                  >
+                    <Icon name="arrow-back" size={24} color="#fff" />
+                  </TouchableOpacity>
+                ),
+                headerTitle: "My Account",
+                headerRight: () => (
+                  <TouchableOpacity
+                    onPress={() => navigationRef.current?.navigate("Cart")}
+                    style={{ marginRight: 15 }}
+                    accessibilityLabel="Go to Cart"
+                  >
+                    <Ionicons name="cart-outline" size={28} color="#fff" />
+                  </TouchableOpacity>
+                ),
+                headerStyle: {
+                  backgroundColor: "#1E1E1E",
+                  shadowOpacity: 0,
+                  elevation: 0,
+                },
+                headerTintColor: "#fff",
+                headerTitleStyle: {
+                  fontWeight: "700",
+                  color: "#BB86FC",
+                },
               }}
             />
           </>
@@ -309,6 +388,17 @@ const AppNavigator: React.FC = () => {
               accessibilityLabel="View Terms of Service"
             >
               <Text style={styles.optionText}>View Terms of Service</Text>
+            </TouchableOpacity>
+            {/* Add "My Account" Button */}
+            <TouchableOpacity
+              onPress={() => {
+                setModalVisible(false);
+                navigationRef.current?.navigate("Account");
+              }}
+              style={styles.option}
+              accessibilityLabel="Go to My Account"
+            >
+              <Text style={styles.optionText}>My Account</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -387,6 +477,14 @@ const styles = StyleSheet.create({
     width: "80%",
     position: "relative",
   },
+  termsContent: {
+    backgroundColor: "#1E1E1E", // Dark modal background
+    padding: 20,
+    borderRadius: 10,
+    width: "90%",
+    height: "80%",
+    position: "relative",
+  },
   closeButton: {
     position: "absolute",
     top: 10,
@@ -401,16 +499,24 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#fff", // White text
   },
-  termsContent: {
-    backgroundColor: "#1E1E1E", // Dark modal background
-    padding: 20,
-    borderRadius: 10,
-    width: "90%",
-    height: "80%",
-    position: "relative",
-  },
   termsText: {
     fontSize: 14,
     color: "#ccc", // Light grey text
+  },
+  cartBadge: {
+    position: "absolute",
+    right: -6,
+    top: -3,
+    backgroundColor: "#FF3B30",
+    borderRadius: 8,
+    width: 16,
+    height: 16,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  cartBadgeText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "bold",
   },
 });

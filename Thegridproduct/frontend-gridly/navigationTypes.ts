@@ -7,6 +7,8 @@ export type RootStackParamList = {
   Gigs: undefined;
   Messaging: undefined;
   AddGig: undefined; 
+  Cart: undefined;
   Card: undefined;
+  Account: undefined;
   EditProduct: { productId: string }; // Ensure this line exists
 };

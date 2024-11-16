@@ -1,3 +1,5 @@
+// main.go
+
 package main
 
 import (
@@ -39,6 +41,7 @@ func main() {
 	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Welcome to The Gridly API"))
 	}).Methods("GET")
+
 	// Protected Routes
 	protected := router.PathPrefix("/").Subrouter()
 	protected.Use(handlers.AuthMiddleware)
@@ -47,6 +50,7 @@ func main() {
 	protected.HandleFunc("/products", handlers.AddProductHandler).Methods("POST")
 	protected.HandleFunc("/products/user", handlers.GetUserProductsHandler).Methods("GET")
 	protected.HandleFunc("/products/all", handlers.GetAllProductsHandler).Methods("GET")
+	protected.HandleFunc("/products/by-ids", handlers.GetProductsByIDsHandler).Methods("GET")
 	protected.HandleFunc("/products/{id}", handlers.GetSingleProductHandler).Methods("GET")
 	protected.HandleFunc("/products/{id}", handlers.UpdateProductHandler).Methods("PUT")
 
@@ -54,6 +58,15 @@ func main() {
 	protected.HandleFunc("/gigs", handlers.AddGigHandler).Methods("POST")
 	protected.HandleFunc("/gigs/all", handlers.GetGigsHandler).Methods("GET")
 	protected.HandleFunc("/gigs/{id}", handlers.GetGigByIDHandler).Methods("GET")
+
+	// Cart Routes
+	protected.HandleFunc("/cart", handlers.GetCartHandler).Methods("GET")
+	protected.HandleFunc("/cart/add", handlers.AddToCartHandler).Methods("POST")
+	protected.HandleFunc("/cart/remove", handlers.RemoveFromCartHandler).Methods("POST")
+	protected.HandleFunc("/cart/clear", handlers.ClearCartHandler).Methods("POST") // Optional
+
+	// **User Routes**
+	protected.HandleFunc("/users/{id}", handlers.GetUserHandler).Methods("GET")
 
 	// Handle undefined routes
 	router.NotFoundHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

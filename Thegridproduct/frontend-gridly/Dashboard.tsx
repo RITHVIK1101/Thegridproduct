@@ -50,6 +50,11 @@ type Product = {
   quality?: string; // Added quality
 };
 
+type CartItem = {
+  productId: string;
+  quantity: number;
+};
+
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
 
 const Dashboard: React.FC<DashboardProps> = ({ route }) => {
@@ -70,7 +75,12 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
   const { userId, token, institution, clearUser } = useContext(UserContext);
 
   // Available Filter Categories
-  const categories = ["#Everything", "#FemaleClothing", "#MensClothing", "#Other"];
+  const categories = [
+    "#Everything",
+    "#FemaleClothing",
+    "#MensClothing",
+    "#Other",
+  ];
 
   // Campus Options with Labels and Values
   const campusOptions: Array<{ label: string; value: "In Campus" | "Both" }> = [
@@ -80,19 +90,170 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
 
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<string>("#Everything");
+  const [selectedCategory, setSelectedCategory] =
+    useState<string>("#Everything");
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
   // States for Description Modal
-  const [isDescriptionModalVisible, setIsDescriptionModalVisible] = useState(false);
-  const [selectedProductDescription, setSelectedProductDescription] = useState<string>(
-    ""
-  );
+  const [isDescriptionModalVisible, setIsDescriptionModalVisible] =
+    useState(false);
+  const [selectedProductDescription, setSelectedProductDescription] =
+    useState<string>("");
 
   // FlatList Ref for Navigating to Next Product
   const flatListRef = useRef<FlatList>(null);
   const currentIndex = useRef<number>(0);
+
+  // State for Cart Update Indicator
+  const [cartUpdated, setCartUpdated] = useState(false);
+
+  // State for Cart Items
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
+
+  // Function to fetch cart items
+  const fetchCart = async () => {
+    if (!userId || !token) return;
+    try {
+      const response = await fetch(`${NGROK_URL}/cart`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (response.status === 401) {
+        // Unauthorized: Clear user data and navigate to Login
+        Alert.alert(
+          "Session Expired",
+          "Your session has expired. Please log in again.",
+          [
+            {
+              text: "OK",
+              onPress: async () => {
+                await clearUser();
+                navigation.dispatch(
+                  CommonActions.reset({
+                    index: 0,
+                    routes: [{ name: "Login" }],
+                  })
+                );
+              },
+            },
+          ]
+        );
+        return;
+      }
+
+      if (!response.ok) {
+        const responseText = await response.text();
+        console.error("Error response text:", responseText);
+        throw new Error(
+          "Failed to fetch cart. Server responded with an error."
+        );
+      }
+
+      const data = await response.json();
+
+      // Assuming the cart data has an 'items' array with 'productId' and 'quantity'
+      if (data && Array.isArray(data.items)) {
+        setCartItems(data.items);
+      } else {
+        console.error("Invalid cart data structure:", data);
+        throw new Error("Received invalid cart data from server.");
+      }
+    } catch (err) {
+      console.error("Fetch Cart Error:", err);
+      Alert.alert("Error", "Could not fetch cart data.");
+    }
+  };
+
+  // Function to add product to cart
+  const addToCart = async (product: Product) => {
+    if (!userId || !token) {
+      Alert.alert("Error", "User not authenticated.");
+      return;
+    }
+
+    // Check if product is already in cart
+    const isAlreadyInCart = cartItems.some(
+      (item) => item.productId === product.id
+    );
+
+    if (isAlreadyInCart) {
+      Alert.alert(
+        "Item already in cart",
+        "This product is already in your cart."
+      );
+      return;
+    }
+
+    try {
+      const response = await fetch(`${NGROK_URL}/cart/add`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ productId: product.id, quantity: 1 }),
+      });
+
+      if (response.status === 401) {
+        // Unauthorized: Clear user data and navigate to Login
+        Alert.alert(
+          "Session Expired",
+          "Your session has expired. Please log in again.",
+          [
+            {
+              text: "OK",
+              onPress: async () => {
+                await clearUser();
+                navigation.dispatch(
+                  CommonActions.reset({
+                    index: 0,
+                    routes: [{ name: "Login" }],
+                  })
+                );
+              },
+            },
+          ]
+        );
+        return;
+      }
+
+      if (response.status === 409) {
+        // Conflict: Product already in cart
+        Alert.alert(
+          "Item already in cart",
+          "This product is already in your cart."
+        );
+        return;
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to add item to cart.");
+      }
+
+      Alert.alert("Success", "Product added to cart!");
+      setCartUpdated(true); // Trigger cart update
+    } catch (err) {
+      console.error("Add to Cart Error:", err);
+      Alert.alert("Error", "Could not add item to cart.");
+    }
+  };
+
+  // Effect to reset cartUpdated state after 2 seconds
+  useEffect(() => {
+    if (cartUpdated) {
+      fetchCart(); // Refresh cart data
+      const timer = setTimeout(() => {
+        setCartUpdated(false);
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [cartUpdated]);
 
   // Fetch Products from Backend
   const fetchProducts = async () => {
@@ -142,7 +303,9 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
       if (!response.ok) {
         const responseText = await response.text();
         console.error("Error response text:", responseText);
-        throw new Error("Failed to fetch products. Server responded with an error.");
+        throw new Error(
+          "Failed to fetch products. Server responded with an error."
+        );
       }
 
       const contentType = response.headers.get("content-type");
@@ -197,17 +360,20 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
       const finalFiltered =
         selectedCategory === "#Everything"
           ? allProducts
-          : allProducts.filter((product) => product.category === selectedCategory);
+          : allProducts.filter(
+              (product) => product.category === selectedCategory
+            );
 
       setFilteredProducts(finalFiltered);
     }
   }, [allProducts, selectedCategory]);
 
-  // Fetch products on component mount and when campusMode changes
+  // Fetch products and cart on component mount and when campusMode changes
   useEffect(() => {
     setLoading(true);
     setError(null);
     fetchProducts();
+    fetchCart();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [campusMode]);
 
@@ -280,6 +446,19 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
             Alert.alert("End of List", "No more products available.");
           }
         }}
+        onSwipeRight={() => {
+          addToCart(item);
+          // Optionally navigate to next product after adding to cart
+          if (index < filteredProducts.length - 1) {
+            flatListRef.current?.scrollToIndex({
+              index: index + 1,
+              animated: true,
+            });
+            currentIndex.current = index + 1;
+          } else {
+            Alert.alert("End of List", "No more products available.");
+          }
+        }}
       />
     );
   };
@@ -289,7 +468,8 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
     product: Product;
     onSwipeUp: () => void;
     onSwipeLeft: () => void;
-  }> = ({ product, onSwipeUp, onSwipeLeft }) => {
+    onSwipeRight: () => void;
+  }> = ({ product, onSwipeUp, onSwipeLeft, onSwipeRight }) => {
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
     // Handle image tap to cycle through images
@@ -305,7 +485,8 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
       <GestureHandlerRootView style={styles.productItemContainer}>
         <PanGestureHandler
           onGestureEvent={({ nativeEvent }) => {
-            const { translationY, translationX, velocityY, velocityX } = nativeEvent;
+            const { translationY, translationX, velocityY, velocityX } =
+              nativeEvent;
 
             // Swipe Up
             if (translationY < -50 && velocityY < -0.5) {
@@ -315,6 +496,11 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
             // Swipe Left
             if (translationX < -50 && velocityX < -0.5) {
               onSwipeLeft();
+            }
+
+            // Swipe Right
+            if (translationX > 50 && velocityX > 0.5) {
+              onSwipeRight();
             }
           }}
         >
@@ -332,12 +518,12 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
               />
             </TapGestureHandler>
 
-            {/* Added Like and Share Icons */}
+            {/* Like and Share Icons */}
             <TouchableOpacity
               style={styles.likeIcon}
               onPress={() => {
                 // Handle like action
-                Alert.alert("Liked", `You liked ${product.title}`);
+                Alert.alert("Liked", "You liked this product!");
               }}
               accessibilityLabel="Like Product"
             >
@@ -347,7 +533,7 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
               style={styles.shareIcon}
               onPress={() => {
                 // Handle share action
-                Alert.alert("Share", `You shared ${product.title}`);
+                Alert.alert("Shared", "You shared this product!");
               }}
               accessibilityLabel="Share Product"
             >
@@ -390,6 +576,7 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
                 setLoading(true);
                 setError(null);
                 fetchProducts();
+                fetchCart(); // Also refetch cart
               }}
               accessibilityLabel="Retry Fetching Products"
             >
@@ -493,7 +680,8 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
                     <Text
                       style={[
                         styles.categoryText,
-                        selectedCategory === item && styles.categoryTextSelected,
+                        selectedCategory === item &&
+                          styles.categoryTextSelected,
                       ]}
                     >
                       {item}
@@ -521,7 +709,8 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
                     <Text
                       style={[
                         styles.categoryText,
-                        campusMode === item.value && styles.categoryTextSelected,
+                        campusMode === item.value &&
+                          styles.categoryTextSelected,
                       ]}
                     >
                       {item.label}
@@ -566,11 +755,14 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
             <View style={styles.detailsModalContent}>
               {selectedProduct && (
                 <>
-                  <Text style={styles.detailsTitle}>{selectedProduct.title}</Text>
+                  <Text style={styles.detailsTitle}>
+                    {selectedProduct.title}
+                  </Text>
                   <Image
                     source={{
                       uri:
-                        selectedProduct.images && selectedProduct.images.length > 0
+                        selectedProduct.images &&
+                        selectedProduct.images.length > 0
                           ? selectedProduct.images[0]
                           : "https://via.placeholder.com/150",
                     }}
@@ -655,7 +847,7 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     alignItems: "flex-end", // Move the filter button to the right
   },
-  
+
   filterButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -663,7 +855,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 15,
     borderRadius: 20,
-  },  
+  },
   filterButtonText: {
     color: "#fff",
     fontSize: 14,
@@ -687,46 +879,45 @@ const styles = StyleSheet.create({
     borderRadius: 20, // Optional: Add rounded corners
     resizeMode: "contain", // Ensure the entire image is visible
   },
-   
-likeIcon: {
-  position: "absolute",
-  right: 20,
-  top: SCREEN_HEIGHT * 0.45, // Slightly lower, closer to the share icon
-  width: 40,
-  height: 40,
-  justifyContent: "center",
-  alignItems: "center",
-  backgroundColor: "#FF4D4D", // Subtle red for the heart icon
-  borderRadius: 20, // Smaller circle
-  borderWidth: 2,
-  borderColor: "#FFF", // Thin white border for distinction
-  shadowColor: "#000", // Light shadow for depth
-  shadowOffset: { width: 0, height: 2 },
-  shadowOpacity: 0.2,
-  shadowRadius: 3,
-  elevation: 3, // For Android shadow
-},
 
-shareIcon: {
-  position: "absolute",
-  right: 20,
-  top: SCREEN_HEIGHT * 0.52, // Positioned closer to the like icon
-  width: 40,
-  height: 40,
-  justifyContent: "center",
-  alignItems: "center",
-  backgroundColor: "#34C759", // Subtle green for the share icon
-  borderRadius: 20, // Smaller circle
-  borderWidth: 2,
-  borderColor: "#FFF", // Thin white border for distinction
-  shadowColor: "#000", // Light shadow for depth
-  shadowOffset: { width: 0, height: 2 },
-  shadowOpacity: 0.2,
-  shadowRadius: 3,
-  elevation: 3, // For Android shadow
-},
+  likeIcon: {
+    position: "absolute",
+    right: 20,
+    top: SCREEN_HEIGHT * 0.45, // Slightly lower, closer to the share icon
+    width: 40,
+    height: 40,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#FF4D4D", // Subtle red for the heart icon
+    borderRadius: 20, // Smaller circle
+    borderWidth: 2,
+    borderColor: "#FFF", // Thin white border for distinction
+    shadowColor: "#000", // Light shadow for depth
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3, // For Android shadow
+  },
 
-  
+  shareIcon: {
+    position: "absolute",
+    right: 20,
+    top: SCREEN_HEIGHT * 0.52, // Positioned closer to the like icon
+    width: 40,
+    height: 40,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#34C759", // Subtle green for the share icon
+    borderRadius: 20, // Smaller circle
+    borderWidth: 2,
+    borderColor: "#FFF", // Thin white border for distinction
+    shadowColor: "#000", // Light shadow for depth
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3, // For Android shadow
+  },
+
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
@@ -911,5 +1102,24 @@ shareIcon: {
     color: "#ccc",
     fontSize: 14,
     textAlign: "center",
+  },
+  cartButton: {
+    position: "absolute",
+    bottom: 80, // Adjust based on BottomNavBar height
+    right: 20,
+    backgroundColor: "#BB86FC",
+    padding: 10,
+    borderRadius: 30,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 5,
+  },
+  descriptionText: {
+    color: "#ccc", // Light gray text color
+    fontSize: 14, // Adjust font size as needed
+    lineHeight: 20, // Adjust line height for readability
+    textAlign: "center", // Center align the text
   },
 });
