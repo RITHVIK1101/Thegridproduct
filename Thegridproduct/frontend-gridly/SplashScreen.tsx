@@ -1,85 +1,178 @@
 import React, { useEffect, useRef } from "react";
-import { View, Text, Animated, StyleSheet } from "react-native";
+import {
+  View,
+  Text,
+  Animated,
+  StyleSheet,
+  Dimensions,
+  Platform,
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 
 interface SplashScreenProps {
   onAnimationEnd: () => void;
 }
 
-const SPLASH_TEXT_COLOR = "#BB86FC"; // Define the purple color for consistency
+const SPLASH_TEXT_COLOR = "#BB86FC"; // Purple color for consistency
+
+const { width, height } = Dimensions.get("window");
+const SPEED_MULTIPLIER = 0.65; // Slightly faster animation
 
 const SplashScreen: React.FC<SplashScreenProps> = ({ onAnimationEnd }) => {
-  const opacity = useRef(new Animated.Value(0)).current;
-  const scale = useRef(new Animated.Value(0.8)).current;
-  const subtitleOpacity = useRef(new Animated.Value(0)).current;
+  // Animated values for the logo
+  const logoOpacity = useRef(new Animated.Value(0)).current;
+  const logoScale = useRef(new Animated.Value(0.8)).current;
+  const logoPulse = useRef(new Animated.Value(1)).current; // For pulsing effect
+
+  // Animated values for the lines
+  const linesOpacity = useRef(new Animated.Value(0)).current;
+  const linesTranslateY = useRef(new Animated.Value(50)).current;
 
   useEffect(() => {
-    Animated.sequence([
-      // Fade in and scale up the main title
-      Animated.parallel([
-        Animated.timing(opacity, {
-          toValue: 1,
-          duration: 800, // Slightly longer fade-in
-          useNativeDriver: true,
-        }),
-        Animated.spring(scale, {
-          toValue: 1,
-          friction: 4,
-          useNativeDriver: true,
-        }),
-      ]),
-      // Fade in the subtitle
-      Animated.timing(subtitleOpacity, {
+    // Logo animations: fade in and scale up with pulsing
+    const logoAnimation = Animated.parallel([
+      Animated.timing(logoOpacity, {
         toValue: 1,
-        duration: 800, // Fade-in for subtitle
+        duration: 800 * SPEED_MULTIPLIER,
         useNativeDriver: true,
       }),
-      Animated.delay(1200), // Slightly longer hold time
-      // Fade out and scale up slightly
+      Animated.spring(logoScale, {
+        toValue: 1,
+        friction: 4,
+        useNativeDriver: true,
+      }),
+    ]);
+
+    // Lines animations: fade in and slide up
+    const linesAnimation = Animated.parallel([
+      Animated.timing(linesOpacity, {
+        toValue: 1,
+        duration: 800 * SPEED_MULTIPLIER,
+        useNativeDriver: true,
+      }),
+      Animated.timing(linesTranslateY, {
+        toValue: 0,
+        duration: 800 * SPEED_MULTIPLIER,
+        useNativeDriver: true,
+      }),
+    ]);
+
+    // Pulsing animation for the logo
+    const pulseAnimation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(logoPulse, {
+          toValue: 1.05,
+          duration: 1000 * SPEED_MULTIPLIER,
+          useNativeDriver: true,
+        }),
+        Animated.timing(logoPulse, {
+          toValue: 1,
+          duration: 1000 * SPEED_MULTIPLIER,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    // Start the pulse animation
+    pulseAnimation.start();
+
+    // Sequence of animations
+    Animated.sequence([
+      logoAnimation,
+      linesAnimation,
+      Animated.delay(1200 * SPEED_MULTIPLIER), // Hold the splash screen for a shorter duration
+      // Fade out animations
       Animated.parallel([
-        Animated.timing(opacity, {
+        Animated.timing(logoOpacity, {
           toValue: 0,
-          duration: 500, // Slightly longer fade-out
+          duration: 500 * SPEED_MULTIPLIER,
           useNativeDriver: true,
         }),
-        Animated.timing(subtitleOpacity, {
+        Animated.timing(linesOpacity, {
           toValue: 0,
-          duration: 500,
+          duration: 500 * SPEED_MULTIPLIER,
           useNativeDriver: true,
         }),
-        Animated.timing(scale, {
-          toValue: 1.2, // Slight scale up during fade-out
-          duration: 500,
+        Animated.timing(logoScale, {
+          toValue: 1.2,
+          duration: 500 * SPEED_MULTIPLIER,
           useNativeDriver: true,
         }),
       ]),
     ]).start(() => {
+      // Stop the pulse animation when done
+      pulseAnimation.stop();
+      // Callback after animation ends
       onAnimationEnd();
     });
-  }, [opacity, scale, subtitleOpacity, onAnimationEnd]);
+  }, [
+    logoOpacity,
+    logoScale,
+    logoPulse,
+    linesOpacity,
+    linesTranslateY,
+    onAnimationEnd,
+  ]);
 
   return (
     <View style={styles.container}>
-      <Animated.Text
+      {/* Logo Section */}
+      <Animated.View
         style={[
-          styles.title,
+          styles.logoContainer,
           {
-            opacity: opacity,
-            transform: [{ scale: scale }],
+            opacity: logoOpacity,
+            transform: [
+              { scale: logoScale },
+              { scale: logoPulse }, // Apply pulsing effect
+            ],
           },
         ]}
       >
-        The Gridly
-      </Animated.Text>
-      <Animated.Text
+        <Ionicons name="grid-outline" size={60} color={SPLASH_TEXT_COLOR} />
+        <Text style={styles.logoText}>Gridly</Text>
+      </Animated.View>
+
+      {/* Animated Lines */}
+      <Animated.View
         style={[
-          styles.subtitle,
+          styles.line,
           {
-            opacity: subtitleOpacity,
+            opacity: linesOpacity,
+            transform: [{ translateY: linesTranslateY }],
           },
         ]}
-      >
-        The Largest Campus Marketplace for Everything
-      </Animated.Text>
+      />
+      <Animated.View
+        style={[
+          styles.line,
+          styles.lineSecond,
+          {
+            opacity: linesOpacity,
+            transform: [{ translateY: linesTranslateY }],
+          },
+        ]}
+      />
+      <Animated.View
+        style={[
+          styles.line,
+          styles.lineThird,
+          {
+            opacity: linesOpacity,
+            transform: [{ translateY: linesTranslateY }],
+          },
+        ]}
+      />
+      <Animated.View
+        style={[
+          styles.line,
+          styles.lineFourth,
+          {
+            opacity: linesOpacity,
+            transform: [{ translateY: linesTranslateY }],
+          },
+        ]}
+      />
     </View>
   );
 };
@@ -90,19 +183,39 @@ const styles = StyleSheet.create({
     backgroundColor: "#121212", // Dark background to match the app's theme
     justifyContent: "center",
     alignItems: "center",
+    position: "relative",
   },
-  title: {
-    fontSize: 48,
-    fontWeight: "bold",
-    color: "#BB86FC", // Changed to vibrant purple
-    letterSpacing: 2,
-    marginBottom: 10, // Space between title and subtitle
+  logoContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 40,
   },
-  subtitle: {
-    fontSize: 18,
-    color: "#BB86FC", // Changed to vibrant purple
-    textAlign: "center",
-    paddingHorizontal: 20, // Optional padding
+  logoText: {
+    fontSize: 32,
+    fontWeight: "700",
+    color: SPLASH_TEXT_COLOR,
+    marginLeft: 10, // Space between icon and text
+    fontFamily: Platform.OS === "ios" ? "HelveticaNeue-Bold" : "Roboto",
+  },
+  line: {
+    position: "absolute",
+    width: width * 0.6,
+    height: 3,
+    backgroundColor: SPLASH_TEXT_COLOR,
+    top: height / 2 + 50, // Position below the logo
+    borderRadius: 2,
+  },
+  lineSecond: {
+    top: height / 2 + 60,
+    width: width * 0.5,
+  },
+  lineThird: {
+    top: height / 2 + 70,
+    width: width * 0.4,
+  },
+  lineFourth: {
+    top: height / 2 + 80,
+    width: width * 0.3,
   },
 });
 
