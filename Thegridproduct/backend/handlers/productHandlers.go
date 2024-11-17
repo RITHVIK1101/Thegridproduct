@@ -5,6 +5,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -16,6 +17,7 @@ import (
 	"github.com/gorilla/mux"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 func AddProductHandler(w http.ResponseWriter, r *http.Request) {
@@ -400,4 +402,167 @@ func GetProductsByIDsHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(products)
+}
+func AddMultipleProductsHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method != http.MethodPost {
+		WriteJSONError(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Retrieve authenticated user details from context
+	userId, ok := r.Context().Value(userIDKey).(string)
+	if !ok || userId == "" {
+		WriteJSONError(w, "User not authenticated", http.StatusUnauthorized)
+		return
+	}
+
+	university, ok := r.Context().Value(userInstitution).(string)
+	if !ok || university == "" {
+		WriteJSONError(w, "User university information missing", http.StatusUnauthorized)
+		return
+	}
+
+	studentType, ok := r.Context().Value(userStudentType).(string)
+	if !ok || studentType == "" {
+		WriteJSONError(w, "User student type information missing", http.StatusUnauthorized)
+		return
+	}
+
+	userObjID, err := primitive.ObjectIDFromHex(userId)
+	if err != nil {
+		WriteJSONError(w, "Invalid user ID", http.StatusBadRequest)
+		return
+	}
+
+	var products []models.Product
+	if err := json.NewDecoder(r.Body).Decode(&products); err != nil {
+		log.Printf("Error decoding request body: %v", err)
+		WriteJSONError(w, "Invalid input", http.StatusBadRequest)
+		return
+	}
+
+	// Optional: Limit the batch size
+	const MaxBatchSize = 50
+	if len(products) > MaxBatchSize {
+		WriteJSONError(w, fmt.Sprintf("Cannot add more than %d products at once", MaxBatchSize), http.StatusBadRequest)
+		return
+	}
+
+	// Validate and prepare each product
+	var insertDocs []interface{}
+	for i, product := range products {
+		// Populate product fields
+		product.UserID = userObjID
+		product.University = university
+		product.StudentType = studentType
+		product.PostedDate = time.Now()
+		product.Expired = false
+
+		// Validate required fields
+		if product.Title == "" || product.Price == 0 || product.Description == "" ||
+			len(product.SelectedTags) == 0 || len(product.Images) == 0 ||
+			product.Rating < 1 || product.Rating > 5 {
+			WriteJSONError(w, fmt.Sprintf("Missing required fields or invalid input in product at index %d", i), http.StatusBadRequest)
+			return
+		}
+
+		insertDocs = append(insertDocs, product)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	collection := db.GetCollection("gridlyapp", "products")
+	result, err := collection.InsertMany(ctx, insertDocs)
+	if err != nil {
+		log.Printf("Error inserting products: %v", err)
+		WriteJSONError(w, "Error saving products", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"message":  "Products added successfully",
+		"inserted": result.InsertedIDs,
+	})
+}
+
+// DeleteProductHandler handles the deletion of a product by its ID
+func DeleteProductHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Ensure the request method is DELETE
+	if r.Method != http.MethodDelete {
+		WriteJSONError(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Retrieve authenticated user details from context
+	userId, ok := r.Context().Value(userIDKey).(string)
+	if !ok || userId == "" {
+		WriteJSONError(w, "User not authenticated", http.StatusUnauthorized)
+		return
+	}
+
+	userObjID, err := primitive.ObjectIDFromHex(userId)
+	if err != nil {
+		WriteJSONError(w, "Invalid user ID", http.StatusBadRequest)
+		return
+	}
+
+	// Extract product ID from URL parameters
+	vars := mux.Vars(r)
+	id := vars["id"]
+
+	productID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		WriteJSONError(w, "Invalid product ID format", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	collection := db.GetCollection("gridlyapp", "products")
+
+	// Fetch the product to verify ownership
+	var existingProduct models.Product
+	err = collection.FindOne(ctx, bson.M{"_id": productID}).Decode(&existingProduct)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			WriteJSONError(w, "Product not found", http.StatusNotFound)
+			return
+		}
+		log.Printf("Error fetching product: %v", err)
+		WriteJSONError(w, "Error fetching product data", http.StatusInternalServerError)
+		return
+	}
+
+	// Check if the authenticated user is the owner of the product
+	if existingProduct.UserID != userObjID {
+		WriteJSONError(w, "Unauthorized to delete this product", http.StatusUnauthorized)
+		return
+	}
+
+	// Proceed to delete the product
+	deleteResult, err := collection.DeleteOne(ctx, bson.M{"_id": productID})
+	if err != nil {
+		log.Printf("Error deleting product: %v", err)
+		WriteJSONError(w, "Error deleting product", http.StatusInternalServerError)
+		return
+	}
+
+	if deleteResult.DeletedCount == 0 {
+		WriteJSONError(w, "Product not found or already deleted", http.StatusNotFound)
+		return
+	}
+
+	// Respond with a success message
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"message": "Product deleted successfully",
+		"deleted": deleteResult.DeletedCount,
+	})
 }

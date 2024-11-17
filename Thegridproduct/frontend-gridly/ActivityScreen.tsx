@@ -97,6 +97,79 @@ const ActivityScreen: React.FC = () => {
     }
   };
 
+  // Function to handle deleting a product
+  const handleDeleteProduct = (productId: string) => {
+    Alert.alert(
+      "Confirm Deletion",
+      "Are you sure you want to delete this product?",
+      [
+        {
+          text: "No",
+          style: "cancel",
+        },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => deleteProduct(productId),
+        },
+      ],
+      { cancelable: true }
+    );
+  };
+
+  // Function to perform the DELETE request
+  const deleteProduct = async (productId: string) => {
+    if (!token) {
+      Alert.alert("Error", "You are not authenticated.");
+      return;
+    }
+
+    try {
+      // Optionally, show a loading indicator or disable the UI
+
+      const response = await fetch(`${NGROK_URL}/products/${productId}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        const text = await response.text();
+        throw new Error(
+          `Unexpected response format: ${response.status} ${text}`
+        );
+      }
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // Remove the deleted product from the local state
+        setProducts((prevProducts) =>
+          prevProducts.filter((product) => product.id !== productId)
+        );
+        setFilteredProducts((prevProducts) =>
+          prevProducts.filter((product) => product.id !== productId)
+        );
+        Alert.alert("Success", "Product deleted successfully.");
+      } else {
+        // Handle errors returned from the backend
+        const errorMessage = data.error || "Failed to delete the product.";
+        Alert.alert("Error", errorMessage);
+      }
+    } catch (error) {
+      console.error("Error deleting product:", error);
+      Alert.alert(
+        "Error",
+        error instanceof Error ? error.message : "An unexpected error occurred."
+      );
+    } finally {
+      // Optionally, hide the loading indicator or re-enable the UI
+    }
+  };
+
   // Fetch data when screen is focused
   useEffect(() => {
     if (isFocused) {
@@ -137,24 +210,26 @@ const ActivityScreen: React.FC = () => {
       daysActive > 30 ? "Expired" : `Active for ${daysActive} days`;
 
     return (
-      <TouchableOpacity
-        style={styles.itemContainer}
-        onPress={() => navigateToEditProduct(item.id)}
-        activeOpacity={0.8}
-      >
+      <View style={styles.itemContainer}>
         {/* Icon Container */}
         <View style={styles.iconContainer}>
           {/* Functional Edit Button */}
           <TouchableOpacity
             style={styles.editIconTouchable}
             onPress={() => navigateToEditProduct(item.id)}
-            activeOpacity={0.7}
+            hitSlop={{ top: 100, bottom: 100, left: 100, right: 100 }}
+            activeOpacity={7.9}
           >
             <Ionicons name="pencil-outline" size={24} color="#4CAF50" />
           </TouchableOpacity>
 
-          {/* Non-functional Delete Icon */}
-          <TouchableOpacity style={styles.deleteIconTouchable}>
+          {/* Functional Delete Button */}
+          <TouchableOpacity
+            style={styles.deleteIconTouchable}
+            onPress={() => handleDeleteProduct(item.id)}
+            hitSlop={{ top: 100, bottom: 100, left: 100, right: 100 }}
+            activeOpacity={7.9}
+          >
             <Ionicons name="trash-outline" size={24} color="#FF6B6B" />
           </TouchableOpacity>
         </View>
@@ -175,7 +250,7 @@ const ActivityScreen: React.FC = () => {
             </View>
           ))}
         </ScrollView>
-      </TouchableOpacity>
+      </View>
     );
   };
 
@@ -313,19 +388,19 @@ const styles = StyleSheet.create({
     position: "relative",
   },
   iconContainer: {
-    flexDirection: "column",
+    flexDirection: "row",
     position: "absolute",
     top: 8,
     right: 8,
   },
   editIconTouchable: {
-    padding: 8, // Increased padding for larger hitbox
+    padding: 20, // Increased padding for larger hitbox
     borderRadius: 12,
     backgroundColor: "#2C2C2C", // Slightly lighter background for visibility
-    marginBottom: 8, // Space between edit and delete icons
+    marginRight: 8, // Space between edit and delete icons
   },
   deleteIconTouchable: {
-    padding: 8, // Increased padding for larger hitbox
+    padding: 20, // Increased padding for larger hitbox
     borderRadius: 12,
     backgroundColor: "#2C2C2C", // Slightly lighter background for visibility
   },

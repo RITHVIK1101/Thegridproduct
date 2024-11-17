@@ -52,7 +52,9 @@ func main() {
 	protected.HandleFunc("/products/all", handlers.GetAllProductsHandler).Methods("GET")
 	protected.HandleFunc("/products/by-ids", handlers.GetProductsByIDsHandler).Methods("GET")
 	protected.HandleFunc("/products/{id}", handlers.GetSingleProductHandler).Methods("GET")
+	protected.HandleFunc("/products/{id}", handlers.DeleteProductHandler).Methods("DELETE")
 	protected.HandleFunc("/products/{id}", handlers.UpdateProductHandler).Methods("PUT")
+	protected.HandleFunc("/products/bulk", handlers.AddMultipleProductsHandler).Methods("POST")
 
 	// Gig Routes
 	protected.HandleFunc("/gigs", handlers.AddGigHandler).Methods("POST")
