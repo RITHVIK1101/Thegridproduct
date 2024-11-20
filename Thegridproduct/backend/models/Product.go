@@ -28,4 +28,5 @@ type Product struct {
 	Availability           string             `json:"availability" bson:"availability"`                             // "In Campus Only" or "On and Off Campus"
 	University             string             `json:"university" bson:"university"`                                 // University associated with the product
 	StudentType            string             `json:"studentType" bson:"studentType"`                               // "highschool" or "university"
+	Condition              string             `json:"condition,omitempty" bson:"condition,omitempty"`               // "New" or "Used"
 }

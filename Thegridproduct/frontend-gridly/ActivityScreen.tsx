@@ -83,8 +83,15 @@ const ActivityScreen: React.FC = () => {
       }
 
       const data: Product[] = await response.json();
-      setProducts(data);
-      setFilteredProducts(data); // Initialize filtered products
+      if (!data || data.length === 0) {
+        console.log("No products available.");
+        setProducts([]);
+        setFilteredProducts([]); // Clear filtered products
+        setError("No products posted."); // Optional: Use an error message for UI
+      } else {
+        setProducts(data);
+        setFilteredProducts(data); // Initialize filtered products
+      }
     } catch (err) {
       console.error("Error fetching your products:", err);
       setError(
@@ -217,7 +224,7 @@ const ActivityScreen: React.FC = () => {
           <TouchableOpacity
             style={styles.editIconTouchable}
             onPress={() => navigateToEditProduct(item.id)}
-            hitSlop={{ top: 100, bottom: 100, left: 100, right: 100 }}
+            hitSlop={{ top: 100, bottom: 100, left: 800, right: 400 }}
             activeOpacity={7.9}
           >
             <Ionicons name="pencil-outline" size={24} color="#4CAF50" />
@@ -227,7 +234,7 @@ const ActivityScreen: React.FC = () => {
           <TouchableOpacity
             style={styles.deleteIconTouchable}
             onPress={() => handleDeleteProduct(item.id)}
-            hitSlop={{ top: 100, bottom: 100, left: 100, right: 100 }}
+            hitSlop={{ top: 100, bottom: 100, left: 30, right: 100 }}
             activeOpacity={7.9}
           >
             <Ionicons name="trash-outline" size={24} color="#FF6B6B" />
@@ -299,7 +306,6 @@ const ActivityScreen: React.FC = () => {
       ) : error ? (
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>{error}</Text>
-          <Button title="Retry" onPress={handleRefresh} color="#BB86FC" />
         </View>
       ) : (
         <FlatList
@@ -371,7 +377,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
   },
   errorText: {
-    color: "#FF6B6B", // Red color for errors
+    color: "white", // Red color for errors
     fontSize: 14,
     textAlign: "center",
     marginBottom: 8,

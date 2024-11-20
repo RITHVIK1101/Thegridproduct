@@ -30,6 +30,7 @@ import {
   PanGestureHandler,
   TapGestureHandler,
   GestureHandlerRootView,
+  State,
 } from "react-native-gesture-handler";
 
 type DashboardProps = {
@@ -278,7 +279,6 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
       });
 
       if (response.status === 401) {
-        // Unauthorized: Clear user data and navigate to Login
         Alert.alert(
           "Session Expired",
           "Your session has expired. Please log in again.",
@@ -318,9 +318,12 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
 
       const data: Product[] = await response.json();
 
-      if (!data || !Array.isArray(data)) {
-        console.error("Received invalid data:", data);
-        throw new Error("Received invalid data from server.");
+      if (!data || !Array.isArray(data) || data.length === 0) {
+        // Handle empty product list
+        setAllProducts([]);
+        setFilteredProducts([]);
+        setError(null); // Clear any previous error
+        return; // Stop further processing
       }
 
       // If Both mode, all products except user's own are already fetched
@@ -342,6 +345,7 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
 
       setAllProducts(filtered);
       setFilteredProducts(finalFiltered);
+      setError(null); // Clear any previous error
     } catch (err) {
       console.error("Error fetching products:", err);
       setError(
@@ -471,6 +475,7 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
     onSwipeRight: () => void;
   }> = ({ product, onSwipeUp, onSwipeLeft, onSwipeRight }) => {
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
+    const [isAdding, setIsAdding] = useState(false); // Prevent multiple adds
 
     // Handle image tap to cycle through images
     const handleImageTap = () => {
@@ -481,29 +486,37 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
       }
     };
 
+    // Handle swipe actions only once
+    const handleStateChange = ({ nativeEvent }: any) => {
+      if (nativeEvent.state === State.END) {
+        const { translationY, translationX, velocityY, velocityX } =
+          nativeEvent;
+
+        // Swipe Up
+        if (translationY < -50 && velocityY < -0.5) {
+          onSwipeUp();
+        }
+
+        // Swipe Left
+        if (translationX < -50 && velocityX < -0.5) {
+          onSwipeLeft();
+        }
+
+        // Swipe Right
+        if (translationX > 50 && velocityX > 0.5) {
+          if (!isAdding) {
+            setIsAdding(true);
+            onSwipeRight();
+            // Reset the adding flag after a short delay
+            setTimeout(() => setIsAdding(false), 1000);
+          }
+        }
+      }
+    };
+
     return (
       <GestureHandlerRootView style={styles.productItemContainer}>
-        <PanGestureHandler
-          onGestureEvent={({ nativeEvent }) => {
-            const { translationY, translationX, velocityY, velocityX } =
-              nativeEvent;
-
-            // Swipe Up
-            if (translationY < -50 && velocityY < -0.5) {
-              onSwipeUp();
-            }
-
-            // Swipe Left
-            if (translationX < -50 && velocityX < -0.5) {
-              onSwipeLeft();
-            }
-
-            // Swipe Right
-            if (translationX > 50 && velocityX > 0.5) {
-              onSwipeRight();
-            }
-          }}
-        >
+        <PanGestureHandler onHandlerStateChange={handleStateChange}>
           <Animated.View style={styles.productContainer}>
             <TapGestureHandler onActivated={handleImageTap}>
               <Image
@@ -849,12 +862,16 @@ const styles = StyleSheet.create({
   },
 
   filterButton: {
+    position: "absolute",
     flexDirection: "row",
+    top: 10, // Adjust this value to position it correctly
+    right: 10, // Adjust this value to position it correctly
     alignItems: "center",
     backgroundColor: "#BB86FC", // Purple button
     paddingVertical: 8,
     paddingHorizontal: 15,
     borderRadius: 20,
+    zIndex: 10,
   },
   filterButtonText: {
     color: "#fff",
@@ -866,18 +883,14 @@ const styles = StyleSheet.create({
   productItemContainer: {
     height: SCREEN_HEIGHT,
   },
-  productContainer: {
-    flex: 1,
-    backgroundColor: "#1E1E1E", // Darker card background
-    padding: 15,
-    position: "relative", // To position icons absolutely within
-  },
+
   productImage: {
-    width: SCREEN_WIDTH * 0.95, // Occupy 95% of the screen width
-    height: SCREEN_HEIGHT * 0.75, // Occupy 75% of the screen height
+    width: SCREEN_WIDTH, // Occupy the full screen width
+    aspectRatio: 9 / 13.5, // Adjust this to match the original aspect ratio of your image
     alignSelf: "center", // Center the image horizontally
     borderRadius: 20, // Optional: Add rounded corners
-    resizeMode: "contain", // Ensure the entire image is visible
+    resizeMode: "contain", // Ensure the image content is fully visible
+    backgroundColor: "#121212", // Optional: Add a background for better visibility
   },
 
   likeIcon: {

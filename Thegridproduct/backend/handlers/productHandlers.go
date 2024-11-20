@@ -20,6 +20,8 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
+// handlers/productHandlers.go
+
 func AddProductHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -68,9 +70,51 @@ func AddProductHandler(w http.ResponseWriter, r *http.Request) {
 	product.Expired = false
 
 	// Validate required fields
-	if product.Title == "" || product.Price == 0 || product.Description == "" ||
-		len(product.SelectedTags) == 0 || len(product.Images) == 0 || product.Rating < 1 || product.Rating > 5 {
+	if product.Title == "" || product.Description == "" || len(product.SelectedTags) == 0 ||
+		len(product.Images) == 0 || (product.ListingType != "Renting" && (product.Rating < 1 || product.Rating > 5)) ||
+		(product.ListingType != "Renting" && product.Price == 0) {
 		WriteJSONError(w, "Missing required fields or invalid input", http.StatusBadRequest)
+		return
+	}
+
+	// Additional Validation based on ListingType
+	switch product.ListingType {
+	case "Selling":
+		// No additional fields required
+	case "Renting":
+		log.Printf("Validating Renting Product: %+v", product)
+
+		if product.Condition == "" {
+			log.Println("Condition is missing")
+			WriteJSONError(w, "Condition is required for Renting listing type", http.StatusBadRequest)
+			return
+		}
+		if product.Availability != "In Campus Only" {
+			log.Printf("Invalid Availability: %s", product.Availability)
+			WriteJSONError(w, "Availability must be 'In Campus Only' for Renting listing type", http.StatusBadRequest)
+			return
+		}
+		if product.RentDuration == "" {
+			log.Println("Rent Duration is missing")
+			WriteJSONError(w, "Rent Duration is required for Renting listing type", http.StatusBadRequest)
+			return
+		}
+
+	case "Both":
+		if product.Condition == "" {
+			WriteJSONError(w, "Condition is required for Both listing type", http.StatusBadRequest)
+			return
+		}
+		if product.Availability != "On and Off Campus" {
+			WriteJSONError(w, "Availability must be 'On and Off Campus' for Both listing type", http.StatusBadRequest)
+			return
+		}
+		if product.RentDuration == "" {
+			WriteJSONError(w, "Rent Duration is required for Both listing type", http.StatusBadRequest)
+			return
+		}
+	default:
+		WriteJSONError(w, "Invalid Listing Type", http.StatusBadRequest)
 		return
 	}
 
@@ -254,6 +298,7 @@ func GetUserProductsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // UpdateProductHandler handles updating an existing product by ID with authentication
+// UpdateProductHandler handles updating an existing product by ID with authentication
 func UpdateProductHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if r.Method != http.MethodPut {
@@ -261,6 +306,7 @@ func UpdateProductHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Authenticate user
 	userId, ok := r.Context().Value(userIDKey).(string)
 	if !ok || userId == "" {
 		WriteJSONError(w, "User not authenticated", http.StatusUnauthorized)
@@ -273,6 +319,7 @@ func UpdateProductHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get product ID from URL
 	vars := mux.Vars(r)
 	id, exists := vars["id"]
 	if !exists || id == "" {
@@ -286,13 +333,7 @@ func UpdateProductHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var updatedProduct models.Product
-	if err := json.NewDecoder(r.Body).Decode(&updatedProduct); err != nil {
-		log.Printf("Error decoding request body: %v", err)
-		WriteJSONError(w, "Invalid input", http.StatusBadRequest)
-		return
-	}
-
+	// Fetch existing product
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -304,26 +345,99 @@ func UpdateProductHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Ensure the authenticated user owns the product
 	if existingProduct.UserID != userObjID {
 		WriteJSONError(w, "Unauthorized to update this product", http.StatusUnauthorized)
 		return
 	}
 
+	// Define a struct for the fields that can be updated
+	type ProductUpdate struct {
+		Title                  string   `json:"title,omitempty"`
+		Price                  *float64 `json:"price,omitempty"`
+		OutOfCampusPrice       *float64 `json:"outOfCampusPrice,omitempty"`
+		RentPrice              *float64 `json:"rentPrice,omitempty"`
+		RentDuration           string   `json:"rentDuration,omitempty"`
+		Description            string   `json:"description,omitempty"`
+		SelectedTags           []string `json:"selectedTags,omitempty"`
+		Images                 []string `json:"images,omitempty"`
+		IsAvailableOutOfCampus *bool    `json:"isAvailableOutOfCampus,omitempty"`
+	}
+
+	var updatedData ProductUpdate
+	if err := json.NewDecoder(r.Body).Decode(&updatedData); err != nil {
+		log.Printf("Error decoding request body: %v", err)
+		WriteJSONError(w, "Invalid input", http.StatusBadRequest)
+		return
+	}
+
+	// Validate updated fields based on existing ListingType
+	switch existingProduct.ListingType {
+	case "Selling":
+		// No additional fields required
+	case "Renting":
+		if updatedData.RentDuration == "" && existingProduct.RentDuration == "" {
+			WriteJSONError(w, "Rent Duration is required for Renting listing type", http.StatusBadRequest)
+			return
+		}
+		if updatedData.RentPrice == nil && existingProduct.RentPrice == 0 {
+			WriteJSONError(w, "Rent Price is required for Renting listing type", http.StatusBadRequest)
+			return
+		}
+	case "Both":
+		if updatedData.RentDuration == "" && existingProduct.RentDuration == "" {
+			WriteJSONError(w, "Rent Duration is required for Both listing type", http.StatusBadRequest)
+			return
+		}
+		if updatedData.RentPrice == nil && existingProduct.RentPrice == 0 {
+			WriteJSONError(w, "Rent Price is required for Both listing type", http.StatusBadRequest)
+			return
+		}
+	default:
+		WriteJSONError(w, "Invalid Listing Type", http.StatusBadRequest)
+		return
+	}
+
+	// Prepare update document with only allowed fields
+	updateFields := bson.M{}
+
+	if updatedData.Title != "" {
+		updateFields["title"] = updatedData.Title
+	}
+	if updatedData.Price != nil {
+		updateFields["price"] = *updatedData.Price
+	}
+	if updatedData.OutOfCampusPrice != nil {
+		updateFields["outOfCampusPrice"] = *updatedData.OutOfCampusPrice
+	}
+	if updatedData.RentPrice != nil {
+		updateFields["rentPrice"] = *updatedData.RentPrice
+	}
+	if updatedData.RentDuration != "" {
+		updateFields["rentDuration"] = updatedData.RentDuration
+	}
+	if updatedData.Description != "" {
+		updateFields["description"] = updatedData.Description
+	}
+	if updatedData.SelectedTags != nil {
+		updateFields["selectedTags"] = updatedData.SelectedTags
+	}
+	if updatedData.Images != nil {
+		updateFields["images"] = updatedData.Images
+	}
+	if updatedData.IsAvailableOutOfCampus != nil {
+		updateFields["isAvailableOutOfCampus"] = *updatedData.IsAvailableOutOfCampus
+	}
+
+	// Check if there's any field to update
+	if len(updateFields) == 0 {
+		WriteJSONError(w, "No valid fields to update", http.StatusBadRequest)
+		return
+	}
+
+	// Perform the update
 	update := bson.M{
-		"$set": bson.M{
-			"title":                  updatedProduct.Title,
-			"price":                  updatedProduct.Price,
-			"description":            updatedProduct.Description,
-			"selectedTags":           updatedProduct.SelectedTags,
-			"images":                 updatedProduct.Images,
-			"isAvailableOutOfCampus": updatedProduct.IsAvailableOutOfCampus,
-			"rating":                 updatedProduct.Rating,
-			"listingType":            updatedProduct.ListingType,
-			"availability":           updatedProduct.Availability,
-			"rentDuration":           updatedProduct.RentDuration,
-			"rentPrice":              updatedProduct.RentPrice,
-			"outOfCampusPrice":       updatedProduct.OutOfCampusPrice,
-		},
+		"$set": updateFields,
 	}
 
 	result, err := collection.UpdateOne(ctx, bson.M{"_id": productID}, update)
@@ -403,6 +517,8 @@ func GetProductsByIDsHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(products)
 }
+
+// AddMultipleProductsHandler handles adding multiple products at once
 func AddMultipleProductsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -465,6 +581,41 @@ func AddMultipleProductsHandler(w http.ResponseWriter, r *http.Request) {
 			len(product.SelectedTags) == 0 || len(product.Images) == 0 ||
 			product.Rating < 1 || product.Rating > 5 {
 			WriteJSONError(w, fmt.Sprintf("Missing required fields or invalid input in product at index %d", i), http.StatusBadRequest)
+			return
+		}
+
+		// Additional Validation based on ListingType
+		switch product.ListingType {
+		case "Selling":
+			// No additional fields required
+		case "Renting":
+			if product.Condition == "" {
+				WriteJSONError(w, fmt.Sprintf("Condition is required for Renting listing type in product at index %d", i), http.StatusBadRequest)
+				return
+			}
+			if product.Availability != "In Campus Only" {
+				WriteJSONError(w, fmt.Sprintf("Availability must be 'In Campus Only' for Renting listing type in product at index %d", i), http.StatusBadRequest)
+				return
+			}
+			if product.RentDuration == "" {
+				WriteJSONError(w, fmt.Sprintf("Rent Duration is required for Renting listing type in product at index %d", i), http.StatusBadRequest)
+				return
+			}
+		case "Both":
+			if product.Condition == "" {
+				WriteJSONError(w, fmt.Sprintf("Condition is required for Both listing type in product at index %d", i), http.StatusBadRequest)
+				return
+			}
+			if product.Availability != "On and Off Campus" {
+				WriteJSONError(w, fmt.Sprintf("Availability must be 'On and Off Campus' for Both listing type in product at index %d", i), http.StatusBadRequest)
+				return
+			}
+			if product.RentDuration == "" {
+				WriteJSONError(w, fmt.Sprintf("Rent Duration is required for Both listing type in product at index %d", i), http.StatusBadRequest)
+				return
+			}
+		default:
+			WriteJSONError(w, fmt.Sprintf("Invalid Listing Type in product at index %d", i), http.StatusBadRequest)
 			return
 		}
 

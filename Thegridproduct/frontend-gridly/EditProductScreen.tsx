@@ -30,18 +30,23 @@ import {
 } from "firebase/storage";
 import * as ImageManipulator from "expo-image-manipulator";
 
+type DurationUnit = "Hours" | "Days" | "Weeks" | "Months";
+
 interface FormData {
   images: string[];
   title: string;
   price: string;
   outOfCampusPrice: string;
   rentPrice: string;
+  rentDuration: string; // Numeric part of duration
+  durationUnit: DurationUnit; // Unit part of duration
   description: string;
   selectedTags: string[];
   availability: "In Campus Only" | "On and Off Campus";
   rating: number;
   listingType: "Selling" | "Renting" | "Both";
   isAvailableOutOfCampus: boolean;
+  condition: "New" | "Used";
 }
 
 type EditProductScreenRouteProp = RouteProp<RootStackParamList, "EditProduct">;
@@ -67,12 +72,15 @@ const EditProduct: React.FC<Props> = ({ route, navigation }) => {
     price: "",
     outOfCampusPrice: "",
     rentPrice: "",
+    rentDuration: "",
+    durationUnit: "Days",
     description: "",
     selectedTags: [],
     availability: "In Campus Only",
     rating: 0,
     listingType: "Selling",
     isAvailableOutOfCampus: false,
+    condition: "New",
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -181,6 +189,15 @@ const EditProduct: React.FC<Props> = ({ route, navigation }) => {
         const productData = await response.json();
         console.log("Fetched product data:", productData);
 
+        // Split rentDuration into number and unit
+        let rentDurationNumber = "";
+        let rentDurationUnit: DurationUnit = "Days";
+        if (productData.rentDuration) {
+          const [number, unit] = productData.rentDuration.split(" ");
+          rentDurationNumber = number || "";
+          rentDurationUnit = unit || "Days";
+        }
+
         setFormData({
           images: productData.images || [],
           title: productData.title || "",
@@ -191,6 +208,8 @@ const EditProduct: React.FC<Props> = ({ route, navigation }) => {
           rentPrice: productData.rentPrice
             ? productData.rentPrice.toString()
             : "",
+          rentDuration: rentDurationNumber,
+          durationUnit: rentDurationUnit as DurationUnit,
           description: productData.description || "",
           selectedTags: productData.selectedTags || [],
           availability: productData.isAvailableOutOfCampus
@@ -199,6 +218,7 @@ const EditProduct: React.FC<Props> = ({ route, navigation }) => {
           rating: productData.rating || 0,
           listingType: productData.listingType || "Selling",
           isAvailableOutOfCampus: productData.isAvailableOutOfCampus || false,
+          condition: productData.condition || "New",
         });
       } catch (err) {
         console.error("Error fetching product data:", err);
@@ -294,8 +314,7 @@ const EditProduct: React.FC<Props> = ({ route, navigation }) => {
         selectedTags: formData.selectedTags,
         images: formData.images,
         isAvailableOutOfCampus: formData.isAvailableOutOfCampus,
-        rating: formData.rating,
-        // listingType and availability are not editable
+        // listingType, availability, condition, and rating are not editable
       };
 
       if (
@@ -303,8 +322,10 @@ const EditProduct: React.FC<Props> = ({ route, navigation }) => {
         formData.listingType === "Renting"
       ) {
         payload.rentPrice = rentPriceNumber;
-        // If you have a rentDuration field, include it here
-        // payload.rentDuration = formData.rentDuration.trim();
+        // Include rentDuration
+        payload.rentDuration = `${formData.rentDuration.trim()} ${
+          formData.durationUnit
+        }`;
       }
 
       if (formData.availability === "On and Off Campus") {
@@ -395,8 +416,7 @@ const EditProduct: React.FC<Props> = ({ route, navigation }) => {
       case 2:
         return (
           formData.description.trim().length > 0 &&
-          formData.selectedTags.length > 0 &&
-          formData.rating > 0
+          formData.selectedTags.length > 0
         );
       case 3:
         return true; // Final step, no validation needed here
@@ -426,7 +446,11 @@ const EditProduct: React.FC<Props> = ({ route, navigation }) => {
                     style={styles.removeButton}
                     onPress={() => handleRemoveImage(index)}
                   >
-                    <Ionicons name="close-circle-outline" size={24} color="#FF0000" />
+                    <Ionicons
+                      name="close-circle-outline"
+                      size={24}
+                      color="#FF0000"
+                    />
                   </TouchableOpacity>
                 </View>
               ))}
@@ -467,7 +491,9 @@ const EditProduct: React.FC<Props> = ({ route, navigation }) => {
                 key={tag}
                 style={[
                   styles.tag,
-                  formData.selectedTags.includes(tag) ? styles.tagSelected : null,
+                  formData.selectedTags.includes(tag)
+                    ? styles.tagSelected
+                    : null,
                 ]}
                 onPress={() => toggleTag(tag)}
               >
@@ -485,35 +511,51 @@ const EditProduct: React.FC<Props> = ({ route, navigation }) => {
             ))}
           </ScrollView>
 
-          {/* Rating */}
-          <Text style={styles.label}>Rate Quality</Text>
-          <View style={styles.ratingContainer}>
-            {[1, 2, 3, 4, 5].map((star) => (
-              <TouchableOpacity
-                key={star}
-                onPress={() => setFormData({ ...formData, rating: star })}
-              >
-                <Ionicons
-                  name="star"
-                  size={30}
-                  color={formData.rating >= star ? "#FFD700" : "#ccc"}
-                />
-              </TouchableOpacity>
-            ))}
+          {/* Condition (Non-Editable) */}
+          <View style={styles.sectionContainer}>
+            <Text style={styles.sectionTitle}>Condition</Text>
+            <View style={styles.infoContainer}>
+              <Text style={styles.infoText}>{formData.condition}</Text>
+            </View>
+            <Text style={styles.noteText}>
+              Condition cannot be changed. To modify it, please delete the
+              product and create a new one.
+            </Text>
           </View>
-          <Text style={styles.ratingDescription}>
-            {formData.rating === 1
-              ? "Poor"
-              : formData.rating === 2
-              ? "Fair"
-              : formData.rating === 3
-              ? "Good"
-              : formData.rating === 4
-              ? "Very Good"
-              : formData.rating === 5
-              ? "Excellent"
-              : "Select a rating"}
-          </Text>
+
+          {/* Rating (if Used) */}
+          {formData.condition === "Used" && (
+            <View style={styles.sectionContainer}>
+              <Text style={styles.sectionTitle}>Quality Rating</Text>
+              <View style={styles.ratingContainer}>
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <Ionicons
+                    key={star}
+                    name="star"
+                    size={30}
+                    color={formData.rating >= star ? "#FFD700" : "#ccc"}
+                  />
+                ))}
+              </View>
+              <Text style={styles.ratingDescription}>
+                {formData.rating === 1
+                  ? "Poor"
+                  : formData.rating === 2
+                  ? "Fair"
+                  : formData.rating === 3
+                  ? "Good"
+                  : formData.rating === 4
+                  ? "Very Good"
+                  : formData.rating === 5
+                  ? "Excellent"
+                  : "Not Rated"}
+              </Text>
+              <Text style={styles.noteText}>
+                Rating cannot be changed. To modify it, please delete the
+                product and create a new one.
+              </Text>
+            </View>
+          )}
         </>
       ),
     },
@@ -528,7 +570,8 @@ const EditProduct: React.FC<Props> = ({ route, navigation }) => {
               <Text style={styles.infoText}>{formData.listingType}</Text>
             </View>
             <Text style={styles.noteText}>
-              Listing type cannot be changed. To modify it, please delete the product and create a new one.
+              Listing type cannot be changed. To modify it, please delete the
+              product and create a new one.
             </Text>
           </View>
 
@@ -539,9 +582,61 @@ const EditProduct: React.FC<Props> = ({ route, navigation }) => {
               <Text style={styles.infoText}>{formData.availability}</Text>
             </View>
             <Text style={styles.noteText}>
-              Availability cannot be changed. To modify it, please delete the product and create a new one.
+              Availability cannot be changed. To modify it, please delete the
+              product and create a new one.
             </Text>
           </View>
+
+          {/* Rent Duration (Editable) */}
+          {(formData.listingType === "Renting" ||
+            formData.listingType === "Both") && (
+            <View style={styles.sectionContainer}>
+              <Text style={styles.sectionTitle}>Rent Duration</Text>
+              <View style={styles.rentDurationContainer}>
+                <TextInput
+                  style={styles.durationInput}
+                  placeholder="Duration"
+                  placeholderTextColor="#888"
+                  keyboardType="numeric"
+                  value={formData.rentDuration}
+                  onChangeText={(text) =>
+                    setFormData({ ...formData, rentDuration: text })
+                  }
+                />
+                {/* Duration Unit Dropdown */}
+                <View style={styles.dropdown}>
+                  {["Hours", "Days", "Weeks", "Months"].map((unit) => (
+                    <TouchableOpacity
+                      key={unit}
+                      style={[
+                        styles.dropdownItem,
+                        formData.durationUnit === unit
+                          ? styles.dropdownItemSelected
+                          : null,
+                      ]}
+                      onPress={() =>
+                        setFormData({
+                          ...formData,
+                          durationUnit: unit as DurationUnit,
+                        })
+                      }
+                    >
+                      <Text
+                        style={[
+                          styles.dropdownText,
+                          formData.durationUnit === unit
+                            ? styles.dropdownTextSelected
+                            : null,
+                        ]}
+                      >
+                        {unit}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            </View>
+          )}
 
           {/* Price */}
           {(formData.listingType === "Selling" ||
@@ -554,7 +649,9 @@ const EditProduct: React.FC<Props> = ({ route, navigation }) => {
                 placeholderTextColor="#888"
                 keyboardType="numeric"
                 value={formData.price}
-                onChangeText={(text) => setFormData({ ...formData, price: text })}
+                onChangeText={(text) =>
+                  setFormData({ ...formData, price: text })
+                }
               />
             </>
           )}
@@ -689,7 +786,9 @@ const EditProduct: React.FC<Props> = ({ route, navigation }) => {
         >
           <View style={styles.infoModalContent}>
             <Text style={styles.infoModalText}>
-              Availability and Listing Type cannot be changed once the product is created. To modify these, please delete the current product and create a new one.
+              Availability, Listing Type, Condition, and Rating cannot be
+              changed once the product is created. To modify these, please
+              delete the current product and create a new one.
             </Text>
             <TouchableOpacity
               style={styles.closeInfoButton}
@@ -817,55 +916,8 @@ const styles = StyleSheet.create({
   tagTextSelected: {
     color: "#fff",
   },
-  availabilityContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 10,
-  },
-  availabilityButton: {
-    flex: 1,
-    padding: 15,
-    borderRadius: 10,
-    backgroundColor: "#1E1E1E",
-    alignItems: "center",
-    marginRight: 10,
-  },
-  availabilitySelected: {
-    backgroundColor: "#BB86FC",
-  },
-  availabilityText: {
-    color: "#ccc",
-    fontSize: 16,
-  },
-  availabilityTextSelected: {
-    color: "#fff",
-  },
-  listingTypeContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 10,
-  },
-  listingTypeButton: {
-    flex: 1,
-    padding: 15,
-    borderRadius: 10,
-    backgroundColor: "#1E1E1E",
-    alignItems: "center",
-    marginRight: 10,
-  },
-  listingTypeSelected: {
-    backgroundColor: "#BB86FC",
-  },
-  listingTypeText: {
-    color: "#ccc",
-    fontSize: 16,
-  },
-  listingTypeTextSelected: {
-    color: "#fff",
-  },
   ratingContainer: {
     flexDirection: "row",
-    gap: 5,
     justifyContent: "center",
     marginVertical: 10,
   },
@@ -885,32 +937,6 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     marginTop: 20,
   },
-  optionsContainer: {
-    flexDirection: "row",
-    gap: 15,
-    marginBottom: 15,
-  },
-  optionButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 15,
-    borderRadius: 12,
-    backgroundColor: "#1E1E1E",
-    gap: 10,
-    flex: 1,
-    justifyContent: "center",
-  },
-  optionButtonSelected: {
-    backgroundColor: "#BB86FC",
-  },
-  optionText: {
-    fontSize: 16,
-    color: "#ccc",
-    fontWeight: "500",
-  },
-  optionTextSelected: {
-    color: "#fff",
-  },
   infoContainer: {
     backgroundColor: "#1E1E1E",
     padding: 15,
@@ -929,6 +955,46 @@ const styles = StyleSheet.create({
     marginTop: 10,
     textAlign: "center",
   },
+  rentDurationContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginVertical: 10,
+  },
+  durationInput: {
+    flex: 1,
+    padding: 15,
+    borderRadius: 12,
+    backgroundColor: "#1E1E1E",
+    color: "#fff",
+    textAlign: "center",
+    marginRight: 10,
+    borderWidth: 1,
+    borderColor: "#424242",
+  },
+  dropdown: {
+    flex: 1,
+    borderRadius: 12,
+    backgroundColor: "#1E1E1E",
+    borderWidth: 1,
+    borderColor: "#424242",
+  },
+  dropdownItem: {
+    padding: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#424242",
+  },
+  dropdownItemSelected: {
+    backgroundColor: "#BB86FC",
+  },
+  dropdownText: {
+    color: "#ccc",
+    fontSize: 16,
+    textAlign: "center",
+  },
+  dropdownTextSelected: {
+    color: "#fff",
+    fontWeight: "bold",
+  },
   buttonContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -939,7 +1005,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     padding: 15,
-    gap: 10,
   },
   backButtonText: {
     color: "#aaa",
@@ -953,7 +1018,6 @@ const styles = StyleSheet.create({
     padding: 15,
     paddingHorizontal: 30,
     borderRadius: 12,
-    gap: 10,
   },
   buttonDisabled: {
     backgroundColor: "#3A3A3A",
@@ -974,12 +1038,12 @@ const styles = StyleSheet.create({
     padding: 30,
     borderRadius: 15,
     alignItems: "center",
-    gap: 15,
   },
   modalText: {
     fontSize: 18,
     fontWeight: "600",
     color: "#fff",
+    textAlign: "center",
   },
   infoModalContent: {
     backgroundColor: "#1E1E1E",

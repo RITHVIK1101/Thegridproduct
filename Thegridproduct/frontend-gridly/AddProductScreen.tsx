@@ -17,11 +17,24 @@ import {
 import Ionicons from "react-native-vector-icons/Ionicons";
 import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from "expo-image-manipulator";
-import { NGROK_URL } from "@env"; // Ensure NGROK_URL is correctly set in your .env file
+import { NGROK_URL } from "@env";
 import { useNavigation } from "@react-navigation/native";
-import { UserContext, StudentType } from "./UserContext"; // Ensure correct import
+import { UserContext, StudentType } from "./UserContext";
 import axios from "axios";
 
+// Define explicit types for dropdown options
+type DurationUnit = "Hours" | "Days" | "Weeks" | "Months";
+type ListingType = "Selling" | "Renting" | "Both";
+type Availability = "In Campus Only" | "On and Off Campus";
+type Condition = "New" | "Used";
+
+// Define constant arrays with literal types
+const availableTags = ["#FemaleClothing", "#MensClothing", "#Other"] as const;
+const durationUnits: DurationUnit[] = ["Hours", "Days", "Weeks", "Months"];
+const listingTypes: ListingType[] = ["Selling", "Renting", "Both"];
+const conditions: Condition[] = ["New", "Used"];
+
+// Define the Product interface with condition and durationUnit
 interface Product {
   title: string;
   price?: number;
@@ -30,33 +43,38 @@ interface Product {
   rentDuration?: string;
   description: string;
   selectedTags: string[];
-  availability: "In Campus Only" | "On and Off Campus";
-  rating: number;
-  listingType: "Selling" | "Renting" | "Both";
+  availability: Availability;
+  rating?: number;
+  listingType: ListingType;
   isAvailableOutOfCampus: boolean;
   university: string;
   studentType: StudentType;
   images: string[];
+  condition?: Condition;
+  durationUnit?: DurationUnit;
 }
 
+// Define the FormData interface with condition and durationUnit as optional
 interface FormData {
+  condition?: Condition;
+  durationUnit?: DurationUnit;
   images: string[]; // Will store image URLs
   title: string;
   price: string;
   outOfCampusPrice: string;
   rentPrice: string;
-  rentDuration: string; // New Field for Rent Duration
+  rentDuration: string; // Numeric value for Rent Duration
   description: string;
   selectedTags: string[];
-  availability: "In Campus Only" | "On and Off Campus";
+  availability: Availability;
   rating: number;
-  listingType: "Selling" | "Renting" | "Both";
+  listingType: ListingType;
   isAvailableOutOfCampus: boolean;
 }
 
 const AddProduct: React.FC = () => {
-  const navigation = useNavigation(); // Initialize navigation
-  const { userId, token, institution, studentType } = useContext(UserContext); // Corrected destructuring
+  const navigation = useNavigation();
+  const { userId, token, institution, studentType } = useContext(UserContext);
 
   const [step, setStep] = useState(1);
   const [slideAnim] = useState(new Animated.Value(0));
@@ -67,25 +85,27 @@ const AddProduct: React.FC = () => {
     price: "",
     outOfCampusPrice: "",
     rentPrice: "",
-    rentDuration: "", // Initialize Rent Duration
+    rentDuration: "",
+    durationUnit: undefined,
     description: "",
     selectedTags: [],
     availability: "In Campus Only",
     rating: 0,
     listingType: "Selling",
     isAvailableOutOfCampus: false,
+    condition: undefined,
   });
 
   const [isLoading, setIsLoading] = useState(false);
-  const [isSuccessModalVisible, setIsSuccessModalVisible] = useState(false);
-  const [isInfoModalVisible, setIsInfoModalVisible] = useState(false); // New State for Info Modal
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
-  const availableTags = ["#FemaleClothing", "#MensClothing", "#Other"];
+  const [isSuccessModalVisible, setIsSuccessModalVisible] = useState(false);
+  const [isInfoModalVisible, setIsInfoModalVisible] = useState(false);
 
   // Replace with your Cloudinary credentials
   const CLOUDINARY_URL =
-    "https://api.cloudinary.com/v1_1/ds0zpfht9/image/upload"; // Replace with your Cloudinary URL
-  const UPLOAD_PRESET = "gridly_preset"; // Replace with your Upload Preset
+    "https://api.cloudinary.com/v1_1/ds0zpfht9/image/upload";
+  const UPLOAD_PRESET = "gridly_preset";
 
   const animateSlide = (direction: "forward" | "backward") => {
     Animated.sequence([
@@ -123,21 +143,25 @@ const AddProduct: React.FC = () => {
       Alert.alert("Image Limit Reached", "You can only upload up to 3 images.");
       return;
     }
+
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsMultipleSelection: true, // Ensure your Expo SDK version supports this
-        quality: 0.7, // Compress the image to 70% quality
+        allowsMultipleSelection: true,
+        quality: 0.7,
       });
+
       if (!result.canceled) {
         let selectedImages = result.assets.map((asset) => asset.uri);
+
+        setIsUploadingImage(true);
 
         // Compress images
         const compressedImages = await Promise.all(
           selectedImages.map(async (uri) => {
             const manipulatedImage = await ImageManipulator.manipulateAsync(
               uri,
-              [{ resize: { width: 800 } }], // Resize to width 800px
+              [{ resize: { width: 800 } }],
               { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
             );
             return manipulatedImage.uri;
@@ -149,34 +173,29 @@ const AddProduct: React.FC = () => {
             "Image Limit Exceeded",
             "You can only upload up to 3 images."
           );
+          setIsUploadingImage(false);
           return;
         }
 
         // Upload each image to Cloudinary
         const uploadedImageUrls = await Promise.all(
           compressedImages.map(async (uri) => {
-            const formData = new FormData();
-            formData.append("file", {
+            const formDataImage = new FormData();
+            formDataImage.append("file", {
               uri,
               type: "image/jpeg",
               name: `upload_${Date.now()}.jpg`,
             } as any);
-            formData.append("upload_preset", UPLOAD_PRESET);
+            formDataImage.append("upload_preset", UPLOAD_PRESET);
 
             try {
-              const response = await axios.post(CLOUDINARY_URL, formData, {
+              const response = await axios.post(CLOUDINARY_URL, formDataImage, {
                 headers: {
                   "Content-Type": "multipart/form-data",
-                },
-                onUploadProgress: (progressEvent) => {
-                  const progress =
-                    (progressEvent.loaded / progressEvent.total) * 100;
-                  console.log(`Upload Progress: ${progress.toFixed(2)}%`);
                 },
               });
 
               const imageUrl = response.data.secure_url;
-              console.log("Image uploaded successfully. URL:", imageUrl);
               return imageUrl;
             } catch (error) {
               console.error("Error uploading image to Cloudinary:", error);
@@ -196,6 +215,8 @@ const AddProduct: React.FC = () => {
         "Image Picker Error",
         "There was an error selecting or uploading images. Please try again."
       );
+    } finally {
+      setIsUploadingImage(false);
     }
   };
 
@@ -224,26 +245,20 @@ const AddProduct: React.FC = () => {
       case 1:
         return formData.images.length > 0 && formData.title.trim().length > 0;
       case 2:
-        return formData.listingType.length > 0;
+        return listingTypes.includes(formData.listingType);
       case 3:
-        // Validate for each listingType
         if (formData.listingType === "Selling") {
           return formData.selectedTags.length > 0 && formData.rating > 0;
         }
-        if (formData.listingType === "Renting") {
+        if (
+          formData.listingType === "Renting" ||
+          formData.listingType === "Both"
+        ) {
           return (
             formData.selectedTags.length > 0 &&
-            formData.availability === "In Campus Only" &&
-            formData.rating > 0 &&
-            formData.rentDuration.trim().length > 0
-          );
-        }
-        if (formData.listingType === "Both") {
-          return (
-            formData.selectedTags.length > 0 &&
-            formData.availability.length > 0 &&
-            formData.rating > 0 &&
-            formData.rentDuration.trim().length > 0
+            formData.condition !== undefined &&
+            formData.rentDuration.trim().length > 0 &&
+            formData.durationUnit !== undefined
           );
         }
         return false;
@@ -272,7 +287,6 @@ const AddProduct: React.FC = () => {
 
   const handleSubmit = async () => {
     if (!userId || !token || !institution || !studentType) {
-      // Added studentType check
       Alert.alert(
         "Submission Error",
         "User not logged in or incomplete profile."
@@ -283,17 +297,22 @@ const AddProduct: React.FC = () => {
     setIsLoading(true);
 
     try {
-      console.log("Submitting Form Data:", formData); // Debugging log
-
       // Convert string inputs to numbers and validate
-      const price = parseFloat(formData.price.trim());
-      const outOfCampusPrice = parseFloat(formData.outOfCampusPrice.trim());
-      const rentPrice = parseFloat(formData.rentPrice.trim());
+      const price = formData.price
+        ? parseFloat(formData.price.trim())
+        : undefined;
+      const outOfCampusPrice = formData.outOfCampusPrice
+        ? parseFloat(formData.outOfCampusPrice.trim())
+        : undefined;
+      const rentPrice = formData.rentPrice
+        ? parseFloat(formData.rentPrice.trim())
+        : undefined;
 
       if (
-        (formData.price && isNaN(price)) ||
-        (formData.outOfCampusPrice && isNaN(outOfCampusPrice)) ||
-        (formData.rentPrice && isNaN(rentPrice))
+        (formData.price && (isNaN(price!) || price! < 0)) ||
+        (formData.outOfCampusPrice &&
+          (isNaN(outOfCampusPrice!) || outOfCampusPrice! < 0)) ||
+        (formData.rentPrice && (isNaN(rentPrice!) || rentPrice! < 0))
       ) {
         throw new Error("Please enter valid numerical values for prices.");
       }
@@ -303,33 +322,51 @@ const AddProduct: React.FC = () => {
       if (formData.images.length === 0)
         throw new Error("Images cannot be empty.");
 
+      // Additional Validation for ListingType and Availability
+      if (
+        formData.listingType === "Both" &&
+        formData.availability !== "On and Off Campus"
+      ) {
+        throw new Error(
+          "Availability must be 'On and Off Campus' for listing type 'Both'."
+        );
+      }
+
+      if (
+        formData.listingType === "Renting" &&
+        formData.availability !== "In Campus Only"
+      ) {
+        throw new Error(
+          "Availability must be 'In Campus Only' for listing type 'Renting'."
+        );
+      }
+
       const payload: Partial<Product> = {
         title: formData.title.trim(),
-        price:
-          formData.listingType === "Both" || formData.listingType === "Selling"
-            ? price
-            : undefined,
-        outOfCampusPrice:
-          formData.availability === "On and Off Campus"
-            ? outOfCampusPrice
-            : undefined,
-        rentPrice:
-          formData.listingType === "Both" || formData.listingType === "Renting"
-            ? rentPrice
-            : undefined,
-        rentDuration:
-          formData.listingType === "Both" || formData.listingType === "Renting"
-            ? formData.rentDuration.trim()
-            : undefined,
+        ...(price !== undefined ? { price } : {}),
+        ...(outOfCampusPrice !== undefined ? { outOfCampusPrice } : {}),
+        ...(rentPrice !== undefined ? { rentPrice } : {}),
+        ...(formData.listingType === "Both" ||
+        formData.listingType === "Renting"
+          ? {
+              rentDuration: `${formData.rentDuration.trim()} ${
+                formData.durationUnit
+              }`,
+            }
+          : {}),
         description: formData.description.trim(),
         selectedTags: formData.selectedTags,
-        images: formData.images, // Now contains URLs
+        images: formData.images,
         isAvailableOutOfCampus: formData.isAvailableOutOfCampus,
-        rating: formData.rating,
+        ...(formData.listingType === "Selling" ||
+        formData.listingType === "Both"
+          ? { rating: formData.rating }
+          : {}),
         listingType: formData.listingType,
         availability: formData.availability,
-        university: institution, // Ensure backend expects 'university'
-        studentType: studentType, // Ensure backend accepts enum or string
+        university: institution,
+        studentType: studentType,
+        condition: formData.condition,
       };
 
       const response = await fetch(`${NGROK_URL}/products`, {
@@ -343,7 +380,6 @@ const AddProduct: React.FC = () => {
 
       const contentType = response.headers.get("content-type");
 
-      // Check if response is JSON, if not log and throw an error
       if (contentType && contentType.includes("application/json")) {
         const data = await response.json();
         if (!response.ok) {
@@ -351,8 +387,6 @@ const AddProduct: React.FC = () => {
             data.message || `HTTP error! status: ${response.status}`
           );
         }
-        console.log("Success:", data);
-
         setFormData({
           images: [],
           title: "",
@@ -360,9 +394,11 @@ const AddProduct: React.FC = () => {
           outOfCampusPrice: "",
           rentPrice: "",
           rentDuration: "",
+          durationUnit: undefined,
           description: "",
           selectedTags: [],
           availability: "In Campus Only",
+          condition: undefined,
           rating: 0,
           listingType: "Selling",
           isAvailableOutOfCampus: false,
@@ -374,8 +410,8 @@ const AddProduct: React.FC = () => {
           navigation.navigate("Dashboard");
         }, 1500);
       } else {
-        const errorText = await response.text(); // Read response as text
-        console.error("Unexpected response format:", errorText); // Log unexpected format
+        const errorText = await response.text();
+        console.error("Unexpected response format:", errorText);
         throw new Error("Unexpected response format. Expected JSON.");
       }
     } catch (error: unknown) {
@@ -398,9 +434,23 @@ const AddProduct: React.FC = () => {
             {`${formData.images.length}/3 Images`}
           </Text>
           <View style={styles.imageUploadContainer}>
-            <TouchableOpacity style={styles.uploadButton} onPress={pickImage}>
-              <Ionicons name="cloud-upload-outline" size={30} color="#BB86FC" />
-              <Text style={styles.uploadButtonText}>Upload Images</Text>
+            <TouchableOpacity
+              style={styles.uploadButton}
+              onPress={pickImage}
+              disabled={isUploadingImage}
+            >
+              {isUploadingImage ? (
+                <ActivityIndicator size="small" color="#BB86FC" />
+              ) : (
+                <>
+                  <Ionicons
+                    name="cloud-upload-outline"
+                    size={30}
+                    color="#BB86FC"
+                  />
+                  <Text style={styles.uploadButtonText}>Upload Images</Text>
+                </>
+              )}
             </TouchableOpacity>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               {formData.images.map((image, index) => (
@@ -430,6 +480,7 @@ const AddProduct: React.FC = () => {
         </>
       ),
     },
+
     2: {
       title: "Choose Listing Type",
       content: (
@@ -437,7 +488,7 @@ const AddProduct: React.FC = () => {
           <View style={styles.sectionContainer}>
             <Text style={styles.sectionTitle}>Listing Type</Text>
             <View style={styles.optionsContainer}>
-              {["Selling", "Renting", "Both"].map((type) => (
+              {listingTypes.map((type) => (
                 <TouchableOpacity
                   key={type}
                   style={[
@@ -449,20 +500,21 @@ const AddProduct: React.FC = () => {
                   onPress={() =>
                     setFormData({
                       ...formData,
-                      listingType: type as "Selling" | "Renting" | "Both",
+                      listingType: type,
                       availability:
                         type === "Renting"
                           ? "In Campus Only"
                           : formData.availability,
-                      // Reset related fields when listingType changes
                       outOfCampusPrice: "",
                       rentPrice: "",
                       isAvailableOutOfCampus:
-                        type === "Both" || type === "On and Off Campus"
+                        type === "Both"
                           ? formData.isAvailableOutOfCampus
                           : false,
-                      rentDuration: "", // Reset Rent Duration on Type Change
-                      rating: 0, // Reset Rating on Type Change
+                      rentDuration: "",
+                      durationUnit: undefined,
+                      condition: undefined,
+                      rating: 0,
                     })
                   }
                 >
@@ -489,7 +541,7 @@ const AddProduct: React.FC = () => {
       ),
     },
     3: {
-      title: "Select Tags, Availability & Rent Details",
+      title: "Select Tags, Condition & Rent Details",
       content: (
         <>
           {/* Select Tags Section */}
@@ -522,115 +574,132 @@ const AddProduct: React.FC = () => {
             </ScrollView>
           </View>
 
-          {/* Availability Section */}
-          {formData.listingType !== "Renting" && (
-            <View style={styles.sectionContainer}>
-              <Text style={styles.sectionTitle}>Availability</Text>
-              <View style={styles.optionsContainer}>
-                {["In Campus Only", "On and Off Campus"].map((option) => (
-                  <TouchableOpacity
-                    key={option}
+          {/* New or Used Section */}
+          <View style={styles.sectionContainer}>
+            <Text style={styles.sectionTitle}>Is the Product New or Used?</Text>
+            <View style={styles.optionsContainer}>
+              {conditions.map((condition) => (
+                <TouchableOpacity
+                  key={condition}
+                  style={[
+                    styles.optionButton,
+                    formData.condition === condition
+                      ? styles.optionButtonSelected
+                      : null,
+                  ]}
+                  onPress={() =>
+                    setFormData({
+                      ...formData,
+                      condition: condition,
+                      rating: condition === "New" ? 0 : formData.rating,
+                    })
+                  }
+                >
+                  <Text
                     style={[
-                      styles.optionButton,
-                      formData.availability === option
-                        ? styles.optionButtonSelected
+                      styles.optionText,
+                      formData.condition === condition
+                        ? styles.optionTextSelected
                         : null,
                     ]}
-                    onPress={() =>
-                      setFormData({
-                        ...formData,
-                        availability: option as
-                          | "In Campus Only"
-                          | "On and Off Campus",
-                        isAvailableOutOfCampus: option === "On and Off Campus",
-                      })
-                    }
                   >
-                    <Text
-                      style={[
-                        styles.optionText,
-                        formData.availability === option
-                          ? styles.optionTextSelected
-                          : null,
-                      ]}
-                    >
-                      {option}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-              <Text style={styles.noteText}>
-                {formData.availability === "On and Off Campus"
-                  ? "For off-campus, include shipping fees in your price. In-campus transactions can be handled directly with the buyer."
-                  : "In-campus availability allows for direct transactions without additional shipping costs."}
-              </Text>
+                    {condition}
+                  </Text>
+                </TouchableOpacity>
+              ))}
             </View>
-          )}
+          </View>
 
           {/* Rent Duration Section */}
           {(formData.listingType === "Renting" ||
             formData.listingType === "Both") && (
             <View style={styles.sectionContainer}>
-              <View style={styles.rentDurationHeader}>
-                <Text style={styles.sectionTitle}>Rent Duration</Text>
-                <TouchableOpacity
-                  onPress={() => setIsInfoModalVisible(true)}
-                  style={styles.infoButton}
-                >
-                  <Ionicons
-                    name="information-circle-outline"
-                    size={24}
-                    color="#BB86FC"
-                  />
-                </TouchableOpacity>
+              <Text style={styles.sectionTitle}>Rent Duration</Text>
+              <View style={styles.rentDurationContainer}>
+                {/* Numeric Input for Duration */}
+                <TextInput
+                  style={styles.durationInput}
+                  placeholder="1"
+                  placeholderTextColor="#888"
+                  keyboardType="numeric"
+                  value={formData.rentDuration}
+                  onChangeText={(text) =>
+                    setFormData({ ...formData, rentDuration: text })
+                  }
+                />
+                {/* Dropdown for Unit Selection */}
+                <View style={styles.dropdown}>
+                  {durationUnits.map((unit) => (
+                    <TouchableOpacity
+                      key={unit}
+                      style={[
+                        styles.dropdownItem,
+                        formData.durationUnit === unit
+                          ? styles.dropdownItemSelected
+                          : null,
+                      ]}
+                      onPress={() =>
+                        setFormData({
+                          ...formData,
+                          durationUnit: unit,
+                        })
+                      }
+                    >
+                      <Text
+                        style={[
+                          styles.dropdownText,
+                          formData.durationUnit === unit
+                            ? styles.dropdownTextSelected
+                            : null,
+                        ]}
+                      >
+                        {unit}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               </View>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g., 1 Month, 6 Months"
-                placeholderTextColor="#888"
-                value={formData.rentDuration}
-                onChangeText={(text) =>
-                  setFormData({ ...formData, rentDuration: text })
-                }
-              />
             </View>
           )}
 
           {/* Rate Quality Section */}
-          <View style={styles.sectionContainer}>
-            <Text style={styles.sectionTitle}>Rate Quality</Text>
-            <View style={styles.ratingContainer}>
-              {[1, 2, 3, 4, 5].map((star) => (
-                <TouchableOpacity
-                  key={star}
-                  onPress={() => setRatingValue(star)}
-                >
-                  <Ionicons
-                    name="star"
-                    size={30}
-                    color={formData.rating >= star ? "#FFD700" : "#ccc"}
-                  />
-                </TouchableOpacity>
-              ))}
-            </View>
+          {formData.condition === "Used" && (
+            <View style={styles.sectionContainer}>
+              <Text style={styles.sectionTitle}>Rate Quality</Text>
+              <View style={styles.ratingContainer}>
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <TouchableOpacity
+                    key={star}
+                    onPress={() => setRatingValue(star)}
+                  >
+                    <Ionicons
+                      name="star"
+                      size={30}
+                      color={formData.rating >= star ? "#FFD700" : "#ccc"}
+                    />
+                  </TouchableOpacity>
+                ))}
+              </View>
 
-            <Text style={styles.ratingDescription}>
-              {formData.rating === 1
-                ? "Poor"
-                : formData.rating === 2
-                ? "Fair"
-                : formData.rating === 3
-                ? "Good"
-                : formData.rating === 4
-                ? "Very Good"
-                : formData.rating === 5
-                ? "Excellent"
-                : "Select a rating"}
-            </Text>
-          </View>
+              <Text style={styles.ratingDescription}>
+                {formData.rating === 1
+                  ? "Poor"
+                  : formData.rating === 2
+                  ? "Fair"
+                  : formData.rating === 3
+                  ? "Good"
+                  : formData.rating === 4
+                  ? "Very Good"
+                  : formData.rating === 5
+                  ? "Excellent"
+                  : "Select a rating"}
+              </Text>
+            </View>
+          )}
         </>
       ),
     },
+
     4: {
       title: "Enter Prices & Description",
       content: (
@@ -640,9 +709,9 @@ const AddProduct: React.FC = () => {
             formData.listingType === "Both") && (
             <TextInput
               style={styles.input}
-              placeholder={`Price (In Campus${
-                formData.listingType === "Both" ? " Selling" : ""
-              }) $`}
+              placeholder={`Price${
+                formData.listingType === "Both" ? " (In Campus Selling)" : ""
+              } $`}
               placeholderTextColor="#888"
               keyboardType="numeric"
               value={formData.price}
@@ -884,6 +953,43 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#424242",
   },
+  rentDurationContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginVertical: 10,
+  },
+  durationInput: {
+    width: "30%",
+    padding: 15,
+    borderRadius: 12,
+    backgroundColor: "#1E1E1E",
+    color: "#fff",
+    textAlign: "center",
+  },
+  dropdown: {
+    flex: 1,
+    borderRadius: 12,
+    backgroundColor: "#1E1E1E",
+    padding: 10,
+  },
+  dropdownItem: {
+    padding: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#424242",
+  },
+  dropdownItemSelected: {
+    backgroundColor: "#BB86FC",
+  },
+  dropdownText: {
+    color: "#ccc",
+    fontSize: 16,
+    textAlign: "center",
+  },
+  dropdownTextSelected: {
+    color: "#fff",
+    fontWeight: "bold",
+  },
   descriptionInput: {
     height: 100,
     textAlignVertical: "top",
@@ -961,11 +1067,6 @@ const styles = StyleSheet.create({
     color: "#bbb",
     marginTop: 10,
     textAlign: "center",
-  },
-  rentDurationHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
   },
   infoButton: {
     padding: 5,
