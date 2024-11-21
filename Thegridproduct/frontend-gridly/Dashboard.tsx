@@ -14,6 +14,7 @@ import {
   ScrollView,
   Animated,
   Dimensions,
+  TextInput,
 } from "react-native";
 import {
   RouteProp,
@@ -70,6 +71,9 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
   const [campusMode, setCampusMode] = useState<"In Campus" | "Both">(
     "In Campus"
   );
+
+  // State for Search Query
+  const [searchQuery, setSearchQuery] = useState<string>("");
 
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
 
@@ -337,11 +341,21 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
         );
       }
 
-      // Further filter based on selected category
-      const finalFiltered =
-        selectedCategory === "#Everything"
-          ? filtered
-          : filtered.filter((product) => product.category === selectedCategory);
+      // Further filter based on selected category and search query
+      let finalFiltered = filtered;
+
+      if (selectedCategory !== "#Everything") {
+        finalFiltered = finalFiltered.filter(
+          (product) => product.category === selectedCategory
+        );
+      }
+
+      if (searchQuery.trim() !== "") {
+        const query = searchQuery.trim().toLowerCase();
+        finalFiltered = finalFiltered.filter((product) =>
+          product.title.toLowerCase().includes(query)
+        );
+      }
 
       setAllProducts(filtered);
       setFilteredProducts(finalFiltered);
@@ -358,19 +372,27 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
     }
   };
 
-  // Re-filter products whenever selectedCategory changes
+  // Re-filter products whenever selectedCategory or searchQuery changes
   useEffect(() => {
     if (allProducts.length > 0) {
-      const finalFiltered =
-        selectedCategory === "#Everything"
-          ? allProducts
-          : allProducts.filter(
-              (product) => product.category === selectedCategory
-            );
+      let finalFiltered = allProducts;
+
+      if (selectedCategory !== "#Everything") {
+        finalFiltered = finalFiltered.filter(
+          (product) => product.category === selectedCategory
+        );
+      }
+
+      if (searchQuery.trim() !== "") {
+        const query = searchQuery.trim().toLowerCase();
+        finalFiltered = finalFiltered.filter((product) =>
+          product.title.toLowerCase().includes(query)
+        );
+      }
 
       setFilteredProducts(finalFiltered);
     }
-  }, [allProducts, selectedCategory]);
+  }, [allProducts, selectedCategory, searchQuery]);
 
   // Fetch products and cart on component mount and when campusMode changes
   useEffect(() => {
@@ -527,7 +549,7 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
                       : "https://via.placeholder.com/150",
                 }}
                 style={styles.productImage}
-                resizeMode="cover"
+                resizeMode="contain"
               />
             </TapGestureHandler>
 
@@ -540,7 +562,7 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
               }}
               accessibilityLabel="Like Product"
             >
-              <Ionicons name="heart-outline" size={30} color="#fff" />
+              <Ionicons name="heart-outline" size={30} color="#007AFF" />
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.shareIcon}
@@ -550,7 +572,7 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
               }}
               accessibilityLabel="Share Product"
             >
-              <Ionicons name="share-social-outline" size={30} color="#fff" />
+              <Ionicons name="share-social-outline" size={30} color="#007AFF" />
             </TouchableOpacity>
           </Animated.View>
         </PanGestureHandler>
@@ -561,23 +583,45 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <View style={styles.container}>
-        {/* Filter and Toggle Buttons Container */}
-        <View style={styles.filterToggleContainer}>
+        {/* Search and Filter Container */}
+        <View style={styles.searchFilterContainer}>
+          {/* Search Bar */}
+          <View style={styles.searchContainer}>
+            <Ionicons name="search-outline" size={20} color="#007AFF" />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search products..."
+              placeholderTextColor="#007AFF"
+              value={searchQuery}
+              onChangeText={(text) => setSearchQuery(text)}
+              returnKeyType="search"
+              accessibilityLabel="Search Products"
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity
+                onPress={() => setSearchQuery("")}
+                style={styles.clearIcon}
+                accessibilityLabel="Clear Search"
+              >
+                <Ionicons name="close-circle" size={20} color="#007AFF" />
+              </TouchableOpacity>
+            )}
+          </View>
+
           {/* Filter Button */}
           <TouchableOpacity
             style={styles.filterButton}
             onPress={toggleFilterModal}
             accessibilityLabel="Filter Products"
           >
-            <Ionicons name="filter-outline" size={20} color="#fff" />
-            <Text style={styles.filterButtonText}>Filter</Text>
+            <Ionicons name="filter-outline" size={20} color="#FFFFFF" />
           </TouchableOpacity>
         </View>
 
         {/* Product List */}
         {loading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#BB86FC" />
+            <ActivityIndicator size="large" color="#007AFF" />
             <Text style={styles.loadingText}>Loading...</Text>
           </View>
         ) : error ? (
@@ -653,7 +697,7 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
                 style={styles.modalClose}
                 accessibilityLabel="Close Add Options Modal"
               >
-                <Ionicons name="close-outline" size={24} color="#fff" />
+                <Ionicons name="close-outline" size={24} color="#007AFF" />
               </TouchableOpacity>
             </View>
           </TouchableOpacity>
@@ -747,7 +791,7 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
                 style={styles.modalClose}
                 accessibilityLabel="Close Filter Modal"
               >
-                <Ionicons name="close-outline" size={24} color="#fff" />
+                <Ionicons name="close-outline" size={24} color="#007AFF" />
               </TouchableOpacity>
             </View>
           </TouchableOpacity>
@@ -801,7 +845,7 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
                     style={styles.modalClose}
                     accessibilityLabel="Close Details Modal"
                   >
-                    <Ionicons name="close-outline" size={24} color="#fff" />
+                    <Ionicons name="close-outline" size={24} color="#007AFF" />
                   </TouchableOpacity>
                 </>
               )}
@@ -833,7 +877,7 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
                 style={styles.modalClose}
                 accessibilityLabel="Close Description Modal"
               >
-                <Ionicons name="close-outline" size={24} color="#fff" />
+                <Ionicons name="close-outline" size={24} color="#007AFF" />
               </TouchableOpacity>
             </View>
           </TouchableOpacity>
@@ -851,48 +895,64 @@ export default Dashboard;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#121212", // Dark background
+    backgroundColor: "#FFFFFF", // Light background
     paddingHorizontal: 20,
     paddingTop: 20,
     paddingBottom: 60, // Space for BottomNavBar
   },
-  filterToggleContainer: {
-    marginBottom: 15,
-    alignItems: "flex-end", // Move the filter button to the right
-  },
-
-  filterButton: {
-    position: "absolute",
+  searchFilterContainer: {
     flexDirection: "row",
-    top: 10, // Adjust this value to position it correctly
-    right: 10, // Adjust this value to position it correctly
     alignItems: "center",
-    backgroundColor: "#BB86FC", // Purple button
+    marginBottom: 15,
+  },
+  searchContainer: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F0F0F0", // Light grey background for search bar
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 25,
+  },
+  searchInput: {
+    flex: 1,
+    marginLeft: 10,
+    color: "#000",
+    fontSize: 16,
+  },
+  clearIcon: {
+    marginLeft: 10,
+  },
+  filterButton: {
+    marginLeft: 10,
+    backgroundColor: "#007AFF", // Blue button
     paddingVertical: 8,
     paddingHorizontal: 15,
     borderRadius: 20,
-    zIndex: 10,
+    justifyContent: "center",
+    alignItems: "center",
   },
-  filterButtonText: {
-    color: "#fff",
-    fontSize: 14,
-    marginLeft: 8,
-    fontWeight: "500",
+  filterButtonIcon: {
+    marginRight: 5,
   },
   listContainer: {},
   productItemContainer: {
     height: SCREEN_HEIGHT,
   },
-
+  productContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: -290,
+  },
   productImage: {
     width: SCREEN_WIDTH, // Occupy the full screen width
-    aspectRatio: 9 / 13.5, // Adjust this to match the original aspect ratio of your image
+    aspectRatio: 14 / 25, // Adjust this to match the original aspect ratio of your image
     alignSelf: "center", // Center the image horizontally
     borderRadius: 20, // Optional: Add rounded corners
     resizeMode: "contain", // Ensure the image content is fully visible
-    backgroundColor: "#121212", // Optional: Add a background for better visibility
+    backgroundColor: "#FFFFFF", // Light background for better visibility
   },
-
   likeIcon: {
     position: "absolute",
     right: 20,
@@ -901,17 +961,16 @@ const styles = StyleSheet.create({
     height: 40,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#FF4D4D", // Subtle red for the heart icon
+    backgroundColor: "#FF3B30", // Red for the heart icon
     borderRadius: 20, // Smaller circle
     borderWidth: 2,
-    borderColor: "#FFF", // Thin white border for distinction
+    borderColor: "#FFFFFF", // Thin white border for distinction
     shadowColor: "#000", // Light shadow for depth
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 3,
     elevation: 3, // For Android shadow
   },
-
   shareIcon: {
     position: "absolute",
     right: 20,
@@ -920,17 +979,16 @@ const styles = StyleSheet.create({
     height: 40,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#34C759", // Subtle green for the share icon
+    backgroundColor: "#34C759", // Green for the share icon
     borderRadius: 20, // Smaller circle
     borderWidth: 2,
-    borderColor: "#FFF", // Thin white border for distinction
+    borderColor: "#FFFFFF", // Thin white border for distinction
     shadowColor: "#000", // Light shadow for depth
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 3,
     elevation: 3, // For Android shadow
   },
-
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
@@ -938,7 +996,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 8,
-    color: "#bbb",
+    color: "#007AFF",
     fontSize: 14,
   },
   errorContainer: {
@@ -948,19 +1006,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
   },
   errorText: {
-    color: "#FF6B6B", // Red color for errors
+    color: "#FF3B30", // Red color for errors
     fontSize: 14,
     textAlign: "center",
     marginBottom: 8,
   },
   retryButton: {
-    backgroundColor: "#BB86FC",
+    backgroundColor: "#007AFF",
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderRadius: 20,
   },
   retryButtonText: {
-    color: "#fff",
+    color: "#FFFFFF",
     fontSize: 14,
     fontWeight: "500",
   },
@@ -970,7 +1028,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   noProductsText: {
-    color: "#bbb",
+    color: "#007AFF",
     fontSize: 16,
   },
   modalOverlay: {
@@ -981,42 +1039,59 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     width: "80%",
-    backgroundColor: "#1E1E1E", // Dark modal background
+    backgroundColor: "#FFFFFF", // Light modal background
     padding: 20,
     borderRadius: 15,
     alignItems: "center",
     maxHeight: "80%",
+    position: "relative",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
   },
   filterModalContent: {
     width: "80%",
-    backgroundColor: "#1E1E1E", // Dark modal background
+    backgroundColor: "#FFFFFF", // Light modal background
     padding: 20,
     borderRadius: 15,
     alignItems: "center",
     maxHeight: "80%",
+    position: "relative",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
   },
   modalTitle: {
     fontSize: 20,
-    fontWeight: "600",
-    color: "#BB86FC", // Purple text
+    fontWeight: "700",
+    color: "#007AFF", // Blue text
     marginBottom: 15,
   },
   modalButton: {
-    backgroundColor: "#BB86FC", // Purple button
-    paddingVertical: 10,
+    backgroundColor: "#007AFF", // Blue button
+    paddingVertical: 12,
     paddingHorizontal: 30,
-    borderRadius: 20,
+    borderRadius: 12,
     marginVertical: 5,
     width: "100%",
     alignItems: "center",
+    shadowColor: "#007AFF",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
   },
   modalButtonText: {
-    color: "#fff",
+    color: "#FFFFFF",
     fontSize: 16,
-    fontWeight: "500",
+    fontWeight: "600",
   },
   applyButton: {
-    backgroundColor: "#BB86FC",
+    backgroundColor: "#007AFF",
     paddingVertical: 10,
     paddingHorizontal: 30,
     borderRadius: 20,
@@ -1025,7 +1100,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   applyButtonText: {
-    color: "#fff",
+    color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "500",
   },
@@ -1039,18 +1114,18 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 15,
     borderRadius: 10,
-    backgroundColor: "#1E1E1E",
+    backgroundColor: "#F0F0F0",
     marginVertical: 5,
   },
   categoryItemSelected: {
-    backgroundColor: "#BB86FC",
+    backgroundColor: "#007AFF",
   },
   categoryText: {
-    color: "#fff",
+    color: "#000",
     fontSize: 16,
   },
   categoryTextSelected: {
-    color: "#121212",
+    color: "#FFFFFF",
     fontWeight: "600",
   },
   campusItem: {
@@ -1058,15 +1133,15 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 15,
     borderRadius: 10,
-    backgroundColor: "#1E1E1E",
+    backgroundColor: "#F0F0F0",
     marginVertical: 5,
   },
   campusItemSelected: {
-    backgroundColor: "#BB86FC",
+    backgroundColor: "#007AFF",
   },
   sectionTitle: {
     fontSize: 18,
-    color: "#BB86FC",
+    color: "#007AFF",
     alignSelf: "flex-start",
     marginTop: 10,
     marginBottom: 5,
@@ -1074,15 +1149,21 @@ const styles = StyleSheet.create({
   },
   detailsModalContent: {
     width: "90%",
-    backgroundColor: "#1E1E1E",
+    backgroundColor: "#FFFFFF", // Light modal background
     borderRadius: 15,
     padding: 20,
     alignItems: "center",
+    position: "relative",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
   },
   detailsTitle: {
     fontSize: 24,
     fontWeight: "700",
-    color: "#BB86FC",
+    color: "#007AFF", // Blue text
     marginBottom: 15,
   },
   detailsImage: {
@@ -1093,18 +1174,18 @@ const styles = StyleSheet.create({
   },
   detailsPrice: {
     fontSize: 20,
-    color: "#fff",
+    color: "#000",
     marginBottom: 10,
     fontWeight: "600",
   },
   detailsRating: {
     fontSize: 16,
-    color: "#fff",
+    color: "#000",
     marginBottom: 5,
   },
   detailsQuality: {
     fontSize: 16,
-    color: "#fff",
+    color: "#000",
     marginBottom: 15,
   },
   detailsDescriptionContainer: {
@@ -1112,7 +1193,7 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   detailsDescription: {
-    color: "#ccc",
+    color: "#555",
     fontSize: 14,
     textAlign: "center",
   },
@@ -1120,7 +1201,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     bottom: 80, // Adjust based on BottomNavBar height
     right: 20,
-    backgroundColor: "#BB86FC",
+    backgroundColor: "#007AFF",
     padding: 10,
     borderRadius: 30,
     shadowColor: "#000",
@@ -1130,7 +1211,7 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   descriptionText: {
-    color: "#ccc", // Light gray text color
+    color: "#000", // Dark text color
     fontSize: 14, // Adjust font size as needed
     lineHeight: 20, // Adjust line height for readability
     textAlign: "center", // Center align the text

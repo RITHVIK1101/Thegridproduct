@@ -1,11 +1,12 @@
 // App.tsx
 
-import React, { useState, createRef, useContext } from "react";
+import React, { useState, createRef, useContext, useEffect } from "react";
 import {
   NavigationContainer,
   NavigationContainerRef,
   CommonActions,
 } from "@react-navigation/native";
+
 import { createStackNavigator } from "@react-navigation/stack";
 import {
   TouchableOpacity,
@@ -18,7 +19,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import Icon from "react-native-vector-icons/MaterialIcons";
-import Ionicons from "react-native-vector-icons/Ionicons";
+import Ionicons from "react-native-vector-icons/Ionicons"; // Ensure Ionicons is imported
 import BottomNavBar from "./components/BottomNavbar";
 
 import SplashScreen from "./SplashScreen";
@@ -29,11 +30,11 @@ import AddGigScreen from "./AddGigScreen";
 import ActivityScreen from "./ActivityScreen";
 import EditProduct from "./EditProductScreen";
 import MessagingScreen from "./MessagingScreen";
-import CartScreen from "./CartScreen";
-import AccountScreen from "./AccountScreen";
+import CartScreen from "./CartScreen"; // Import CartScreen
+import AccountScreen from "./AccountScreen"; // If you have an edit account screen
 
 import { RootStackParamList } from "./navigationTypes";
-import { UserProvider, UserContext } from "./UserContext";
+import { UserProvider, UserContext } from "./UserContext"; // Import UserContext
 
 export const navigationRef =
   createRef<NavigationContainerRef<RootStackParamList>>();
@@ -44,7 +45,7 @@ const AppNavigator: React.FC = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
 
-  const { userId, token, clearUser, isLoading } = useContext(UserContext);
+  const { userId, token, clearUser, isLoading } = useContext(UserContext); // Access UserContext including isLoading
 
   /**
    * Handles user logout by clearing context and SecureStore,
@@ -89,8 +90,6 @@ const AppNavigator: React.FC = () => {
             fontWeight: "700",
             color: "#BB86FC", // Purple title
           },
-          // Disable animations globally
-          animationEnabled: false,
         }}
       >
         {token ? (
@@ -111,22 +110,19 @@ const AppNavigator: React.FC = () => {
                 ),
                 headerRight: () => (
                   <TouchableOpacity
-                    onPress={() =>
-                      navigationRef.current?.dispatch(
-                        CommonActions.reset({
-                          index: 0,
-                          routes: [{ name: "Cart" }],
-                        })
-                      )
-                    }
+                    onPress={() => navigationRef.current?.navigate("Cart")}
                     style={{ marginRight: 15 }}
                     accessibilityLabel="Go to Cart"
                   >
                     <Ionicons name="cart-outline" size={28} color="#fff" />
+                    {/* Optional: Add a badge for cart items count */}
+                    {/* <View style={styles.cartBadge}>
+                      <Text style={styles.cartBadgeText}>{cartItemCount}</Text>
+                    </View> */}
                   </TouchableOpacity>
                 ),
                 headerTitle: "The Gridly",
-                gestureEnabled: false, // Disable back swipe on Dashboard
+                gestureEnabled: false,
               }}
             />
             <Stack.Screen
@@ -145,22 +141,13 @@ const AppNavigator: React.FC = () => {
                 headerTitle: "Add Product",
                 headerRight: () => (
                   <TouchableOpacity
-                    onPress={() =>
-                      navigationRef.current?.dispatch(
-                        CommonActions.reset({
-                          index: 0,
-                          routes: [{ name: "Cart" }],
-                        })
-                      )
-                    }
+                    onPress={() => navigationRef.current?.navigate("Cart")}
                     style={{ marginRight: 15 }}
                     accessibilityLabel="Go to Cart"
                   >
                     <Ionicons name="cart-outline" size={28} color="#fff" />
                   </TouchableOpacity>
                 ),
-                animationEnabled: false,
-                gestureEnabled: false,
               })}
             />
             <Stack.Screen
@@ -179,30 +166,19 @@ const AppNavigator: React.FC = () => {
                 headerTitle: "Add Gig",
                 headerRight: () => (
                   <TouchableOpacity
-                    onPress={() =>
-                      navigationRef.current?.dispatch(
-                        CommonActions.reset({
-                          index: 0,
-                          routes: [{ name: "Cart" }],
-                        })
-                      )
-                    }
+                    onPress={() => navigationRef.current?.navigate("Cart")}
                     style={{ marginRight: 15 }}
                     accessibilityLabel="Go to Cart"
                   >
                     <Ionicons name="cart-outline" size={28} color="#fff" />
                   </TouchableOpacity>
                 ),
-                animationEnabled: false,
-                gestureEnabled: false,
               })}
             />
             <Stack.Screen
               name="Activity"
               component={ActivityScreen}
               options={{
-                gestureEnabled: false,
-                animationEnabled: false,
                 headerLeft: () => (
                   <TouchableOpacity
                     onPress={() => setModalVisible(true)}
@@ -214,14 +190,7 @@ const AppNavigator: React.FC = () => {
                 ),
                 headerRight: () => (
                   <TouchableOpacity
-                    onPress={() =>
-                      navigationRef.current?.dispatch(
-                        CommonActions.reset({
-                          index: 0,
-                          routes: [{ name: "Cart" }],
-                        })
-                      )
-                    }
+                    onPress={() => navigationRef.current?.navigate("Cart")}
                     style={{ marginRight: 15 }}
                     accessibilityLabel="Go to Cart"
                   >
@@ -229,9 +198,21 @@ const AppNavigator: React.FC = () => {
                   </TouchableOpacity>
                 ),
                 headerTitle: "The Gridly",
+                gestureEnabled: false, // Disable swipe-back gesture
+                headerStyle: {
+                  backgroundColor: "#1E1E1E", // Dark header background
+                  shadowOpacity: 0, // Remove shadow on iOS
+                  elevation: 0, // Remove shadow on Android
+                },
+                headerTintColor: "#fff", // Header text color
+                headerTitleStyle: {
+                  fontWeight: "700",
+                  color: "#BB86FC", // Purple title
+                },
               }}
             />
-            {/* EditProduct Screen */}
+
+            {/* Add EditProduct Screen */}
             <Stack.Screen
               name="EditProduct"
               component={EditProduct}
@@ -248,31 +229,30 @@ const AppNavigator: React.FC = () => {
                 headerTitle: "Edit Product",
                 headerRight: () => (
                   <TouchableOpacity
-                    onPress={() =>
-                      navigationRef.current?.dispatch(
-                        CommonActions.reset({
-                          index: 0,
-                          routes: [{ name: "Cart" }],
-                        })
-                      )
-                    }
+                    onPress={() => navigationRef.current?.navigate("Cart")}
                     style={{ marginRight: 15 }}
                     accessibilityLabel="Go to Cart"
                   >
                     <Ionicons name="cart-outline" size={28} color="#fff" />
                   </TouchableOpacity>
                 ),
-                animationEnabled: false,
-                gestureEnabled: false,
+                headerStyle: {
+                  backgroundColor: "#1E1E1E", // Consistent header style
+                  shadowOpacity: 0,
+                  elevation: 0,
+                },
+                headerTintColor: "#fff",
+                headerTitleStyle: {
+                  fontWeight: "700",
+                  color: "#BB86FC",
+                },
               })}
             />
-            {/* Messaging Screen */}
+            {/* Add the Messaging Screen */}
             <Stack.Screen
               name="Messaging"
               component={MessagingScreen}
               options={{
-                gestureEnabled: false,
-                animationEnabled: false,
                 headerLeft: () => (
                   <TouchableOpacity
                     onPress={() => setModalVisible(true)}
@@ -284,14 +264,7 @@ const AppNavigator: React.FC = () => {
                 ),
                 headerRight: () => (
                   <TouchableOpacity
-                    onPress={() =>
-                      navigationRef.current?.dispatch(
-                        CommonActions.reset({
-                          index: 0,
-                          routes: [{ name: "Cart" }],
-                        })
-                      )
-                    }
+                    onPress={() => navigationRef.current?.navigate("Cart")}
                     style={{ marginRight: 15 }}
                     accessibilityLabel="Go to Cart"
                   >
@@ -299,58 +272,79 @@ const AppNavigator: React.FC = () => {
                   </TouchableOpacity>
                 ),
                 headerTitle: "Messaging",
+                gestureEnabled: false,
               }}
             />
-            {/* Cart Screen */}
+            {/* Add CartScreen to the Stack */}
             <Stack.Screen
               name="Cart"
               component={CartScreen}
               options={{
-                gestureEnabled: false,
-                animationEnabled: false,
                 headerLeft: () => (
                   <TouchableOpacity
-                    onPress={() =>
-                      navigationRef.current?.dispatch(
-                        CommonActions.reset({
-                          index: 0,
-                          routes: [{ name: "Dashboard" }],
-                        })
-                      )
-                    }
+                    onPress={() => navigationRef.current?.goBack()}
                     style={{ paddingLeft: 15 }}
-                    accessibilityLabel="Go Back to Dashboard"
+                    accessibilityLabel="Go Back"
                   >
-                    <Icon name="home" size={24} color="#fff" />
+                    <Icon name="arrow-back" size={24} color="#fff" />
                   </TouchableOpacity>
                 ),
                 headerTitle: "Your Cart",
+                headerRight: () => (
+                  <TouchableOpacity
+                    onPress={() => navigationRef.current?.navigate("Cart")} // Optional: Can be omitted or used for additional functionality
+                    style={{ marginRight: 15 }}
+                    accessibilityLabel="Cart Icon"
+                  >
+                    <Ionicons name="cart-outline" size={28} color="#fff" />
+                  </TouchableOpacity>
+                ),
+                headerStyle: {
+                  backgroundColor: "#1E1E1E",
+                  shadowOpacity: 0,
+                  elevation: 0,
+                },
+                headerTintColor: "#fff",
+                headerTitleStyle: {
+                  fontWeight: "700",
+                  color: "#BB86FC",
+                },
               }}
             />
-            {/* Account Screen */}
+            {/* Add AccountScreen to the Stack */}
             <Stack.Screen
               name="Account"
               component={AccountScreen}
               options={{
-                gestureEnabled: false,
-                animationEnabled: false,
                 headerLeft: () => (
                   <TouchableOpacity
-                    onPress={() =>
-                      navigationRef.current?.dispatch(
-                        CommonActions.reset({
-                          index: 0,
-                          routes: [{ name: "Dashboard" }],
-                        })
-                      )
-                    }
+                    onPress={() => navigationRef.current?.goBack()}
                     style={{ paddingLeft: 15 }}
-                    accessibilityLabel="Go Back to Dashboard"
+                    accessibilityLabel="Go Back"
                   >
-                    <Icon name="home" size={24} color="#fff" />
+                    <Icon name="arrow-back" size={24} color="#fff" />
                   </TouchableOpacity>
                 ),
                 headerTitle: "My Account",
+                headerRight: () => (
+                  <TouchableOpacity
+                    onPress={() => navigationRef.current?.navigate("Cart")}
+                    style={{ marginRight: 15 }}
+                    accessibilityLabel="Go to Cart"
+                  >
+                    <Ionicons name="cart-outline" size={28} color="#fff" />
+                  </TouchableOpacity>
+                ),
+                headerStyle: {
+                  backgroundColor: "#1E1E1E",
+                  shadowOpacity: 0,
+                  elevation: 0,
+                },
+                headerTintColor: "#fff",
+                headerTitleStyle: {
+                  fontWeight: "700",
+                  color: "#BB86FC",
+                },
               }}
             />
           </>
@@ -359,11 +353,7 @@ const AppNavigator: React.FC = () => {
           <Stack.Screen
             name="Login"
             component={LoginScreen}
-            options={{
-              headerShown: false,
-              gestureEnabled: false,
-              animationEnabled: false,
-            }}
+            options={{ headerShown: false }}
           />
         )}
       </Stack.Navigator>
@@ -401,16 +391,11 @@ const AppNavigator: React.FC = () => {
             >
               <Text style={styles.optionText}>View Terms of Service</Text>
             </TouchableOpacity>
-            {/* "My Account" Button */}
+            {/* Add "My Account" Button */}
             <TouchableOpacity
               onPress={() => {
                 setModalVisible(false);
-                navigationRef.current?.dispatch(
-                  CommonActions.reset({
-                    index: 0,
-                    routes: [{ name: "Account" }],
-                  })
-                );
+                navigationRef.current?.navigate("Account");
               }}
               style={styles.option}
               accessibilityLabel="Go to My Account"
