@@ -327,6 +327,7 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
         setAllProducts([]);
         setFilteredProducts([]);
         setError(null); // Clear any previous error
+        setLoading(false);
         return; // Stop further processing
       }
 
@@ -537,10 +538,10 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
     };
 
     return (
-      <GestureHandlerRootView style={styles.productItemContainer}>
-        <PanGestureHandler onHandlerStateChange={handleStateChange}>
-          <Animated.View style={styles.productContainer}>
-            <TapGestureHandler onActivated={handleImageTap}>
+      <PanGestureHandler onHandlerStateChange={handleStateChange}>
+        <Animated.View style={styles.productContainer}>
+          <TapGestureHandler onActivated={handleImageTap}>
+            <TouchableOpacity activeOpacity={0.9}>
               <Image
                 source={{
                   uri:
@@ -549,34 +550,34 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
                       : "https://via.placeholder.com/150",
                 }}
                 style={styles.productImage}
-                resizeMode="contain"
+                resizeMode="cover"
               />
-            </TapGestureHandler>
+            </TouchableOpacity>
+          </TapGestureHandler>
 
-            {/* Like and Share Icons */}
-            <TouchableOpacity
-              style={styles.likeIcon}
-              onPress={() => {
-                // Handle like action
-                Alert.alert("Liked", "You liked this product!");
-              }}
-              accessibilityLabel="Like Product"
-            >
-              <Ionicons name="heart-outline" size={30} color="#007AFF" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.shareIcon}
-              onPress={() => {
-                // Handle share action
-                Alert.alert("Shared", "You shared this product!");
-              }}
-              accessibilityLabel="Share Product"
-            >
-              <Ionicons name="share-social-outline" size={30} color="#007AFF" />
-            </TouchableOpacity>
-          </Animated.View>
-        </PanGestureHandler>
-      </GestureHandlerRootView>
+          {/* Like and Share Icons */}
+          <TouchableOpacity
+            style={styles.likeIcon}
+            onPress={() => {
+              // Handle like action
+              Alert.alert("Liked", "You liked this product!");
+            }}
+            accessibilityLabel="Like Product"
+          >
+            <Ionicons name="heart-outline" size={30} color="#FFFFFF" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.shareIcon}
+            onPress={() => {
+              // Handle share action
+              Alert.alert("Shared", "You shared this product!");
+            }}
+            accessibilityLabel="Share Product"
+          >
+            <Ionicons name="share-social-outline" size={30} color="#FFFFFF" />
+          </TouchableOpacity>
+        </Animated.View>
+      </PanGestureHandler>
     );
   };
 
@@ -938,31 +939,32 @@ const styles = StyleSheet.create({
   listContainer: {},
   productItemContainer: {
     height: SCREEN_HEIGHT,
-  },
-  productContainer: {
-    flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    marginTop: -290,
+  },
+  productContainer: {
+    width: SCREEN_WIDTH - 40, // Adjusted width with horizontal padding
+    height: SCREEN_HEIGHT * 0.6, // 60% of screen height
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 20,
   },
   productImage: {
-    width: SCREEN_WIDTH, // Occupy the full screen width
-    aspectRatio: 14 / 25, // Adjust this to match the original aspect ratio of your image
-    alignSelf: "center", // Center the image horizontally
-    borderRadius: 20, // Optional: Add rounded corners
-    resizeMode: "contain", // Ensure the image content is fully visible
+    width: "100%",
+    height: "80%",
+    borderRadius: 20,
     backgroundColor: "#FFFFFF", // Light background for better visibility
   },
   likeIcon: {
     position: "absolute",
     right: 20,
-    top: SCREEN_HEIGHT * 0.45, // Slightly lower, closer to the share icon
+    top: 20,
     width: 40,
     height: 40,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "#FF3B30", // Red for the heart icon
-    borderRadius: 20, // Smaller circle
+    borderRadius: 20, // Circle
     borderWidth: 2,
     borderColor: "#FFFFFF", // Thin white border for distinction
     shadowColor: "#000", // Light shadow for depth
@@ -974,13 +976,13 @@ const styles = StyleSheet.create({
   shareIcon: {
     position: "absolute",
     right: 20,
-    top: SCREEN_HEIGHT * 0.52, // Positioned closer to the like icon
+    top: 80, // Positioned below the like icon
     width: 40,
     height: 40,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "#34C759", // Green for the share icon
-    borderRadius: 20, // Smaller circle
+    borderRadius: 20, // Circle
     borderWidth: 2,
     borderColor: "#FFFFFF", // Thin white border for distinction
     shadowColor: "#000", // Light shadow for depth
@@ -1196,19 +1198,6 @@ const styles = StyleSheet.create({
     color: "#555",
     fontSize: 14,
     textAlign: "center",
-  },
-  cartButton: {
-    position: "absolute",
-    bottom: 80, // Adjust based on BottomNavBar height
-    right: 20,
-    backgroundColor: "#007AFF",
-    padding: 10,
-    borderRadius: 30,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-    elevation: 5,
   },
   descriptionText: {
     color: "#000", // Dark text color
