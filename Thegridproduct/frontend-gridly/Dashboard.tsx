@@ -8,13 +8,13 @@ import {
   TouchableOpacity,
   Image,
   Modal,
-  FlatList,
   ActivityIndicator,
   Alert,
   ScrollView,
   Animated,
   Dimensions,
   TextInput,
+  FlatList,
 } from "react-native";
 import {
   RouteProp,
@@ -22,11 +22,11 @@ import {
   CommonActions,
 } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
-import Ionicons from "react-native-vector-icons/Ionicons"; // For Ionicons
+import Ionicons from "react-native-vector-icons/Ionicons";
 import BottomNavBar from "./components/BottomNavbar";
 import { NGROK_URL } from "@env";
 import { UserContext } from "./UserContext";
-import { RootStackParamList } from "./navigationTypes"; // Import RootStackParamList
+import { RootStackParamList } from "./navigationTypes";
 import {
   PanGestureHandler,
   TapGestureHandler,
@@ -45,11 +45,11 @@ type Product = {
   description: string;
   category: string;
   images: string[];
-  university: string; // Assuming backend uses 'university'
+  university: string;
   ownerId: string;
   postedDate: string;
-  rating?: number; // Added rating
-  quality?: string; // Added quality
+  rating?: number;
+  quality?: string;
 };
 
 type CartItem = {
@@ -106,15 +106,14 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
   const [selectedProductDescription, setSelectedProductDescription] =
     useState<string>("");
 
-  // FlatList Ref for Navigating to Next Product
-  const flatListRef = useRef<FlatList>(null);
-  const currentIndex = useRef<number>(0);
-
   // State for Cart Update Indicator
   const [cartUpdated, setCartUpdated] = useState(false);
 
   // State for Cart Items
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
+
+  // State to track the current product index
+  const [currentIndex, setCurrentIndex] = useState(0);
 
   // Function to fetch cart items
   const fetchCart = async () => {
@@ -373,6 +372,26 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
     }
   };
 
+  // Handle swiping actions
+  const handleSwipe = (direction: "left" | "right") => {
+    if (direction === "left") {
+      // Open product details modal
+      setSelectedProduct(filteredProducts[currentIndex]);
+      setIsDetailsModalVisible(true);
+    } else if (direction === "right") {
+      // Add to cart
+      const product = filteredProducts[currentIndex];
+      addToCart(product);
+    }
+
+    // Move to the next product
+    if (currentIndex < filteredProducts.length - 1) {
+      setCurrentIndex(currentIndex + 1);
+    } else {
+      Alert.alert("End of List", "No more products available.");
+    }
+  };
+
   // Re-filter products whenever selectedCategory or searchQuery changes
   useEffect(() => {
     if (allProducts.length > 0) {
@@ -392,6 +411,7 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
       }
 
       setFilteredProducts(finalFiltered);
+      setCurrentIndex(0); // Reset to first product when filters change
     }
   }, [allProducts, selectedCategory, searchQuery]);
 
@@ -401,6 +421,7 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
     setError(null);
     fetchProducts();
     fetchCart();
+    setCurrentIndex(0); // Reset to first product when campusMode changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [campusMode]);
 
@@ -453,50 +474,22 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
     }
   };
 
-  // Render each product item with gesture handling
-  const renderProduct = ({ item, index }: { item: Product; index: number }) => {
-    return (
-      <ProductItem
-        product={item}
-        onSwipeUp={() => {
-          setSelectedProduct(item);
-          setIsDetailsModalVisible(true);
-        }}
-        onSwipeLeft={() => {
-          if (index < filteredProducts.length - 1) {
-            flatListRef.current?.scrollToIndex({
-              index: index + 1,
-              animated: true,
-            });
-            currentIndex.current = index + 1;
-          } else {
-            Alert.alert("End of List", "No more products available.");
-          }
-        }}
-        onSwipeRight={() => {
-          addToCart(item);
-          // Optionally navigate to next product after adding to cart
-          if (index < filteredProducts.length - 1) {
-            flatListRef.current?.scrollToIndex({
-              index: index + 1,
-              animated: true,
-            });
-            currentIndex.current = index + 1;
-          } else {
-            Alert.alert("End of List", "No more products available.");
-          }
-        }}
-      />
-    );
-  };
-
   // ProductItem Component
-  const ProductItem: React.FC<{
+  type ProductItemProps = {
     product: Product;
-    onSwipeUp: () => void;
     onSwipeLeft: () => void;
     onSwipeRight: () => void;
-  }> = ({ product, onSwipeUp, onSwipeLeft, onSwipeRight }) => {
+    isTop: boolean;
+    style?: any;
+  };
+
+  const ProductItem: React.FC<ProductItemProps> = ({
+    product,
+    onSwipeLeft,
+    onSwipeRight,
+    isTop,
+    style,
+  }) => {
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
     const [isAdding, setIsAdding] = useState(false); // Prevent multiple adds
 
@@ -509,15 +502,17 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
       }
     };
 
-    // Handle swipe actions only once
-    const handleStateChange = ({ nativeEvent }: any) => {
+    // Handle swipe actions only if this is the top product
+    const handleGestureStateChange = ({ nativeEvent }: any) => {
+      if (!isTop) return;
+
       if (nativeEvent.state === State.END) {
         const { translationY, translationX, velocityY, velocityX } =
           nativeEvent;
 
-        // Swipe Up
+        // Swipe Up (Optional: Can be used for additional actions)
         if (translationY < -50 && velocityY < -0.5) {
-          onSwipeUp();
+          // You can implement swipe up actions if needed
         }
 
         // Swipe Left
@@ -538,44 +533,61 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
     };
 
     return (
-      <PanGestureHandler onHandlerStateChange={handleStateChange}>
-        <Animated.View style={styles.productContainer}>
-          <TapGestureHandler onActivated={handleImageTap}>
+      <PanGestureHandler onHandlerStateChange={handleGestureStateChange}>
+        <Animated.View style={[styles.productContainer, style]}>
+          <TapGestureHandler
+            onActivated={() => {
+              if (isTop) {
+                handleImageTap();
+              }
+            }}
+          >
             <TouchableOpacity activeOpacity={0.9}>
               <Image
                 source={{
                   uri:
                     product.images && product.images.length > 0
                       ? product.images[currentImageIndex]
-                      : "https://via.placeholder.com/150",
+                      : "https://via.placeholder.com/150", // Fallback URL
                 }}
-                style={styles.productImage}
+                style={{
+                  width: 300, // Explicit width (adjust as needed)
+                  height: 300, // Explicit height (adjust as needed)
+                  borderRadius: 10,
+                  backgroundColor: "gray", // Debugging: Ensure the image container is visible
+                }}
                 resizeMode="cover"
               />
             </TouchableOpacity>
           </TapGestureHandler>
 
-          {/* Like and Share Icons */}
-          <TouchableOpacity
-            style={styles.likeIcon}
-            onPress={() => {
-              // Handle like action
-              Alert.alert("Liked", "You liked this product!");
-            }}
-            accessibilityLabel="Like Product"
-          >
-            <Ionicons name="heart-outline" size={30} color="#FFFFFF" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.shareIcon}
-            onPress={() => {
-              // Handle share action
-              Alert.alert("Shared", "You shared this product!");
-            }}
-            accessibilityLabel="Share Product"
-          >
-            <Ionicons name="share-social-outline" size={30} color="#FFFFFF" />
-          </TouchableOpacity>
+          {/* Like and Share Icons (Only for Top Product) */}
+          {isTop && (
+            <>
+              <TouchableOpacity
+                style={styles.likeIcon}
+                onPress={() => {
+                  Alert.alert("Liked", "You liked this product!");
+                }}
+                accessibilityLabel="Like Product"
+              >
+                <Ionicons name="heart-outline" size={30} color="#FFFFFF" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.shareIcon}
+                onPress={() => {
+                  Alert.alert("Shared", "You shared this product!");
+                }}
+                accessibilityLabel="Share Product"
+              >
+                <Ionicons
+                  name="share-social-outline"
+                  size={30}
+                  color="#FFFFFF"
+                />
+              </TouchableOpacity>
+            </>
+          )}
         </Animated.View>
       </PanGestureHandler>
     );
@@ -619,7 +631,7 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
           </TouchableOpacity>
         </View>
 
-        {/* Product List */}
+        {/* Product Stack */}
         {loading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#007AFF" />
@@ -634,7 +646,8 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
                 setLoading(true);
                 setError(null);
                 fetchProducts();
-                fetchCart(); // Also refetch cart
+                fetchCart();
+                setCurrentIndex(0);
               }}
               accessibilityLabel="Retry Fetching Products"
             >
@@ -646,23 +659,25 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
             <Text style={styles.noProductsText}>No products available.</Text>
           </View>
         ) : (
-          <FlatList
-            ref={flatListRef}
-            data={filteredProducts}
-            keyExtractor={(item) => item.id}
-            renderItem={renderProduct}
-            contentContainerStyle={styles.listContainer}
-            showsVerticalScrollIndicator={false}
-            pagingEnabled
-            snapToAlignment="start"
-            decelerationRate="fast"
-            snapToInterval={SCREEN_HEIGHT}
-            getItemLayout={(data, index) => ({
-              length: SCREEN_HEIGHT,
-              offset: SCREEN_HEIGHT * index,
-              index,
-            })}
-          />
+          <View style={styles.productStack}>
+            {filteredProducts
+              .slice(currentIndex, currentIndex + 2)
+              .reverse()
+              .map((product, index) => (
+                <ProductItem
+                  key={product.id}
+                  product={product}
+                  onSwipeLeft={() => handleSwipe("left")}
+                  onSwipeRight={() => handleSwipe("right")}
+                  isTop={index === 1}
+                  style={[
+                    styles.stackedProduct,
+                    { zIndex: index },
+                    index === 1 ? styles.topProduct : styles.bottomProduct,
+                  ]}
+                />
+              ))}
+          </View>
         )}
 
         {/* Add Product/Gig Modal */}
@@ -937,23 +952,35 @@ const styles = StyleSheet.create({
     marginRight: 5,
   },
   listContainer: {},
-  productItemContainer: {
-    height: SCREEN_HEIGHT,
+  productStack: {
+    flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
-  productContainer: {
+  stackedProduct: {
+    position: "absolute",
     width: SCREEN_WIDTH - 40, // Adjusted width with horizontal padding
     height: SCREEN_HEIGHT * 0.6, // 60% of screen height
+    borderRadius: 10,
+    backgroundColor: "#FFFFFF",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  topProduct: {
+    zIndex: 2,
+  },
+  bottomProduct: {
+    zIndex: 1,
+    transform: [{ scale: 0.95 }, { translateY: 20 }],
+  },
+  productContainer: {
+    width: "100%",
+    height: "100%",
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 20,
-  },
-  productImage: {
-    width: "100%",
-    height: "80%",
-    borderRadius: 20,
-    backgroundColor: "#FFFFFF", // Light background for better visibility
   },
   likeIcon: {
     position: "absolute",
