@@ -1,8 +1,0 @@
-[build]
-command = "cd backend && go build -o main"
-
-[deploy]
-command = "cd backend && ./main"
-
-[watch]
-paths = ["backend/**"]
