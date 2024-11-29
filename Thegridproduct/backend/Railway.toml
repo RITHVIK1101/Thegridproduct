@@ -1,0 +1,10 @@
+[build]
+# Specify the build command
+command = "go build -o main"
+
+[deploy]
+# Specify the start command to run your backend
+command = "./main"
+
+# Define the directory to watch for changes (optional)
+watch_paths = ["backend/**"]
