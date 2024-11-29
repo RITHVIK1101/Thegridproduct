@@ -1,6 +1,6 @@
 // Dashboard.tsx
 
-import React, { useState, useEffect, useContext, useRef } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import {
   View,
   Text,
@@ -11,7 +11,6 @@ import {
   ActivityIndicator,
   Alert,
   ScrollView,
-  Animated,
   Dimensions,
   TextInput,
   FlatList,
@@ -59,6 +58,11 @@ type CartItem = {
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
 
+// Define constants for margins and heights
+const SEARCH_BAR_HEIGHT = 50;
+const NAVBAR_HEIGHT = 60;
+const GAP_MARGIN = 20;
+
 const Dashboard: React.FC<DashboardProps> = ({ route }) => {
   const [isAddModalVisible, setIsAddModalVisible] = useState(false);
   const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
@@ -100,7 +104,7 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // States for Description Modal
+  // State for Description Modal
   const [isDescriptionModalVisible, setIsDescriptionModalVisible] =
     useState(false);
   const [selectedProductDescription, setSelectedProductDescription] =
@@ -373,14 +377,18 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
   };
 
   // Handle swiping actions
-  const handleSwipe = (direction: "left" | "right") => {
-    if (direction === "left") {
-      // Open product details modal
-      setSelectedProduct(filteredProducts[currentIndex]);
-      setIsDetailsModalVisible(true);
-    } else if (direction === "right") {
+  const handleSwipe = (direction: "left" | "right" | "up") => {
+    const product = filteredProducts[currentIndex];
+
+    if (direction === "up") {
+      // Open description modal
+      setSelectedProductDescription(product.description);
+      setIsDescriptionModalVisible(true);
+      return; // Do not move to next product
+    }
+
+    if (direction === "right") {
       // Add to cart
-      const product = filteredProducts[currentIndex];
       addToCart(product);
     }
 
@@ -389,6 +397,8 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
       setCurrentIndex(currentIndex + 1);
     } else {
       Alert.alert("End of List", "No more products available.");
+      // Optionally, reset to first product
+      setCurrentIndex(0);
     }
   };
 
@@ -445,12 +455,6 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
     }
   };
 
-  // Show description modal
-  const showDescription = (description: string) => {
-    setSelectedProductDescription(description);
-    setIsDescriptionModalVisible(true);
-  };
-
   // Handle Logout
   const handleLogout = async () => {
     try {
@@ -479,6 +483,7 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
     product: Product;
     onSwipeLeft: () => void;
     onSwipeRight: () => void;
+    onSwipeUp: () => void;
     isTop: boolean;
     style?: any;
   };
@@ -487,6 +492,7 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
     product,
     onSwipeLeft,
     onSwipeRight,
+    onSwipeUp,
     isTop,
     style,
   }) => {
@@ -502,7 +508,7 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
       }
     };
 
-    // Handle swipe actions only if this is the top product
+    // Handle gesture state changes
     const handleGestureStateChange = ({ nativeEvent }: any) => {
       if (!isTop) return;
 
@@ -510,39 +516,34 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
         const { translationY, translationX, velocityY, velocityX } =
           nativeEvent;
 
-        // Swipe Up (Optional: Can be used for additional actions)
+        // Determine the swipe direction based on translation and velocity
         if (translationY < -50 && velocityY < -0.5) {
-          // You can implement swipe up actions if needed
-        }
-
-        // Swipe Left
-        if (translationX < -50 && velocityX < -0.5) {
-          onSwipeLeft();
-        }
-
-        // Swipe Right
-        if (translationX > 50 && velocityX > 0.5) {
+          // Swipe Up
+          onSwipeUp();
+        } else if (translationX > 50 && velocityX > 0.5) {
+          // Swipe Right
           if (!isAdding) {
             setIsAdding(true);
             onSwipeRight();
             // Reset the adding flag after a short delay
             setTimeout(() => setIsAdding(false), 1000);
           }
+        } else if (translationX < -50 && velocityX < -0.5) {
+          // Swipe Left
+          onSwipeLeft();
         }
       }
     };
 
     return (
       <PanGestureHandler onHandlerStateChange={handleGestureStateChange}>
-        <Animated.View style={[styles.productContainer, style]}>
+        <View style={[styles.stackedProduct, style]}>
           <TapGestureHandler
             onActivated={() => {
-              if (isTop) {
-                handleImageTap();
-              }
+              handleImageTap();
             }}
           >
-            <TouchableOpacity activeOpacity={0.9}>
+            <TouchableOpacity activeOpacity={0.9} style={styles.imageContainer}>
               <Image
                 source={{
                   uri:
@@ -550,45 +551,32 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
                       ? product.images[currentImageIndex]
                       : "https://via.placeholder.com/150", // Fallback URL
                 }}
-                style={{
-                  width: 300, // Explicit width (adjust as needed)
-                  height: 300, // Explicit height (adjust as needed)
-                  borderRadius: 10,
-                  backgroundColor: "gray", // Debugging: Ensure the image container is visible
-                }}
-                resizeMode="cover"
+                style={styles.productImage}
+                resizeMode="contain" // Maintain aspect ratio
               />
             </TouchableOpacity>
           </TapGestureHandler>
 
-          {/* Like and Share Icons (Only for Top Product) */}
-          {isTop && (
-            <>
-              <TouchableOpacity
-                style={styles.likeIcon}
-                onPress={() => {
-                  Alert.alert("Liked", "You liked this product!");
-                }}
-                accessibilityLabel="Like Product"
-              >
-                <Ionicons name="heart-outline" size={30} color="#FFFFFF" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.shareIcon}
-                onPress={() => {
-                  Alert.alert("Shared", "You shared this product!");
-                }}
-                accessibilityLabel="Share Product"
-              >
-                <Ionicons
-                  name="share-social-outline"
-                  size={30}
-                  color="#FFFFFF"
-                />
-              </TouchableOpacity>
-            </>
-          )}
-        </Animated.View>
+          {/* Like and Share Icons */}
+          <TouchableOpacity
+            style={styles.likeIcon}
+            onPress={() => {
+              Alert.alert("Liked", "You liked this product!");
+            }}
+            accessibilityLabel="Like Product"
+          >
+            <Ionicons name="heart-outline" size={30} color="#FFFFFF" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.shareIcon}
+            onPress={() => {
+              Alert.alert("Shared", "You shared this product!");
+            }}
+            accessibilityLabel="Share Product"
+          >
+            <Ionicons name="share-social-outline" size={30} color="#FFFFFF" />
+          </TouchableOpacity>
+        </View>
       </PanGestureHandler>
     );
   };
@@ -669,9 +657,9 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
                   product={product}
                   onSwipeLeft={() => handleSwipe("left")}
                   onSwipeRight={() => handleSwipe("right")}
+                  onSwipeUp={() => handleSwipe("up")}
                   isTop={index === 1}
                   style={[
-                    styles.stackedProduct,
                     { zIndex: index },
                     index === 1 ? styles.topProduct : styles.bottomProduct,
                   ]}
@@ -831,17 +819,6 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
                   <Text style={styles.detailsTitle}>
                     {selectedProduct.title}
                   </Text>
-                  <Image
-                    source={{
-                      uri:
-                        selectedProduct.images &&
-                        selectedProduct.images.length > 0
-                          ? selectedProduct.images[0]
-                          : "https://via.placeholder.com/150",
-                    }}
-                    style={styles.detailsImage}
-                    resizeMode="cover"
-                  />
                   <Text style={styles.detailsPrice}>
                     Price: ${selectedProduct.price.toFixed(2)}
                   </Text>
@@ -869,7 +846,7 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
           </TouchableOpacity>
         </Modal>
 
-        {/* Description Modal (Existing) */}
+        {/* Description Modal */}
         <Modal
           visible={isDescriptionModalVisible}
           transparent
@@ -881,7 +858,7 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
             activeOpacity={1}
             onPressOut={() => setIsDescriptionModalVisible(false)}
           >
-            <View style={styles.modalContent}>
+            <View style={styles.descriptionModalContent}>
               <Text style={styles.modalTitle}>Product Description</Text>
               <ScrollView>
                 <Text style={styles.descriptionText}>
@@ -914,7 +891,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF", // Light background
     paddingHorizontal: 20,
     paddingTop: 20,
-    paddingBottom: 60, // Space for BottomNavBar
+    paddingBottom: NAVBAR_HEIGHT + GAP_MARGIN, // Space for BottomNavBar with gap
   },
   searchFilterContainer: {
     flexDirection: "row",
@@ -960,11 +937,12 @@ const styles = StyleSheet.create({
   stackedProduct: {
     position: "absolute",
     width: SCREEN_WIDTH - 40, // Adjusted width with horizontal padding
-    height: SCREEN_HEIGHT * 0.6, // 60% of screen height
+    height: SCREEN_HEIGHT - SEARCH_BAR_HEIGHT - NAVBAR_HEIGHT - 9 * GAP_MARGIN,
+    // Total height minus search bar, navbar, and gaps
     borderRadius: 10,
     backgroundColor: "#FFFFFF",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 5,
@@ -977,10 +955,23 @@ const styles = StyleSheet.create({
     transform: [{ scale: 0.95 }, { translateY: 20 }],
   },
   productContainer: {
-    width: "100%",
-    height: "100%",
+    flex: 1,
     justifyContent: "center",
     alignItems: "center",
+  },
+  imageContainer: {
+    flex: 1,
+    width: "100%",
+    justifyContent: "flex-start", // Align image to the top
+    alignItems: "center",
+    marginTop: 10, // Move image up by adding marginTop
+    marginHorizontal: 10, // Margins on left and right
+  },
+  productImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 10,
+    backgroundColor: "gray", // Placeholder background
   },
   likeIcon: {
     position: "absolute",
@@ -1094,6 +1085,20 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 5,
   },
+  descriptionModalContent: {
+    width: "80%",
+    backgroundColor: "#FFFFFF", // Light modal background
+    padding: 20,
+    borderRadius: 15,
+    alignItems: "center",
+    maxHeight: "70%",
+    position: "relative",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
   modalTitle: {
     fontSize: 20,
     fontWeight: "700",
@@ -1193,12 +1198,6 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "700",
     color: "#007AFF", // Blue text
-    marginBottom: 15,
-  },
-  detailsImage: {
-    width: "100%",
-    height: SCREEN_HEIGHT * 0.3,
-    borderRadius: 15,
     marginBottom: 15,
   },
   detailsPrice: {
