@@ -1,4 +1,20 @@
 // navigationTypes.ts
+
+export type CartProduct = {
+  id: string;
+  title: string;
+  price: number;
+  images: string[];
+  quantity: number;
+  description?: string;
+  category?: string;
+  university?: string;
+  ownerId?: string;
+  postedDate?: string;
+  rating?: number;
+  quality?: string;
+};
+
 export type RootStackParamList = {
   Login: undefined;
   Dashboard: undefined;
@@ -8,7 +24,7 @@ export type RootStackParamList = {
   Messaging: undefined;
   AddGig: undefined; 
   Cart: undefined;
-  Card: undefined;
+  Payment: { product: CartProduct };
   Account: undefined;
-  EditProduct: { productId: string }; // Ensure this line exists
+  EditProduct: { productId: string };
 };

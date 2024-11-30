@@ -16,6 +16,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
+	"github.com/stripe/stripe-go/v72" // Import Stripe Go SDK
 )
 
 func main() {
@@ -24,6 +25,13 @@ func main() {
 	if err != nil {
 		log.Println("Error loading .env file, proceeding with system environment variables")
 	}
+
+	// Set Stripe secret key
+	stripeKey := os.Getenv("STRIPE_SECRET_KEY")
+	if stripeKey == "" {
+		log.Fatal("STRIPE_SECRET_KEY not set in environment variables")
+	}
+	stripe.Key = stripeKey
 
 	// Connect to MongoDB
 	db.ConnectDB()
@@ -69,6 +77,9 @@ func main() {
 
 	// **User Routes**
 	protected.HandleFunc("/users/{id}", handlers.GetUserHandler).Methods("GET")
+
+	//payment
+	protected.HandleFunc("/create-payment-intent", handlers.CreatePaymentIntentHandler).Methods("POST")
 
 	// Handle undefined routes
 	router.NotFoundHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

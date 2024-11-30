@@ -10,12 +10,10 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
-  ScrollView,
 } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { UserContext } from "./UserContext";
 import { CommonActions } from "@react-navigation/native";
-
 import { NGROK_URL } from "@env";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { useNavigation } from "@react-navigation/native";
@@ -292,6 +290,14 @@ const CartScreen: React.FC = () => {
       >
         <Ionicons name="trash-outline" size={24} color="#FF3B30" />
       </TouchableOpacity>
+      {/* Buy Button */}
+      <TouchableOpacity
+        onPress={() => navigation.navigate("Payment", { product: item })}
+        style={styles.buyButton}
+        accessibilityLabel="Buy Now"
+      >
+        <Text style={styles.buyButtonText}>Buy</Text>
+      </TouchableOpacity>
     </View>
   );
 
@@ -341,6 +347,7 @@ const CartScreen: React.FC = () => {
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
       />
+      {/* Checkout Button */}
       <TouchableOpacity
         style={styles.checkoutButton}
         onPress={proceedToCheckout}
@@ -402,6 +409,20 @@ const styles = StyleSheet.create({
   },
   removeButton: {
     padding: 5,
+  },
+  buyButton: {
+    backgroundColor: "#34C759", // Green button
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginLeft: 10,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  buyButtonText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "600",
   },
   loadingContainer: {
     flex: 1,

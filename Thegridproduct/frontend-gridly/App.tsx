@@ -1,6 +1,6 @@
 // App.tsx
 
-import React, { useState, createRef, useContext, useEffect } from "react";
+import React, { useState, createRef, useContext } from "react";
 import {
   NavigationContainer,
   NavigationContainerRef,
@@ -21,7 +21,7 @@ import {
 import Icon from "react-native-vector-icons/MaterialIcons";
 import Ionicons from "react-native-vector-icons/Ionicons"; // Ensure Ionicons is imported
 import BottomNavBar from "./components/BottomNavbar";
-
+import PaymentScreen from "./PaymentScreen"; // Import PaymentScreen
 import SplashScreen from "./SplashScreen";
 import LoginScreen from "./LoginScreen";
 import Dashboard from "./Dashboard";
@@ -35,6 +35,7 @@ import AccountScreen from "./AccountScreen"; // If you have an edit account scre
 
 import { RootStackParamList } from "./navigationTypes";
 import { UserProvider, UserContext } from "./UserContext"; // Import UserContext
+import { StripeProvider } from "@stripe/stripe-react-native"; // Import StripeProvider
 
 export const navigationRef =
   createRef<NavigationContainerRef<RootStackParamList>>();
@@ -77,362 +78,393 @@ const AppNavigator: React.FC = () => {
   }
 
   return (
-    <NavigationContainer ref={navigationRef}>
-      <Stack.Navigator
-        screenOptions={{
-          headerStyle: {
-            backgroundColor: "#1E1E1E", // Dark header background
-            shadowOpacity: 0, // Remove shadow on iOS
-            elevation: 0, // Remove shadow on Android
-          },
-          headerTintColor: "#fff", // Header text color
-          headerTitleStyle: {
-            fontWeight: "700",
-            color: "#BB86FC", // Purple title
-          },
-        }}
-      >
-        {token ? (
-          // Authenticated screens
-          <>
-            <Stack.Screen
-              name="Dashboard"
-              component={Dashboard}
-              options={{
-                headerLeft: () => (
-                  <TouchableOpacity
-                    onPress={() => setModalVisible(true)}
-                    style={{ marginLeft: 10 }}
-                    accessibilityLabel="Open Options Modal"
-                  >
-                    <Icon name="person" size={30} color="#fff" />
-                  </TouchableOpacity>
-                ),
-                headerRight: () => (
-                  <TouchableOpacity
-                    onPress={() => navigationRef.current?.navigate("Cart")}
-                    style={{ marginRight: 15 }}
-                    accessibilityLabel="Go to Cart"
-                  >
-                    <Ionicons name="cart-outline" size={28} color="#fff" />
-                    {/* Optional: Add a badge for cart items count */}
-                    {/* <View style={styles.cartBadge}>
-                      <Text style={styles.cartBadgeText}>{cartItemCount}</Text>
-                    </View> */}
-                  </TouchableOpacity>
-                ),
-                headerTitle: "The Gridly",
-                gestureEnabled: false,
-              }}
-            />
-            <Stack.Screen
-              name="AddProduct"
-              component={AddProductScreen}
-              options={({ navigation }) => ({
-                headerLeft: () => (
-                  <TouchableOpacity
-                    onPress={() => navigation.goBack()}
-                    style={{ paddingLeft: 15 }}
-                    accessibilityLabel="Go Back"
-                  >
-                    <Icon name="arrow-back" size={24} color="#fff" />
-                  </TouchableOpacity>
-                ),
-                headerTitle: "Add Product",
-                headerRight: () => (
-                  <TouchableOpacity
-                    onPress={() => navigationRef.current?.navigate("Cart")}
-                    style={{ marginRight: 15 }}
-                    accessibilityLabel="Go to Cart"
-                  >
-                    <Ionicons name="cart-outline" size={28} color="#fff" />
-                  </TouchableOpacity>
-                ),
-              })}
-            />
-            <Stack.Screen
-              name="AddGig"
-              component={AddGigScreen}
-              options={({ navigation }) => ({
-                headerLeft: () => (
-                  <TouchableOpacity
-                    onPress={() => navigation.goBack()}
-                    style={{ paddingLeft: 15 }}
-                    accessibilityLabel="Go Back"
-                  >
-                    <Icon name="arrow-back" size={24} color="#fff" />
-                  </TouchableOpacity>
-                ),
-                headerTitle: "Add Gig",
-                headerRight: () => (
-                  <TouchableOpacity
-                    onPress={() => navigationRef.current?.navigate("Cart")}
-                    style={{ marginRight: 15 }}
-                    accessibilityLabel="Go to Cart"
-                  >
-                    <Ionicons name="cart-outline" size={28} color="#fff" />
-                  </TouchableOpacity>
-                ),
-              })}
-            />
-            <Stack.Screen
-              name="Activity"
-              component={ActivityScreen}
-              options={{
-                headerLeft: () => (
-                  <TouchableOpacity
-                    onPress={() => setModalVisible(true)}
-                    style={{ marginLeft: 10 }}
-                    accessibilityLabel="Open Options Modal"
-                  >
-                    <Icon name="person" size={30} color="#fff" />
-                  </TouchableOpacity>
-                ),
-                headerRight: () => (
-                  <TouchableOpacity
-                    onPress={() => navigationRef.current?.navigate("Cart")}
-                    style={{ marginRight: 15 }}
-                    accessibilityLabel="Go to Cart"
-                  >
-                    <Ionicons name="cart-outline" size={28} color="#fff" />
-                  </TouchableOpacity>
-                ),
-                headerTitle: "The Gridly",
-                gestureEnabled: false, // Disable swipe-back gesture
-                headerStyle: {
-                  backgroundColor: "#1E1E1E", // Dark header background
-                  shadowOpacity: 0, // Remove shadow on iOS
-                  elevation: 0, // Remove shadow on Android
-                },
-                headerTintColor: "#fff", // Header text color
-                headerTitleStyle: {
-                  fontWeight: "700",
-                  color: "#BB86FC", // Purple title
-                },
-              }}
-            />
+    <StripeProvider
+      publishableKey="pk_live_51QQZb9Fg2PIykDNlxiX04AYjLnow7r1p0WCLBBFn2Q8eafoY1GJmzkBqcDL8KYUj3yEu2nw5oNUj7X8mfyOm8MOa009Sq3WAX3" // Replace with your actual Stripe publishable key
+      merchantIdentifier="merchant.com.yourapp" // Required for Apple Pay (replace with your merchant identifier)
+    >
+      <NavigationContainer ref={navigationRef}>
+        <Stack.Navigator
+          screenOptions={{
+            headerStyle: {
+              backgroundColor: "#1E1E1E", // Dark header background
+              shadowOpacity: 0, // Remove shadow on iOS
+              elevation: 0, // Remove shadow on Android
+            },
+            headerTintColor: "#fff", // Header text color
+            headerTitleStyle: {
+              fontWeight: "700",
+              color: "#BB86FC", // Purple title
+            },
+          }}
+        >
+          {token ? (
+            // Authenticated screens
+            <>
+              <Stack.Screen
+                name="Dashboard"
+                component={Dashboard}
+                options={{
+                  headerLeft: () => (
+                    <TouchableOpacity
+                      onPress={() => setModalVisible(true)}
+                      style={{ marginLeft: 10 }}
+                      accessibilityLabel="Open Options Modal"
+                    >
+                      <Icon name="person" size={30} color="#fff" />
+                    </TouchableOpacity>
+                  ),
+                  headerRight: () => (
+                    <TouchableOpacity
+                      onPress={() => navigationRef.current?.navigate("Cart")}
+                      style={{ marginRight: 15 }}
+                      accessibilityLabel="Go to Cart"
+                    >
+                      <Ionicons name="cart-outline" size={28} color="#fff" />
+                      {/* Optional: Add a badge for cart items count */}
+                      {/* <View style={styles.cartBadge}>
+                        <Text style={styles.cartBadgeText}>{cartItemCount}</Text>
+                      </View> */}
+                    </TouchableOpacity>
+                  ),
+                  headerTitle: "The Gridly",
+                  gestureEnabled: false,
+                }}
+              />
+              <Stack.Screen
+                name="AddProduct"
+                component={AddProductScreen}
+                options={({ navigation }) => ({
+                  headerLeft: () => (
+                    <TouchableOpacity
+                      onPress={() => navigation.goBack()}
+                      style={{ paddingLeft: 15 }}
+                      accessibilityLabel="Go Back"
+                    >
+                      <Icon name="arrow-back" size={24} color="#fff" />
+                    </TouchableOpacity>
+                  ),
+                  headerTitle: "Add Product",
+                  headerRight: () => (
+                    <TouchableOpacity
+                      onPress={() => navigationRef.current?.navigate("Cart")}
+                      style={{ marginRight: 15 }}
+                      accessibilityLabel="Go to Cart"
+                    >
+                      <Ionicons name="cart-outline" size={28} color="#fff" />
+                    </TouchableOpacity>
+                  ),
+                })}
+              />
+              <Stack.Screen
+                name="AddGig"
+                component={AddGigScreen}
+                options={({ navigation }) => ({
+                  headerLeft: () => (
+                    <TouchableOpacity
+                      onPress={() => navigation.goBack()}
+                      style={{ paddingLeft: 15 }}
+                      accessibilityLabel="Go Back"
+                    >
+                      <Icon name="arrow-back" size={24} color="#fff" />
+                    </TouchableOpacity>
+                  ),
+                  headerTitle: "Add Gig",
+                  headerRight: () => (
+                    <TouchableOpacity
+                      onPress={() => navigationRef.current?.navigate("Cart")}
+                      style={{ marginRight: 15 }}
+                      accessibilityLabel="Go to Cart"
+                    >
+                      <Ionicons name="cart-outline" size={28} color="#fff" />
+                    </TouchableOpacity>
+                  ),
+                })}
+              />
+              <Stack.Screen
+                name="Activity"
+                component={ActivityScreen}
+                options={{
+                  headerLeft: () => (
+                    <TouchableOpacity
+                      onPress={() => setModalVisible(true)}
+                      style={{ marginLeft: 10 }}
+                      accessibilityLabel="Open Options Modal"
+                    >
+                      <Icon name="person" size={30} color="#fff" />
+                    </TouchableOpacity>
+                  ),
+                  headerRight: () => (
+                    <TouchableOpacity
+                      onPress={() => navigationRef.current?.navigate("Cart")}
+                      style={{ marginRight: 15 }}
+                      accessibilityLabel="Go to Cart"
+                    >
+                      <Ionicons name="cart-outline" size={28} color="#fff" />
+                    </TouchableOpacity>
+                  ),
+                  headerTitle: "The Gridly",
+                  gestureEnabled: false,
+                }}
+              />
 
-            {/* Add EditProduct Screen */}
+              {/* Add EditProduct Screen */}
+              <Stack.Screen
+                name="EditProduct"
+                component={EditProduct}
+                options={({ navigation }) => ({
+                  headerLeft: () => (
+                    <TouchableOpacity
+                      onPress={() => navigation.goBack()}
+                      style={{ paddingLeft: 15 }}
+                      accessibilityLabel="Go Back"
+                    >
+                      <Icon name="arrow-back" size={24} color="#fff" />
+                    </TouchableOpacity>
+                  ),
+                  headerTitle: "Edit Product",
+                  headerRight: () => (
+                    <TouchableOpacity
+                      onPress={() => navigationRef.current?.navigate("Cart")}
+                      style={{ marginRight: 15 }}
+                      accessibilityLabel="Go to Cart"
+                    >
+                      <Ionicons name="cart-outline" size={28} color="#fff" />
+                    </TouchableOpacity>
+                  ),
+                  headerStyle: {
+                    backgroundColor: "#1E1E1E", // Consistent header style
+                    shadowOpacity: 0,
+                    elevation: 0,
+                  },
+                  headerTintColor: "#fff",
+                  headerTitleStyle: {
+                    fontWeight: "700",
+                    color: "#BB86FC",
+                  },
+                })}
+              />
+              {/* Add the Messaging Screen */}
+              <Stack.Screen
+                name="Messaging"
+                component={MessagingScreen}
+                options={{
+                  headerLeft: () => (
+                    <TouchableOpacity
+                      onPress={() => setModalVisible(true)}
+                      style={{ marginLeft: 10 }}
+                      accessibilityLabel="Open Options Modal"
+                    >
+                      <Icon name="person" size={30} color="#fff" />
+                    </TouchableOpacity>
+                  ),
+                  headerRight: () => (
+                    <TouchableOpacity
+                      onPress={() => navigationRef.current?.navigate("Cart")}
+                      style={{ marginRight: 15 }}
+                      accessibilityLabel="Go to Cart"
+                    >
+                      <Ionicons name="cart-outline" size={28} color="#fff" />
+                    </TouchableOpacity>
+                  ),
+                  headerTitle: "Messaging",
+                  gestureEnabled: false,
+                }}
+              />
+              {/* Add CartScreen to the Stack */}
+              <Stack.Screen
+                name="Cart"
+                component={CartScreen}
+                options={{
+                  headerLeft: () => (
+                    <TouchableOpacity
+                      onPress={() => navigationRef.current?.goBack()}
+                      style={{ paddingLeft: 15 }}
+                      accessibilityLabel="Go Back"
+                    >
+                      <Icon name="arrow-back" size={24} color="#fff" />
+                    </TouchableOpacity>
+                  ),
+                  headerTitle: "Your Cart",
+                  headerRight: () => (
+                    <TouchableOpacity
+                      onPress={() => navigationRef.current?.navigate("Cart")} // Optional: Can be omitted or used for additional functionality
+                      style={{ marginRight: 15 }}
+                      accessibilityLabel="Cart Icon"
+                    >
+                      <Ionicons name="cart-outline" size={28} color="#fff" />
+                    </TouchableOpacity>
+                  ),
+                  headerStyle: {
+                    backgroundColor: "#1E1E1E",
+                    shadowOpacity: 0,
+                    elevation: 0,
+                  },
+                  headerTintColor: "#fff",
+                  headerTitleStyle: {
+                    fontWeight: "700",
+                    color: "#BB86FC",
+                  },
+                }}
+              />
+              {/* Add PaymentScreen to the Stack */}
+              <Stack.Screen
+                name="Payment"
+                component={PaymentScreen}
+                options={({ navigation }) => ({
+                  headerLeft: () => (
+                    <TouchableOpacity
+                      onPress={() => navigation.goBack()}
+                      style={{ paddingLeft: 15 }}
+                      accessibilityLabel="Go Back"
+                    >
+                      <Icon name="arrow-back" size={24} color="#fff" />
+                    </TouchableOpacity>
+                  ),
+                  headerTitle: "Payment",
+                  headerRight: () => (
+                    <TouchableOpacity
+                      onPress={() => navigationRef.current?.navigate("Cart")}
+                      style={{ marginRight: 15 }}
+                      accessibilityLabel="Go to Cart"
+                    >
+                      <Ionicons name="cart-outline" size={28} color="#fff" />
+                    </TouchableOpacity>
+                  ),
+                  headerStyle: {
+                    backgroundColor: "#1E1E1E",
+                    shadowOpacity: 0,
+                    elevation: 0,
+                  },
+                  headerTintColor: "#fff",
+                  headerTitleStyle: {
+                    fontWeight: "700",
+                    color: "#BB86FC",
+                  },
+                })}
+              />
+              {/* Add AccountScreen to the Stack */}
+              <Stack.Screen
+                name="Account"
+                component={AccountScreen}
+                options={{
+                  headerLeft: () => (
+                    <TouchableOpacity
+                      onPress={() => navigationRef.current?.goBack()}
+                      style={{ paddingLeft: 15 }}
+                      accessibilityLabel="Go Back"
+                    >
+                      <Icon name="arrow-back" size={24} color="#fff" />
+                    </TouchableOpacity>
+                  ),
+                  headerTitle: "My Account",
+                  headerRight: () => (
+                    <TouchableOpacity
+                      onPress={() => navigationRef.current?.navigate("Cart")}
+                      style={{ marginRight: 15 }}
+                      accessibilityLabel="Go to Cart"
+                    >
+                      <Ionicons name="cart-outline" size={28} color="#fff" />
+                    </TouchableOpacity>
+                  ),
+                  headerStyle: {
+                    backgroundColor: "#1E1E1E",
+                    shadowOpacity: 0,
+                    elevation: 0,
+                  },
+                  headerTintColor: "#fff",
+                  headerTitleStyle: {
+                    fontWeight: "700",
+                    color: "#BB86FC",
+                  },
+                }}
+              />
+            </>
+          ) : (
+            // Unauthenticated screens
             <Stack.Screen
-              name="EditProduct"
-              component={EditProduct}
-              options={({ navigation }) => ({
-                headerLeft: () => (
-                  <TouchableOpacity
-                    onPress={() => navigation.goBack()}
-                    style={{ paddingLeft: 15 }}
-                    accessibilityLabel="Go Back"
-                  >
-                    <Icon name="arrow-back" size={24} color="#fff" />
-                  </TouchableOpacity>
-                ),
-                headerTitle: "Edit Product",
-                headerRight: () => (
-                  <TouchableOpacity
-                    onPress={() => navigationRef.current?.navigate("Cart")}
-                    style={{ marginRight: 15 }}
-                    accessibilityLabel="Go to Cart"
-                  >
-                    <Ionicons name="cart-outline" size={28} color="#fff" />
-                  </TouchableOpacity>
-                ),
-                headerStyle: {
-                  backgroundColor: "#1E1E1E", // Consistent header style
-                  shadowOpacity: 0,
-                  elevation: 0,
-                },
-                headerTintColor: "#fff",
-                headerTitleStyle: {
-                  fontWeight: "700",
-                  color: "#BB86FC",
-                },
-              })}
+              name="Login"
+              component={LoginScreen}
+              options={{ headerShown: false }}
             />
-            {/* Add the Messaging Screen */}
-            <Stack.Screen
-              name="Messaging"
-              component={MessagingScreen}
-              options={{
-                headerLeft: () => (
-                  <TouchableOpacity
-                    onPress={() => setModalVisible(true)}
-                    style={{ marginLeft: 10 }}
-                    accessibilityLabel="Open Options Modal"
-                  >
-                    <Icon name="person" size={30} color="#fff" />
-                  </TouchableOpacity>
-                ),
-                headerRight: () => (
-                  <TouchableOpacity
-                    onPress={() => navigationRef.current?.navigate("Cart")}
-                    style={{ marginRight: 15 }}
-                    accessibilityLabel="Go to Cart"
-                  >
-                    <Ionicons name="cart-outline" size={28} color="#fff" />
-                  </TouchableOpacity>
-                ),
-                headerTitle: "Messaging",
-                gestureEnabled: false,
-              }}
-            />
-            {/* Add CartScreen to the Stack */}
-            <Stack.Screen
-              name="Cart"
-              component={CartScreen}
-              options={{
-                headerLeft: () => (
-                  <TouchableOpacity
-                    onPress={() => navigationRef.current?.goBack()}
-                    style={{ paddingLeft: 15 }}
-                    accessibilityLabel="Go Back"
-                  >
-                    <Icon name="arrow-back" size={24} color="#fff" />
-                  </TouchableOpacity>
-                ),
-                headerTitle: "Your Cart",
-                headerRight: () => (
-                  <TouchableOpacity
-                    onPress={() => navigationRef.current?.navigate("Cart")} // Optional: Can be omitted or used for additional functionality
-                    style={{ marginRight: 15 }}
-                    accessibilityLabel="Cart Icon"
-                  >
-                    <Ionicons name="cart-outline" size={28} color="#fff" />
-                  </TouchableOpacity>
-                ),
-                headerStyle: {
-                  backgroundColor: "#1E1E1E",
-                  shadowOpacity: 0,
-                  elevation: 0,
-                },
-                headerTintColor: "#fff",
-                headerTitleStyle: {
-                  fontWeight: "700",
-                  color: "#BB86FC",
-                },
-              }}
-            />
-            {/* Add AccountScreen to the Stack */}
-            <Stack.Screen
-              name="Account"
-              component={AccountScreen}
-              options={{
-                headerLeft: () => (
-                  <TouchableOpacity
-                    onPress={() => navigationRef.current?.goBack()}
-                    style={{ paddingLeft: 15 }}
-                    accessibilityLabel="Go Back"
-                  >
-                    <Icon name="arrow-back" size={24} color="#fff" />
-                  </TouchableOpacity>
-                ),
-                headerTitle: "My Account",
-                headerRight: () => (
-                  <TouchableOpacity
-                    onPress={() => navigationRef.current?.navigate("Cart")}
-                    style={{ marginRight: 15 }}
-                    accessibilityLabel="Go to Cart"
-                  >
-                    <Ionicons name="cart-outline" size={28} color="#fff" />
-                  </TouchableOpacity>
-                ),
-                headerStyle: {
-                  backgroundColor: "#1E1E1E",
-                  shadowOpacity: 0,
-                  elevation: 0,
-                },
-                headerTintColor: "#fff",
-                headerTitleStyle: {
-                  fontWeight: "700",
-                  color: "#BB86FC",
-                },
-              }}
-            />
-          </>
-        ) : (
-          // Unauthenticated screens
-          <Stack.Screen
-            name="Login"
-            component={LoginScreen}
-            options={{ headerShown: false }}
-          />
-        )}
-      </Stack.Navigator>
+          )}
+        </Stack.Navigator>
 
-      {/* Modal for options */}
-      <Modal
-        transparent={true}
-        visible={modalVisible}
-        animationType="fade"
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <TouchableOpacity
-              onPress={() => setModalVisible(false)}
-              style={styles.closeButton}
-              accessibilityLabel="Close Options Modal"
-            >
-              <Icon name="close" size={24} color="#fff" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={handleLogout}
-              style={styles.option}
-              accessibilityLabel="Logout"
-            >
-              <Text style={styles.optionText}>Logout</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => {
-                setShowTerms(true);
-                setModalVisible(false);
-              }}
-              style={styles.option}
-              accessibilityLabel="View Terms of Service"
-            >
-              <Text style={styles.optionText}>View Terms of Service</Text>
-            </TouchableOpacity>
-            {/* Add "My Account" Button */}
-            <TouchableOpacity
-              onPress={() => {
-                setModalVisible(false);
-                navigationRef.current?.navigate("Account");
-              }}
-              style={styles.option}
-              accessibilityLabel="Go to My Account"
-            >
-              <Text style={styles.optionText}>My Account</Text>
-            </TouchableOpacity>
+        {/* Modal for options */}
+        <Modal
+          transparent={true}
+          visible={modalVisible}
+          animationType="fade"
+          onRequestClose={() => setModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <TouchableOpacity
+                onPress={() => setModalVisible(false)}
+                style={styles.closeButton}
+                accessibilityLabel="Close Options Modal"
+              >
+                <Icon name="close" size={24} color="#fff" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleLogout}
+                style={styles.option}
+                accessibilityLabel="Logout"
+              >
+                <Text style={styles.optionText}>Logout</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => {
+                  setShowTerms(true);
+                  setModalVisible(false);
+                }}
+                style={styles.option}
+                accessibilityLabel="View Terms of Service"
+              >
+                <Text style={styles.optionText}>View Terms of Service</Text>
+              </TouchableOpacity>
+              {/* Add "My Account" Button */}
+              <TouchableOpacity
+                onPress={() => {
+                  setModalVisible(false);
+                  navigationRef.current?.navigate("Account");
+                }}
+                style={styles.option}
+                accessibilityLabel="Go to My Account"
+              >
+                <Text style={styles.optionText}>My Account</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
 
-      {/* Modal for Terms of Service */}
-      <Modal
-        transparent={true}
-        visible={showTerms}
-        animationType="slide"
-        onRequestClose={() => setShowTerms(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.termsContent}>
-            <TouchableOpacity
-              onPress={() => setShowTerms(false)}
-              style={styles.closeButton}
-              accessibilityLabel="Close Terms Modal"
-            >
-              <Icon name="close" size={24} color="#fff" />
-            </TouchableOpacity>
-            <ScrollView>
-              <Text style={styles.termsText}>
-                Terms of Service: {"\n\n"}Welcome to The Gridly. By using our
-                platform, you agree to the following terms... [Add more terms
-                here as needed for your service.]
-              </Text>
-            </ScrollView>
+        {/* Modal for Terms of Service */}
+        <Modal
+          transparent={true}
+          visible={showTerms}
+          animationType="slide"
+          onRequestClose={() => setShowTerms(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.termsContent}>
+              <TouchableOpacity
+                onPress={() => setShowTerms(false)}
+                style={styles.closeButton}
+                accessibilityLabel="Close Terms Modal"
+              >
+                <Icon name="close" size={24} color="#fff" />
+              </TouchableOpacity>
+              <ScrollView>
+                <Text style={styles.termsText}>
+                  Terms of Service: {"\n\n"}Welcome to The Gridly. By using our
+                  platform, you agree to the following terms... [Add more terms
+                  here as needed for your service.]
+                </Text>
+              </ScrollView>
+            </View>
           </View>
-        </View>
-      </Modal>
-    </NavigationContainer>
+        </Modal>
+      </NavigationContainer>
+    </StripeProvider>
   );
 };
 
