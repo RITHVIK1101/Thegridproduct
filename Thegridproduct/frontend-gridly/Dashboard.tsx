@@ -390,15 +390,18 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
     if (direction === "right") {
       // Add to cart
       addToCart(product);
+      return; // Do not move to next product
     }
 
-    // Move to the next product
-    if (currentIndex < filteredProducts.length - 1) {
-      setCurrentIndex(currentIndex + 1);
-    } else {
-      Alert.alert("End of List", "No more products available.");
-      // Optionally, reset to first product
-      setCurrentIndex(0);
+    if (direction === "left") {
+      // Move to the next product
+      if (currentIndex < filteredProducts.length - 1) {
+        setCurrentIndex(currentIndex + 1);
+      } else {
+        Alert.alert("End of List", "No more products available.");
+        // Optionally, reset to first product
+        setCurrentIndex(0);
+      }
     }
   };
 
@@ -552,47 +555,87 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
                       : "https://via.placeholder.com/150", // Fallback URL
                 }}
                 style={styles.productImage}
-                resizeMode="contain" // Maintain aspect ratio
+                resizeMode="cover" // Cover for better image scaling
               />
             </TouchableOpacity>
           </TapGestureHandler>
 
-          {/* Like and Share Icons */}
-          <TouchableOpacity
-            style={styles.likeIcon}
-            onPress={() => {
-              Alert.alert("Liked", "You liked this product!");
-            }}
-            accessibilityLabel="Like Product"
-          >
-            <Ionicons name="heart-outline" size={30} color="#FFFFFF" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.shareIcon}
-            onPress={() => {
-              Alert.alert("Shared", "You shared this product!");
-            }}
-            accessibilityLabel="Share Product"
-          >
-            <Ionicons name="share-social-outline" size={30} color="#FFFFFF" />
-          </TouchableOpacity>
+          {/* Five Action Buttons */}
+          {isTop && (
+            <View style={styles.actionButtonsContainer}>
+              {/* Share Button */}
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={() => {
+                  Alert.alert("Shared", "You shared this product!");
+                }}
+                accessibilityLabel="Share Product"
+              >
+                <Ionicons name="share-social" size={24} color="#FF9500" />
+              </TouchableOpacity>
+
+              {/* Add to Cart Button (Second Button - Smaller) */}
+              <TouchableOpacity
+                style={[styles.actionButton, styles.smallActionButton]}
+                onPress={() => {
+                  addToCart(product);
+                }}
+                accessibilityLabel="Add to Cart"
+              >
+                <Ionicons name="cart" size={24} color="#34C759" />
+              </TouchableOpacity>
+
+              {/* Reject Button */}
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={() => {
+                  handleSwipe("left");
+                }}
+                accessibilityLabel="Reject Product"
+              >
+                <Ionicons name="close-circle" size={24} color="#FF3B30" />
+              </TouchableOpacity>
+
+              {/* Like Button (Fourth Button - Smaller) */}
+              <TouchableOpacity
+                style={[styles.actionButton, styles.smallActionButton]}
+                onPress={() => {
+                  handleSwipe("right");
+                }}
+                accessibilityLabel="Like Product"
+              >
+                <Ionicons name="heart" size={24} color="#5856D6" />
+              </TouchableOpacity>
+
+              {/* View Description Button */}
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={() => {
+                  handleSwipe("up");
+                }}
+                accessibilityLabel="View Description"
+              >
+                <Ionicons name="arrow-up-circle" size={24} color="#FFCC00" />
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       </PanGestureHandler>
     );
   };
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: "#121212" }}>
       <View style={styles.container}>
         {/* Search and Filter Container */}
         <View style={styles.searchFilterContainer}>
           {/* Search Bar */}
           <View style={styles.searchContainer}>
-            <Ionicons name="search-outline" size={20} color="#007AFF" />
+            <Ionicons name="search-outline" size={20} color="#FFFFFF" />
             <TextInput
               style={styles.searchInput}
               placeholder="Search products..."
-              placeholderTextColor="#007AFF"
+              placeholderTextColor="#AAAAAA"
               value={searchQuery}
               onChangeText={(text) => setSearchQuery(text)}
               returnKeyType="search"
@@ -604,7 +647,7 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
                 style={styles.clearIcon}
                 accessibilityLabel="Clear Search"
               >
-                <Ionicons name="close-circle" size={20} color="#007AFF" />
+                <Ionicons name="close-circle" size={20} color="#FFFFFF" />
               </TouchableOpacity>
             )}
           </View>
@@ -701,7 +744,7 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
                 style={styles.modalClose}
                 accessibilityLabel="Close Add Options Modal"
               >
-                <Ionicons name="close-outline" size={24} color="#007AFF" />
+                <Ionicons name="close-outline" size={24} color="#FFFFFF" />
               </TouchableOpacity>
             </View>
           </TouchableOpacity>
@@ -741,8 +784,7 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
                     <Text
                       style={[
                         styles.categoryText,
-                        selectedCategory === item &&
-                          styles.categoryTextSelected,
+                        selectedCategory === item && styles.categoryTextSelected,
                       ]}
                     >
                       {item}
@@ -770,8 +812,7 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
                     <Text
                       style={[
                         styles.categoryText,
-                        campusMode === item.value &&
-                          styles.categoryTextSelected,
+                        campusMode === item.value && styles.categoryTextSelected,
                       ]}
                     >
                       {item.label}
@@ -795,7 +836,7 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
                 style={styles.modalClose}
                 accessibilityLabel="Close Filter Modal"
               >
-                <Ionicons name="close-outline" size={24} color="#007AFF" />
+                <Ionicons name="close-outline" size={24} color="#FFFFFF" />
               </TouchableOpacity>
             </View>
           </TouchableOpacity>
@@ -838,7 +879,7 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
                     style={styles.modalClose}
                     accessibilityLabel="Close Details Modal"
                   >
-                    <Ionicons name="close-outline" size={24} color="#007AFF" />
+                    <Ionicons name="close-outline" size={24} color="#FFFFFF" />
                   </TouchableOpacity>
                 </>
               )}
@@ -870,7 +911,7 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
                 style={styles.modalClose}
                 accessibilityLabel="Close Description Modal"
               >
-                <Ionicons name="close-outline" size={24} color="#007AFF" />
+                <Ionicons name="close-outline" size={24} color="#FFFFFF" />
               </TouchableOpacity>
             </View>
           </TouchableOpacity>
@@ -888,7 +929,7 @@ export default Dashboard;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFFFFF", // Light background
+    backgroundColor: "#121212", // Dark background
     paddingHorizontal: 20,
     paddingTop: 20,
     paddingBottom: NAVBAR_HEIGHT + GAP_MARGIN, // Space for BottomNavBar with gap
@@ -902,7 +943,7 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F0F0F0", // Light grey background for search bar
+    backgroundColor: "#1E1E1E", // Dark grey background for search bar
     paddingHorizontal: 15,
     paddingVertical: 8,
     borderRadius: 25,
@@ -910,7 +951,7 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     marginLeft: 10,
-    color: "#000",
+    color: "#FFFFFF",
     fontSize: 16,
   },
   clearIcon: {
@@ -936,23 +977,23 @@ const styles = StyleSheet.create({
   },
   stackedProduct: {
     position: "absolute",
-    width: SCREEN_WIDTH - 40, // Adjusted width with horizontal padding
-    height: SCREEN_HEIGHT - SEARCH_BAR_HEIGHT - NAVBAR_HEIGHT - 9 * GAP_MARGIN,
-    // Total height minus search bar, navbar, and gaps
-    borderRadius: 10,
-    backgroundColor: "#FFFFFF",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
+    width: SCREEN_WIDTH - 40, // Keep some padding for better layout
+    height: SCREEN_HEIGHT * 0.75, // Increased height for larger image
+    borderRadius: 10, // Rounded corners
+    alignItems: "center", // Center content
+    justifyContent: "flex-start", // Align items to the top
+    backgroundColor: "transparent", // Transparent background
+    overflow: "hidden", // Prevent content overflow
+    zIndex: 1,
   },
   topProduct: {
-    zIndex: 2,
+    zIndex: 2, // Ensure the top product is on top
+    transform: [{ scale: 1 }], // No scaling for the top product
   },
   bottomProduct: {
-    zIndex: 1,
-    transform: [{ scale: 0.95 }, { translateY: 20 }],
+    zIndex: 1, // Place below the top product
+    transform: [{ scale: 0.95 }, { translateY: SCREEN_HEIGHT * 0.05 }], // Adjusted translateY
+    opacity: 0, // Hide the bottom product completely
   },
   productContainer: {
     flex: 1,
@@ -960,54 +1001,49 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   imageContainer: {
-    flex: 1,
-    width: "100%",
-    justifyContent: "flex-start", // Align image to the top
+    width: "95%", // Slight padding from edges
+    height: "80%", // Make the image taller
+    justifyContent: "center",
     alignItems: "center",
-    marginTop: 10, // Move image up by adding marginTop
-    marginHorizontal: 10, // Margins on left and right
+    borderRadius: 10, // Match card radius
+    overflow: "hidden", // Ensure image stays inside boundaries
+    marginBottom: 0, // Remove margin to move image down
+    marginTop: 20, // Add marginTop to push the image lower
+    backgroundColor: "transparent",
   },
   productImage: {
     width: "100%",
     height: "100%",
-    borderRadius: 10,
-    backgroundColor: "gray", // Placeholder background
+    resizeMode: "cover", // Ensure proper scaling
+    borderRadius: 10, // Match border radius for consistency
   },
-  likeIcon: {
-    position: "absolute",
-    right: 20,
-    top: 20,
-    width: 40,
-    height: 40,
-    justifyContent: "center",
+  actionButtonsContainer: {
+    flexDirection: "row",
+    justifyContent: "space-evenly", // Center the buttons
     alignItems: "center",
-    backgroundColor: "#FF3B30", // Red for the heart icon
-    borderRadius: 20, // Circle
-    borderWidth: 2,
-    borderColor: "#FFFFFF", // Thin white border for distinction
-    shadowColor: "#000", // Light shadow for depth
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    elevation: 3, // For Android shadow
+    width: "100%", // Full width
+    marginTop: 10, // Adjusted spacing
+    paddingVertical: 10, // Increased padding for better touch experience
   },
-  shareIcon: {
-    position: "absolute",
-    right: 20,
-    top: 80, // Positioned below the like icon
-    width: 40,
-    height: 40,
-    justifyContent: "center",
+  // Base style for all action buttons
+  actionButton: {
+    width: 60,
+    height: 60,
+    borderRadius: 30, // Make buttons circular
     alignItems: "center",
-    backgroundColor: "#34C759", // Green for the share icon
-    borderRadius: 20, // Circle
-    borderWidth: 2,
-    borderColor: "#FFFFFF", // Thin white border for distinction
-    shadowColor: "#000", // Light shadow for depth
+    justifyContent: "center",
+    backgroundColor: "#333333", // Gray background
+    marginHorizontal: 5,
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    elevation: 3, // For Android shadow
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5, // Add shadow on Android
+  },
+  smallActionButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
   },
   loadingContainer: {
     flex: 1,
@@ -1016,7 +1052,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 8,
-    color: "#007AFF",
+    color: "#FFFFFF",
     fontSize: 14,
   },
   errorContainer: {
@@ -1048,7 +1084,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   noProductsText: {
-    color: "#007AFF",
+    color: "#FFFFFF",
     fontSize: 16,
   },
   modalOverlay: {
@@ -1059,7 +1095,7 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     width: "80%",
-    backgroundColor: "#FFFFFF", // Light modal background
+    backgroundColor: "#1E1E1E", // Dark modal background
     padding: 20,
     borderRadius: 15,
     alignItems: "center",
@@ -1073,7 +1109,7 @@ const styles = StyleSheet.create({
   },
   filterModalContent: {
     width: "80%",
-    backgroundColor: "#FFFFFF", // Light modal background
+    backgroundColor: "#1E1E1E", // Dark modal background
     padding: 20,
     borderRadius: 15,
     alignItems: "center",
@@ -1087,7 +1123,7 @@ const styles = StyleSheet.create({
   },
   descriptionModalContent: {
     width: "80%",
-    backgroundColor: "#FFFFFF", // Light modal background
+    backgroundColor: "#1E1E1E", // Dark modal background
     padding: 20,
     borderRadius: 15,
     alignItems: "center",
@@ -1102,7 +1138,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: "700",
-    color: "#007AFF", // Blue text
+    color: "#FFFFFF", // White text
     marginBottom: 15,
   },
   modalButton: {
@@ -1148,14 +1184,14 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 15,
     borderRadius: 10,
-    backgroundColor: "#F0F0F0",
+    backgroundColor: "#2C2C2C",
     marginVertical: 5,
   },
   categoryItemSelected: {
     backgroundColor: "#007AFF",
   },
   categoryText: {
-    color: "#000",
+    color: "#FFFFFF",
     fontSize: 16,
   },
   categoryTextSelected: {
@@ -1167,7 +1203,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 15,
     borderRadius: 10,
-    backgroundColor: "#F0F0F0",
+    backgroundColor: "#2C2C2C",
     marginVertical: 5,
   },
   campusItemSelected: {
@@ -1175,7 +1211,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
-    color: "#007AFF",
+    color: "#FFFFFF",
     alignSelf: "flex-start",
     marginTop: 10,
     marginBottom: 5,
@@ -1183,7 +1219,7 @@ const styles = StyleSheet.create({
   },
   detailsModalContent: {
     width: "90%",
-    backgroundColor: "#FFFFFF", // Light modal background
+    backgroundColor: "#1E1E1E", // Dark modal background
     borderRadius: 15,
     padding: 20,
     alignItems: "center",
@@ -1197,23 +1233,23 @@ const styles = StyleSheet.create({
   detailsTitle: {
     fontSize: 24,
     fontWeight: "700",
-    color: "#007AFF", // Blue text
+    color: "#FFFFFF", // White text
     marginBottom: 15,
   },
   detailsPrice: {
     fontSize: 20,
-    color: "#000",
+    color: "#FFFFFF",
     marginBottom: 10,
     fontWeight: "600",
   },
   detailsRating: {
     fontSize: 16,
-    color: "#000",
+    color: "#FFFFFF",
     marginBottom: 5,
   },
   detailsQuality: {
     fontSize: 16,
-    color: "#000",
+    color: "#FFFFFF",
     marginBottom: 15,
   },
   detailsDescriptionContainer: {
@@ -1221,12 +1257,12 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   detailsDescription: {
-    color: "#555",
+    color: "#AAAAAA",
     fontSize: 14,
     textAlign: "center",
   },
   descriptionText: {
-    color: "#000", // Dark text color
+    color: "#FFFFFF", // White text
     fontSize: 14, // Adjust font size as needed
     lineHeight: 20, // Adjust line height for readability
     textAlign: "center", // Center align the text

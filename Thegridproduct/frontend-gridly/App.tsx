@@ -42,6 +42,16 @@ export const navigationRef =
 
 const Stack = createStackNavigator<RootStackParamList>();
 
+/**
+ * Custom Header Title Component with Logo and Text
+ */
+const HeaderTitleWithLogo: React.FC<{ title: string }> = ({ title }) => (
+  <View style={styles.headerTitleContainer}>
+    <Ionicons name="grid-outline" size={20} color="#BB86FC" /> {/* Smaller logo size */}
+    <Text style={styles.headerTitleText}>{title}</Text>
+  </View>
+);
+
 const AppNavigator: React.FC = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
@@ -113,6 +123,9 @@ const AppNavigator: React.FC = () => {
                       <Icon name="person" size={30} color="#fff" />
                     </TouchableOpacity>
                   ),
+                  headerTitle: () => (
+                    <HeaderTitleWithLogo title="The Gridly" />
+                  ), // Custom header title with logo
                   headerRight: () => (
                     <TouchableOpacity
                       onPress={() => navigationRef.current?.navigate("Cart")}
@@ -126,7 +139,6 @@ const AppNavigator: React.FC = () => {
                       </View> */}
                     </TouchableOpacity>
                   ),
-                  headerTitle: "The Gridly",
                   gestureEnabled: false,
                 }}
               />
@@ -193,6 +205,9 @@ const AppNavigator: React.FC = () => {
                       <Icon name="person" size={30} color="#fff" />
                     </TouchableOpacity>
                   ),
+                  headerTitle: () => (
+                    <HeaderTitleWithLogo title="The Gridly" />
+                  ), // Custom header title with logo
                   headerRight: () => (
                     <TouchableOpacity
                       onPress={() => navigationRef.current?.navigate("Cart")}
@@ -202,7 +217,6 @@ const AppNavigator: React.FC = () => {
                       <Ionicons name="cart-outline" size={28} color="#fff" />
                     </TouchableOpacity>
                   ),
-                  headerTitle: "The Gridly",
                   gestureEnabled: false,
                 }}
               />
@@ -257,6 +271,7 @@ const AppNavigator: React.FC = () => {
                       <Icon name="person" size={30} color="#fff" />
                     </TouchableOpacity>
                   ),
+                  headerTitle: "Messaging",
                   headerRight: () => (
                     <TouchableOpacity
                       onPress={() => navigationRef.current?.navigate("Cart")}
@@ -266,7 +281,6 @@ const AppNavigator: React.FC = () => {
                       <Ionicons name="cart-outline" size={28} color="#fff" />
                     </TouchableOpacity>
                   ),
-                  headerTitle: "Messaging",
                   gestureEnabled: false,
                 }}
               />
@@ -552,5 +566,15 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 10,
     fontWeight: "bold",
+  },
+  headerTitleContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  headerTitleText: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#BB86FC",
+    marginLeft: 5, // Space between icon and text
   },
 });

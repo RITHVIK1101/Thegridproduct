@@ -88,11 +88,12 @@ const BottomNavBar: React.FC<BottomNavBarProps> = ({ firstName }) => {
       <TouchableOpacity
         style={styles.navItem}
         onPress={() => navigation.navigate("Dashboard")}
+        accessibilityLabel="Navigate to Home"
       >
         <Ionicons
           name="home-outline"
-          size={28}
-          color={isActive("Dashboard") ? "#6200EE" : "#555"}
+          size={24} // Reduced size for a slimmer look
+          color={isActive("Dashboard") ? "#E57373" : "#AAAAAA"} // Subtle tender red
         />
         <Text
           style={[
@@ -108,11 +109,12 @@ const BottomNavBar: React.FC<BottomNavBarProps> = ({ firstName }) => {
       <TouchableOpacity
         style={styles.navItem}
         onPress={() => navigation.navigate("Gigs")}
+        accessibilityLabel="Navigate to Gigs"
       >
         <Ionicons
           name="briefcase-outline"
-          size={28}
-          color={isActive("Gigs") ? "#6200EE" : "#555"}
+          size={24} // Reduced size
+          color={isActive("Gigs") ? "#E57373" : "#AAAAAA"} // Subtle tender red
         />
         <Text
           style={[styles.navText, isActive("Gigs") && styles.navTextActive]}
@@ -127,6 +129,7 @@ const BottomNavBar: React.FC<BottomNavBarProps> = ({ firstName }) => {
         onPress={toggleModal}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
+        accessibilityLabel="Add Product or Gig"
       >
         <Animated.View
           style={[
@@ -134,7 +137,7 @@ const BottomNavBar: React.FC<BottomNavBarProps> = ({ firstName }) => {
             { transform: [{ scale: scaleValue }, { rotate: spin }] },
           ]}
         >
-          <Ionicons name="add-circle" size={56} color="#6200EE" />
+          <Ionicons name="add-circle" size={48} color="#E57373" /> {/* Reduced size and subtle red */}
         </Animated.View>
       </TouchableOpacity>
 
@@ -142,11 +145,12 @@ const BottomNavBar: React.FC<BottomNavBarProps> = ({ firstName }) => {
       <TouchableOpacity
         style={styles.navItem}
         onPress={() => navigation.navigate("Messaging")}
+        accessibilityLabel="Navigate to Messaging"
       >
         <Ionicons
           name="chatbubble-outline"
-          size={28}
-          color={isActive("Messaging") ? "#6200EE" : "#555"}
+          size={24} // Reduced size
+          color={isActive("Messaging") ? "#E57373" : "#AAAAAA"} // Subtle tender red
         />
         <Text
           style={[
@@ -162,14 +166,18 @@ const BottomNavBar: React.FC<BottomNavBarProps> = ({ firstName }) => {
       <TouchableOpacity
         style={styles.navItem}
         onPress={() => navigation.navigate("Activity", { firstName })}
+        accessibilityLabel="Navigate to Activity"
       >
         <Ionicons
           name="stats-chart-outline"
-          size={28}
-          color={isActive("Activity") ? "#6200EE" : "#555"}
+          size={24} // Reduced size
+          color={isActive("Activity") ? "#E57373" : "#AAAAAA"} // Subtle tender red
         />
         <Text
-          style={[styles.navText, isActive("Activity") && styles.navTextActive]}
+          style={[
+            styles.navText,
+            isActive("Activity") && styles.navTextActive,
+          ]}
         >
           Activity
         </Text>
@@ -182,7 +190,11 @@ const BottomNavBar: React.FC<BottomNavBarProps> = ({ firstName }) => {
         animationType="fade"
         onRequestClose={toggleModal}
       >
-        <View style={styles.modalContainer}>
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPressOut={toggleModal}
+        >
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Add Options</Text>
             <View style={styles.modalButtonsContainer}>
@@ -192,6 +204,7 @@ const BottomNavBar: React.FC<BottomNavBarProps> = ({ firstName }) => {
                   toggleModal();
                   navigation.navigate("AddProduct");
                 }}
+                accessibilityLabel="Add Product"
               >
                 <Text style={styles.modalButtonText}>Add Product</Text>
               </TouchableOpacity>
@@ -201,15 +214,20 @@ const BottomNavBar: React.FC<BottomNavBarProps> = ({ firstName }) => {
                   toggleModal();
                   navigation.navigate("AddGig");
                 }}
+                accessibilityLabel="Add Gig"
               >
                 <Text style={styles.modalButtonText}>Add Gig</Text>
               </TouchableOpacity>
             </View>
-            <TouchableOpacity onPress={toggleModal} style={styles.modalClose}>
-              <Ionicons name="close-outline" size={24} color="#555" />
+            <TouchableOpacity
+              onPress={toggleModal}
+              style={styles.modalClose}
+              accessibilityLabel="Close Add Options Modal"
+            >
+              <Ionicons name="close-outline" size={24} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
-        </View>
+        </TouchableOpacity>
       </Modal>
     </View>
   );
@@ -222,17 +240,17 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-around",
     alignItems: "center",
-    paddingVertical: 10,
-    backgroundColor: "#FFFFFF",
+    paddingVertical: 6, // Reduced from 8 to make navbar smaller
+    backgroundColor: "#1E1E1E", // Dark background to match Dashboard
     position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
     borderTopWidth: 1,
-    borderColor: "#E0E0E0",
+    borderColor: "#333333",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 10,
   },
@@ -242,74 +260,74 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   navText: {
-    fontSize: 12,
-    color: "#555",
-    marginTop: 4,
+    fontSize: 10, // Reduced from 11 for a slimmer look
+    color: "#AAAAAA",
+    marginTop: 2, // Reduced from 2 to maintain balance
+    fontFamily: "System",
   },
   navTextActive: {
-    color: "#6200EE",
+    color: "#E57373", // Subtle tender red for active tab
     fontWeight: "600",
   },
   addButton: {
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "white",
+    backgroundColor: "#1E1E1E", // Matching dark background
     borderRadius: 35,
-    padding: 5,
-    shadowColor: "grey",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
+    padding: 4, // Reduced from 5 to make it slightly smaller
+    shadowColor: "#E57373", // Subtle red shadow
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 6,
+    elevation: 10,
   },
-  modalContainer: {
+  modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.3)",
+    backgroundColor: "rgba(0,0,0,0.8)", // Darker overlay for better contrast
     justifyContent: "center",
     alignItems: "center",
   },
   modalContent: {
-    width: "85%",
-    backgroundColor: "#F5F5F5",
+    width: "80%",
+    backgroundColor: "#2C2C2C", // Dark modal background
     padding: 25,
     borderRadius: 20,
     alignItems: "center",
     position: "relative",
-    shadowColor: "#000",
+    shadowColor: "#E57373",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
+    shadowOpacity: 0.6,
+    shadowRadius: 6,
+    elevation: 10,
   },
   modalTitle: {
-    fontSize: 22,
+    fontSize: 20, // Reduced from 22 to maintain proportion
     fontWeight: "700",
-    color: "#6200EE",
+    color: "#FFFFFF",
     marginBottom: 20,
   },
   modalButtonsContainer: {
     width: "100%",
-    flexDirection: "row",
+    flexDirection: "column",
     justifyContent: "space-between",
     marginTop: 10,
   },
   modalButton: {
-    backgroundColor: "#6200EE",
-    paddingVertical: 12,
+    backgroundColor: "#E57373", // Subtle tender red buttons
+    paddingVertical: 10, // Reduced from 12 for smaller size
     borderRadius: 12,
-    marginVertical: 5,
-    flex: 1,
-    marginHorizontal: 5,
+    marginVertical: 8, // Reduced from 10 for tighter spacing
+    width: "100%",
     alignItems: "center",
-    shadowColor: "#6200EE",
+    shadowColor: "#E57373",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.4,
     shadowRadius: 4,
-    elevation: 3,
+    elevation: 5,
   },
   modalButtonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
+    color: "#1E1E1E", // Dark text for contrast against red buttons
+    fontSize: 15, // Reduced from 16 for consistency
     fontWeight: "600",
   },
   modalClose: {
