@@ -41,6 +41,20 @@ func CreatePaymentIntentHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Fetch buyer details
+	buyer, err := db.GetUserByID(request.BuyerID) // Pass as string directly
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to fetch buyer details: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Fetch seller details
+	seller, err := db.GetUserByID(request.SellerID) // Pass as string directly
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Failed to fetch seller details: %v", err), http.StatusInternalServerError)
+		return
+	}
+
 	// Create the PaymentIntent
 	params := &stripe.PaymentIntentParams{
 		Amount:   stripe.Int64(request.Amount),
@@ -55,21 +69,23 @@ func CreatePaymentIntentHandler(w http.ResponseWriter, r *http.Request) {
 	// Create a chat session after successful PaymentIntent creation
 	chat := models.Chat{
 		ProductID: request.ProductID,
-		BuyerID:   request.BuyerID,
-		SellerID:  request.SellerID,
+		BuyerID:   request.BuyerID,    // Store as string
+		SellerID:  request.SellerID,   // Store as string
 		Messages:  []models.Message{}, // Start with an empty chat
 		CreatedAt: time.Now(),
 	}
 
-	if err := db.CreateChat(chat); err != nil {
+	if err := db.CreateChat(&chat); err != nil {
+
 		http.Error(w, fmt.Sprintf("Failed to create chat session: %v", err), http.StatusInternalServerError)
 		return
 	}
 
-	// Respond with the client secret and chat ID
+	// Respond with the client secret, chat ID, and confirmation message
 	response := map[string]string{
 		"clientSecret": pi.ClientSecret,
 		"chatId":       chat.ID, // Include chat ID for frontend reference
+		"message":      fmt.Sprintf("Chat created between %s and %s.", buyer.FirstName, seller.FirstName),
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)

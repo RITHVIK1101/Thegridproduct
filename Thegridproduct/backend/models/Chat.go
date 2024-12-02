@@ -11,10 +11,3 @@ type Chat struct {
 	Messages  []Message `bson:"messages,omitempty"`
 	CreatedAt time.Time `bson:"createdAt"`
 }
-
-// Message represents a single message in a chat
-type Message struct {
-	SenderID  string    `bson:"senderId"`
-	Content   string    `bson:"content"`
-	Timestamp time.Time `bson:"timestamp"`
-}
