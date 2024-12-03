@@ -1,3 +1,5 @@
+// SplashScreen.tsx
+
 import React, { useEffect, useRef } from "react";
 import {
   View,
@@ -13,7 +15,7 @@ interface SplashScreenProps {
   onAnimationEnd: () => void;
 }
 
-const SPLASH_TEXT_COLOR = "#BB86FC"; // Purple color for consistency
+const SPLASH_TEXT_COLOR = "#E0F7FA"; // Cool white color for a distinct and modern look
 
 const { width, height } = Dimensions.get("window");
 const SPEED_MULTIPLIER = 0.65; // Slightly faster animation

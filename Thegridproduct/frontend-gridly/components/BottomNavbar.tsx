@@ -93,7 +93,7 @@ const BottomNavBar: React.FC<BottomNavBarProps> = ({ firstName }) => {
         <Ionicons
           name="home-outline"
           size={24} // Reduced size for a slimmer look
-          color={isActive("Dashboard") ? "#E57373" : "#AAAAAA"} // Subtle tender red
+          color={isActive("Dashboard") ? "#FFFFFF" : "#CCCCCC"} // White for active, light gray for inactive
         />
         <Text
           style={[
@@ -114,7 +114,7 @@ const BottomNavBar: React.FC<BottomNavBarProps> = ({ firstName }) => {
         <Ionicons
           name="briefcase-outline"
           size={24} // Reduced size
-          color={isActive("Gigs") ? "#E57373" : "#AAAAAA"} // Subtle tender red
+          color={isActive("Gigs") ? "#FFFFFF" : "#CCCCCC"} // White for active, light gray for inactive
         />
         <Text
           style={[styles.navText, isActive("Gigs") && styles.navTextActive]}
@@ -137,7 +137,7 @@ const BottomNavBar: React.FC<BottomNavBarProps> = ({ firstName }) => {
             { transform: [{ scale: scaleValue }, { rotate: spin }] },
           ]}
         >
-          <Ionicons name="add-circle" size={48} color="#E57373" /> {/* Reduced size and subtle red */}
+          <Ionicons name="arrow-up-outline" size={36} color="#FFFFFF" /> {/* Changed icon to pointer and adjusted size */}
         </Animated.View>
       </TouchableOpacity>
 
@@ -150,7 +150,7 @@ const BottomNavBar: React.FC<BottomNavBarProps> = ({ firstName }) => {
         <Ionicons
           name="chatbubble-outline"
           size={24} // Reduced size
-          color={isActive("Messaging") ? "#E57373" : "#AAAAAA"} // Subtle tender red
+          color={isActive("Messaging") ? "#FFFFFF" : "#CCCCCC"} // White for active, light gray for inactive
         />
         <Text
           style={[
@@ -171,7 +171,7 @@ const BottomNavBar: React.FC<BottomNavBarProps> = ({ firstName }) => {
         <Ionicons
           name="stats-chart-outline"
           size={24} // Reduced size
-          color={isActive("Activity") ? "#E57373" : "#AAAAAA"} // Subtle tender red
+          color={isActive("Activity") ? "#FFFFFF" : "#CCCCCC"} // White for active, light gray for inactive
         />
         <Text
           style={[
@@ -241,14 +241,14 @@ const styles = StyleSheet.create({
     justifyContent: "space-around",
     alignItems: "center",
     paddingVertical: 6, // Reduced from 8 to make navbar smaller
-    backgroundColor: "#1E1E1E", // Dark background to match Dashboard
+    backgroundColor: "#000000", // Changed to black
     position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
     borderTopWidth: 1,
-    borderColor: "#333333",
-    shadowColor: "#000",
+    borderColor: "#000000", // Changed to black to blend with background
+    shadowColor: "#FFFFFF", // Changed shadow color to white for visibility on black background
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
@@ -261,21 +261,21 @@ const styles = StyleSheet.create({
   },
   navText: {
     fontSize: 10, // Reduced from 11 for a slimmer look
-    color: "#AAAAAA",
+    color: "#CCCCCC", // Light gray for inactive tabs
     marginTop: 2, // Reduced from 2 to maintain balance
     fontFamily: "System",
   },
   navTextActive: {
-    color: "#E57373", // Subtle tender red for active tab
+    color: "#FFFFFF", // White for active tab
     fontWeight: "600",
   },
   addButton: {
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#1E1E1E", // Matching dark background
+    backgroundColor: "#000000", // Changed to black to match the theme
     borderRadius: 35,
     padding: 4, // Reduced from 5 to make it slightly smaller
-    shadowColor: "#E57373", // Subtle red shadow
+    shadowColor: "#FFFFFF", // Changed shadow color to white
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.5,
     shadowRadius: 6,
@@ -289,12 +289,12 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     width: "80%",
-    backgroundColor: "#2C2C2C", // Dark modal background
+    backgroundColor: "#1A1A1A", // Changed to a slightly lighter black for modal background
     padding: 25,
     borderRadius: 20,
     alignItems: "center",
     position: "relative",
-    shadowColor: "#E57373",
+    shadowColor: "#FFFFFF", // Changed shadow color to white
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.6,
     shadowRadius: 6,
@@ -313,20 +313,20 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   modalButton: {
-    backgroundColor: "#E57373", // Subtle tender red buttons
+    backgroundColor: "#FFFFFF", // Changed to white buttons
     paddingVertical: 10, // Reduced from 12 for smaller size
     borderRadius: 12,
     marginVertical: 8, // Reduced from 10 for tighter spacing
     width: "100%",
     alignItems: "center",
-    shadowColor: "#E57373",
+    shadowColor: "#FFFFFF", // Changed shadow color to white
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.4,
     shadowRadius: 4,
     elevation: 5,
   },
   modalButtonText: {
-    color: "#1E1E1E", // Dark text for contrast against red buttons
+    color: "#000000", // Changed to black text for contrast against white buttons
     fontSize: 15, // Reduced from 16 for consistency
     fontWeight: "600",
   },

@@ -45,11 +45,12 @@ const Stack = createStackNavigator<RootStackParamList>();
 
 /**
  * Custom Header Title Component with Logo and Text
+ * Aligned to the left side of the header.
  */
 const HeaderTitleWithLogo: React.FC<{ title: string }> = ({ title }) => (
   <View style={styles.headerTitleContainer}>
-    <Ionicons name="grid-outline" size={20} color="#BB86FC" />{" "}
-    {/* Smaller logo size */}
+    <Ionicons name="grid-outline" size={20} color="#FFFFFF" />{" "}
+    {/* Changed color to white */}
     <Text style={styles.headerTitleText}>{title}</Text>
   </View>
 );
@@ -115,7 +116,8 @@ const AppNavigator: React.FC = () => {
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#BB86FC" />
+        <ActivityIndicator size="large" color="#FFFFFF" />{" "}
+        {/* Changed color to white */}
       </View>
     );
   }
@@ -127,7 +129,18 @@ const AppNavigator: React.FC = () => {
     >
       <NavigationContainer ref={navigationRef}>
         <Stack.Navigator
-          screenOptions={commonHeaderOptions} // Apply common header options
+          screenOptions={{
+            headerStyle: {
+              backgroundColor: "#000000", // Changed to pure black
+              shadowOpacity: 0, // Remove shadow on iOS
+              elevation: 0, // Remove shadow on Android
+            },
+            headerTintColor: "#FFFFFF", // Changed to white for header text and icons
+            headerTitleStyle: {
+              fontWeight: "700",
+              color: "#FFFFFF", // Changed title color to white
+            },
+          }}
         >
           {token ? (
             // Authenticated screens
@@ -136,16 +149,36 @@ const AppNavigator: React.FC = () => {
                 name="Dashboard"
                 component={Dashboard}
                 options={{
-                  headerLeft: () => (
-                    <TouchableOpacity
-                      onPress={() => setModalVisible(true)}
-                      style={{ marginLeft: 10 }}
-                      accessibilityLabel="Open Options Modal"
-                    >
-                      <Icon name="person" size={30} color="#fff" />
-                    </TouchableOpacity>
+                  headerTitle: () => <HeaderTitleWithLogo title="The Gridly" />, // Custom header title with logo aligned left
+                  headerRight: () => (
+                    <View style={styles.headerRightContainer}>
+                      {/* Cart Icon */}
+                      <TouchableOpacity
+                        onPress={() => navigationRef.current?.navigate("Cart")}
+                        style={styles.headerIcon}
+                        accessibilityLabel="Go to Cart"
+                      >
+                        <Ionicons
+                          name="cart-outline"
+                          size={28}
+                          color="#FFFFFF"
+                        />
+                        {/* Optional: Add a badge for cart items count */}
+                        {/* <View style={styles.cartBadge}>
+                          <Text style={styles.cartBadgeText}>{cartItemCount}</Text>
+                        </View> */}
+                      </TouchableOpacity>
+                      {/* Three Dots Icon */}
+                      <TouchableOpacity
+                        onPress={() => setModalVisible(true)}
+                        style={styles.headerIcon}
+                        accessibilityLabel="Open Options Modal"
+                      >
+                        <Icon name="more-vert" size={24} color="#FFFFFF" />{" "}
+                        {/* Replaced person icon with three dots */}
+                      </TouchableOpacity>
+                    </View>
                   ),
-                  headerTitle: () => <HeaderTitleWithLogo title="The Gridly" />, // Custom header title with logo
                   gestureEnabled: false,
                 }}
               />
@@ -153,50 +186,122 @@ const AppNavigator: React.FC = () => {
                 name="AddProduct"
                 component={AddProductScreen}
                 options={({ navigation }) => ({
-                  headerLeft: () => (
-                    <TouchableOpacity
-                      onPress={() => navigation.goBack()}
-                      style={{ paddingLeft: 15 }}
-                      accessibilityLabel="Go Back"
-                    >
-                      <Icon name="arrow-back" size={24} color="#fff" />
-                    </TouchableOpacity>
-                  ),
                   headerTitle: "Add Product",
-                  // headerRight is already defined in commonHeaderOptions
+                  headerTitleAlign: "left", // Ensure title is aligned left
+                  headerRight: () => (
+                    <View style={styles.headerRightContainer}>
+                      {/* Cart Icon */}
+                      <TouchableOpacity
+                        onPress={() => navigationRef.current?.navigate("Cart")}
+                        style={styles.headerIcon}
+                        accessibilityLabel="Go to Cart"
+                      >
+                        <Ionicons
+                          name="cart-outline"
+                          size={28}
+                          color="#FFFFFF"
+                        />
+                      </TouchableOpacity>
+                      {/* Three Dots Icon */}
+                      <TouchableOpacity
+                        onPress={() => setModalVisible(true)}
+                        style={styles.headerIcon}
+                        accessibilityLabel="Open Options Modal"
+                      >
+                        <Icon name="more-vert" size={24} color="#FFFFFF" />
+                      </TouchableOpacity>
+                    </View>
+                  ),
+                  headerLeft: () => null, // Remove default back button
+                  headerStyle: {
+                    backgroundColor: "#000000", // Consistent header style
+                  },
+                  headerTintColor: "#FFFFFF",
+                  headerTitleStyle: {
+                    fontWeight: "700",
+                    color: "#FFFFFF",
+                  },
                 })}
               />
               <Stack.Screen
                 name="AddGig"
                 component={AddGigScreen}
                 options={({ navigation }) => ({
-                  headerLeft: () => (
-                    <TouchableOpacity
-                      onPress={() => navigation.goBack()}
-                      style={{ paddingLeft: 15 }}
-                      accessibilityLabel="Go Back"
-                    >
-                      <Icon name="arrow-back" size={24} color="#fff" />
-                    </TouchableOpacity>
-                  ),
                   headerTitle: "Add Gig",
-                  // headerRight is already defined in commonHeaderOptions
+                  headerTitleAlign: "left",
+                  headerRight: () => (
+                    <View style={styles.headerRightContainer}>
+                      {/* Cart Icon */}
+                      <TouchableOpacity
+                        onPress={() => navigationRef.current?.navigate("Cart")}
+                        style={styles.headerIcon}
+                        accessibilityLabel="Go to Cart"
+                      >
+                        <Ionicons
+                          name="cart-outline"
+                          size={28}
+                          color="#FFFFFF"
+                        />
+                      </TouchableOpacity>
+                      {/* Three Dots Icon */}
+                      <TouchableOpacity
+                        onPress={() => setModalVisible(true)}
+                        style={styles.headerIcon}
+                        accessibilityLabel="Open Options Modal"
+                      >
+                        <Icon name="more-vert" size={24} color="#FFFFFF" />
+                      </TouchableOpacity>
+                    </View>
+                  ),
+                  headerLeft: () => null, // Remove default back button
+                  headerStyle: {
+                    backgroundColor: "#000000",
+                  },
+                  headerTintColor: "#FFFFFF",
+                  headerTitleStyle: {
+                    fontWeight: "700",
+                    color: "#FFFFFF",
+                  },
                 })}
               />
               <Stack.Screen
                 name="Activity"
                 component={ActivityScreen}
                 options={{
-                  headerLeft: () => (
-                    <TouchableOpacity
-                      onPress={() => setModalVisible(true)}
-                      style={{ marginLeft: 10 }}
-                      accessibilityLabel="Open Options Modal"
-                    >
-                      <Icon name="person" size={30} color="#fff" />
-                    </TouchableOpacity>
+                  headerTitle: "The Gridly", // You can customize as needed
+                  headerTitleAlign: "left",
+                  headerRight: () => (
+                    <View style={styles.headerRightContainer}>
+                      {/* Cart Icon */}
+                      <TouchableOpacity
+                        onPress={() => navigationRef.current?.navigate("Cart")}
+                        style={styles.headerIcon}
+                        accessibilityLabel="Go to Cart"
+                      >
+                        <Ionicons
+                          name="cart-outline"
+                          size={28}
+                          color="#FFFFFF"
+                        />
+                      </TouchableOpacity>
+                      {/* Three Dots Icon */}
+                      <TouchableOpacity
+                        onPress={() => setModalVisible(true)}
+                        style={styles.headerIcon}
+                        accessibilityLabel="Open Options Modal"
+                      >
+                        <Icon name="more-vert" size={24} color="#FFFFFF" />
+                      </TouchableOpacity>
+                    </View>
                   ),
-                  headerTitle: () => <HeaderTitleWithLogo title="The Gridly" />, // Custom header title with logo
+                  headerStyle: {
+                    backgroundColor: "#000000",
+                  },
+                  headerTintColor: "#FFFFFF",
+                  headerTitleStyle: {
+                    fontWeight: "700",
+                    color: "#FFFFFF",
+                  },
                   gestureEnabled: false,
                 }}
               />
@@ -205,17 +310,41 @@ const AppNavigator: React.FC = () => {
                 name="EditProduct"
                 component={EditProduct}
                 options={({ navigation }) => ({
-                  headerLeft: () => (
-                    <TouchableOpacity
-                      onPress={() => navigation.goBack()}
-                      style={{ paddingLeft: 15 }}
-                      accessibilityLabel="Go Back"
-                    >
-                      <Icon name="arrow-back" size={24} color="#fff" />
-                    </TouchableOpacity>
-                  ),
                   headerTitle: "Edit Product",
-                  // headerRight is already defined in commonHeaderOptions
+                  headerTitleAlign: "left",
+                  headerRight: () => (
+                    <View style={styles.headerRightContainer}>
+                      {/* Cart Icon */}
+                      <TouchableOpacity
+                        onPress={() => navigationRef.current?.navigate("Cart")}
+                        style={styles.headerIcon}
+                        accessibilityLabel="Go to Cart"
+                      >
+                        <Ionicons
+                          name="cart-outline"
+                          size={28}
+                          color="#FFFFFF"
+                        />
+                      </TouchableOpacity>
+                      {/* Three Dots Icon */}
+                      <TouchableOpacity
+                        onPress={() => setModalVisible(true)}
+                        style={styles.headerIcon}
+                        accessibilityLabel="Open Options Modal"
+                      >
+                        <Icon name="more-vert" size={24} color="#FFFFFF" />
+                      </TouchableOpacity>
+                    </View>
+                  ),
+                  headerLeft: () => null, // Remove default back button
+                  headerStyle: {
+                    backgroundColor: "#000000",
+                  },
+                  headerTintColor: "#FFFFFF",
+                  headerTitleStyle: {
+                    fontWeight: "700",
+                    color: "#FFFFFF",
+                  },
                 })}
               />
               {/* Add the Messaging Screen */}
@@ -223,17 +352,40 @@ const AppNavigator: React.FC = () => {
                 name="Messaging"
                 component={MessagingScreen}
                 options={{
-                  headerLeft: () => (
-                    <TouchableOpacity
-                      onPress={() => setModalVisible(true)}
-                      style={{ marginLeft: 10 }}
-                      accessibilityLabel="Open Options Modal"
-                    >
-                      <Icon name="person" size={30} color="#fff" />
-                    </TouchableOpacity>
-                  ),
                   headerTitle: "Messaging",
-                  // headerRight is already defined in commonHeaderOptions
+                  headerTitleAlign: "left",
+                  headerRight: () => (
+                    <View style={styles.headerRightContainer}>
+                      {/* Cart Icon */}
+                      <TouchableOpacity
+                        onPress={() => navigationRef.current?.navigate("Cart")}
+                        style={styles.headerIcon}
+                        accessibilityLabel="Go to Cart"
+                      >
+                        <Ionicons
+                          name="cart-outline"
+                          size={28}
+                          color="#FFFFFF"
+                        />
+                      </TouchableOpacity>
+                      {/* Three Dots Icon */}
+                      <TouchableOpacity
+                        onPress={() => setModalVisible(true)}
+                        style={styles.headerIcon}
+                        accessibilityLabel="Open Options Modal"
+                      >
+                        <Icon name="more-vert" size={24} color="#FFFFFF" />
+                      </TouchableOpacity>
+                    </View>
+                  ),
+                  headerStyle: {
+                    backgroundColor: "#000000",
+                  },
+                  headerTintColor: "#FFFFFF",
+                  headerTitleStyle: {
+                    fontWeight: "700",
+                    color: "#FFFFFF",
+                  },
                   gestureEnabled: false,
                 }}
               />
@@ -242,18 +394,37 @@ const AppNavigator: React.FC = () => {
                 name="Cart"
                 component={CartScreen}
                 options={{
+                  headerTitle: "Your Cart",
+                  headerTitleAlign: "left",
+                  headerRight: () => (
+                    <View style={styles.headerRightContainer}>
+                      {/* Three Dots Icon */}
+                      <TouchableOpacity
+                        onPress={() => setModalVisible(true)}
+                        style={styles.headerIcon}
+                        accessibilityLabel="Open Options Modal"
+                      >
+                        <Icon name="more-vert" size={24} color="#FFFFFF" />
+                      </TouchableOpacity>
+                    </View>
+                  ),
                   headerLeft: () => (
                     <TouchableOpacity
                       onPress={() => navigationRef.current?.goBack()}
                       style={{ paddingLeft: 15 }}
                       accessibilityLabel="Go Back"
                     >
-                      <Icon name="arrow-back" size={24} color="#fff" />
+                      <Icon name="arrow-back" size={24} color="#FFFFFF" />
                     </TouchableOpacity>
                   ),
-                  headerTitle: "Your Cart",
-                  // Remove headerRight if it's redundant
-                  headerRight: () => null,
+                  headerStyle: {
+                    backgroundColor: "#000000",
+                  },
+                  headerTintColor: "#FFFFFF",
+                  headerTitleStyle: {
+                    fontWeight: "700",
+                    color: "#FFFFFF",
+                  },
                 }}
               />
               {/* Add PaymentScreen to the Stack */}
@@ -261,6 +432,32 @@ const AppNavigator: React.FC = () => {
                 name="Payment"
                 component={PaymentScreen}
                 options={({ navigation }) => ({
+                  headerTitle: "Payment",
+                  headerTitleAlign: "left",
+                  headerRight: () => (
+                    <View style={styles.headerRightContainer}>
+                      {/* Cart Icon */}
+                      <TouchableOpacity
+                        onPress={() => navigationRef.current?.navigate("Cart")}
+                        style={styles.headerIcon}
+                        accessibilityLabel="Go to Cart"
+                      >
+                        <Ionicons
+                          name="cart-outline"
+                          size={28}
+                          color="#FFFFFF"
+                        />
+                      </TouchableOpacity>
+                      {/* Three Dots Icon */}
+                      <TouchableOpacity
+                        onPress={() => setModalVisible(true)}
+                        style={styles.headerIcon}
+                        accessibilityLabel="Open Options Modal"
+                      >
+                        <Icon name="more-vert" size={24} color="#FFFFFF" />
+                      </TouchableOpacity>
+                    </View>
+                  ),
                   headerLeft: () => (
                     <TouchableOpacity
                       onPress={() => navigation.goBack()}
@@ -279,17 +476,49 @@ const AppNavigator: React.FC = () => {
                 name="Account"
                 component={AccountScreen}
                 options={{
+                  headerTitle: "My Account",
+                  headerTitleAlign: "left",
+                  headerRight: () => (
+                    <View style={styles.headerRightContainer}>
+                      {/* Cart Icon */}
+                      <TouchableOpacity
+                        onPress={() => navigationRef.current?.navigate("Cart")}
+                        style={styles.headerIcon}
+                        accessibilityLabel="Go to Cart"
+                      >
+                        <Ionicons
+                          name="cart-outline"
+                          size={28}
+                          color="#FFFFFF"
+                        />
+                      </TouchableOpacity>
+                      {/* Three Dots Icon */}
+                      <TouchableOpacity
+                        onPress={() => setModalVisible(true)}
+                        style={styles.headerIcon}
+                        accessibilityLabel="Open Options Modal"
+                      >
+                        <Icon name="more-vert" size={24} color="#FFFFFF" />
+                      </TouchableOpacity>
+                    </View>
+                  ),
                   headerLeft: () => (
                     <TouchableOpacity
                       onPress={() => navigationRef.current?.goBack()}
                       style={{ paddingLeft: 15 }}
                       accessibilityLabel="Go Back"
                     >
-                      <Icon name="arrow-back" size={24} color="#fff" />
+                      <Icon name="arrow-back" size={24} color="#FFFFFF" />
                     </TouchableOpacity>
                   ),
-                  headerTitle: "My Account",
-                  // headerRight is already defined in commonHeaderOptions
+                  headerStyle: {
+                    backgroundColor: "#000000",
+                  },
+                  headerTintColor: "#FFFFFF",
+                  headerTitleStyle: {
+                    fontWeight: "700",
+                    color: "#FFFFFF",
+                  },
                 }}
               />
             </>
@@ -317,7 +546,8 @@ const AppNavigator: React.FC = () => {
                 style={styles.closeButton}
                 accessibilityLabel="Close Options Modal"
               >
-                <Icon name="close" size={24} color="#fff" />
+                <Icon name="close" size={24} color="#FFFFFF" />{" "}
+                {/* Changed color to white */}
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={handleLogout}
@@ -365,7 +595,8 @@ const AppNavigator: React.FC = () => {
                 style={styles.closeButton}
                 accessibilityLabel="Close Terms Modal"
               >
-                <Icon name="close" size={24} color="#fff" />
+                <Icon name="close" size={24} color="#FFFFFF" />{" "}
+                {/* Changed color to white */}
               </TouchableOpacity>
               <ScrollView>
                 <Text style={styles.termsText}>
@@ -410,7 +641,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#121212",
+    backgroundColor: "#000000", // Changed to pure black
   },
   modalOverlay: {
     flex: 1,
@@ -419,14 +650,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   modalContent: {
-    backgroundColor: "#1E1E1E", // Dark modal background
+    backgroundColor: "#000000", // Changed to pure black for modal background
     padding: 20,
     borderRadius: 10,
     width: "80%",
     position: "relative",
   },
   termsContent: {
-    backgroundColor: "#1E1E1E", // Dark modal background
+    backgroundColor: "#000000", // Changed to pure black for terms modal background
     padding: 20,
     borderRadius: 10,
     width: "90%",
@@ -441,15 +672,15 @@ const styles = StyleSheet.create({
   option: {
     padding: 15,
     borderBottomWidth: 1,
-    borderBottomColor: "#424242", // Dark grey border
+    borderBottomColor: "#424242", // Dark grey border remains for separation
   },
   optionText: {
     fontSize: 16,
-    color: "#fff", // White text
+    color: "#FFFFFF", // Changed to white text
   },
   termsText: {
     fontSize: 14,
-    color: "#ccc", // Light grey text
+    color: "#FFFFFF", // Changed to white text for better contrast
   },
   cartBadge: {
     position: "absolute",
@@ -463,7 +694,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   cartBadgeText: {
-    color: "#fff",
+    color: "#FFFFFF",
     fontSize: 10,
     fontWeight: "bold",
   },
@@ -474,7 +705,14 @@ const styles = StyleSheet.create({
   headerTitleText: {
     fontSize: 20,
     fontWeight: "700",
-    color: "#BB86FC",
+    color: "#FFFFFF", // Changed to white
     marginLeft: 5, // Space between icon and text
+  },
+  headerRightContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  headerIcon: {
+    marginLeft: 15, // Space between icons
   },
 });
