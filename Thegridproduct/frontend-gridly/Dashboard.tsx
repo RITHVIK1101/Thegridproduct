@@ -22,7 +22,7 @@ import {
 } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import Ionicons from "react-native-vector-icons/Ionicons";
-import BottomNavBar from "./components/BottomNavbar";
+import BottomNavBar from "./components/BottomNavbar"; // Ensure this path is correct
 import { NGROK_URL } from "@env";
 import { UserContext } from "./UserContext";
 import { RootStackParamList } from "./navigationTypes";
@@ -60,8 +60,7 @@ const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
 
 // Define constants for margins and heights
 const SEARCH_BAR_HEIGHT = 50;
-const NAVBAR_HEIGHT = 60;
-const GAP_MARGIN = 20;
+// Removed NAVBAR_HEIGHT and GAP_MARGIN as BottomNavBar is handled separately
 
 const Dashboard: React.FC<DashboardProps> = ({ route }) => {
   const [isAddModalVisible, setIsAddModalVisible] = useState(false);
@@ -99,8 +98,9 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
 
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
-  const [selectedCategory, setSelectedCategory] =
-    useState<string>("#Everything");
+  const [selectedCategory, setSelectedCategory] = useState<string>(
+    "#Everything"
+  );
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -541,6 +541,19 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
     return (
       <PanGestureHandler onHandlerStateChange={handleGestureStateChange}>
         <View style={[styles.stackedProduct, style]}>
+          {/* Share Button at Top Left */}
+          {isTop && (
+            <TouchableOpacity
+              style={styles.shareButton}
+              onPress={() => {
+                Alert.alert("Shared", "You shared this product!");
+              }}
+              accessibilityLabel="Share Product"
+            >
+              <Ionicons name="share-social" size={24} color="#FFFFFF" />
+            </TouchableOpacity>
+          )}
+
           <TapGestureHandler
             onActivated={() => {
               handleImageTap();
@@ -557,81 +570,58 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
                 style={styles.productImage}
                 resizeMode="cover" // Cover for better image scaling
               />
+              {/* 'X' Button at Bottom Left */}
+              {isTop && (
+                <TouchableOpacity
+                  style={styles.rejectButton}
+                  onPress={() => handleSwipe("left")}
+                  accessibilityLabel="Reject Product"
+                >
+                  <Ionicons name="close" size={24} color="#FF3B30" />
+                </TouchableOpacity>
+              )}
+              {/* Check Mark Button at Bottom Right */}
+              {isTop && (
+                <TouchableOpacity
+                  style={styles.likeButton}
+                  onPress={() => handleSwipe("right")}
+                  accessibilityLabel="Like Product"
+                >
+                  <Ionicons name="checkmark" size={24} color="#34C759" />
+                </TouchableOpacity>
+              )}
             </TouchableOpacity>
           </TapGestureHandler>
 
-          {/* Five Action Buttons */}
+          {/* Product Name with Check Mark in Oval Bubble */}
           {isTop && (
-            <View style={styles.actionButtonsContainer}>
-              {/* Share Button */}
+            <View style={styles.productInfoContainer}>
+              <Text style={styles.productTitle}>{product.title}</Text>
               <TouchableOpacity
-                style={styles.actionButton}
-                onPress={() => {
-                  Alert.alert("Shared", "You shared this product!");
-                }}
-                accessibilityLabel="Share Product"
-              >
-                <Ionicons name="share-social" size={24} color="#FF9500" />
-              </TouchableOpacity>
-
-              {/* Add to Cart Button (Second Button - Smaller) */}
-              <TouchableOpacity
-                style={[styles.actionButton, styles.smallActionButton]}
-                onPress={() => {
-                  addToCart(product);
-                }}
-                accessibilityLabel="Add to Cart"
-              >
-                <Ionicons name="cart" size={24} color="#34C759" />
-              </TouchableOpacity>
-
-              {/* Reject Button */}
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={() => {
-                  handleSwipe("left");
-                }}
-                accessibilityLabel="Reject Product"
-              >
-                <Ionicons name="close-circle" size={24} color="#FF3B30" />
-              </TouchableOpacity>
-
-              {/* Like Button (Fourth Button - Smaller) */}
-              <TouchableOpacity
-                style={[styles.actionButton, styles.smallActionButton]}
-                onPress={() => {
-                  handleSwipe("right");
-                }}
+                style={styles.productCheckMark}
+                onPress={() => handleSwipe("right")}
                 accessibilityLabel="Like Product"
               >
-                <Ionicons name="heart" size={24} color="#5856D6" />
-              </TouchableOpacity>
-
-              {/* View Description Button */}
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={() => {
-                  handleSwipe("up");
-                }}
-                accessibilityLabel="View Description"
-              >
-                <Ionicons name="arrow-up-circle" size={24} color="#FFCC00" />
+                <Ionicons name="checkmark" size={16} color="#FFFFFF" />
               </TouchableOpacity>
             </View>
           )}
+
+          {/* Five Action Buttons Removed from Bottom */}
+          {/* Only Share Button is kept at Top Left */}
         </View>
       </PanGestureHandler>
     );
   };
 
   return (
-    <GestureHandlerRootView style={{ flex: 1, backgroundColor: "#121212" }}>
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: "#000000" }}>
       <View style={styles.container}>
         {/* Search and Filter Container */}
         <View style={styles.searchFilterContainer}>
-          {/* Search Bar */}
+          {/* Simplified Search Bar */}
           <View style={styles.searchContainer}>
-            <Ionicons name="search-outline" size={20} color="#FFFFFF" />
+            <Ionicons name="search" size={20} color="#FFFFFF" />
             <TextInput
               style={styles.searchInput}
               placeholder="Search products..."
@@ -647,18 +637,18 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
                 style={styles.clearIcon}
                 accessibilityLabel="Clear Search"
               >
-                <Ionicons name="close-circle" size={20} color="#FFFFFF" />
+                <Ionicons name="close-circle" size={20} color="#FF3B30" />
               </TouchableOpacity>
             )}
           </View>
 
-          {/* Filter Button */}
+          {/* Filter Button with Black and White Colors */}
           <TouchableOpacity
             style={styles.filterButton}
             onPress={toggleFilterModal}
             accessibilityLabel="Filter Products"
           >
-            <Ionicons name="filter-outline" size={20} color="#FFFFFF" />
+            <Ionicons name="filter" size={20} color="#FFFFFF" />
           </TouchableOpacity>
         </View>
 
@@ -916,9 +906,11 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
             </View>
           </TouchableOpacity>
         </Modal>
+
+        {/* Integrate the BottomNavBar here */}
+        <BottomNavBar />
       </View>
-      {/* Bottom Navigation Bar */}
-      <BottomNavBar />
+      {/* Removed BottomNavBar */}
     </GestureHandlerRootView>
   );
 };
@@ -929,10 +921,10 @@ export default Dashboard;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#121212", // Dark background
+    backgroundColor: "#000000", // Pure black background
     paddingHorizontal: 20,
     paddingTop: 20,
-    paddingBottom: NAVBAR_HEIGHT + GAP_MARGIN, // Space for BottomNavBar with gap
+    paddingBottom: 60, // Adjust based on BottomNavBar height (e.g., 60)
   },
   searchFilterContainer: {
     flexDirection: "row",
@@ -943,7 +935,7 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#1E1E1E", // Dark grey background for search bar
+    backgroundColor: "#1E1E1E", // Darker background for better contrast
     paddingHorizontal: 15,
     paddingVertical: 8,
     borderRadius: 25,
@@ -959,12 +951,14 @@ const styles = StyleSheet.create({
   },
   filterButton: {
     marginLeft: 10,
-    backgroundColor: "#007AFF", // Blue button
+    backgroundColor: "#000000", // Black background
     paddingVertical: 8,
     paddingHorizontal: 15,
     borderRadius: 20,
     justifyContent: "center",
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#FFFFFF", // White border
   },
   filterButtonIcon: {
     marginRight: 5,
@@ -985,6 +979,7 @@ const styles = StyleSheet.create({
     backgroundColor: "transparent", // Transparent background
     overflow: "hidden", // Prevent content overflow
     zIndex: 1,
+    paddingTop: 30, // **Added paddingTop to shift content downward**
   },
   topProduct: {
     zIndex: 2, // Ensure the top product is on top
@@ -1001,15 +996,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   imageContainer: {
-    width: "95%", // Slight padding from edges
-    height: "80%", // Make the image taller
+    width: "100%", // Expanded to fit the screen width
+    height: "90%", // Make the image taller
     justifyContent: "center",
     alignItems: "center",
     borderRadius: 10, // Match card radius
     overflow: "hidden", // Ensure image stays inside boundaries
-    marginBottom: 0, // Remove margin to move image down
-    marginTop: 20, // Add marginTop to push the image lower
     backgroundColor: "transparent",
+    marginTop: 10, // **Optional: Add marginTop if needed to further shift image**
   },
   productImage: {
     width: "100%",
@@ -1017,33 +1011,73 @@ const styles = StyleSheet.create({
     resizeMode: "cover", // Ensure proper scaling
     borderRadius: 10, // Match border radius for consistency
   },
-  actionButtonsContainer: {
+  // Added shareButton style
+  shareButton: {
+    position: "absolute",
+    top: 45,    // Adjust top margin to control distance from the top
+    right: 10,  // Adjust right margin to control distance from the right
+    padding: 0.1, // Smaller padding to make the button smaller
+  backgroundColor: "#1E1E1E", // Dark modal background
+    borderRadius: 15, // Smaller rounded corners for a more compact button
+    zIndex: 2,  // Ensures the button appears above the image
+    borderWidth: 1, // Optional: thinner border
+    borderColor: "#FFFFFF", // White border to outline the button
+    width: 30, // Fixed width for a more compact size
+    height: 30, // Fixed height for a more compact size
+    justifyContent: "center", // Ensure icon is centered
+    alignItems: "center", // Ensure icon is centered
+  },
+  
+  shareButtonText: {
+    color: "#FFFFFF", // White icon color for contrast
+    fontSize: 10, // Smaller font size for the icon
+  },
+  
+  
+  
+  
+  // Added rejectButton style
+  rejectButton: {
+    position: "absolute",
+    bottom: 20,
+    left: 35,
+    backgroundColor: "transparent",  // Remove the circular background
+    padding: 0,  // Remove padding to keep it tight around the "X"
+    borderRadius: 0,  // No rounded corners
+    zIndex: 3,   // Ensure it's on top
+    justifyContent: "center",  // Center the "X" icon
+    alignItems: "center",      // Center the "X" icon
+
+ 
+  },
+  
+  // Added likeButton style
+  likeButton: {
+    position: "absolute",
+    bottom: 10,
+    right: 10,
+    backgroundColor: "rgba(52, 199, 89, 0.8)", // Semi-transparent green
+    padding: 8,
+    borderRadius: 20,
+  },
+  productInfoContainer: {
     flexDirection: "row",
-    justifyContent: "space-evenly", // Center the buttons
     alignItems: "center",
-    width: "100%", // Full width
-    marginTop: 10, // Adjusted spacing
-    paddingVertical: 10, // Increased padding for better touch experience
+    marginTop: 16, // **Increased marginTop to shift title downward**
   },
-  // Base style for all action buttons
-  actionButton: {
-    width: 60,
-    height: 60,
-    borderRadius: 30, // Make buttons circular
-    alignItems: "center",
+  productTitle: {
+    color: "#FFFFFF",
+    fontSize: 18,
+    fontWeight: "600",
+    marginRight: 10,
+  },
+  productCheckMark: {
+    backgroundColor: "#34C759", // Green background
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     justifyContent: "center",
-    backgroundColor: "#333333", // Gray background
-    marginHorizontal: 5,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5, // Add shadow on Android
-  },
-  smallActionButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    alignItems: "center",
   },
   loadingContainer: {
     flex: 1,

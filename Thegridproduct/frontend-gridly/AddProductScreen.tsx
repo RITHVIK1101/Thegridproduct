@@ -875,7 +875,7 @@ export default AddProduct;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#121212",
+    backgroundColor: "#000000", // Pure black background
     padding: 20,
   },
   progressContainer: {
