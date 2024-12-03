@@ -21,10 +21,11 @@ export type RootStackParamList = {
   AddProduct: undefined;
   Activity: undefined;
   Gigs: undefined;
-  Messaging: undefined;
+  Messaging: { chatId: string; userId: string; };
   AddGig: undefined; 
   Cart: undefined;
-  Payment: { product: CartProduct };
+  Payment: { product: CartProduct; buyerId: string; sellerId: string };
   Account: undefined;
   EditProduct: { productId: string };
+
 };

@@ -37,6 +37,9 @@ func main() {
 	db.ConnectDB()
 	defer db.DisconnectDB() // Ensure MongoDB disconnects when main exits
 
+	hub := handlers.NewHub()
+	go hub.Run()
+
 	// Initialize router
 	router := mux.NewRouter()
 
@@ -53,7 +56,7 @@ func main() {
 	// Protected Routes
 	protected := router.PathPrefix("/").Subrouter()
 	protected.Use(handlers.AuthMiddleware)
-
+	router.HandleFunc("/ws/{chatId}/{userId}", hub.ServeWS).Methods("GET")
 	// Product Routes
 	protected.HandleFunc("/products", handlers.AddProductHandler).Methods("POST")
 	protected.HandleFunc("/products/user", handlers.GetUserProductsHandler).Methods("GET")
@@ -77,6 +80,9 @@ func main() {
 
 	// **User Routes**
 	protected.HandleFunc("/users/{id}", handlers.GetUserHandler).Methods("GET")
+	protected.HandleFunc("/chats/{productId}", handlers.GetChatHandler).Methods("GET")
+	protected.HandleFunc("/chats/{chatId}/messages", handlers.AddMessageHandler).Methods("POST")
+	protected.HandleFunc("/chats/{chatId}/messages", handlers.GetMessagesHandler).Methods("GET")
 
 	//payment
 	protected.HandleFunc("/create-payment-intent", handlers.CreatePaymentIntentHandler).Methods("POST")

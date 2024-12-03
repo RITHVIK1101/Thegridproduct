@@ -1,6 +1,6 @@
 // App.tsx
 
-import React, { useState, createRef, useContext } from "react";
+import React, { useState, useContext } from "react";
 import {
   NavigationContainer,
   NavigationContainerRef,
@@ -19,8 +19,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import Icon from "react-native-vector-icons/MaterialIcons";
-import Ionicons from "react-native-vector-icons/Ionicons"; // Ensure Ionicons is imported
-import BottomNavBar from "./components/BottomNavbar";
+import Ionicons from "react-native-vector-icons/Ionicons";
 import PaymentScreen from "./PaymentScreen"; // Import PaymentScreen
 import SplashScreen from "./SplashScreen";
 import LoginScreen from "./LoginScreen";
@@ -28,17 +27,19 @@ import Dashboard from "./Dashboard";
 import AddProductScreen from "./AddProductScreen";
 import AddGigScreen from "./AddGigScreen";
 import ActivityScreen from "./ActivityScreen";
+
 import EditProduct from "./EditProductScreen";
 import MessagingScreen from "./MessagingScreen";
 import CartScreen from "./CartScreen"; // Import CartScreen
 import AccountScreen from "./AccountScreen"; // If you have an edit account screen
+import { StackNavigationOptions } from "@react-navigation/stack";
 
 import { RootStackParamList } from "./navigationTypes";
 import { UserProvider, UserContext } from "./UserContext"; // Import UserContext
 import { StripeProvider } from "@stripe/stripe-react-native"; // Import StripeProvider
 
 export const navigationRef =
-  createRef<NavigationContainerRef<RootStackParamList>>();
+  React.createRef<NavigationContainerRef<RootStackParamList>>();
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -47,10 +48,38 @@ const Stack = createStackNavigator<RootStackParamList>();
  */
 const HeaderTitleWithLogo: React.FC<{ title: string }> = ({ title }) => (
   <View style={styles.headerTitleContainer}>
-    <Ionicons name="grid-outline" size={20} color="#BB86FC" /> {/* Smaller logo size */}
+    <Ionicons name="grid-outline" size={20} color="#BB86FC" />{" "}
+    {/* Smaller logo size */}
     <Text style={styles.headerTitleText}>{title}</Text>
   </View>
 );
+
+// Common header options to reduce redundancy
+const commonHeaderOptions: StackNavigationOptions = {
+  headerStyle: {
+    backgroundColor: "#1E1E1E", // Dark header background
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  headerTintColor: "#fff", // Header text color
+  headerTitleStyle: {
+    fontWeight: "700",
+    color: "#BB86FC", // Purple title
+  },
+  headerRight: () => (
+    <TouchableOpacity
+      onPress={() => navigationRef.current?.navigate("Cart")}
+      style={{ marginRight: 15 }}
+      accessibilityLabel="Go to Cart"
+    >
+      <Ionicons name="cart-outline" size={28} color="#fff" />
+      {/* Optional: Add a badge for cart items count */}
+      {/* <View style={styles.cartBadge}>
+        <Text style={styles.cartBadgeText}>{cartItemCount}</Text>
+      </View> */}
+    </TouchableOpacity>
+  ),
+};
 
 const AppNavigator: React.FC = () => {
   const [modalVisible, setModalVisible] = useState(false);
@@ -65,14 +94,18 @@ const AppNavigator: React.FC = () => {
   const handleLogout = async () => {
     setModalVisible(false);
     try {
-      await clearUser(); // Clear user data from context and storage
+      await clearUser();
       Alert.alert("Logout Successful", "You have been logged out.");
-      navigationRef.current?.dispatch(
-        CommonActions.reset({
-          index: 0,
-          routes: [{ name: "Login" }],
-        })
-      );
+
+      // Use optional chaining safely
+      if (navigationRef.current) {
+        navigationRef.current.dispatch(
+          CommonActions.reset({
+            index: 0,
+            routes: [{ name: "Login" }],
+          })
+        );
+      }
     } catch (error) {
       console.error("Logout Error:", error);
       Alert.alert("Logout Error", "Failed to log out. Please try again.");
@@ -94,18 +127,7 @@ const AppNavigator: React.FC = () => {
     >
       <NavigationContainer ref={navigationRef}>
         <Stack.Navigator
-          screenOptions={{
-            headerStyle: {
-              backgroundColor: "#1E1E1E", // Dark header background
-              shadowOpacity: 0, // Remove shadow on iOS
-              elevation: 0, // Remove shadow on Android
-            },
-            headerTintColor: "#fff", // Header text color
-            headerTitleStyle: {
-              fontWeight: "700",
-              color: "#BB86FC", // Purple title
-            },
-          }}
+          screenOptions={commonHeaderOptions} // Apply common header options
         >
           {token ? (
             // Authenticated screens
@@ -123,22 +145,7 @@ const AppNavigator: React.FC = () => {
                       <Icon name="person" size={30} color="#fff" />
                     </TouchableOpacity>
                   ),
-                  headerTitle: () => (
-                    <HeaderTitleWithLogo title="The Gridly" />
-                  ), // Custom header title with logo
-                  headerRight: () => (
-                    <TouchableOpacity
-                      onPress={() => navigationRef.current?.navigate("Cart")}
-                      style={{ marginRight: 15 }}
-                      accessibilityLabel="Go to Cart"
-                    >
-                      <Ionicons name="cart-outline" size={28} color="#fff" />
-                      {/* Optional: Add a badge for cart items count */}
-                      {/* <View style={styles.cartBadge}>
-                        <Text style={styles.cartBadgeText}>{cartItemCount}</Text>
-                      </View> */}
-                    </TouchableOpacity>
-                  ),
+                  headerTitle: () => <HeaderTitleWithLogo title="The Gridly" />, // Custom header title with logo
                   gestureEnabled: false,
                 }}
               />
@@ -156,15 +163,7 @@ const AppNavigator: React.FC = () => {
                     </TouchableOpacity>
                   ),
                   headerTitle: "Add Product",
-                  headerRight: () => (
-                    <TouchableOpacity
-                      onPress={() => navigationRef.current?.navigate("Cart")}
-                      style={{ marginRight: 15 }}
-                      accessibilityLabel="Go to Cart"
-                    >
-                      <Ionicons name="cart-outline" size={28} color="#fff" />
-                    </TouchableOpacity>
-                  ),
+                  // headerRight is already defined in commonHeaderOptions
                 })}
               />
               <Stack.Screen
@@ -181,15 +180,7 @@ const AppNavigator: React.FC = () => {
                     </TouchableOpacity>
                   ),
                   headerTitle: "Add Gig",
-                  headerRight: () => (
-                    <TouchableOpacity
-                      onPress={() => navigationRef.current?.navigate("Cart")}
-                      style={{ marginRight: 15 }}
-                      accessibilityLabel="Go to Cart"
-                    >
-                      <Ionicons name="cart-outline" size={28} color="#fff" />
-                    </TouchableOpacity>
-                  ),
+                  // headerRight is already defined in commonHeaderOptions
                 })}
               />
               <Stack.Screen
@@ -205,22 +196,10 @@ const AppNavigator: React.FC = () => {
                       <Icon name="person" size={30} color="#fff" />
                     </TouchableOpacity>
                   ),
-                  headerTitle: () => (
-                    <HeaderTitleWithLogo title="The Gridly" />
-                  ), // Custom header title with logo
-                  headerRight: () => (
-                    <TouchableOpacity
-                      onPress={() => navigationRef.current?.navigate("Cart")}
-                      style={{ marginRight: 15 }}
-                      accessibilityLabel="Go to Cart"
-                    >
-                      <Ionicons name="cart-outline" size={28} color="#fff" />
-                    </TouchableOpacity>
-                  ),
+                  headerTitle: () => <HeaderTitleWithLogo title="The Gridly" />, // Custom header title with logo
                   gestureEnabled: false,
                 }}
               />
-
               {/* Add EditProduct Screen */}
               <Stack.Screen
                 name="EditProduct"
@@ -236,25 +215,7 @@ const AppNavigator: React.FC = () => {
                     </TouchableOpacity>
                   ),
                   headerTitle: "Edit Product",
-                  headerRight: () => (
-                    <TouchableOpacity
-                      onPress={() => navigationRef.current?.navigate("Cart")}
-                      style={{ marginRight: 15 }}
-                      accessibilityLabel="Go to Cart"
-                    >
-                      <Ionicons name="cart-outline" size={28} color="#fff" />
-                    </TouchableOpacity>
-                  ),
-                  headerStyle: {
-                    backgroundColor: "#1E1E1E", // Consistent header style
-                    shadowOpacity: 0,
-                    elevation: 0,
-                  },
-                  headerTintColor: "#fff",
-                  headerTitleStyle: {
-                    fontWeight: "700",
-                    color: "#BB86FC",
-                  },
+                  // headerRight is already defined in commonHeaderOptions
                 })}
               />
               {/* Add the Messaging Screen */}
@@ -272,15 +233,7 @@ const AppNavigator: React.FC = () => {
                     </TouchableOpacity>
                   ),
                   headerTitle: "Messaging",
-                  headerRight: () => (
-                    <TouchableOpacity
-                      onPress={() => navigationRef.current?.navigate("Cart")}
-                      style={{ marginRight: 15 }}
-                      accessibilityLabel="Go to Cart"
-                    >
-                      <Ionicons name="cart-outline" size={28} color="#fff" />
-                    </TouchableOpacity>
-                  ),
+                  // headerRight is already defined in commonHeaderOptions
                   gestureEnabled: false,
                 }}
               />
@@ -299,25 +252,8 @@ const AppNavigator: React.FC = () => {
                     </TouchableOpacity>
                   ),
                   headerTitle: "Your Cart",
-                  headerRight: () => (
-                    <TouchableOpacity
-                      onPress={() => navigationRef.current?.navigate("Cart")} // Optional: Can be omitted or used for additional functionality
-                      style={{ marginRight: 15 }}
-                      accessibilityLabel="Cart Icon"
-                    >
-                      <Ionicons name="cart-outline" size={28} color="#fff" />
-                    </TouchableOpacity>
-                  ),
-                  headerStyle: {
-                    backgroundColor: "#1E1E1E",
-                    shadowOpacity: 0,
-                    elevation: 0,
-                  },
-                  headerTintColor: "#fff",
-                  headerTitleStyle: {
-                    fontWeight: "700",
-                    color: "#BB86FC",
-                  },
+                  // Remove headerRight if it's redundant
+                  headerRight: () => null,
                 }}
               />
               {/* Add PaymentScreen to the Stack */}
@@ -335,25 +271,7 @@ const AppNavigator: React.FC = () => {
                     </TouchableOpacity>
                   ),
                   headerTitle: "Payment",
-                  headerRight: () => (
-                    <TouchableOpacity
-                      onPress={() => navigationRef.current?.navigate("Cart")}
-                      style={{ marginRight: 15 }}
-                      accessibilityLabel="Go to Cart"
-                    >
-                      <Ionicons name="cart-outline" size={28} color="#fff" />
-                    </TouchableOpacity>
-                  ),
-                  headerStyle: {
-                    backgroundColor: "#1E1E1E",
-                    shadowOpacity: 0,
-                    elevation: 0,
-                  },
-                  headerTintColor: "#fff",
-                  headerTitleStyle: {
-                    fontWeight: "700",
-                    color: "#BB86FC",
-                  },
+                  // headerRight is already defined in commonHeaderOptions
                 })}
               />
               {/* Add AccountScreen to the Stack */}
@@ -371,25 +289,7 @@ const AppNavigator: React.FC = () => {
                     </TouchableOpacity>
                   ),
                   headerTitle: "My Account",
-                  headerRight: () => (
-                    <TouchableOpacity
-                      onPress={() => navigationRef.current?.navigate("Cart")}
-                      style={{ marginRight: 15 }}
-                      accessibilityLabel="Go to Cart"
-                    >
-                      <Ionicons name="cart-outline" size={28} color="#fff" />
-                    </TouchableOpacity>
-                  ),
-                  headerStyle: {
-                    backgroundColor: "#1E1E1E",
-                    shadowOpacity: 0,
-                    elevation: 0,
-                  },
-                  headerTintColor: "#fff",
-                  headerTitleStyle: {
-                    fontWeight: "700",
-                    color: "#BB86FC",
-                  },
+                  // headerRight is already defined in commonHeaderOptions
                 }}
               />
             </>
@@ -436,7 +336,7 @@ const AppNavigator: React.FC = () => {
               >
                 <Text style={styles.optionText}>View Terms of Service</Text>
               </TouchableOpacity>
-              {/* Add "My Account" Button */}
+
               <TouchableOpacity
                 onPress={() => {
                   setModalVisible(false);
