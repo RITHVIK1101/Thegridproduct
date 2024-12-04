@@ -92,8 +92,8 @@ const BottomNavBar: React.FC<BottomNavBarProps> = ({ firstName }) => {
       >
         <Ionicons
           name="home-outline"
-          size={24} // Reduced size for a slimmer look
-          color={isActive("Dashboard") ? "#FFFFFF" : "#CCCCCC"} // White for active, light gray for inactive
+          size={28} // Increased size for better visibility
+          color={isActive("Dashboard") ? "#FFFFFF" : "#CCCCCC"}
         />
         <Text
           style={[
@@ -113,8 +113,8 @@ const BottomNavBar: React.FC<BottomNavBarProps> = ({ firstName }) => {
       >
         <Ionicons
           name="briefcase-outline"
-          size={24} // Reduced size
-          color={isActive("Gigs") ? "#FFFFFF" : "#CCCCCC"} // White for active, light gray for inactive
+          size={28} // Increased size
+          color={isActive("Gigs") ? "#FFFFFF" : "#CCCCCC"}
         />
         <Text
           style={[styles.navText, isActive("Gigs") && styles.navTextActive]}
@@ -137,7 +137,7 @@ const BottomNavBar: React.FC<BottomNavBarProps> = ({ firstName }) => {
             { transform: [{ scale: scaleValue }, { rotate: spin }] },
           ]}
         >
-          <Ionicons name="arrow-up-outline" size={36} color="#FFFFFF" /> {/* Changed icon to pointer and adjusted size */}
+          <Ionicons name="arrow-up-outline" size={40} color="#FFFFFF" /> {/* Increased size */}
         </Animated.View>
       </TouchableOpacity>
 
@@ -149,8 +149,8 @@ const BottomNavBar: React.FC<BottomNavBarProps> = ({ firstName }) => {
       >
         <Ionicons
           name="chatbubble-outline"
-          size={24} // Reduced size
-          color={isActive("Messaging") ? "#FFFFFF" : "#CCCCCC"} // White for active, light gray for inactive
+          size={28} // Increased size
+          color={isActive("Messaging") ? "#FFFFFF" : "#CCCCCC"}
         />
         <Text
           style={[
@@ -170,8 +170,8 @@ const BottomNavBar: React.FC<BottomNavBarProps> = ({ firstName }) => {
       >
         <Ionicons
           name="stats-chart-outline"
-          size={24} // Reduced size
-          color={isActive("Activity") ? "#FFFFFF" : "#CCCCCC"} // White for active, light gray for inactive
+          size={28} // Increased size
+          color={isActive("Activity") ? "#FFFFFF" : "#CCCCCC"}
         />
         <Text
           style={[
@@ -240,15 +240,15 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-around",
     alignItems: "center",
-    paddingVertical: 6, // Reduced from 8 to make navbar smaller
-    backgroundColor: "#000000", // Changed to black
+    paddingVertical: 10, // Increased from 6 to make navbar taller
+    backgroundColor: "#000000",
     position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
     borderTopWidth: 1,
-    borderColor: "#000000", // Changed to black to blend with background
-    shadowColor: "#FFFFFF", // Changed shadow color to white for visibility on black background
+    borderColor: "#000000",
+    shadowColor: "#FFFFFF",
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
@@ -260,22 +260,22 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   navText: {
-    fontSize: 10, // Reduced from 11 for a slimmer look
-    color: "#CCCCCC", // Light gray for inactive tabs
-    marginTop: 2, // Reduced from 2 to maintain balance
+    fontSize: 12, // Increased from 10 for better readability
+    color: "#CCCCCC",
+    marginTop: 4, // Slightly increased for balance
     fontFamily: "System",
   },
   navTextActive: {
-    color: "#FFFFFF", // White for active tab
+    color: "#FFFFFF",
     fontWeight: "600",
   },
   addButton: {
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#000000", // Changed to black to match the theme
-    borderRadius: 35,
-    padding: 4, // Reduced from 5 to make it slightly smaller
-    shadowColor: "#FFFFFF", // Changed shadow color to white
+    backgroundColor: "#000000",
+    borderRadius: 35, // Maintained to keep it circular
+    padding: 6, // Increased from 4 to accommodate larger icon
+    shadowColor: "#FFFFFF",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.5,
     shadowRadius: 6,
@@ -283,25 +283,25 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.8)", // Darker overlay for better contrast
+    backgroundColor: "rgba(0,0,0,0.8)",
     justifyContent: "center",
     alignItems: "center",
   },
   modalContent: {
     width: "80%",
-    backgroundColor: "#1A1A1A", // Changed to a slightly lighter black for modal background
+    backgroundColor: "#1A1A1A",
     padding: 25,
     borderRadius: 20,
     alignItems: "center",
     position: "relative",
-    shadowColor: "#FFFFFF", // Changed shadow color to white
+    shadowColor: "#FFFFFF",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.6,
     shadowRadius: 6,
     elevation: 10,
   },
   modalTitle: {
-    fontSize: 20, // Reduced from 22 to maintain proportion
+    fontSize: 20,
     fontWeight: "700",
     color: "#FFFFFF",
     marginBottom: 20,
@@ -313,21 +313,21 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   modalButton: {
-    backgroundColor: "#FFFFFF", // Changed to white buttons
-    paddingVertical: 10, // Reduced from 12 for smaller size
+    backgroundColor: "#FFFFFF",
+    paddingVertical: 12, // Slightly increased for better touch targets
     borderRadius: 12,
-    marginVertical: 8, // Reduced from 10 for tighter spacing
+    marginVertical: 8,
     width: "100%",
     alignItems: "center",
-    shadowColor: "#FFFFFF", // Changed shadow color to white
+    shadowColor: "#FFFFFF",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.4,
     shadowRadius: 4,
     elevation: 5,
   },
   modalButtonText: {
-    color: "#000000", // Changed to black text for contrast against white buttons
-    fontSize: 15, // Reduced from 16 for consistency
+    color: "#000000",
+    fontSize: 15,
     fontWeight: "600",
   },
   modalClose: {

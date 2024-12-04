@@ -554,11 +554,7 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
             </TouchableOpacity>
           )}
 
-          <TapGestureHandler
-            onActivated={() => {
-              handleImageTap();
-            }}
-          >
+          <TapGestureHandler onActivated={handleImageTap}>
             <TouchableOpacity activeOpacity={0.9} style={styles.imageContainer}>
               <Image
                 source={{
@@ -570,6 +566,7 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
                 style={styles.productImage}
                 resizeMode="cover" // Cover for better image scaling
               />
+
               {/* 'X' Button at Bottom Left */}
               {isTop && (
                 <TouchableOpacity
@@ -580,32 +577,37 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
                   <Ionicons name="close" size={24} color="#FF3B30" />
                 </TouchableOpacity>
               )}
+
               {/* Check Mark Button at Bottom Right */}
               {isTop && (
                 <TouchableOpacity
-                  style={styles.likeButton}
                   onPress={() => handleSwipe("right")}
                   accessibilityLabel="Like Product"
                 >
                   <Ionicons name="checkmark" size={24} color="#34C759" />
                 </TouchableOpacity>
               )}
+
+              {/* Product Info Bubble at Bottom-Right */}
+              {isTop && (
+                <View style={styles.productInfoBubble}>
+                  <View style={styles.productInfoTextContainer}>
+                    <Text style={styles.productInfoTitle}>{product.title}</Text>
+                    <Text style={styles.productInfoPrice}>
+                      ${product.price.toFixed(2)}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.checkmarkButton}
+                    onPress={() => handleSwipe("right")}
+                    accessibilityLabel="Like Product"
+                  >
+                    <Ionicons name="checkmark" style={styles.checkmarkIcon} />
+                  </TouchableOpacity>
+                </View>
+              )}
             </TouchableOpacity>
           </TapGestureHandler>
-
-          {/* Product Name with Check Mark in Oval Bubble */}
-          {isTop && (
-            <View style={styles.productInfoContainer}>
-              <Text style={styles.productTitle}>{product.title}</Text>
-              <TouchableOpacity
-                style={styles.productCheckMark}
-                onPress={() => handleSwipe("right")}
-                accessibilityLabel="Like Product"
-              >
-                <Ionicons name="checkmark" size={16} color="#FFFFFF" />
-              </TouchableOpacity>
-            </View>
-          )}
 
           {/* Five Action Buttons Removed from Bottom */}
           {/* Only Share Button is kept at Top Left */}
@@ -1014,70 +1016,81 @@ const styles = StyleSheet.create({
   // Added shareButton style
   shareButton: {
     position: "absolute",
-    top: 45,    // Adjust top margin to control distance from the top
-    right: 10,  // Adjust right margin to control distance from the right
-    padding: 0.1, // Smaller padding to make the button smaller
-  backgroundColor: "#1E1E1E", // Dark modal background
+    top: 45, // Adjust top margin to control distance from the top
+    right: 10, // Adjust right margin to control distance from the right
+    padding: 0, // Removed padding to make the button size consistent
+    backgroundColor: "#1E1E1E", // Dark modal background
     borderRadius: 15, // Smaller rounded corners for a more compact button
-    zIndex: 2,  // Ensures the button appears above the image
-    borderWidth: 1, // Optional: thinner border
+    zIndex: 2, // Ensures the button appears above the image
+    borderWidth: 1, // Thinner border
     borderColor: "#FFFFFF", // White border to outline the button
     width: 30, // Fixed width for a more compact size
     height: 30, // Fixed height for a more compact size
     justifyContent: "center", // Ensure icon is centered
     alignItems: "center", // Ensure icon is centered
   },
-  
+
   shareButtonText: {
     color: "#FFFFFF", // White icon color for contrast
     fontSize: 10, // Smaller font size for the icon
   },
-  
-  
-  
-  
+
   // Added rejectButton style
   rejectButton: {
     position: "absolute",
     bottom: 20,
-    left: 35,
-    backgroundColor: "transparent",  // Remove the circular background
-    padding: 0,  // Remove padding to keep it tight around the "X"
-    borderRadius: 0,  // No rounded corners
-    zIndex: 3,   // Ensure it's on top
-    justifyContent: "center",  // Center the "X" icon
-    alignItems: "center",      // Center the "X" icon
+    left: 25,
+    backgroundColor: "transparent", // Remove the circular background
+    padding: 0, // Remove padding to keep it tight around the "X"
+    borderRadius: 0, // No rounded corners
+    zIndex: 3, // Ensure it's on top
+    justifyContent: "center", // Center the "X" icon
+    alignItems: "center", // Center the "X" icon
+  },
 
- 
-  },
-  
-  // Added likeButton style
-  likeButton: {
+  productInfoBubble: {
     position: "absolute",
-    bottom: 10,
-    right: 10,
-    backgroundColor: "rgba(52, 199, 89, 0.8)", // Semi-transparent green
-    padding: 8,
-    borderRadius: 20,
-  },
-  productInfoContainer: {
-    flexDirection: "row",
+    bottom: 20, // Adjust to position slightly above the bottom edge
+    right: 10, // Adjust to align with the right edge
+    backgroundColor: "rgba(255, 255, 255, 0.8)", // Semi-transparent white
+    borderRadius: 20, // Rounded bubble
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    flexDirection: "row", // Align text and checkmark horizontally
     alignItems: "center",
-    marginTop: 16, // **Increased marginTop to shift title downward**
+    justifyContent: "space-between",
+    width: SCREEN_WIDTH * 0.6, // Make the bubble wider
+    zIndex: 3, // Ensure it's above other elements
   },
-  productTitle: {
-    color: "#FFFFFF",
-    fontSize: 18,
+  productInfoTextContainer: {
+    flex: 1,
+    flexDirection: "column",
+  },
+  productInfoTitle: {
+    color: "#000000", // Black text for visibility on white background
+    fontSize: 16, // Adjust font size
     fontWeight: "600",
-    marginRight: 10,
+    marginBottom: 2, // Space between title and price
   },
-  productCheckMark: {
-    backgroundColor: "#34C759", // Green background
+  productInfoPrice: {
+    color: "#000000", // Black text for visibility on white background
+    fontSize: 14, // Adjust font size
+    fontWeight: "500",
+  },
+  checkmarkButton: {
     width: 24,
     height: 24,
-    borderRadius: 12,
+    backgroundColor: "#34C759", // Bright green
+    borderRadius: 12, // Circle shape
     justifyContent: "center",
     alignItems: "center",
+    borderWidth: 2, // Add border for better visibility
+    borderColor: "#FFFFFF", // White border for contrast
+    marginLeft: 10, // Space between text and checkmark
+  },
+  checkmarkIcon: {
+    color: "#FFFFFF", // White checkmark color
+    fontSize: 16, // Adjust size of the checkmark
   },
   loadingContainer: {
     flex: 1,
