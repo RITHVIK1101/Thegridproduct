@@ -34,6 +34,29 @@ func GetChatHandler(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, chat, http.StatusOK)
 }
 
+// GetChatsByUserHandler fetches all chats for a specific user
+func GetChatsByUserHandler(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	userId := vars["userId"]
+
+	if userId == "" {
+		WriteJSONError(w, "User ID is required", http.StatusBadRequest)
+		return
+	}
+
+	// Call the database function to fetch chats
+	chats, err := db.FindChatsByUser(userId)
+	if err != nil {
+		WriteJSONError(w, "Failed to fetch chats", http.StatusInternalServerError)
+		return
+	}
+
+	// Respond with the list of chats
+	WriteJSON(w, map[string]interface{}{
+		"conversations": chats,
+	}, http.StatusOK)
+}
+
 // AddMessageHandler adds a new message to a chat
 func AddMessageHandler(w http.ResponseWriter, r *http.Request) {
 	// Extract chat ID from URL parameters

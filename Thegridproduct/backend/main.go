@@ -80,6 +80,7 @@ func main() {
 
 	// **User Routes**
 	protected.HandleFunc("/users/{id}", handlers.GetUserHandler).Methods("GET")
+	protected.HandleFunc("/chats/user/{userId}", handlers.GetChatsByUserHandler).Methods("GET")
 	protected.HandleFunc("/chats/{productId}", handlers.GetChatHandler).Methods("GET")
 	protected.HandleFunc("/chats/{chatId}/messages", handlers.AddMessageHandler).Methods("POST")
 	protected.HandleFunc("/chats/{chatId}/messages", handlers.GetMessagesHandler).Methods("GET")
