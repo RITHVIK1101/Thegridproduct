@@ -4,6 +4,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"time"
 
@@ -35,6 +36,7 @@ func GetChatHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetChatsByUserHandler fetches all chats for a specific user
+// GetChatsByUserHandler fetches all chats for a specific user
 func GetChatsByUserHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	userId := vars["userId"]
@@ -51,9 +53,42 @@ func GetChatsByUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Respond with the list of chats
+	// Enrich chat details with product name and user details
+	var enrichedChats []map[string]interface{}
+	for _, chat := range chats {
+		// Fetch product details
+		product, err := db.GetProductByID(chat.ProductID)
+		if err != nil {
+			log.Printf("Failed to fetch product details for productID %s: %v", chat.ProductID, err)
+			continue // Skip this chat if product details are missing
+		}
+
+		// Fetch the connected user's details
+		otherUserID := chat.BuyerID
+		if chat.BuyerID == userId {
+			otherUserID = chat.SellerID
+		}
+		otherUser, err := db.GetUserByID(otherUserID)
+		if err != nil {
+			log.Printf("Failed to fetch user details for userID %s: %v", otherUserID, err)
+			continue // Skip this chat if user details are missing
+		}
+
+		// Prepare enriched chat data
+		enrichedChats = append(enrichedChats, map[string]interface{}{
+			"chatID":       chat.ID,
+			"productID":    product.ID,
+			"productTitle": product.Title,
+			"user": map[string]string{
+				"firstName": otherUser.FirstName,
+				"lastName":  otherUser.LastName,
+			},
+		})
+	}
+
+	// Respond with the enriched chat details
 	WriteJSON(w, map[string]interface{}{
-		"conversations": chats,
+		"conversations": enrichedChats,
 	}, http.StatusOK)
 }
 

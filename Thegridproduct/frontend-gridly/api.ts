@@ -2,7 +2,7 @@ import { NGROK_URL } from "@env";
 
 export const fetchConversations = async (userId: string, token: string) => {
   try {
-    const response = await fetch(`${NGROK_URL}/chats?userId=${userId}`, {
+    const response = await fetch(`${NGROK_URL}/chats/user/${userId}`, {
       method: "GET",
       headers: {
         "Authorization": `Bearer ${token}`,

@@ -132,9 +132,32 @@ func CreateChat(chat *models.Chat) error {
 	return nil
 }
 
+// GetProductByID retrieves a product by its ID
+func GetProductByID(productID string) (*models.Product, error) {
+	collection := GetCollection("gridlyapp", "products")
+
+	objectID, err := primitive.ObjectIDFromHex(productID)
+	if err != nil {
+		log.Printf("Invalid product ID format %s: %v", productID, err)
+		return nil, fmt.Errorf("invalid product ID format: %v", err)
+	}
+
+	var product models.Product
+	err = collection.FindOne(context.TODO(), bson.M{"_id": objectID}).Decode(&product)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			log.Printf("Product with ID %s not found", productID)
+			return nil, errors.New("product not found")
+		}
+		log.Printf("Error fetching product with ID %s: %v", productID, err)
+		return nil, fmt.Errorf("error fetching product: %v", err)
+	}
+	return &product, nil
+}
+
 // FindChatsByUser retrieves chats involving a specific user (either buyer or seller)
 func FindChatsByUser(userID string) ([]models.Chat, error) {
-	collection := GetCollection("gridlyapp", "chats") // Ensure "gridlyapp" is your correct database name
+	collection := GetCollection("gridlyapp", "chats")
 
 	filter := bson.M{
 		"$or": []bson.M{

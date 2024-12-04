@@ -6,10 +6,12 @@ export interface Message {
   }
   
   export interface Conversation {
-    _id: string;
-    participant: string;
-    lastMessage: string;
-    updatedAt: string;
-    messages: Message[];
+    chatID: string;
+    productID: string;
+    productTitle: string;
+    user: {
+      firstName: string;
+      lastName: string;
+    };
   }
   
