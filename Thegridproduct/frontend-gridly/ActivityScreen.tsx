@@ -5,9 +5,8 @@ import {
   View,
   Text,
   StyleSheet,
-  Button,
-  FlatList,
   TouchableOpacity,
+  FlatList,
   ActivityIndicator,
   Alert,
   ScrollView,
@@ -132,8 +131,6 @@ const ActivityScreen: React.FC = () => {
     }
 
     try {
-      // Optionally, show a loading indicator or disable the UI
-
       const response = await fetch(`${NGROK_URL}/products/${productId}`, {
         method: "DELETE",
         headers: {
@@ -172,8 +169,6 @@ const ActivityScreen: React.FC = () => {
         "Error",
         error instanceof Error ? error.message : "An unexpected error occurred."
       );
-    } finally {
-      // Optionally, hide the loading indicator or re-enable the UI
     }
   };
 
@@ -224,20 +219,22 @@ const ActivityScreen: React.FC = () => {
           <TouchableOpacity
             style={styles.editIconTouchable}
             onPress={() => navigateToEditProduct(item.id)}
-            hitSlop={{ top: 100, bottom: 100, left: 800, right: 400 }}
-            activeOpacity={7.9}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            activeOpacity={0.7}
+            accessibilityLabel="Edit Product"
           >
-            <Ionicons name="pencil-outline" size={24} color="#4CAF50" />
+            <Ionicons name="pencil-outline" size={20} color="#4CAF50" />
           </TouchableOpacity>
 
           {/* Functional Delete Button */}
           <TouchableOpacity
             style={styles.deleteIconTouchable}
             onPress={() => handleDeleteProduct(item.id)}
-            hitSlop={{ top: 100, bottom: 100, left: 30, right: 100 }}
-            activeOpacity={7.9}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            activeOpacity={0.7}
+            accessibilityLabel="Delete Product"
           >
-            <Ionicons name="trash-outline" size={24} color="#FF6B6B" />
+            <Ionicons name="trash-outline" size={20} color="#FF3B30" />
           </TouchableOpacity>
         </View>
 
@@ -274,25 +271,25 @@ const ActivityScreen: React.FC = () => {
       <View style={styles.searchContainer}>
         <Ionicons
           name="search"
-          size={20}
-          color="#888"
+          size={18}
+          color="#FFFFFF"
           style={styles.searchIcon}
         />
         <TextInput
           style={styles.searchInput}
           placeholder="Search your products..."
-          placeholderTextColor="#888"
+          placeholderTextColor="#AAAAAA"
           value={searchQuery}
           onChangeText={setSearchQuery}
+          accessibilityLabel="Search Your Products"
         />
         {searchQuery.length > 0 && (
-          <TouchableOpacity onPress={() => setSearchQuery("")}>
-            <Ionicons
-              name="close-circle"
-              size={20}
-              color="#888"
-              style={styles.clearIcon}
-            />
+          <TouchableOpacity
+            onPress={() => setSearchQuery("")}
+            style={styles.clearIconTouchable}
+            accessibilityLabel="Clear Search"
+          >
+            <Ionicons name="close-circle" size={18} color="#FF3B30" />
           </TouchableOpacity>
         )}
       </View>
@@ -300,7 +297,7 @@ const ActivityScreen: React.FC = () => {
       {/* Display Loading, Error, or List */}
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#BB86FC" />
+          <ActivityIndicator size="small" color="#34C759" />
           <Text style={styles.loadingText}>Loading your products...</Text>
         </View>
       ) : error ? (
@@ -334,31 +331,31 @@ export default ActivityScreen;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#121212", // Dark background
-    padding: 15, // Reduced padding for conciseness
-    paddingBottom: 60, // Adjusted to remove extra space
-    paddingTop: 20,
+    backgroundColor: "#000000", // Pure black background
+    padding: 10, // Reduced padding for smaller layout
+    paddingBottom: 60, // Adjust based on BottomNavBar height (e.g., 60)
+    paddingTop: 15,
   },
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#1E1E1E",
-    borderRadius: 25,
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    marginHorizontal: 10,
-    marginBottom: 15,
+    backgroundColor: "#1E1E1E", // Darker background for better contrast
+    borderRadius: 20, // Reduced border radius for compactness
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginHorizontal: 5,
+    marginBottom: 10,
   },
   searchIcon: {
-    marginRight: 10,
+    marginRight: 8,
   },
   searchInput: {
     flex: 1,
-    color: "#fff",
-    fontSize: 14,
+    color: "#FFFFFF",
+    fontSize: 14, // Smaller font size
   },
-  clearIcon: {
-    marginLeft: 10,
+  clearIconTouchable: {
+    marginLeft: 8,
   },
   loadingContainer: {
     flex: 1,
@@ -366,32 +363,36 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   loadingText: {
-    marginTop: 8,
-    color: "#bbb",
-    fontSize: 14,
+    marginTop: 5,
+    color: "#34C759", // Green color for loading text
+    fontSize: 12, // Smaller font size
   },
   errorContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    paddingHorizontal: 15,
+    paddingHorizontal: 10,
   },
   errorText: {
-    color: "white", // Red color for errors
+    color: "#FF3B30", // Red color for errors
     fontSize: 14,
     textAlign: "center",
-    marginBottom: 8,
+    marginBottom: 5,
   },
   listContainer: {
-    // You can add padding or other styles here if needed
+    paddingHorizontal: 5,
   },
   itemContainer: {
-    backgroundColor: "#1E1E1E", // Darker card background
-    borderRadius: 8, // Reduced border radius for conciseness
-    padding: 12, // Reduced padding
-    marginBottom: 12, // Reduced margin
-    elevation: 2,
+    backgroundColor: "#1E1E1E", // Dark card background
+    borderRadius: 8, // Reduced border radius
+    padding: 10, // Reduced padding
+    marginBottom: 10, // Reduced margin
     position: "relative",
+    shadowColor: "#FFFFFF",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 3,
   },
   iconContainer: {
     flexDirection: "row",
@@ -400,53 +401,53 @@ const styles = StyleSheet.create({
     right: 8,
   },
   editIconTouchable: {
-    padding: 20, // Increased padding for larger hitbox
-    borderRadius: 12,
+    padding: 8, // Smaller padding for compactness
+    borderRadius: 6,
     backgroundColor: "#2C2C2C", // Slightly lighter background for visibility
-    marginRight: 8, // Space between edit and delete icons
+    marginRight: 6, // Space between edit and delete icons
   },
   deleteIconTouchable: {
-    padding: 20, // Increased padding for larger hitbox
-    borderRadius: 12,
+    padding: 8, // Smaller padding for compactness
+    borderRadius: 6,
     backgroundColor: "#2C2C2C", // Slightly lighter background for visibility
   },
   itemTitle: {
-    fontSize: 16,
+    fontSize: 16, // Smaller font size
     fontWeight: "600",
-    color: "#BB86FC", // Primary color for titles
-    marginBottom: 4,
+    color: "#FFFFFF", // White color for titles
+    marginBottom: 3,
   },
   itemPrice: {
-    fontSize: 14,
-    color: "#fff", // White color for price
-    marginBottom: 4,
+    fontSize: 14, // Smaller font size
+    color: "#34C759", // Subtle green for price
+    marginBottom: 3,
   },
   itemDate: {
-    fontSize: 12,
-    color: "#bbb", // Slightly darker grey for date
-    marginBottom: 4,
+    fontSize: 12, // Smaller font size
+    color: "#AAAAAA", // Light grey for date
+    marginBottom: 3,
   },
   itemStatus: {
-    fontSize: 12,
-    color: "#4CAF50", // Green color for active status
+    fontSize: 12, // Smaller font size
+    color: "#FF3B30", // Subtle red for status (e.g., Expired)
     marginBottom: 6,
   },
   tagBadge: {
-    backgroundColor: "#BB86FC",
-    borderRadius: 12,
+    backgroundColor: "#4A4A4A", // Dark grey for tags to replace orange
+    borderRadius: 10,
     paddingVertical: 2,
     paddingHorizontal: 8,
     marginRight: 5,
-    marginTop: 4,
+    marginTop: 2,
   },
   tagBadgeText: {
-    color: "#fff",
-    fontSize: 10,
+    color: "#FFFFFF",
+    fontSize: 10, // Smaller font size
   },
   emptyText: {
     textAlign: "center",
-    color: "#bbb",
-    fontSize: 14,
-    marginTop: 20,
+    color: "#AAAAAA",
+    fontSize: 14, // Slightly larger for better visibility
+    marginTop: 15,
   },
 });
