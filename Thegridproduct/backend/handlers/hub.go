@@ -84,7 +84,7 @@ func (h *Hub) Run() {
 		case message := <-h.broadcast:
 			h.mu.Lock()
 			// Broadcast to all clients in the specific chat room
-			for _, clients := range h.clients {
+			if clients, ok := h.clients[message.ChatID]; ok { // Assuming Message struct has ChatID
 				for client := range clients {
 					select {
 					case client.send <- message:

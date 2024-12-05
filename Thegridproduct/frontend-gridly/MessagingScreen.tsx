@@ -1,6 +1,8 @@
-import React, { useState, useEffect, useRef, useMemo, useContext } from "react";
+// MessagingScreen.tsx
+
+import React, { useState, useEffect, useContext } from "react";
 import {
-  View,
+  SafeAreaView,
   Text,
   StyleSheet,
   FlatList,
@@ -10,18 +12,15 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
-  SafeAreaView,
-  StatusBar,
   ActivityIndicator,
+  View,
 } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
-import { NGROK_URL } from "@env";
 import BottomNavBar from "./components/BottomNavbar";
 import { fetchConversations, postMessage } from "./api";
 import { Conversation, Message } from "./types";
 import { UserContext } from "./UserContext";
 
-// Define TabType outside the component for better type management
 type TabType = "marketplace" | "gigs";
 
 const MessagingScreen: React.FC = () => {
@@ -33,10 +32,8 @@ const MessagingScreen: React.FC = () => {
   const [newMessage, setNewMessage] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
 
-  // Access UserContext
   const { userId, token } = useContext(UserContext);
 
-  // Fetch conversations when the screen loads
   useEffect(() => {
     fetchUserConversations();
   }, [userId, token]);
@@ -47,7 +44,8 @@ const MessagingScreen: React.FC = () => {
     setLoading(true);
     try {
       const fetchedConversations = await fetchConversations(userId, token);
-      setConversations(fetchedConversations);
+      console.log("Fetched Conversations:", fetchedConversations);
+      setConversations(fetchedConversations); // Ensure this is the array
     } catch (error) {
       console.error("Error fetching conversations:", error);
       Alert.alert("Error", "Failed to load conversations.");
@@ -75,25 +73,57 @@ const MessagingScreen: React.FC = () => {
         token || ""
       );
       setNewMessage("");
+      // Optionally, refresh the conversation messages
+      // fetchUserConversations(); // If needed
     } catch (error) {
       console.error("sendMessage error:", error);
       Alert.alert("Error", "Failed to send message.");
     }
   };
 
-  const renderConversation = ({ item }: { item: Conversation }) => (
-    <TouchableOpacity
-      style={styles.conversationItem}
-      onPress={() => openChat(item)}
-    >
-      <View>
-        <Text style={styles.participantName}>
-          {item.user.firstName} {item.user.lastName}
-        </Text>
-        <Text style={styles.productName}>{item.productTitle}</Text>
-      </View>
-    </TouchableOpacity>
-  );
+  const renderConversation = ({ item }: { item: Conversation }) => {
+    if (!item.user) {
+      console.warn(
+        `Conversation with chatID ${item.chatID} is missing user data.`
+      );
+      return null;
+    }
+
+    // Extract the latest message and timestamp
+    const latestMessage =
+      item.messages && item.messages.length > 0
+        ? item.messages[item.messages.length - 1]
+        : null;
+
+    const formattedTimestamp = latestMessage
+      ? new Date(latestMessage.timestamp).toLocaleString()
+      : "";
+
+    return (
+      <TouchableOpacity
+        style={styles.conversationItem}
+        onPress={() => openChat(item)}
+      >
+        <View style={styles.conversationDetails}>
+          <View>
+            <Text style={styles.participantName}>
+              {item.user.firstName} {item.user.lastName}
+            </Text>
+            <Text style={styles.productName}>{item.productTitle}</Text>
+            {latestMessage && (
+              <View style={styles.messageInfo}>
+                <Text style={styles.latestMessage} numberOfLines={1}>
+                  {latestMessage.content}
+                </Text>
+                <Text style={styles.timestamp}>{formattedTimestamp}</Text>
+              </View>
+            )}
+          </View>
+          {/* Optionally, you can add an icon or avatar here */}
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   const renderMessage = ({ item }: { item: Message }) => (
     <View
@@ -114,7 +144,7 @@ const MessagingScreen: React.FC = () => {
       ) : (
         <FlatList
           data={conversations}
-          keyExtractor={(item) => item.chatID}
+          keyExtractor={(item) => item.chatID || item.productID}
           renderItem={renderConversation}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
@@ -160,6 +190,7 @@ const MessagingScreen: React.FC = () => {
               <TextInput
                 style={styles.messageInput}
                 placeholder="Type a message..."
+                placeholderTextColor="#888"
                 value={newMessage}
                 onChangeText={setNewMessage}
                 multiline
@@ -198,6 +229,11 @@ const styles = StyleSheet.create({
     backgroundColor: "#1F1F1F",
     marginBottom: 10,
   },
+  conversationDetails: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
   participantName: {
     fontSize: 16,
     fontWeight: "600",
@@ -206,6 +242,22 @@ const styles = StyleSheet.create({
   productName: {
     fontSize: 14,
     color: "#ccc",
+  },
+  messageInfo: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 5,
+  },
+  latestMessage: {
+    fontSize: 12,
+    color: "#888",
+    flex: 1,
+    marginRight: 10,
+  },
+  timestamp: {
+    fontSize: 10,
+    color: "#888",
   },
   emptyContainer: {
     marginTop: 50,
@@ -228,6 +280,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 10,
     backgroundColor: "#BB86FC",
+    borderRadius: 10,
   },
   backButton: {
     marginRight: 10,
@@ -236,6 +289,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "600",
     color: "#fff",
+    flexShrink: 1,
   },
   messagesList: {
     padding: 10,
@@ -244,6 +298,7 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 10,
     marginBottom: 5,
+    maxWidth: "80%",
   },
   myMessage: {
     alignSelf: "flex-end",
@@ -269,6 +324,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     paddingHorizontal: 15,
     color: "#fff",
+    marginRight: 10,
   },
   sendButton: {
     backgroundColor: "#BB86FC",

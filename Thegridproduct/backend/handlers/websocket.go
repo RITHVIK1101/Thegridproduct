@@ -87,9 +87,13 @@ func (c *Client) readPump() {
 		}
 		// Set the timestamp
 		msg.Timestamp = time.Now()
+		// Set ChatID if not already set
+		if msg.ChatID == "" {
+			msg.ChatID = c.chatID
+		}
 		// Broadcast the message to the hub
 		c.hub.broadcast <- msg
-		// Optionally, save the message to the database
+		// Save the message to the database
 		err = db.AddMessageToChat(c.chatID, msg)
 		if err != nil {
 			log.Printf("Error saving message to DB: %v", err)

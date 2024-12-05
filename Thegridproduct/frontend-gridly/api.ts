@@ -1,20 +1,32 @@
 import { NGROK_URL } from "@env";
 
-export const fetchConversations = async (userId: string, token: string) => {
+// api.ts
+
+// api.ts
+
+export const fetchConversations = async (userId: string, token: string): Promise<Conversation[]> => {
   try {
-    const response = await fetch(`${NGROK_URL}/chats/user/${userId}`, {
-      method: "GET",
+    const response = await fetch(`https://thegridproduct-production.up.railway.app/chats/user/${userId}`, {
+      method: 'GET',
       headers: {
-        "Authorization": `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
       },
     });
+
     if (!response.ok) {
-      throw new Error("Failed to fetch conversations");
+      throw new Error('Failed to fetch conversations');
     }
+
     const data = await response.json();
+    // Ensure that 'conversations' exists in the response
+    if (!data.conversations) {
+      throw new Error('Invalid response structure');
+    }
+
     return data.conversations;
   } catch (error) {
-    console.error("Error fetching conversations:", error);
+    console.error("fetchConversations error:", error);
     throw error;
   }
 };

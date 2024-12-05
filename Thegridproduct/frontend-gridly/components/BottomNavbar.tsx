@@ -17,11 +17,7 @@ import {
 } from "@react-navigation/native";
 import { RootStackParamList } from "../navigationTypes";
 
-type BottomNavBarProps = {
-  firstName: string;
-};
-
-const BottomNavBar: React.FC<BottomNavBarProps> = ({ firstName }) => {
+const BottomNavBar: React.FC = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const route = useRoute();
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -137,7 +133,8 @@ const BottomNavBar: React.FC<BottomNavBarProps> = ({ firstName }) => {
             { transform: [{ scale: scaleValue }, { rotate: spin }] },
           ]}
         >
-          <Ionicons name="arrow-up-outline" size={40} color="#FFFFFF" /> {/* Increased size */}
+          <Ionicons name="arrow-up-outline" size={40} color="#FFFFFF" />{" "}
+          {/* Increased size */}
         </Animated.View>
       </TouchableOpacity>
 
@@ -174,10 +171,7 @@ const BottomNavBar: React.FC<BottomNavBarProps> = ({ firstName }) => {
           color={isActive("Activity") ? "#FFFFFF" : "#CCCCCC"}
         />
         <Text
-          style={[
-            styles.navText,
-            isActive("Activity") && styles.navTextActive,
-          ]}
+          style={[styles.navText, isActive("Activity") && styles.navTextActive]}
         >
           Activity
         </Text>

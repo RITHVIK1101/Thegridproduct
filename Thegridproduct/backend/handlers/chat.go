@@ -1,5 +1,3 @@
-// handlers/chat.go
-
 package handlers
 
 import (
@@ -13,6 +11,22 @@ import (
 
 	"github.com/gorilla/mux"
 )
+
+// EnrichedChat represents the enriched chat data sent to the frontend
+type EnrichedChat struct {
+	ChatID          string `json:"chatID"`
+	ProductID       string `json:"productID"`
+	ProductTitle    string `json:"productTitle"`
+	User            User   `json:"user"`
+	LatestMessage   string `json:"latestMessage,omitempty"`
+	LatestTimestamp string `json:"latestTimestamp,omitempty"`
+}
+
+// User represents a user object in the enriched chat
+type User struct {
+	FirstName string `json:"firstName"`
+	LastName  string `json:"lastName"`
+}
 
 // GetChatHandler fetches chat details by product ID
 func GetChatHandler(w http.ResponseWriter, r *http.Request) {
@@ -36,7 +50,6 @@ func GetChatHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetChatsByUserHandler fetches all chats for a specific user
-// GetChatsByUserHandler fetches all chats for a specific user
 func GetChatsByUserHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	userId := vars["userId"]
@@ -54,7 +67,7 @@ func GetChatsByUserHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Enrich chat details with product name and user details
-	var enrichedChats []map[string]interface{}
+	var enrichedChats []EnrichedChat
 	for _, chat := range chats {
 		// Fetch product details
 		product, err := db.GetProductByID(chat.ProductID)
@@ -63,27 +76,36 @@ func GetChatsByUserHandler(w http.ResponseWriter, r *http.Request) {
 			continue // Skip this chat if product details are missing
 		}
 
-		// Fetch the connected user's details
+		// Determine the other user ID
 		otherUserID := chat.BuyerID
 		if chat.BuyerID == userId {
 			otherUserID = chat.SellerID
 		}
+
+		// Fetch the other user's details
 		otherUser, err := db.GetUserByID(otherUserID)
 		if err != nil {
 			log.Printf("Failed to fetch user details for userID %s: %v", otherUserID, err)
 			continue // Skip this chat if user details are missing
 		}
 
+		// Get the latest message and timestamp
+		latestMessage, latestTimestamp := getLatestMessageAndTimestamp(chat.Messages)
+
 		// Prepare enriched chat data
-		enrichedChats = append(enrichedChats, map[string]interface{}{
-			"chatID":       chat.ID,
-			"productID":    product.ID,
-			"productTitle": product.Title,
-			"user": map[string]string{
-				"firstName": otherUser.FirstName,
-				"lastName":  otherUser.LastName,
+		enrichedChat := EnrichedChat{
+			ChatID:       chat.ID,
+			ProductID:    product.ID.Hex(), // Convert ObjectID to hex string
+			ProductTitle: product.Title,
+			User: User{
+				FirstName: otherUser.FirstName,
+				LastName:  otherUser.LastName,
 			},
-		})
+			LatestMessage:   latestMessage,
+			LatestTimestamp: latestTimestamp,
+		}
+
+		enrichedChats = append(enrichedChats, enrichedChat)
 	}
 
 	// Respond with the enriched chat details
@@ -148,4 +170,14 @@ func GetMessagesHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Respond with the chat messages
 	WriteJSON(w, chat.Messages, http.StatusOK)
+}
+
+// Helper functions to get the latest message and timestamp
+func getLatestMessageAndTimestamp(messages []models.Message) (string, string) {
+	if len(messages) == 0 {
+		return "", ""
+	}
+	latestMessage := messages[len(messages)-1].Content
+	latestTimestamp := messages[len(messages)-1].Timestamp.Format(time.RFC3339)
+	return latestMessage, latestTimestamp
 }

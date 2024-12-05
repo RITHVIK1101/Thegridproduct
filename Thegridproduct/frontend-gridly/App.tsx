@@ -49,8 +49,7 @@ const Stack = createStackNavigator<RootStackParamList>();
  */
 const HeaderTitleWithLogo: React.FC<{ title: string }> = ({ title }) => (
   <View style={styles.headerTitleContainer}>
-    <Ionicons name="grid-outline" size={20} color="#FFFFFF" />{" "}
-    {/* Changed color to white */}
+    <Ionicons name="grid-outline" size={20} color="#FFFFFF" />
     <Text style={styles.headerTitleText}>{title}</Text>
   </View>
 );
@@ -116,8 +115,7 @@ const AppNavigator: React.FC = () => {
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#FFFFFF" />{" "}
-        {/* Changed color to white */}
+        <ActivityIndicator size="large" color="#FFFFFF" />
       </View>
     );
   }
@@ -163,10 +161,6 @@ const AppNavigator: React.FC = () => {
                           size={28}
                           color="#FFFFFF"
                         />
-                        {/* Optional: Add a badge for cart items count */}
-                        {/* <View style={styles.cartBadge}>
-                          <Text style={styles.cartBadgeText}>{cartItemCount}</Text>
-                        </View> */}
                       </TouchableOpacity>
                       {/* Three Dots Icon */}
                       <TouchableOpacity
@@ -174,8 +168,7 @@ const AppNavigator: React.FC = () => {
                         style={styles.headerIcon}
                         accessibilityLabel="Open Options Modal"
                       >
-                        <Icon name="more-vert" size={24} color="#FFFFFF" />{" "}
-                        {/* Replaced person icon with three dots */}
+                        <Icon name="more-vert" size={24} color="#FFFFFF" />
                       </TouchableOpacity>
                     </View>
                   ),
@@ -546,8 +539,7 @@ const AppNavigator: React.FC = () => {
                 style={styles.closeButton}
                 accessibilityLabel="Close Options Modal"
               >
-                <Icon name="close" size={24} color="#FFFFFF" />{" "}
-                {/* Changed color to white */}
+                <Icon name="close" size={24} color="#FFFFFF" />
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={handleLogout}
@@ -595,8 +587,7 @@ const AppNavigator: React.FC = () => {
                 style={styles.closeButton}
                 accessibilityLabel="Close Terms Modal"
               >
-                <Icon name="close" size={24} color="#FFFFFF" />{" "}
-                {/* Changed color to white */}
+                <Icon name="close" size={24} color="#FFFFFF" />
               </TouchableOpacity>
               <ScrollView>
                 <Text style={styles.termsText}>

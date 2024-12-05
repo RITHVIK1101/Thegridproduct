@@ -123,6 +123,11 @@ func CreateChat(chat *models.Chat) error {
 		chat.ID = generateID() // Implement a unique ID generator, e.g., UUID or ObjectID
 	}
 
+	// Set CreatedAt if not already set
+	if chat.CreatedAt.IsZero() {
+		chat.CreatedAt = time.Now()
+	}
+
 	// Insert the chat document
 	_, err := collection.InsertOne(context.Background(), chat)
 	if err != nil {

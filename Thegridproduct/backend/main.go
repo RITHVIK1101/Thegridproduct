@@ -56,7 +56,10 @@ func main() {
 	// Protected Routes
 	protected := router.PathPrefix("/").Subrouter()
 	protected.Use(handlers.AuthMiddleware)
-	router.HandleFunc("/ws/{chatId}/{userId}", hub.ServeWS).Methods("GET")
+
+	// WebSocket Route should be under protected to enforce authentication
+	protected.HandleFunc("/ws/{chatId}/{userId}", hub.ServeWS).Methods("GET")
+
 	// Product Routes
 	protected.HandleFunc("/products", handlers.AddProductHandler).Methods("POST")
 	protected.HandleFunc("/products/user", handlers.GetUserProductsHandler).Methods("GET")
@@ -78,14 +81,14 @@ func main() {
 	protected.HandleFunc("/cart/remove", handlers.RemoveFromCartHandler).Methods("POST")
 	protected.HandleFunc("/cart/clear", handlers.ClearCartHandler).Methods("POST") // Optional
 
-	// **User Routes**
+	// User Routes
 	protected.HandleFunc("/users/{id}", handlers.GetUserHandler).Methods("GET")
 	protected.HandleFunc("/chats/user/{userId}", handlers.GetChatsByUserHandler).Methods("GET")
 	protected.HandleFunc("/chats/{productId}", handlers.GetChatHandler).Methods("GET")
 	protected.HandleFunc("/chats/{chatId}/messages", handlers.AddMessageHandler).Methods("POST")
 	protected.HandleFunc("/chats/{chatId}/messages", handlers.GetMessagesHandler).Methods("GET")
 
-	//payment
+	// Payment Route
 	protected.HandleFunc("/create-payment-intent", handlers.CreatePaymentIntentHandler).Methods("POST")
 
 	// Handle undefined routes

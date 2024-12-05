@@ -98,9 +98,8 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
 
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<string>(
-    "#Everything"
-  );
+  const [selectedCategory, setSelectedCategory] =
+    useState<string>("#Everything");
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -776,7 +775,8 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
                     <Text
                       style={[
                         styles.categoryText,
-                        selectedCategory === item && styles.categoryTextSelected,
+                        selectedCategory === item &&
+                          styles.categoryTextSelected,
                       ]}
                     >
                       {item}
@@ -804,7 +804,8 @@ const Dashboard: React.FC<DashboardProps> = ({ route }) => {
                     <Text
                       style={[
                         styles.categoryText,
-                        campusMode === item.value && styles.categoryTextSelected,
+                        campusMode === item.value &&
+                          styles.categoryTextSelected,
                       ]}
                     >
                       {item.label}
