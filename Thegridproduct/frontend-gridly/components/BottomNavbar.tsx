@@ -33,15 +33,13 @@ const BottomNavBar: React.FC = () => {
   );
 
   useEffect(() => {
-    // Start the spin animation when the modal is visible
     if (isModalVisible) {
       spinAnimation.start();
     } else {
       spinAnimation.stop();
-      spinValue.setValue(0); // Reset the spin animation
+      spinValue.setValue(0);
     }
 
-    // Cleanup animation on unmount
     return () => {
       spinAnimation.stop();
     };
@@ -53,7 +51,7 @@ const BottomNavBar: React.FC = () => {
 
   const handlePressIn = () => {
     Animated.spring(scaleValue, {
-      toValue: 1.2,
+      toValue: 1.1,
       useNativeDriver: true,
     }).start();
   };
@@ -88,7 +86,7 @@ const BottomNavBar: React.FC = () => {
       >
         <Ionicons
           name="home-outline"
-          size={28} // Increased size for better visibility
+          size={24}
           color={isActive("Dashboard") ? "#FFFFFF" : "#CCCCCC"}
         />
         <Text
@@ -109,7 +107,7 @@ const BottomNavBar: React.FC = () => {
       >
         <Ionicons
           name="briefcase-outline"
-          size={28} // Increased size
+          size={24}
           color={isActive("Gigs") ? "#FFFFFF" : "#CCCCCC"}
         />
         <Text
@@ -133,8 +131,7 @@ const BottomNavBar: React.FC = () => {
             { transform: [{ scale: scaleValue }, { rotate: spin }] },
           ]}
         >
-          <Ionicons name="arrow-up-outline" size={40} color="#FFFFFF" />{" "}
-          {/* Increased size */}
+          <Ionicons name="arrow-up-outline" size={30} color="#FFFFFF" />
         </Animated.View>
       </TouchableOpacity>
 
@@ -146,7 +143,7 @@ const BottomNavBar: React.FC = () => {
       >
         <Ionicons
           name="chatbubble-outline"
-          size={28} // Increased size
+          size={24}
           color={isActive("Messaging") ? "#FFFFFF" : "#CCCCCC"}
         />
         <Text
@@ -155,7 +152,7 @@ const BottomNavBar: React.FC = () => {
             isActive("Messaging") && styles.navTextActive,
           ]}
         >
-          Messaging
+          Messages
         </Text>
       </TouchableOpacity>
 
@@ -167,7 +164,7 @@ const BottomNavBar: React.FC = () => {
       >
         <Ionicons
           name="stats-chart-outline"
-          size={28} // Increased size
+          size={24}
           color={isActive("Activity") ? "#FFFFFF" : "#CCCCCC"}
         />
         <Text
@@ -234,7 +231,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-around",
     alignItems: "center",
-    paddingVertical: 10, // Increased from 6 to make navbar taller
+    paddingVertical: 10,
     backgroundColor: "#000000",
     position: "absolute",
     bottom: 0,
@@ -250,14 +247,16 @@ const styles = StyleSheet.create({
   },
   navItem: {
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "flex-end",
     flex: 1,
+    paddingBottom: 6,
   },
   navText: {
-    fontSize: 12, // Increased from 10 for better readability
+    fontSize: 10,
     color: "#CCCCCC",
-    marginTop: 4, // Slightly increased for balance
+    marginTop: 2,
     fontFamily: "System",
+    marginBottom: 15, // Add this line to shift elements up slightly
   },
   navTextActive: {
     color: "#FFFFFF",
@@ -267,13 +266,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#000000",
-    borderRadius: 35, // Maintained to keep it circular
-    padding: 6, // Increased from 4 to accommodate larger icon
+    borderRadius: 30,
+    padding: 4,
     shadowColor: "#FFFFFF",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.5,
     shadowRadius: 6,
     elevation: 10,
+    marginBottom: 18.5, // Add this line to shift elements up slightly
+
   },
   modalOverlay: {
     flex: 1,
@@ -308,7 +309,7 @@ const styles = StyleSheet.create({
   },
   modalButton: {
     backgroundColor: "#FFFFFF",
-    paddingVertical: 12, // Slightly increased for better touch targets
+    paddingVertical: 12,
     borderRadius: 12,
     marginVertical: 8,
     width: "100%",
