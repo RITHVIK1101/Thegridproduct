@@ -1,14 +1,14 @@
-// handlers/websocket.go
-
 package handlers
 
 import (
-	"Thegridproduct/backend/db"
-	"Thegridproduct/backend/models"
 	"log"
 	"net/http"
-	"time"
+	"os"
+	"strings"
 
+	"Thegridproduct/backend/models"
+
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 )
@@ -17,7 +17,7 @@ import (
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
-	// Allow all origins for simplicity. In production, restrict this.
+	// In production, restrict origins to your frontend domain
 	CheckOrigin: func(r *http.Request) bool {
 		return true
 	},
@@ -36,6 +36,42 @@ func (h *Hub) ServeWS(w http.ResponseWriter, r *http.Request) {
 	userID, ok := vars["userId"]
 	if !ok || userID == "" {
 		http.Error(w, "User ID is required", http.StatusBadRequest)
+		return
+	}
+
+	// Extract token from query parameters
+	tokenString := r.URL.Query().Get("token")
+	if tokenString == "" {
+		http.Error(w, "Authorization token is required", http.StatusUnauthorized)
+		return
+	}
+
+	// Validate the JWT token directly
+	jwtSecret := []byte(os.Getenv("JWT_SECRET_KEY"))
+	if len(jwtSecret) == 0 {
+		log.Println("JWT_SECRET_KEY is not set in environment variables")
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	claims := &Claims{}
+
+	// Parse and validate the JWT
+	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, jwt.ErrSignatureInvalid
+		}
+		return jwtSecret, nil
+	})
+	if err != nil || !token.Valid {
+		log.Printf("JWT validation error: %v", err)
+		http.Error(w, "Invalid or expired token", http.StatusUnauthorized)
+		return
+	}
+
+	// Ensure the token's user ID matches the userId in the URL
+	if strings.TrimSpace(claims.UserID) != userID {
+		http.Error(w, "Token does not match user ID", http.StatusUnauthorized)
 		return
 	}
 
@@ -61,74 +97,4 @@ func (h *Hub) ServeWS(w http.ResponseWriter, r *http.Request) {
 	// Start the client's read and write pumps
 	go client.writePump()
 	go client.readPump()
-}
-
-// readPump pumps messages from the WebSocket connection to the hub.
-func (c *Client) readPump() {
-	defer func() {
-		c.hub.unregister <- Unregistration{chatID: c.chatID, client: c}
-		c.conn.Close()
-	}()
-	c.conn.SetReadLimit(512)
-	c.conn.SetReadDeadline(time.Now().Add(60 * time.Second))
-	c.conn.SetPongHandler(func(string) error {
-		c.conn.SetReadDeadline(time.Now().Add(60 * time.Second))
-		return nil
-	})
-
-	for {
-		var msg models.Message
-		err := c.conn.ReadJSON(&msg)
-		if err != nil {
-			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Printf("WebSocket ReadJSON error: %v", err)
-			}
-			break
-		}
-		// Set the timestamp
-		msg.Timestamp = time.Now()
-		// Set ChatID if not already set
-		if msg.ChatID == "" {
-			msg.ChatID = c.chatID
-		}
-		// Broadcast the message to the hub
-		c.hub.broadcast <- msg
-		// Save the message to the database
-		err = db.AddMessageToChat(c.chatID, msg)
-		if err != nil {
-			log.Printf("Error saving message to DB: %v", err)
-		}
-	}
-}
-
-// writePump pumps messages from the hub to the WebSocket connection.
-func (c *Client) writePump() {
-	ticker := time.NewTicker(54 * time.Second) // Ping period less than read deadline
-	defer func() {
-		ticker.Stop()
-		c.conn.Close()
-	}()
-	for {
-		select {
-		case message, ok := <-c.send:
-			c.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
-			if !ok {
-				// The hub closed the channel
-				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
-				return
-			}
-
-			// Write the message as JSON
-			if err := c.conn.WriteJSON(message); err != nil {
-				log.Printf("WebSocket WriteJSON error: %v", err)
-				return
-			}
-		case <-ticker.C:
-			// Send a ping to the client
-			c.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
-			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
-				return
-			}
-		}
-	}
 }

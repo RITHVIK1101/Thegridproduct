@@ -7,10 +7,11 @@ export interface User {
 
 export interface Message {
   _id: string;
-  sender: "user" | "other"; // Adjust based on your backend
+  sender: "user" | "other"; // Adjust based on backend implementation
   senderID: string;
   content: string;
   timestamp: string; // ISO string
+  chatID?: string; // Optional, depending on backend
 }
 
 export interface Conversation {
@@ -18,5 +19,7 @@ export interface Conversation {
   productID: string;
   productTitle: string;
   user: User;
-  messages: Message[];
+  latestMessage?: string;
+  latestTimestamp?: string;
+  messages?: Message[]; // Make messages optional
 }

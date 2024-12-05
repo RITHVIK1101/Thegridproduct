@@ -1,12 +1,12 @@
-import { NGROK_URL } from "@env";
-
 // api.ts
 
-// api.ts
+import { NGROK_URL } from "@env"; // Ensure NGROK_URL is defined in your .env file
+import { Conversation, Message } from "./types"; // Import necessary types
 
+// Fetch user conversations
 export const fetchConversations = async (userId: string, token: string): Promise<Conversation[]> => {
   try {
-    const response = await fetch(`https://thegridproduct-production.up.railway.app/chats/user/${userId}`, {
+    const response = await fetch(`${NGROK_URL}/chats/user/${userId}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -19,7 +19,6 @@ export const fetchConversations = async (userId: string, token: string): Promise
     }
 
     const data = await response.json();
-    // Ensure that 'conversations' exists in the response
     if (!data.conversations) {
       throw new Error('Invalid response structure');
     }
@@ -31,11 +30,12 @@ export const fetchConversations = async (userId: string, token: string): Promise
   }
 };
 
+// Post a new message
 export const postMessage = async (
   chatId: string,
   message: string,
   token: string
-) => {
+): Promise<string> => {
   try {
     const response = await fetch(`${NGROK_URL}/chats/${chatId}/messages`, {
       method: "POST",
@@ -52,6 +52,33 @@ export const postMessage = async (
     return data.message;
   } catch (error) {
     console.error("Error sending message:", error);
+    throw error;
+  }
+};
+
+// Get messages for a specific chat
+export const getMessages = async (chatId: string, token: string): Promise<Message[]> => {
+  try {
+    const response = await fetch(`${NGROK_URL}/chats/${chatId}/messages`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to fetch messages');
+    }
+
+    const data = await response.json();
+    if (!data.messages) {
+      throw new Error('Invalid response structure');
+    }
+
+    return data.messages;
+  } catch (error) {
+    console.error("getMessages error:", error);
     throw error;
   }
 };

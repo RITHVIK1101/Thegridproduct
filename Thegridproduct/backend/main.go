@@ -37,6 +37,7 @@ func main() {
 	db.ConnectDB()
 	defer db.DisconnectDB() // Ensure MongoDB disconnects when main exits
 
+	// Initialize the Hub
 	hub := handlers.NewHub()
 	go hub.Run()
 
@@ -55,9 +56,11 @@ func main() {
 
 	// Protected Routes
 	protected := router.PathPrefix("/").Subrouter()
+
 	protected.Use(handlers.AuthMiddleware)
 
 	// WebSocket Route should be under protected to enforce authentication
+	// Updated to include the token as a query parameter
 	protected.HandleFunc("/ws/{chatId}/{userId}", hub.ServeWS).Methods("GET")
 
 	// Product Routes
@@ -84,7 +87,7 @@ func main() {
 	// User Routes
 	protected.HandleFunc("/users/{id}", handlers.GetUserHandler).Methods("GET")
 	protected.HandleFunc("/chats/user/{userId}", handlers.GetChatsByUserHandler).Methods("GET")
-	protected.HandleFunc("/chats/{productId}", handlers.GetChatHandler).Methods("GET")
+	protected.HandleFunc("/chats/{chatId}", handlers.GetChatHandler).Methods("GET")
 	protected.HandleFunc("/chats/{chatId}/messages", handlers.AddMessageHandler).Methods("POST")
 	protected.HandleFunc("/chats/{chatId}/messages", handlers.GetMessagesHandler).Methods("GET")
 

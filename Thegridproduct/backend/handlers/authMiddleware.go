@@ -4,6 +4,7 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"log"
 	"net/http"
 	"os"
@@ -17,12 +18,14 @@ func AuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
+		// Extract Authorization header
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {
 			WriteJSONError(w, "Authorization header missing", http.StatusUnauthorized)
 			return
 		}
 
+		// Check Authorization format
 		parts := strings.SplitN(authHeader, " ", 2)
 		if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
 			WriteJSONError(w, "Invalid Authorization header format. Expected 'Bearer <token>'", http.StatusUnauthorized)
@@ -39,36 +42,36 @@ func AuthMiddleware(next http.Handler) http.Handler {
 
 		claims := &Claims{}
 
-		// Parse the JWT token and validate it
+		// Parse and validate the JWT
 		token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-				log.Println("Unexpected signing method in JWT")
-				return nil, http.ErrAbortHandler
+				return nil, errors.New("unexpected signing method")
 			}
 			return jwtSecret, nil
 		})
 
-		// Check if token is valid
 		if err != nil || !token.Valid {
-			log.Printf("Token parsing error: %v", err)
 			WriteJSONError(w, "Invalid or expired token", http.StatusUnauthorized)
 			return
 		}
 
-		// Ensure all required claims are present
-		if strings.TrimSpace(claims.UserID) == "" || strings.TrimSpace(claims.Institution) == "" || strings.TrimSpace(claims.StudentType) == "" {
+		// Check required claims
+		if strings.TrimSpace(claims.UserID) == "" ||
+			strings.TrimSpace(claims.Institution) == "" ||
+			strings.TrimSpace(claims.StudentType) == "" {
 			WriteJSONError(w, "Invalid or missing claims in token", http.StatusUnauthorized)
 			return
 		}
 
-		// Log parsed claims for debugging
+		// Debug logs for development (optional, remove in production)
 		log.Printf("Authenticated UserID: %s, Institution: %s, StudentType: %s", claims.UserID, claims.Institution, claims.StudentType)
 
-		// Set userID, institution, and studentType in the context
+		// Set claims into the request context
 		ctx := context.WithValue(r.Context(), userIDKey, claims.UserID)
 		ctx = context.WithValue(ctx, userInstitution, claims.Institution)
 		ctx = context.WithValue(ctx, userStudentType, claims.StudentType)
 
+		// Proceed with the next handler
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

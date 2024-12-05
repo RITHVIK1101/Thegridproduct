@@ -1,6 +1,6 @@
 // MessagingScreen.tsx
 
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, useRef } from "react";
 import {
   SafeAreaView,
   Text,
@@ -17,7 +17,8 @@ import {
 } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import BottomNavBar from "./components/BottomNavbar";
-import { fetchConversations, postMessage } from "./api";
+import { fetchConversations, postMessage, getMessages } from "./api";
+import { NGROK_URL } from "@env"; // Ensure NGROK_URL is defined in your .env file
 import { Conversation, Message } from "./types";
 import { UserContext } from "./UserContext";
 
@@ -31,12 +32,28 @@ const MessagingScreen: React.FC = () => {
     useState<Conversation | null>(null);
   const [newMessage, setNewMessage] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
+  const [sending, setSending] = useState<boolean>(false);
 
   const { userId, token } = useContext(UserContext);
+  const webSocketRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
-    fetchUserConversations();
+    if (userId && token) {
+      fetchUserConversations();
+    }
   }, [userId, token]);
+
+  useEffect(() => {
+    if (selectedConversation) {
+      connectToWebSocket(selectedConversation.chatID);
+    }
+
+    return () => {
+      if (webSocketRef.current) {
+        webSocketRef.current.close();
+      }
+    };
+  }, [selectedConversation]);
 
   const fetchUserConversations = async () => {
     if (!userId || !token) return;
@@ -45,7 +62,7 @@ const MessagingScreen: React.FC = () => {
     try {
       const fetchedConversations = await fetchConversations(userId, token);
       console.log("Fetched Conversations:", fetchedConversations);
-      setConversations(fetchedConversations); // Ensure this is the array
+      setConversations(fetchedConversations);
     } catch (error) {
       console.error("Error fetching conversations:", error);
       Alert.alert("Error", "Failed to load conversations.");
@@ -54,10 +71,75 @@ const MessagingScreen: React.FC = () => {
     }
   };
 
-  const openChat = (conversation: Conversation) => {
-    setSelectedConversation(conversation);
-    setChatModalVisible(true);
-    setNewMessage("");
+  const connectToWebSocket = (chatId: string) => {
+    if (!userId || !token) return;
+
+    // Ensure the URL uses 'wss' protocol for secure connections
+    const ws = new WebSocket(
+      `${NGROK_URL.replace("http", "ws")}/ws/${chatId}/${userId}?token=${token}`
+    );
+    webSocketRef.current = ws;
+
+    ws.onopen = () => {
+      console.log("WebSocket connection established");
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const message: Message = JSON.parse(event.data);
+        console.log("Received message via WebSocket:", message);
+        setSelectedConversation((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            messages: [...(prev.messages || []), message], // Ensure messages array exists
+          };
+        });
+      } catch (err) {
+        console.error("Error parsing WebSocket message:", err);
+      }
+    };
+
+    ws.onerror = (error) => {
+      console.error("WebSocket error:", error);
+      Alert.alert(
+        "WebSocket Error",
+        "An error occurred with the WebSocket connection."
+      );
+    };
+
+    ws.onclose = (event) => {
+      if (event.code !== 1000) {
+        // 1000 means normal closure
+        console.log(
+          `WebSocket closed with code: ${event.code}, reason: ${event.reason}`
+        );
+        Alert.alert(
+          "WebSocket Closed",
+          "The WebSocket connection was closed unexpectedly."
+        );
+        // Optionally, implement reconnection logic here
+      }
+      console.log("WebSocket connection closed");
+    };
+  };
+
+  const openChat = async (conversation: Conversation) => {
+    setLoading(true);
+    try {
+      const messages = await getMessages(conversation.chatID, token || "");
+      setSelectedConversation({
+        ...conversation,
+        messages: messages,
+      });
+      setChatModalVisible(true);
+      setNewMessage("");
+    } catch (error) {
+      console.error("Error fetching messages:", error);
+      Alert.alert("Error", "Failed to load messages.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const sendMessage = async () => {
@@ -66,18 +148,22 @@ const MessagingScreen: React.FC = () => {
       return;
     }
 
+    setSending(true);
+    const messageContent = newMessage.trim();
+    setNewMessage("");
+
     try {
       await postMessage(
         selectedConversation.chatID,
-        newMessage.trim(),
+        messageContent,
         token || ""
       );
-      setNewMessage("");
-      // Optionally, refresh the conversation messages
-      // fetchUserConversations(); // If needed
+      // The message will be added via WebSocket when the server broadcasts it
     } catch (error) {
       console.error("sendMessage error:", error);
       Alert.alert("Error", "Failed to send message.");
+    } finally {
+      setSending(false);
     }
   };
 
@@ -89,10 +175,12 @@ const MessagingScreen: React.FC = () => {
       return null;
     }
 
-    // Extract the latest message and timestamp
     const latestMessage =
-      item.messages && item.messages.length > 0
-        ? item.messages[item.messages.length - 1]
+      item.latestMessage && item.latestTimestamp
+        ? {
+            content: item.latestMessage,
+            timestamp: item.latestTimestamp,
+          }
         : null;
 
     const formattedTimestamp = latestMessage
@@ -133,6 +221,12 @@ const MessagingScreen: React.FC = () => {
       ]}
     >
       <Text style={styles.messageText}>{item.content}</Text>
+      <Text style={styles.messageTimestamp}>
+        {new Date(item.timestamp).toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        })}
+      </Text>
     </View>
   );
 
@@ -144,7 +238,7 @@ const MessagingScreen: React.FC = () => {
       ) : (
         <FlatList
           data={conversations}
-          keyExtractor={(item) => item.chatID || item.productID}
+          keyExtractor={(item) => item.chatID}
           renderItem={renderConversation}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
@@ -158,7 +252,13 @@ const MessagingScreen: React.FC = () => {
         visible={isChatModalVisible}
         animationType="slide"
         transparent={false}
-        onRequestClose={() => setChatModalVisible(false)}
+        onRequestClose={() => {
+          setChatModalVisible(false);
+          setSelectedConversation(null);
+          if (webSocketRef.current) {
+            webSocketRef.current.close();
+          }
+        }}
       >
         <SafeAreaView style={styles.modalSafeArea}>
           <KeyboardAvoidingView
@@ -167,7 +267,13 @@ const MessagingScreen: React.FC = () => {
           >
             <View style={styles.chatHeader}>
               <TouchableOpacity
-                onPress={() => setChatModalVisible(false)}
+                onPress={() => {
+                  setChatModalVisible(false);
+                  setSelectedConversation(null);
+                  if (webSocketRef.current) {
+                    webSocketRef.current.close();
+                  }
+                }}
                 style={styles.backButton}
               >
                 <Ionicons name="arrow-back" size={24} color="#fff" />
@@ -179,7 +285,7 @@ const MessagingScreen: React.FC = () => {
             </View>
 
             <FlatList
-              data={selectedConversation?.messages || []}
+              data={selectedConversation?.messages || []} // Provide an empty array as fallback
               keyExtractor={(item) => item._id}
               renderItem={renderMessage}
               contentContainerStyle={styles.messagesList}
@@ -195,8 +301,16 @@ const MessagingScreen: React.FC = () => {
                 onChangeText={setNewMessage}
                 multiline
               />
-              <TouchableOpacity style={styles.sendButton} onPress={sendMessage}>
-                <Ionicons name="send" size={20} color="#fff" />
+              <TouchableOpacity
+                style={styles.sendButton}
+                onPress={sendMessage}
+                disabled={sending}
+              >
+                {sending ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Ionicons name="send" size={20} color="#fff" />
+                )}
               </TouchableOpacity>
             </View>
           </KeyboardAvoidingView>
@@ -281,6 +395,7 @@ const styles = StyleSheet.create({
     padding: 10,
     backgroundColor: "#BB86FC",
     borderRadius: 10,
+    marginBottom: 10,
   },
   backButton: {
     marginRight: 10,
@@ -292,7 +407,8 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   messagesList: {
-    padding: 10,
+    flexGrow: 1,
+    justifyContent: "flex-end",
   },
   messageBubble: {
     padding: 10,
@@ -310,6 +426,13 @@ const styles = StyleSheet.create({
   },
   messageText: {
     color: "#fff",
+    fontSize: 14,
+  },
+  messageTimestamp: {
+    color: "#ddd",
+    fontSize: 10,
+    marginTop: 2,
+    alignSelf: "flex-end",
   },
   inputContainer: {
     flexDirection: "row",
@@ -325,10 +448,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     color: "#fff",
     marginRight: 10,
+    maxHeight: 100,
   },
   sendButton: {
     backgroundColor: "#BB86FC",
     borderRadius: 20,
     padding: 10,
+    justifyContent: "center",
+    alignItems: "center",
   },
 });

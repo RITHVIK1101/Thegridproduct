@@ -187,18 +187,28 @@ func FindChatsByUser(userID string) ([]models.Chat, error) {
 	return chats, nil
 }
 
-// AddMessageToChat adds a new message to an existing chat
 func AddMessageToChat(chatID string, message models.Message) error {
-	collection := GetCollection("gridlyapp", "chats") // Ensure "gridlyapp" is your correct database name
+	collection := GetCollection("gridlyapp", "chats")
 
-	filter := bson.M{"_id": chatID} // Use "_id" to match the chat document
+	// Check if the chat exists
+	var chat models.Chat
+	err := collection.FindOne(context.Background(), bson.M{"_id": chatID}).Decode(&chat)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			log.Printf("Chat with ID %s not found", chatID)
+			return fmt.Errorf("chat not found")
+		}
+		log.Printf("Error finding chat: %v", err)
+		return fmt.Errorf("failed to find chat: %v", err)
+	}
+
+	// Push the new message into the chat
 	update := bson.M{
 		"$push": bson.M{
 			"messages": message,
 		},
 	}
-
-	_, err := collection.UpdateOne(context.Background(), filter, update)
+	_, err = collection.UpdateOne(context.Background(), bson.M{"_id": chatID}, update)
 	if err != nil {
 		log.Printf("Error adding message to chat %s: %v", chatID, err)
 		return fmt.Errorf("failed to add message to chat: %v", err)
