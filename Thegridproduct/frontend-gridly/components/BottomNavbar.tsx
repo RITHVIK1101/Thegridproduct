@@ -87,7 +87,7 @@ const BottomNavBar: React.FC = () => {
         <Ionicons
           name="home-outline"
           size={24}
-          color={isActive("Dashboard") ? "#FFFFFF" : "#CCCCCC"}
+          color={isActive("Dashboard") ? "#a1c4fd" : "#CCCCCC"}
         />
         <Text
           style={[
@@ -108,7 +108,7 @@ const BottomNavBar: React.FC = () => {
         <Ionicons
           name="briefcase-outline"
           size={24}
-          color={isActive("Gigs") ? "#FFFFFF" : "#CCCCCC"}
+          color={isActive("Gigs") ? "#a1c4fd" : "#CCCCCC"}
         />
         <Text
           style={[styles.navText, isActive("Gigs") && styles.navTextActive]}
@@ -144,7 +144,7 @@ const BottomNavBar: React.FC = () => {
         <Ionicons
           name="chatbubble-outline"
           size={24}
-          color={isActive("Messaging") ? "#FFFFFF" : "#CCCCCC"}
+          color={isActive("Messaging") ? "#a1c4fd" : "#CCCCCC"}
         />
         <Text
           style={[
@@ -165,7 +165,7 @@ const BottomNavBar: React.FC = () => {
         <Ionicons
           name="stats-chart-outline"
           size={24}
-          color={isActive("Activity") ? "#FFFFFF" : "#CCCCCC"}
+          color={isActive("Activity") ?"#a1c4fd" : "#CCCCCC"}
         />
         <Text
           style={[styles.navText, isActive("Activity") && styles.navTextActive]}
