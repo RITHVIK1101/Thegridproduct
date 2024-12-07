@@ -72,12 +72,28 @@ const MessagingScreen: React.FC = () => {
   };
 
   const connectToWebSocket = (chatId: string) => {
-    if (!userId || !token) return;
+    if (!userId || !token) {
+      console.warn("No userId or token available for WebSocket connection");
+      return;
+    }
 
-    // Ensure the URL uses 'wss' protocol for secure connections
-    const ws = new WebSocket(
-      `${NGROK_URL.replace("http", "ws")}/ws/${chatId}/${userId}?token=${token}`
-    );
+    // Make sure we use wss:// if the URL is https://
+    let wsUrl = NGROK_URL;
+    if (wsUrl.startsWith("https://")) {
+      wsUrl = wsUrl.replace("https://", "wss://");
+    } else if (wsUrl.startsWith("http://")) {
+      wsUrl = wsUrl.replace("http://", "ws://");
+    }
+
+    // Double-check that userId and token are correct (for debugging)
+    console.log("Connecting to WebSocket with:", {
+      wsUrl,
+      chatId,
+      userId,
+      token,
+    });
+
+    const ws = new WebSocket(`${wsUrl}/ws/${chatId}/${userId}?token=${token}`);
     webSocketRef.current = ws;
 
     ws.onopen = () => {
@@ -90,10 +106,7 @@ const MessagingScreen: React.FC = () => {
         console.log("Received message via WebSocket:", message);
         setSelectedConversation((prev) => {
           if (!prev) return prev;
-          return {
-            ...prev,
-            messages: [...(prev.messages || []), message], // Ensure messages array exists
-          };
+          return { ...prev, messages: [...(prev.messages || []), message] };
         });
       } catch (err) {
         console.error("Error parsing WebSocket message:", err);
@@ -110,7 +123,6 @@ const MessagingScreen: React.FC = () => {
 
     ws.onclose = (event) => {
       if (event.code !== 1000) {
-        // 1000 means normal closure
         console.log(
           `WebSocket closed with code: ${event.code}, reason: ${event.reason}`
         );
@@ -118,7 +130,6 @@ const MessagingScreen: React.FC = () => {
           "WebSocket Closed",
           "The WebSocket connection was closed unexpectedly."
         );
-        // Optionally, implement reconnection logic here
       }
       console.log("WebSocket connection closed");
     };
@@ -153,11 +164,14 @@ const MessagingScreen: React.FC = () => {
     setNewMessage("");
 
     try {
+      // In sendMessage function:
       await postMessage(
         selectedConversation.chatID,
         messageContent,
-        token || ""
+        token,
+        userId
       );
+
       // The message will be added via WebSocket when the server broadcasts it
     } catch (error) {
       console.error("sendMessage error:", error);
@@ -286,7 +300,9 @@ const MessagingScreen: React.FC = () => {
 
             <FlatList
               data={selectedConversation?.messages || []} // Provide an empty array as fallback
-              keyExtractor={(item) => item._id}
+              keyExtractor={(item, index) =>
+                item._id ? item._id : index.toString()
+              }
               renderItem={renderMessage}
               contentContainerStyle={styles.messagesList}
               inverted

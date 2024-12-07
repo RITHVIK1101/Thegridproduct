@@ -30,30 +30,30 @@ export const fetchConversations = async (userId: string, token: string): Promise
   }
 };
 
-// Post a new message
 export const postMessage = async (
   chatId: string,
   message: string,
-  token: string
+  token: string,
+  userId: string
 ): Promise<string> => {
-  try {
-    const response = await fetch(`${NGROK_URL}/chats/${chatId}/messages`, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ content: message }),
-    });
-    if (!response.ok) {
-      throw new Error("Failed to send message");
-    }
-    const data = await response.json();
-    return data.message;
-  } catch (error) {
-    console.error("Error sending message:", error);
-    throw error;
+  const response = await fetch(`${NGROK_URL}/chats/${chatId}/messages`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      senderID: userId, // include the sender ID
+      content: message,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to send message");
   }
+
+  const data = await response.json();
+  return data.message;
 };
 
 // Get messages for a specific chat
@@ -71,14 +71,17 @@ export const getMessages = async (chatId: string, token: string): Promise<Messag
       throw new Error('Failed to fetch messages');
     }
 
+    // Now 'data' will be just an array of messages
     const data = await response.json();
-    if (!data.messages) {
+    // Check if it's an array
+    if (!Array.isArray(data)) {
       throw new Error('Invalid response structure');
     }
 
-    return data.messages;
+    return data; // data is already an array of messages
   } catch (error) {
     console.error("getMessages error:", error);
     throw error;
   }
 };
+

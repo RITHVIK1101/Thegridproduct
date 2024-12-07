@@ -45,7 +45,6 @@ func (h *Hub) ServeWS(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Authorization token is required", http.StatusUnauthorized)
 		return
 	}
-
 	// Validate the JWT token directly
 	jwtSecret := []byte(os.Getenv("JWT_SECRET_KEY"))
 	if len(jwtSecret) == 0 {
