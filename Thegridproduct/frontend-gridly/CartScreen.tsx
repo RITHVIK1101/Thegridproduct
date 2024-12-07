@@ -10,15 +10,17 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  Dimensions,
+  Animated,
 } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { UserContext } from "./UserContext";
-import { CommonActions } from "@react-navigation/native";
-import { NGROK_URL } from "@env";
+import { CommonActions, useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
-import { useNavigation } from "@react-navigation/native";
 import { RootStackParamList } from "./navigationTypes";
+import { NGROK_URL } from "@env";
 
+// Define Types
 type CartItem = {
   productId: string;
   quantity: number;
@@ -60,10 +62,13 @@ type CartProduct = {
   quality?: string;
 };
 
+const { width } = Dimensions.get("window");
+
 const CartScreen: React.FC = () => {
   const [cartProducts, setCartProducts] = useState<CartProduct[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const fadeAnim = useState(new Animated.Value(0))[0]; // For fade-in animation
 
   const { userId, token, clearUser } = useContext(UserContext);
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
@@ -174,6 +179,12 @@ const CartScreen: React.FC = () => {
       });
 
       setCartProducts(combinedCartProducts);
+      // Start fade-in animation
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }).start();
     } catch (err) {
       console.error("Fetch Cart Error:", err);
       setError(
@@ -240,18 +251,25 @@ const CartScreen: React.FC = () => {
     }
   };
 
-  // Navigate to Checkout (Optional)
-  const proceedToCheckout = () => {
-    Alert.alert("Checkout", "Proceeding to checkout...", [
+  // Buy individual product
+  const buyProduct = (product: CartProduct) => {
+    Alert.alert("Buy Product", `Proceeding to buy "${product.title}"`, [
       {
         text: "OK",
         onPress: () => {
-          // Implement navigation to Checkout screen if available
-          // navigation.navigate("Checkout");
-          Alert.alert("Info", "Checkout screen not implemented yet.");
+          navigation.navigate("Payment", { product });
         },
       },
     ]);
+  };
+
+  // Navigate to Checkout
+  const proceedToCheckout = () => {
+    if (cartProducts.length === 0) {
+      Alert.alert("Empty Cart", "Your cart is empty.");
+      return;
+    }
+    navigation.navigate("Checkout", { cartItems: cartProducts });
   };
 
   useEffect(() => {
@@ -261,8 +279,11 @@ const CartScreen: React.FC = () => {
     // return unsubscribe;
   }, []);
 
+  // Separator Component
+  const renderSeparator = () => <View style={styles.separator} />;
+
   const renderCartItem = ({ item }: { item: CartProduct }) => (
-    <View style={styles.cartItem}>
+    <Animated.View style={[styles.cartItem, { opacity: fadeAnim }]}>
       <Image
         source={{
           uri:
@@ -274,32 +295,34 @@ const CartScreen: React.FC = () => {
         resizeMode="cover"
       />
       <View style={styles.cartDetails}>
-        <Text style={styles.cartTitle}>{item.title}</Text>
+        <Text style={styles.cartTitle} numberOfLines={2}>
+          {item.title}
+        </Text>
         <Text style={styles.cartPrice}>${item.price.toFixed(2)}</Text>
-        <Text style={styles.cartQuantity}>Quantity: {item.quantity}</Text>
-        {item.description && (
-          <Text style={styles.cartDescription} numberOfLines={2}>
-            {item.description}
-          </Text>
-        )}
       </View>
-      <TouchableOpacity
-        onPress={() => removeFromCart(item.id)}
-        style={styles.removeButton}
-        accessibilityLabel="Remove from Cart"
-      >
-        <Ionicons name="trash-outline" size={24} color="#FF3B30" />
-      </TouchableOpacity>
-      {/* Buy Button */}
-      <TouchableOpacity
-        onPress={() => navigation.navigate("Payment", { product: item })}
-        style={styles.buyButton}
-        accessibilityLabel="Buy Now"
-      >
-        <Text style={styles.buyButtonText}>Buy</Text>
-      </TouchableOpacity>
-    </View>
+      <View style={styles.actionButtons}>
+        <TouchableOpacity
+          onPress={() => buyProduct(item)}
+          style={styles.buyButton}
+          accessibilityLabel={`Buy ${item.title}`}
+        >
+          <Ionicons name="cart-outline" size={18} color="#fff" />
+          <Text style={styles.buyButtonText}>Buy</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => removeFromCart(item.id)}
+          style={styles.removeButton}
+          accessibilityLabel={`Remove ${item.title} from Cart`}
+        >
+          <Ionicons name="trash-outline" size={22} color="#FF3B30" />
+        </TouchableOpacity>
+      </View>
+    </Animated.View>
   );
+
+  const calculateTotal = () => {
+    return cartProducts.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  };
 
   if (loading) {
     return (
@@ -313,6 +336,7 @@ const CartScreen: React.FC = () => {
   if (error) {
     return (
       <View style={styles.errorContainer}>
+        <Ionicons name="alert-circle-outline" size={60} color="#FF3B30" />
         <Text style={styles.errorText}>{error}</Text>
         <TouchableOpacity
           style={styles.retryButton}
@@ -323,6 +347,7 @@ const CartScreen: React.FC = () => {
           }}
           accessibilityLabel="Retry Fetching Cart"
         >
+          <Ionicons name="refresh-outline" size={20} color="#fff" />
           <Text style={styles.retryButtonText}>Retry</Text>
         </TouchableOpacity>
       </View>
@@ -344,17 +369,25 @@ const CartScreen: React.FC = () => {
         data={cartProducts}
         keyExtractor={(item) => item.id}
         renderItem={renderCartItem}
+        ItemSeparatorComponent={renderSeparator}
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
       />
-      {/* Checkout Button */}
-      <TouchableOpacity
-        style={styles.checkoutButton}
-        onPress={proceedToCheckout}
-        accessibilityLabel="Proceed to Checkout"
-      >
-        <Text style={styles.checkoutButtonText}>Proceed to Checkout</Text>
-      </TouchableOpacity>
+      {/* Total and Checkout Section */}
+      <View style={styles.footer}>
+        <View style={styles.totalContainer}>
+          <Text style={styles.totalText}>Total:</Text>
+          <Text style={styles.totalAmount}>${calculateTotal().toFixed(2)}</Text>
+        </View>
+        <TouchableOpacity
+          style={styles.checkoutButton}
+          onPress={proceedToCheckout}
+          accessibilityLabel="Proceed to Checkout"
+        >
+          <Text style={styles.checkoutButtonText}>Checkout</Text>
+          <Ionicons name="arrow-forward" size={20} color="#fff" />
+        </TouchableOpacity>
+      </View>
     </View>
   );
 };
@@ -366,63 +399,73 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#121212",
-    padding: 20,
-    paddingBottom: 80, // Space for Checkout Button
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 40, // Increased to raise the footer a bit
   },
   cartItem: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#1E1E1E",
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 15,
+    paddingVertical: 12, // Increased padding for larger listing
+    paddingHorizontal: 15,
+    borderRadius: 16,
+    // Removed backgroundColor to eliminate grey container
+    // Added padding for better spacing
   },
   cartImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 10,
+    width: width * 0.2, // Increased image size
+    height: width * 0.2,
+    borderRadius: 12,
     marginRight: 15,
+    backgroundColor: "#2C2C2C",
   },
   cartDetails: {
     flex: 1,
+    justifyContent: "center",
   },
   cartTitle: {
     color: "#fff",
     fontSize: 16,
-    fontWeight: "600",
-    marginBottom: 5,
+    fontWeight: "700",
+    marginBottom: 4,
   },
   cartPrice: {
     color: "#BB86FC",
     fontSize: 14,
-    fontWeight: "500",
+    fontWeight: "600",
   },
-  cartQuantity: {
-    color: "#fff",
-    fontSize: 14,
-    marginTop: 2,
-  },
-  cartDescription: {
-    color: "#ccc",
-    fontSize: 12,
-    marginTop: 2,
-  },
-  removeButton: {
-    padding: 5,
+  actionButtons: {
+    flexDirection: "row",
+    alignItems: "center",
   },
   buyButton: {
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: "#34C759", // Green button
-    paddingVertical: 8,
+    paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 8,
-    marginLeft: 10,
     justifyContent: "center",
-    alignItems: "center",
+    marginRight: 10,
+    shadowColor: "#34C759",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 5,
   },
   buyButtonText: {
     color: "#FFFFFF",
     fontSize: 14,
     fontWeight: "600",
+    marginLeft: 4,
+  },
+  removeButton: {
+    padding: 6,
+  },
+  separator: {
+    height: 1,
+    backgroundColor: "#fff", // White line for separation
+    marginVertical: 5,
   },
   loadingContainer: {
     flex: 1,
@@ -431,65 +474,102 @@ const styles = StyleSheet.create({
     backgroundColor: "#121212",
   },
   loadingText: {
-    marginTop: 8,
+    marginTop: 10,
     color: "#bbb",
-    fontSize: 14,
+    fontSize: 16,
   },
   errorContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    paddingHorizontal: 15,
+    paddingHorizontal: 20,
+    backgroundColor: "#121212",
   },
   errorText: {
-    color: "#FF6B6B",
-    fontSize: 14,
+    color: "#FF3B30",
+    fontSize: 16,
     textAlign: "center",
-    marginBottom: 8,
+    marginTop: 15,
   },
   retryButton: {
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: "#BB86FC",
     paddingVertical: 10,
     paddingHorizontal: 20,
-    borderRadius: 20,
+    borderRadius: 25,
+    marginTop: 20,
   },
   retryButtonText: {
     color: "#fff",
-    fontSize: 14,
-    fontWeight: "500",
+    fontSize: 16,
+    fontWeight: "600",
+    marginLeft: 8,
   },
   emptyContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: "#121212",
   },
   emptyText: {
     color: "#bbb",
-    fontSize: 18,
+    fontSize: 22,
     marginTop: 20,
+    fontWeight: "500",
   },
   listContainer: {
-    paddingBottom: 20,
+    paddingBottom: 150, // Increased padding to accommodate footer
   },
-  checkoutButton: {
+  footer: {
     position: "absolute",
-    bottom: 20,
+    bottom: 20, // Raised the footer slightly
     left: 20,
     right: 20,
-    backgroundColor: "#BB86FC",
-    paddingVertical: 15,
-    borderRadius: 30,
+    backgroundColor: "#1E1E1E",
+    paddingVertical: 18,
+    paddingHorizontal: 25,
+    borderRadius: 20,
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-    elevation: 5,
+    justifyContent: "space-between",
+    shadowColor: "#BB86FC",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.7,
+    shadowRadius: 6,
+    elevation: 15,
+  },
+  totalContainer: {
+    flexDirection: "column",
+  },
+  totalText: {
+    color: "#bbb",
+    fontSize: 16,
+    fontWeight: "500",
+  },
+  totalAmount: {
+    color: "#fff",
+    fontSize: 20,
+    fontWeight: "700",
+    marginTop: 4,
+  },
+  checkoutButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#BB86FC",
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 30,
+    shadowColor: "#BB86FC",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.8,
+    shadowRadius: 6,
+    elevation: 15,
   },
   checkoutButtonText: {
     color: "#fff",
     fontSize: 16,
-    fontWeight: "600",
+    fontWeight: "700",
+    marginRight: 6,
   },
 });
