@@ -1,6 +1,6 @@
 // BottomNavBar.tsx
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -8,12 +8,14 @@ import {
   StyleSheet,
   Modal,
   Animated,
+  Easing,
 } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import {
   useNavigation,
   useRoute,
   NavigationProp,
+  CommonActions,
 } from "@react-navigation/native";
 import { RootStackParamList } from "../navigationTypes";
 
@@ -21,73 +23,79 @@ const BottomNavBar: React.FC = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const route = useRoute();
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const [spinValue] = useState(new Animated.Value(0));
-  const [scaleValue] = useState(new Animated.Value(1));
 
-  const spinAnimation = Animated.loop(
-    Animated.timing(spinValue, {
-      toValue: 1,
-      duration: 1000,
-      useNativeDriver: true,
-    })
-  );
+  // Animation value for spinning the add button
+  const spinValue = useRef(new Animated.Value(0)).current;
+
+  // Define the spinning animation
+  const spinAnimation = useRef(
+    Animated.loop(
+      Animated.timing(spinValue, {
+        toValue: 1,
+        duration: 1000, // 1 second for a full rotation
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    )
+  ).current;
 
   useEffect(() => {
     if (isModalVisible) {
       spinAnimation.start();
     } else {
       spinAnimation.stop();
-      spinValue.setValue(0);
+      spinValue.setValue(0); // Reset rotation
     }
 
+    // Cleanup on unmount
     return () => {
       spinAnimation.stop();
     };
   }, [isModalVisible, spinAnimation, spinValue]);
 
-  const toggleModal = () => {
-    setIsModalVisible(!isModalVisible);
-  };
-
-  const handlePressIn = () => {
-    Animated.spring(scaleValue, {
-      toValue: 1.1,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  const handlePressOut = () => {
-    Animated.spring(scaleValue, {
-      toValue: 1,
-      useNativeDriver: true,
-    }).start();
-  };
-
+  // Interpolate spinValue to rotate from 0deg to 360deg
   const spin = spinValue.interpolate({
     inputRange: [0, 1],
     outputRange: ["0deg", "360deg"],
   });
 
+  const toggleModal = () => {
+    setIsModalVisible(!isModalVisible);
+  };
+
   // Determine the current route name
-  const currentRouteName = route.name;
+  const currentRouteName = route.name as keyof RootStackParamList;
 
   // Helper function to check if a tab is active
   const isActive = (routeName: keyof RootStackParamList) => {
     return currentRouteName === routeName;
   };
 
+  // Use reset to instantly switch without stacking or transitions
+  const switchScreen = (targetRoute: keyof RootStackParamList) => {
+    navigation.dispatch(
+      CommonActions.reset({
+        index: 0,
+        routes: [{ name: targetRoute }],
+      })
+    );
+  };
+
+  const hitSlopValue = { top: 30, bottom: 30, left: 30, right: 30 };
+
   return (
     <View style={styles.container}>
       {/* Home Tab */}
       <TouchableOpacity
         style={styles.navItem}
-        onPress={() => navigation.navigate("Dashboard")}
+        onPress={() => switchScreen("Dashboard")}
         accessibilityLabel="Navigate to Home"
+        hitSlop={hitSlopValue}
       >
         <Ionicons
-          name="home-outline"
+          name={isActive("Dashboard") ? "home" : "home-outline"}
           size={24}
-          color={isActive("Dashboard") ? "#a1c4fd" : "#CCCCCC"}
+          color="#FFFFFF"
         />
         <Text
           style={[
@@ -102,13 +110,14 @@ const BottomNavBar: React.FC = () => {
       {/* Gigs Tab */}
       <TouchableOpacity
         style={styles.navItem}
-        onPress={() => navigation.navigate("Gigs")}
+        onPress={() => switchScreen("Gigs")}
         accessibilityLabel="Navigate to Gigs"
+        hitSlop={hitSlopValue}
       >
         <Ionicons
-          name="briefcase-outline"
+          name={isActive("Gigs") ? "briefcase" : "briefcase-outline"}
           size={24}
-          color={isActive("Gigs") ? "#a1c4fd" : "#CCCCCC"}
+          color="#FFFFFF"
         />
         <Text
           style={[styles.navText, isActive("Gigs") && styles.navTextActive]}
@@ -121,16 +130,10 @@ const BottomNavBar: React.FC = () => {
       <TouchableOpacity
         style={styles.navItem}
         onPress={toggleModal}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
         accessibilityLabel="Add Product or Gig"
+        hitSlop={hitSlopValue}
       >
-        <Animated.View
-          style={[
-            styles.addButton,
-            { transform: [{ scale: scaleValue }, { rotate: spin }] },
-          ]}
-        >
+        <Animated.View style={[styles.addButton, { transform: [{ rotate: spin }] }]}>
           <Ionicons name="arrow-up-outline" size={30} color="#FFFFFF" />
         </Animated.View>
       </TouchableOpacity>
@@ -138,13 +141,14 @@ const BottomNavBar: React.FC = () => {
       {/* Messaging Tab */}
       <TouchableOpacity
         style={styles.navItem}
-        onPress={() => navigation.navigate("Messaging")}
+        onPress={() => switchScreen("Messaging")}
         accessibilityLabel="Navigate to Messaging"
+        hitSlop={hitSlopValue}
       >
         <Ionicons
-          name="chatbubble-outline"
+          name={isActive("Messaging") ? "chatbubble" : "chatbubble-outline"}
           size={24}
-          color={isActive("Messaging") ? "#a1c4fd" : "#CCCCCC"}
+          color="#FFFFFF"
         />
         <Text
           style={[
@@ -159,13 +163,14 @@ const BottomNavBar: React.FC = () => {
       {/* Activity Tab */}
       <TouchableOpacity
         style={styles.navItem}
-        onPress={() => navigation.navigate("Activity", { firstName })}
+        onPress={() => switchScreen("Activity")}
         accessibilityLabel="Navigate to Activity"
+        hitSlop={hitSlopValue}
       >
         <Ionicons
-          name="stats-chart-outline"
+          name={isActive("Activity") ? "stats-chart" : "stats-chart-outline"}
           size={24}
-          color={isActive("Activity") ?"#a1c4fd" : "#CCCCCC"}
+          color="#FFFFFF"
         />
         <Text
           style={[styles.navText, isActive("Activity") && styles.navTextActive]}
@@ -178,7 +183,7 @@ const BottomNavBar: React.FC = () => {
       <Modal
         visible={isModalVisible}
         transparent
-        animationType="fade"
+        animationType="none"
         onRequestClose={toggleModal}
       >
         <TouchableOpacity
@@ -193,7 +198,7 @@ const BottomNavBar: React.FC = () => {
                 style={styles.modalButton}
                 onPress={() => {
                   toggleModal();
-                  navigation.navigate("AddProduct");
+                  switchScreen("AddProduct");
                 }}
                 accessibilityLabel="Add Product"
               >
@@ -203,7 +208,7 @@ const BottomNavBar: React.FC = () => {
                 style={styles.modalButton}
                 onPress={() => {
                   toggleModal();
-                  navigation.navigate("AddGig");
+                  switchScreen("AddGig");
                 }}
                 accessibilityLabel="Add Gig"
               >
@@ -256,10 +261,9 @@ const styles = StyleSheet.create({
     color: "#CCCCCC",
     marginTop: 2,
     fontFamily: "System",
-    marginBottom: 15, // Add this line to shift elements up slightly
+    marginBottom: 15,
   },
   navTextActive: {
-    color: "#FFFFFF",
     fontWeight: "600",
   },
   addButton: {
@@ -273,8 +277,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.5,
     shadowRadius: 6,
     elevation: 10,
-    marginBottom: 18.5, // Add this line to shift elements up slightly
-
+    marginBottom: 18.5,
   },
   modalOverlay: {
     flex: 1,
