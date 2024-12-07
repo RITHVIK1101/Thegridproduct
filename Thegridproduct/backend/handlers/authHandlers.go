@@ -8,7 +8,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strings"
 	"time"
 
 	"Thegridproduct/backend/db"
@@ -43,11 +42,10 @@ type SignupRequest struct {
 	Institution string `json:"institution"` // Name of high school or university
 }
 
-// generateToken creates a JWT token for the authenticated user, including studentType.
 func generateToken(userID primitive.ObjectID, institution string, studentType string) (string, error) {
 	expirationTime := time.Now().Add(24 * time.Hour)
 	claims := &Claims{
-		UserID:      userID.Hex(), // Ensure UserID is set as hex string
+		UserID:      userID.Hex(),
 		Institution: institution,
 		StudentType: studentType,
 		StandardClaims: jwt.StandardClaims{
@@ -251,60 +249,4 @@ func SignupHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(response)
-}
-
-// AuthMiddleware validates JWT tokens and sets userID, institution, and studentType in the context.
-func authMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-
-		authHeader := r.Header.Get("Authorization")
-		if authHeader == "" {
-			WriteJSONError(w, "Authorization header missing", http.StatusUnauthorized)
-			return
-		}
-
-		parts := strings.SplitN(authHeader, " ", 2)
-		if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
-			WriteJSONError(w, "Invalid Authorization header format. Expected 'Bearer <token>'", http.StatusUnauthorized)
-			return
-		}
-
-		tokenString := parts[1]
-		jwtSecret := []byte(os.Getenv("JWT_SECRET_KEY"))
-		if len(jwtSecret) == 0 {
-			log.Println("JWT_SECRET_KEY is not set in environment variables")
-			WriteJSONError(w, "Internal server error", http.StatusInternalServerError)
-			return
-		}
-
-		claims := &Claims{}
-
-		token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
-			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, http.ErrAbortHandler
-			}
-			return jwtSecret, nil
-		})
-
-		if err != nil || !token.Valid {
-			WriteJSONError(w, "Invalid or expired token", http.StatusUnauthorized)
-			return
-		}
-
-		// Ensure all required claims are present
-		if strings.TrimSpace(claims.UserID) == "" || strings.TrimSpace(claims.Institution) == "" || strings.TrimSpace(claims.StudentType) == "" {
-			WriteJSONError(w, "Invalid or missing claims in token", http.StatusUnauthorized)
-			return
-		}
-
-		log.Printf("Authenticated UserID: %s, Institution: %s, StudentType: %s", claims.UserID, claims.Institution, claims.StudentType)
-
-		// Set userID, institution, and studentType in the context
-		ctx := context.WithValue(r.Context(), userIDKey, claims.UserID)
-		ctx = context.WithValue(ctx, userInstitution, claims.Institution)
-		ctx = context.WithValue(ctx, userStudentType, claims.StudentType)
-
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
 }

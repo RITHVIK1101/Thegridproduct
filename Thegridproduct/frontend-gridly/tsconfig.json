@@ -3,7 +3,8 @@
   "compilerOptions": {
     "strict": true,
     "paths": {
-      "@firebase/auth": ["./node_modules/@firebase/auth/dist/index.rn.d.ts"]
+      "@firebase/auth": ["./node_modules/@firebase/auth/dist/index.rn.d.ts"],
+      "ably": ["./node_modules/ably/dist/types/index.d.ts"]
     }
   },
   "include": ["declaration.d.ts", "src/**/*"]

@@ -6,11 +6,9 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 )
 
-// contextKey is a custom type to prevent context key collisions.
 type contextKey string
 
 const (
-	// userIDKey is the context key for the authenticated user's ID.
 	userIDKey contextKey = "userID"
 
 	// userInstitution is the context key for the authenticated user's institution.

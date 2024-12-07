@@ -18,9 +18,10 @@ import {
 import Ionicons from "react-native-vector-icons/Ionicons";
 import BottomNavBar from "./components/BottomNavbar";
 import { fetchConversations, postMessage, getMessages } from "./api";
-import { NGROK_URL } from "@env"; // Ensure NGROK_URL is defined in your .env file
+import { NGROK_URL, ABLY_API_KEY } from "@env"; // Ensure ABLY_API_KEY is defined in your .env file
 import { Conversation, Message } from "./types";
 import { UserContext } from "./UserContext";
+import Ably from "ably";
 
 type TabType = "marketplace" | "gigs";
 
@@ -35,7 +36,8 @@ const MessagingScreen: React.FC = () => {
   const [sending, setSending] = useState<boolean>(false);
 
   const { userId, token } = useContext(UserContext);
-  const webSocketRef = useRef<WebSocket | null>(null);
+  const ablyRef = useRef<Ably.Realtime | null>(null);
+  const channelRef = useRef<Ably.RealtimeChannel | null>(null);
 
   useEffect(() => {
     if (userId && token) {
@@ -44,14 +46,41 @@ const MessagingScreen: React.FC = () => {
   }, [userId, token]);
 
   useEffect(() => {
-    if (selectedConversation) {
-      connectToWebSocket(selectedConversation.chatID);
+    // Initialize Ably client once
+    if (!ablyRef.current) {
+      ablyRef.current = new Ably.Realtime({
+        key: ABLY_API_KEY,
+      });
+
+      ablyRef.current.connection.on("connected", () => {
+        console.log("Ably connected");
+      });
+
+      ablyRef.current.connection.on("failed", (stateChange) => {
+        console.error("Ably connection failed:", stateChange.reason);
+        Alert.alert(
+          "Error",
+          "Failed to connect to real-time messaging service."
+        );
+      });
     }
 
     return () => {
-      if (webSocketRef.current) {
-        webSocketRef.current.close();
+      // Clean up Ably connection on component unmount
+      if (ablyRef.current) {
+        ablyRef.current.close();
+        ablyRef.current = null;
       }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (selectedConversation) {
+      subscribeToChannel(selectedConversation.chatID);
+    }
+
+    return () => {
+      unsubscribeFromChannel();
     };
   }, [selectedConversation]);
 
@@ -71,68 +100,79 @@ const MessagingScreen: React.FC = () => {
     }
   };
 
-  const connectToWebSocket = (chatId: string) => {
-    if (!userId || !token) {
-      console.warn("No userId or token available for WebSocket connection");
+  const subscribeToChannel = (chatId: string) => {
+    if (!ablyRef.current) {
+      console.warn("Ably client is not initialized");
       return;
     }
 
-    // Make sure we use wss:// if the URL is https://
-    let wsUrl = NGROK_URL;
-    if (wsUrl.startsWith("https://")) {
-      wsUrl = wsUrl.replace("https://", "wss://");
-    } else if (wsUrl.startsWith("http://")) {
-      wsUrl = wsUrl.replace("http://", "ws://");
-    }
+    const channel = ablyRef.current.channels.get(chatId);
+    channelRef.current = channel;
 
-    // Double-check that userId and token are correct (for debugging)
-    console.log("Connecting to WebSocket with:", {
-      wsUrl,
-      chatId,
-      userId,
-      token,
-    });
-
-    const ws = new WebSocket(`${wsUrl}/ws/${chatId}/${userId}?token=${token}`);
-    webSocketRef.current = ws;
-
-    ws.onopen = () => {
-      console.log("WebSocket connection established");
-    };
-
-    ws.onmessage = (event) => {
+    // Subscribe to messages
+    channel.subscribe("message", (msg) => {
       try {
-        const message: Message = JSON.parse(event.data);
-        console.log("Received message via WebSocket:", message);
+        const messageData = msg.data as {
+          senderId: string;
+          content: string;
+          timestamp: number;
+        };
+        console.log("Received message via Ably:", messageData);
+
+        const newMsg: Message = {
+          _id: Date.now().toString(),
+          sender: messageData.senderId === userId ? "user" : "other",
+          senderID: messageData.senderId,
+          content: messageData.content,
+          timestamp: new Date(messageData.timestamp * 1000).toISOString(),
+        };
+
         setSelectedConversation((prev) => {
           if (!prev) return prev;
-          return { ...prev, messages: [...(prev.messages || []), message] };
+          return { ...prev, messages: [...(prev.messages || []), newMsg] };
         });
       } catch (err) {
-        console.error("Error parsing WebSocket message:", err);
+        console.error("Error parsing Ably message data:", err);
       }
-    };
+    });
 
-    ws.onerror = (error) => {
-      console.error("WebSocket error:", error);
-      Alert.alert(
-        "WebSocket Error",
-        "An error occurred with the WebSocket connection."
-      );
-    };
+    // Handle channel state changes
+    channel.on("attached", () => {
+      console.log(`Subscribed to Ably channel: ${chatId}`);
+    });
 
-    ws.onclose = (event) => {
-      if (event.code !== 1000) {
-        console.log(
-          `WebSocket closed with code: ${event.code}, reason: ${event.reason}`
+    channel.on("update", (stateChange) => {
+      if (stateChange.current === "failed") {
+        console.error(
+          "Channel failed:",
+          stateChange.reason?.message || "Unknown reason"
         );
         Alert.alert(
-          "WebSocket Closed",
-          "The WebSocket connection was closed unexpectedly."
+          "Error",
+          `An error occurred with the channel: ${
+            stateChange.reason?.message || "Unknown reason"
+          }`
         );
+      } else {
+        console.log(`Channel state changed to: ${stateChange.current}`);
       }
-      console.log("WebSocket connection closed");
-    };
+    });
+
+    channel.on("failed", (err) => {
+      Alert.alert(
+        "Error",
+        "An error occurred with the real-time messaging service."
+      );
+    });
+  };
+
+  const unsubscribeFromChannel = () => {
+    if (channelRef.current) {
+      channelRef.current.unsubscribe("message");
+      channelRef.current.unsubscribe("failed");
+      channelRef.current = null;
+      console.log("Unsubscribed from Ably channel");
+    }
   };
 
   const openChat = async (conversation: Conversation) => {
@@ -164,18 +204,17 @@ const MessagingScreen: React.FC = () => {
     setNewMessage("");
 
     try {
-      // In sendMessage function:
-      await postMessage(
+      const status = await postMessage(
         selectedConversation.chatID,
         messageContent,
         token,
         userId
       );
-
-      // The message will be added via WebSocket when the server broadcasts it
+      console.log("Message sent successfully:", status);
+      // The message will be added via Ably subscription
     } catch (error) {
       console.error("sendMessage error:", error);
-      Alert.alert("Error", "Failed to send message.");
+      Alert.alert("Error", error.message || "Failed to send message.");
     } finally {
       setSending(false);
     }
@@ -269,9 +308,7 @@ const MessagingScreen: React.FC = () => {
         onRequestClose={() => {
           setChatModalVisible(false);
           setSelectedConversation(null);
-          if (webSocketRef.current) {
-            webSocketRef.current.close();
-          }
+          unsubscribeFromChannel();
         }}
       >
         <SafeAreaView style={styles.modalSafeArea}>
@@ -284,9 +321,7 @@ const MessagingScreen: React.FC = () => {
                 onPress={() => {
                   setChatModalVisible(false);
                   setSelectedConversation(null);
-                  if (webSocketRef.current) {
-                    webSocketRef.current.close();
-                  }
+                  unsubscribeFromChannel();
                 }}
                 style={styles.backButton}
               >

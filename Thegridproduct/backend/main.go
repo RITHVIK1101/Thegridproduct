@@ -1,5 +1,3 @@
-// main.go
-
 package main
 
 import (
@@ -14,9 +12,10 @@ import (
 	"Thegridproduct/backend/db"
 	"Thegridproduct/backend/handlers"
 
+	"github.com/ably/ably-go/ably"
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
-	"github.com/stripe/stripe-go/v72" // Import Stripe Go SDK
+	"github.com/stripe/stripe-go/v72"
 )
 
 func main() {
@@ -26,20 +25,43 @@ func main() {
 		log.Println("Error loading .env file, proceeding with system environment variables")
 	}
 
-	// Set Stripe secret key
+	// Load and validate essential environment variables
+	jwtSecret := os.Getenv("JWT_SECRET_KEY")
+	if jwtSecret == "" {
+		log.Fatal("JWT_SECRET_KEY is not set in environment variables")
+	} else {
+		log.Println("JWT_SECRET_KEY loaded successfully")
+	}
+
 	stripeKey := os.Getenv("STRIPE_SECRET_KEY")
 	if stripeKey == "" {
-		log.Fatal("STRIPE_SECRET_KEY not set in environment variables")
+		log.Fatal("STRIPE_SECRET_KEY is not set in environment variables")
 	}
 	stripe.Key = stripeKey
 
+	ablyAPIKey := os.Getenv("ABLY_API_KEY")
+	if ablyAPIKey == "" {
+		log.Fatal("ABLY_API_KEY is not set in environment variables")
+	}
+
+	// Initialize the Ably client
+	ablyClient, err := ably.NewRealtime(ably.WithKey(ablyAPIKey))
+	if err != nil {
+		log.Fatalf("Failed to initialize Ably client: %v", err)
+	}
+	log.Println("Ably client initialized successfully")
+
+	// Pass the Ably client to handlers
+	handlers.SetAblyClient(ablyClient)
+
 	// Connect to MongoDB
 	db.ConnectDB()
-	defer db.DisconnectDB() // Ensure MongoDB disconnects when main exits
-
-	// Initialize the Hub
-	hub := handlers.NewHub()
-	go hub.Run()
+	log.Println("Connected to MongoDB successfully.")
+	defer func() {
+		log.Println("Disconnecting from MongoDB...")
+		db.DisconnectDB()
+		log.Println("MongoDB disconnected successfully.")
+	}()
 
 	// Initialize router
 	router := mux.NewRouter()
@@ -56,12 +78,7 @@ func main() {
 
 	// Protected Routes
 	protected := router.PathPrefix("/").Subrouter()
-
 	protected.Use(handlers.AuthMiddleware)
-
-	// WebSocket Route should be under protected to enforce authentication
-	// Updated to include the token as a query parameter
-	protected.HandleFunc("/ws/{chatId}/{userId}", hub.ServeWS).Methods("GET")
 
 	// Product Routes
 	protected.HandleFunc("/products", handlers.AddProductHandler).Methods("POST")
@@ -82,7 +99,7 @@ func main() {
 	protected.HandleFunc("/cart", handlers.GetCartHandler).Methods("GET")
 	protected.HandleFunc("/cart/add", handlers.AddToCartHandler).Methods("POST")
 	protected.HandleFunc("/cart/remove", handlers.RemoveFromCartHandler).Methods("POST")
-	protected.HandleFunc("/cart/clear", handlers.ClearCartHandler).Methods("POST") // Optional
+	protected.HandleFunc("/cart/clear", handlers.ClearCartHandler).Methods("POST")
 
 	// User Routes
 	protected.HandleFunc("/users/{id}", handlers.GetUserHandler).Methods("GET")
@@ -90,6 +107,9 @@ func main() {
 	protected.HandleFunc("/chats/{chatId}", handlers.GetChatHandler).Methods("GET")
 	protected.HandleFunc("/chats/{chatId}/messages", handlers.AddMessageHandler).Methods("POST")
 	protected.HandleFunc("/chats/{chatId}/messages", handlers.GetMessagesHandler).Methods("GET")
+
+	// Real-time messaging route using Ably
+	protected.HandleFunc("/messages", handlers.PublishMessageHandler).Methods("POST")
 
 	// Payment Route
 	protected.HandleFunc("/create-payment-intent", handlers.CreatePaymentIntentHandler).Methods("POST")

@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "expo/AppEntry.js",
   "scripts": {
-   "start": "export NODE_OPTIONS=--openssl-legacy-provider && expo start",
+    "start": "export NODE_OPTIONS=--openssl-legacy-provider && expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web"
@@ -25,6 +25,7 @@
     "@react-navigation/native-stack": "^6.11.0",
     "@react-navigation/stack": "^6.4.1",
     "@stripe/stripe-react-native": "^0.40.0",
+    "ably": "^2.5.0",
     "axios": "^1.7.7",
     "expo": "^52.0.0",
     "expo-cli": "^4.0.17",
