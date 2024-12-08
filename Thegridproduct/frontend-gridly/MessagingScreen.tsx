@@ -1,12 +1,10 @@
-// MessagingScreen.tsx
-
 import React, { useState, useEffect, useContext, useRef } from "react";
 import {
   SafeAreaView,
   Text,
   StyleSheet,
   FlatList,
-  TouchableOpacity,
+  Pressable,
   Modal,
   TextInput,
   Alert,
@@ -14,57 +12,73 @@ import {
   Platform,
   ActivityIndicator,
   View,
+  Dimensions,
+  Image,
+  ScrollView
 } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import BottomNavBar from "./components/BottomNavbar";
 import { fetchConversations, postMessage, getMessages } from "./api";
-import { NGROK_URL, ABLY_API_KEY } from "@env"; // Ensure ABLY_API_KEY is defined in your .env file
+import { ABLY_API_KEY } from "@env";
 import { Conversation, Message } from "./types";
 import { UserContext } from "./UserContext";
 import Ably from "ably";
 import { RouteProp, useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "./navigationTypes";
+import * as ImagePicker from "expo-image-picker";
+
+type Chat = Conversation;
 
 type MessagingScreenRouteProp = RouteProp<RootStackParamList, "Messaging">;
-
-type MessagingScreenProps = {
-  route: MessagingScreenRouteProp;
-};
-
+type MessagingScreenProps = { route: MessagingScreenRouteProp };
 type NavigationProp = StackNavigationProp<RootStackParamList, "Messaging">;
 
 const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
-  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [chats, setChats] = useState<Chat[]>([]);
+  const [filteredChats, setFilteredChats] = useState<Chat[]>([]);
+  const [filter, setFilter] = useState<"all" | "products" | "gigs">("all");
   const [isChatModalVisible, setChatModalVisible] = useState<boolean>(false);
-  const [selectedConversation, setSelectedConversation] =
-    useState<Conversation | null>(null);
+  const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
   const [newMessage, setNewMessage] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
   const [sending, setSending] = useState<boolean>(false);
 
+  const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
+  const [isImagePreviewModalVisible, setIsImagePreviewModalVisible] = useState<boolean>(false);
+
+  const [filterMenuVisible, setFilterMenuVisible] = useState<boolean>(false);
+
   const { userId, token } = useContext(UserContext);
   const ablyRef = useRef<Ably.Realtime | null>(null);
   const channelRef = useRef<Ably.RealtimeChannel | null>(null);
+  const flatListRef = useRef<FlatList<Message> | null>(null);
 
   const navigation = useNavigation<NavigationProp>();
+  const { chatId: routeChatId } = route.params || {};
 
-  // Extract chatId and userId from route params
-  const { chatId: routeChatId, userId: routeUserId } = route.params || {};
+  const applyFilter = (chatsToFilter: Chat[], f: "all"|"products"|"gigs") => {
+    if (f === "all") return chatsToFilter;
+    if (f === "products") {
+      return chatsToFilter.filter(c => c.productTitle && c.productTitle.trim() !== "");
+    } else {
+      return chatsToFilter.filter(c => !c.productTitle || c.productTitle.trim() === "");
+    }
+  };
+
+  useEffect(() => {
+    setFilteredChats(applyFilter(chats, filter));
+  }, [chats, filter]);
 
   useEffect(() => {
     if (userId && token) {
-      fetchUserConversations();
+      fetchUserChats();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, token]);
 
   useEffect(() => {
-    // Initialize Ably client once
     if (!ablyRef.current) {
-      ablyRef.current = new Ably.Realtime({
-        key: ABLY_API_KEY,
-      });
+      ablyRef.current = new Ably.Realtime({ key: ABLY_API_KEY });
 
       ablyRef.current.connection.on("connected", () => {
         console.log("Ably connected");
@@ -73,91 +87,74 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       ablyRef.current.connection.on("failed", (stateChange) => {
         console.error("Ably connection failed:", stateChange.reason);
         Alert.alert(
-          "Error",
-          "Failed to connect to real-time messaging service."
+          "Connection Error",
+          "Failed to connect to the real-time messaging service."
         );
       });
     }
 
     return () => {
-      // Clean up Ably connection on component unmount
       if (ablyRef.current) {
         ablyRef.current.close();
         ablyRef.current = null;
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    if (selectedConversation) {
-      subscribeToChannel(selectedConversation.chatID);
+    if (selectedChat) {
+      subscribeToChannel(selectedChat.chatID);
     }
-
     return () => {
       unsubscribeFromChannel();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedConversation]);
+  }, [selectedChat]);
 
   useEffect(() => {
-    // If navigated with a specific chatId, open that chat
     if (routeChatId && userId && token) {
-      const conversation = conversations.find(
-        (conv) => conv.chatID === routeChatId
-      );
-      if (conversation) {
-        openChat(conversation);
+      const chat = chats.find((c) => c.chatID === routeChatId);
+      if (chat) {
+        openChat(chat);
       } else {
-        // Fetch the specific conversation if not already fetched
-        fetchSpecificConversation(routeChatId);
+        fetchSpecificChat(routeChatId);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [routeChatId, conversations]);
+  }, [routeChatId, chats]);
 
-  const fetchSpecificConversation = async (chatId: string) => {
+  const fetchSpecificChat = async (chatId: string) => {
     setLoading(true);
     try {
-      const specificConversation = await fetchConversations(
-        userId,
-        token,
-        chatId
-      );
-      if (specificConversation.length > 0) {
-        setConversations((prev) => [...prev, ...specificConversation]);
-        openChat(specificConversation[0]);
+      const specificChat = await fetchConversations(userId, token, chatId);
+      if (specificChat.length > 0) {
+        setChats((prev) => [...prev, ...specificChat]);
+        openChat(specificChat[0]);
       } else {
-        Alert.alert("Error", "Conversation not found.");
+        Alert.alert("Error", "Chat not found.");
       }
     } catch (error) {
-      console.error("Error fetching specific conversation:", error);
-      Alert.alert("Error", "Failed to load the conversation.");
+      console.error("Error fetching specific chat:", error);
+      Alert.alert("Error", "Failed to load the chat.");
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchUserConversations = async () => {
+  const fetchUserChats = async () => {
     if (!userId || !token) return;
 
     setLoading(true);
     try {
-      const fetchedConversations = await fetchConversations(userId, token);
-      console.log("Fetched Conversations:", fetchedConversations);
-      setConversations(fetchedConversations);
-      // If navigated with a chatId that exists in fetched conversations, open it
+      const fetchedChats = await fetchConversations(userId, token);
+      setChats(fetchedChats);
       if (routeChatId) {
-        const conversation = fetchedConversations.find(
-          (conv) => conv.chatID === routeChatId
-        );
-        if (conversation) {
-          openChat(conversation);
+        const chat = fetchedChats.find((c) => c.chatID === routeChatId);
+        if (chat) {
+          openChat(chat);
         }
       }
     } catch (error) {
-      console.error("Error fetching conversations:", error);
-      Alert.alert("Error", "Failed to load conversations.");
+      console.error("Error fetching chats:", error);
+      Alert.alert("Error", "Failed to load chats.");
     } finally {
       setLoading(false);
     }
@@ -172,7 +169,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     const channel = ablyRef.current.channels.get(chatId);
     channelRef.current = channel;
 
-    // Subscribe to messages
     channel.subscribe("message", (msg) => {
       try {
         const messageData = msg.data as {
@@ -190,16 +186,30 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
           timestamp: new Date(messageData.timestamp * 1000).toISOString(),
         };
 
-        setSelectedConversation((prev) => {
+        setSelectedChat((prev) => {
           if (!prev) return prev;
-          return { ...prev, messages: [...(prev.messages || []), newMsg] };
+
+          const isDuplicate = prev.messages?.some(
+            (m) =>
+              m.content === newMsg.content &&
+              m.timestamp === newMsg.timestamp &&
+              m.senderID === newMsg.senderID
+          );
+
+          if (isDuplicate) {
+            return prev;
+          }
+
+          return {
+            ...prev,
+            messages: [...prev.messages, newMsg],
+          };
         });
       } catch (err) {
         console.error("Error parsing Ably message data:", err);
       }
     });
 
-    // Handle channel state changes
     channel.on("attached", () => {
       console.log(`Subscribed to Ably channel: ${chatId}`);
     });
@@ -211,7 +221,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
           stateChange.reason?.message || "Unknown reason"
         );
         Alert.alert(
-          "Error",
+          "Channel Error",
           `An error occurred with the channel: ${
             stateChange.reason?.message || "Unknown reason"
           }`
@@ -221,9 +231,9 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       }
     });
 
-    channel.on("failed", (err) => {
+    channel.on("failed", () => {
       Alert.alert(
-        "Error",
+        "Messaging Service Error",
         "An error occurred with the real-time messaging service."
       );
     });
@@ -232,34 +242,48 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
   const unsubscribeFromChannel = () => {
     if (channelRef.current) {
       channelRef.current.unsubscribe("message");
-      channelRef.current.unsubscribe("failed");
       channelRef.current = null;
       console.log("Unsubscribed from Ably channel");
     }
   };
 
-  const openChat = async (conversation: Conversation) => {
+  const openChat = async (chat: Chat) => {
     setLoading(true);
     try {
-      const messages = await getMessages(conversation.chatID, token || "");
+      const messages = await getMessages(chat.chatID, token || "");
+      const sortedMessages: Message[] = Array.isArray(messages)
+        ? messages
+            .map((msg, index) => ({
+              _id: msg._id ? msg._id.toString() : Date.now().toString() + index,
+              sender: msg.senderID === userId ? "user" : "other",
+              senderID: msg.senderID,
+              content: msg.content,
+              timestamp: new Date(msg.timestamp).toISOString(),
+            }))
+            .sort(
+              (a, b) =>
+                new Date(a.timestamp).getTime() -
+                new Date(b.timestamp).getTime()
+            )
+        : [];
 
-      // If the response is null or invalid, fall back to an empty array
-      setSelectedConversation({
-        ...conversation,
-        messages: Array.isArray(messages) ? messages : [], // Default to an empty array
+      setSelectedChat({
+        ...chat,
+        messages: sortedMessages,
       });
 
       setChatModalVisible(true);
       setNewMessage("");
+
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
     } catch (error) {
       console.error("getMessages error:", error);
-
-      // Fallback to an empty conversation with no alerts
-      setSelectedConversation({
-        ...conversation,
-        messages: [], // Default to an empty array
+      setSelectedChat({
+        ...chat,
+        messages: [],
       });
-
       setChatModalVisible(true);
     } finally {
       setLoading(false);
@@ -267,7 +291,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
   };
 
   const sendMessage = async () => {
-    if (!newMessage.trim() || !selectedConversation) {
+    if (!newMessage.trim() || !selectedChat) {
       Alert.alert("Error", "Please enter a message.");
       return;
     }
@@ -277,15 +301,9 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     setNewMessage("");
 
     try {
-      const status = await postMessage(
-        selectedConversation.chatID,
-        messageContent,
-        token,
-        userId
-      );
-      console.log("Message sent successfully:", status);
-      // The message will be added via Ably subscription
-    } catch (error) {
+      await postMessage(selectedChat.chatID, messageContent, token, userId);
+      console.log("Message sent successfully.");
+    } catch (error: any) {
       console.error("sendMessage error:", error);
       Alert.alert("Error", error.message || "Failed to send message.");
     } finally {
@@ -293,11 +311,57 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }
   };
 
-  const renderConversation = ({ item }: { item: Conversation }) => {
+  const handleImagePress = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert(
+          "Permission Required",
+          "Permission to access the camera roll is required!"
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsMultipleSelection: false,
+        quality: 1,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        setSelectedImageUri(asset.uri);
+        setIsImagePreviewModalVisible(true);
+      } else {
+        console.log("User cancelled image picker");
+      }
+    } catch (error) {
+      console.error("Error picking image:", error);
+      Alert.alert("Error", "An error occurred while selecting the image.");
+    }
+  };
+
+  const confirmAddImage = async () => {
+    if (!selectedChat || !selectedImageUri) return;
+
+    setSending(true);
+    try {
+      const imageMessage = `[Image] ${selectedImageUri}`;
+      await postMessage(selectedChat.chatID, imageMessage, token, userId);
+      console.log("Image message sent successfully.");
+    } catch (error: any) {
+      console.error("sendImageMessage error:", error);
+      Alert.alert("Error", error.message || "Failed to send image.");
+    } finally {
+      setSelectedImageUri(null);
+      setIsImagePreviewModalVisible(false);
+      setSending(false);
+    }
+  };
+
+  const renderChat = ({ item }: { item: Chat }) => {
     if (!item.user) {
-      console.warn(
-        `Conversation with chatID ${item.chatID} is missing user data.`
-      );
+      console.warn(`Chat with chatID ${item.chatID} is missing user data.`);
       return null;
     }
 
@@ -310,169 +374,479 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         : null;
 
     const formattedTimestamp = latestMessage
-      ? new Date(latestMessage.timestamp).toLocaleString()
+      ? new Date(latestMessage.timestamp).toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        })
       : "";
 
+    const initials = `${item.user.firstName.charAt(0)}${item.user.lastName.charAt(0)}`.toUpperCase();
+    const unread = item.unreadCount && item.unreadCount > 0;
+
     return (
-      <TouchableOpacity
-        style={styles.conversationItem}
+      <Pressable
+        style={styles.chatItemContainer}
         onPress={() => openChat(item)}
         accessibilityLabel={`Open chat with ${item.user.firstName} ${item.user.lastName}`}
       >
-        <View style={styles.conversationDetails}>
-          <View>
-            <Text style={styles.participantName}>
-              {item.user.firstName} {item.user.lastName}
+        <View style={styles.chatItem}>
+          <View style={styles.profilePicWrapper}>
+            <View style={styles.profilePicPlaceholder}>
+              <Text style={styles.profilePicInitials}>{initials}</Text>
+            </View>
+          </View>
+
+          <View style={styles.chatDetails}>
+            <View style={styles.chatHeaderRow}>
+              <Text style={styles.chatName} numberOfLines={1}>
+                {item.user.firstName} {item.user.lastName}
+              </Text>
+              <Text style={styles.chatTime}>{formattedTimestamp}</Text>
+            </View>
+            <Text style={styles.chatProductName} numberOfLines={1}>
+              {item.productTitle ? item.productTitle : "Gig"}
             </Text>
-            <Text style={styles.productName}>{item.productTitle}</Text>
             {latestMessage && (
-              <View style={styles.messageInfo}>
-                <Text style={styles.latestMessage} numberOfLines={1}>
+              <View style={styles.lastMessageRow}>
+                {unread && <View style={styles.unreadDot} />}
+                <Text style={styles.lastMessage} numberOfLines={1}>
                   {latestMessage.content}
                 </Text>
-                <Text style={styles.timestamp}>{formattedTimestamp}</Text>
               </View>
             )}
           </View>
-          {/* Optionally, you can add an icon or avatar here */}
         </View>
-      </TouchableOpacity>
+      </Pressable>
     );
   };
 
-  const renderMessage = ({ item }: { item: Message }) => (
-    <View
-      style={[
-        styles.messageBubble,
-        item.sender === "user" ? styles.myMessage : styles.theirMessage,
-      ]}
-    >
-      <Text style={styles.messageText}>{item.content}</Text>
-      <Text style={styles.messageTimestamp}>
-        {new Date(item.timestamp).toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        })}
-      </Text>
-    </View>
-  );
+  const renderMessage = ({ item }: { item: Message }) => {
+    const isImageMessage = item.content.startsWith("[Image] ");
+    const imageUri = isImageMessage ? item.content.replace("[Image] ", "") : null;
+    const isUser = item.sender === "user";
+
+    return (
+      <View
+        style={[
+          styles.messageContainer,
+          isUser ? styles.myMessageContainer : styles.theirMessageContainer,
+        ]}
+      >
+        <View style={[styles.messageBubble, isUser ? styles.myMessage : styles.theirMessage]}>
+          {isImageMessage ? (
+            <Image
+              source={{ uri: imageUri! }}
+              style={styles.messageImage}
+              resizeMode="cover"
+            />
+          ) : (
+            <Text style={[styles.messageText, isUser ? styles.myMessageTextColor : styles.theirMessageTextColor]}>
+              {item.content}
+            </Text>
+          )}
+          <Text
+            style={[
+              styles.messageTimestamp,
+              isUser ? styles.myTimestampColor : styles.theirTimestampColor,
+            ]}
+          >
+            {new Date(item.timestamp).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </Text>
+        </View>
+      </View>
+    );
+  };
+
+  const productsOrGigs = chats.map((c) => ({
+    chatID: c.chatID,
+    title: c.productTitle ? c.productTitle : "Gig",
+    type: c.productTitle ? "product" : "gig",
+  }));
+
+  const handleNavigateFromProductOrGig = (item: { chatID: string; title: string; type: string; }) => {
+    const chat = chats.find((c) => c.chatID === item.chatID);
+    if (chat) {
+      openChat(chat);
+    }
+  };
+
+  const currentHeaderTitle = filter === "all" ? "All Chats" : filter === "products" ? "Your Products" : "Your Gigs";
+  const currentFilterLabel = filter === "all" ? "All ×" : filter === "products" ? "Products ×" : "Gigs ×";
+
+  const handleFilterPillPress = () => {
+    if (filter === "all") {
+      // Open filter modal
+      setFilterMenuVisible(true);
+    } else {
+      // Reset to all
+      setFilter("all");
+    }
+  };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Text style={styles.header}>Conversations</Text>
-      {loading ? (
-        <ActivityIndicator size="large" color="#BB86FC" />
-      ) : (
-        <FlatList
-          data={conversations}
-          keyExtractor={(item) => item.chatID}
-          renderItem={renderConversation}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>No conversations found.</Text>
-            </View>
-          }
-          contentContainerStyle={
-            conversations.length === 0 && styles.flatListContainer
-          }
-        />
-      )}
-
-      <Modal
-        visible={isChatModalVisible}
-        animationType="slide"
-        transparent={false}
-        onRequestClose={() => {
-          setChatModalVisible(false);
-          setSelectedConversation(null);
-          unsubscribeFromChannel();
-        }}
-      >
-        <SafeAreaView style={styles.modalSafeArea}>
-          <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : undefined}
-            style={styles.modalContainer}
+    <View style={styles.container}>
+      <SafeAreaView style={{ flex: 1 }}>
+        {/* Header Row with Title and Filter */}
+        <View style={styles.headerRow}>
+          <Text style={styles.mainHeader}>{currentHeaderTitle}</Text>
+          <Pressable
+            style={styles.filterLabelButton}
+            onPress={handleFilterPillPress}
+            accessibilityLabel="Filter Options"
           >
-            <View style={styles.chatHeader}>
-              <TouchableOpacity
+            <Text style={styles.filterLabelText}>{currentFilterLabel}</Text>
+          </Pressable>
+        </View>
+
+        {/* Filter Modal */}
+        <Modal
+          visible={filterMenuVisible}
+          animationType="fade"
+          transparent={true}
+          onRequestClose={() => setFilterMenuVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.filterModalContainer}>
+              <Pressable
+                style={styles.filterModalOption}
                 onPress={() => {
-                  setChatModalVisible(false);
-                  setSelectedConversation(null);
-                  unsubscribeFromChannel();
+                  setFilter("products");
+                  setFilterMenuVisible(false);
                 }}
-                style={styles.backButton}
-                accessibilityLabel="Go Back"
               >
-                <Ionicons name="arrow-back" size={24} color="#fff" />
-              </TouchableOpacity>
-              <Text style={styles.chatTitle} numberOfLines={1}>
-                {selectedConversation?.user.firstName}{" "}
-                {selectedConversation?.user.lastName}
-              </Text>
+                <Text style={styles.filterModalOptionText}>Products</Text>
+              </Pressable>
+              <Pressable
+                style={styles.filterModalOption}
+                onPress={() => {
+                  setFilter("gigs");
+                  setFilterMenuVisible(false);
+                }}
+              >
+                <Text style={styles.filterModalOptionText}>Gigs</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.filterModalOption, styles.filterModalClose]}
+                onPress={() => setFilterMenuVisible(false)}
+              >
+                <Text style={styles.filterModalOptionText}>Close</Text>
+              </Pressable>
             </View>
+          </View>
+        </Modal>
 
-            <FlatList
-              data={selectedConversation?.messages || []}
-              keyExtractor={(item, index) =>
-                item._id ? item._id : index.toString()
-              }
-              renderItem={renderMessage}
-              contentContainerStyle={styles.messagesList}
-              inverted
-              ListEmptyComponent={
-                <View style={styles.emptyMessagesContainer}>
-                  <Text style={styles.emptyMessagesText}>
-                    Start the conversation by sending a message!
-                  </Text>
-                </View>
-              }
-            />
+        {/* Purchases Section */}
+        {productsOrGigs.length > 0 && (
+          <View style={styles.horizontalListContainer}>
+            <Text style={styles.sectionTitle}>Your Purchases</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalScroll}>
+              {productsOrGigs.map((item, index) => (
+                <Pressable
+                  key={item.chatID + index}
+                  style={styles.productGigItem}
+                  onPress={() => handleNavigateFromProductOrGig(item)}
+                >
+                  <Text style={styles.productGigItemText}>{item.title}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        )}
 
-            <View style={styles.inputContainer}>
-              <TextInput
-                style={styles.messageInput}
-                placeholder="Type a message..."
-                placeholderTextColor="#888"
-                value={newMessage}
-                onChangeText={setNewMessage}
-                multiline
-                accessibilityLabel="Message Input"
-              />
-              <TouchableOpacity
-                style={styles.sendButton}
-                onPress={sendMessage}
-                disabled={sending}
-                accessibilityLabel="Send Message"
+        {/* Separator Line after Purchases or just after filter */}
+        <View style={styles.separatorAfterPurchases} />
+
+        {loading ? (
+          <ActivityIndicator size="large" color="#BB86FC" />
+        ) : (
+          <FlatList
+            data={filteredChats}
+            keyExtractor={(item, index) => item.chatID || index.toString()}
+            renderItem={renderChat}
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>No chats found.</Text>
+              </View>
+            }
+            contentContainerStyle={
+              filteredChats.length === 0 && styles.flatListContainer
+            }
+            ItemSeparatorComponent={() => <View style={styles.separatorLine} />}
+          />
+        )}
+
+        {/* Chat Modal */}
+        <Modal
+          visible={isChatModalVisible}
+          animationType="slide"
+          transparent={false}
+          onRequestClose={() => {
+            setChatModalVisible(false);
+            setSelectedChat(null);
+            unsubscribeFromChannel();
+          }}
+        >
+          <View style={[styles.modalSafeArea, { backgroundColor: "#121212" }]}>
+            <SafeAreaView style={{ flex: 1 }}>
+              <KeyboardAvoidingView
+                behavior={Platform.OS === "ios" ? "padding" : undefined}
+                style={styles.modalContainer}
               >
-                {sending ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Ionicons name="send" size={20} color="#fff" />
+                {selectedChat && (
+                  <View style={styles.enhancedChatHeader}>
+                    <Pressable
+                      onPress={() => {
+                        setChatModalVisible(false);
+                        setSelectedChat(null);
+                        unsubscribeFromChannel();
+                      }}
+                      style={styles.backButton}
+                      accessibilityLabel="Go Back"
+                    >
+                      <Ionicons name="arrow-back" size={24} color="#BB86FC" />
+                    </Pressable>
+                    <View style={styles.chatHeaderInfo}>
+                      <View style={styles.headerProfilePicPlaceholder}>
+                        <Text style={styles.headerProfilePicInitials}>
+                          {selectedChat.user.firstName.charAt(0).toUpperCase()}
+                          {selectedChat.user.lastName.charAt(0).toUpperCase()}
+                        </Text>
+                      </View>
+                      <View style={styles.chatHeaderTextContainer}>
+                        <Text style={styles.chatHeaderUserName}>
+                          {selectedChat.user.firstName} {selectedChat.user.lastName}
+                        </Text>
+                        <Text style={styles.chatHeaderSubTitle}>
+                          {selectedChat.productTitle ? selectedChat.productTitle : "Gig"}
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={styles.chatHeaderBottomLine}/>
+                  </View>
                 )}
-              </TouchableOpacity>
-            </View>
-          </KeyboardAvoidingView>
-        </SafeAreaView>
-      </Modal>
 
-      <BottomNavBar />
-    </SafeAreaView>
+                <FlatList
+                  ref={flatListRef}
+                  data={selectedChat?.messages || []}
+                  keyExtractor={(item, index) => item._id || index.toString()}
+                  renderItem={renderMessage}
+                  contentContainerStyle={styles.messagesList}
+                  onContentSizeChange={() =>
+                    flatListRef.current?.scrollToEnd({ animated: true })
+                  }
+                  onLayout={() =>
+                    flatListRef.current?.scrollToEnd({ animated: true })
+                  }
+                  ListEmptyComponent={
+                    <View style={styles.emptyMessagesContainer}>
+                      <Text style={styles.emptyMessagesText}>
+                        Start the conversation by sending a message!
+                      </Text>
+                    </View>
+                  }
+                />
+
+                {/* Input Bar */}
+                <View style={styles.inputBarContainer}>
+                  <View style={styles.inputBarLine} />
+                  <View style={styles.inputContainer}>
+                    <Pressable
+                      style={styles.iconButton}
+                      onPress={handleImagePress}
+                      accessibilityLabel="Upload Image"
+                    >
+                      <Ionicons name="image" size={24} color="#fff" />
+                    </Pressable>
+
+                    <Pressable
+                      style={styles.iconButton}
+                      onPress={() => {
+                        Alert.alert("Voice Recording", "Voice recording functionality here.");
+                      }}
+                      accessibilityLabel="Record Voice"
+                    >
+                      <Ionicons name="mic" size={24} color="#fff" />
+                    </Pressable>
+
+                    <TextInput
+                      style={styles.messageInput}
+                      placeholder="Type a message..."
+                      placeholderTextColor="#888"
+                      value={newMessage}
+                      onChangeText={setNewMessage}
+                      multiline
+                      accessibilityLabel="Message Input"
+                    />
+
+                    <Pressable
+                      style={styles.sendButton}
+                      onPress={sendMessage}
+                      disabled={sending}
+                      accessibilityLabel="Send Message"
+                    >
+                      {sending ? (
+                        <ActivityIndicator color="#fff" />
+                      ) : (
+                        <Ionicons name="send" size={20} color="#fff" />
+                      )}
+                    </Pressable>
+                  </View>
+                  <View style={styles.inputBarLine} />
+                </View>
+              </KeyboardAvoidingView>
+            </SafeAreaView>
+          </View>
+        </Modal>
+
+        {/* Image Preview Modal */}
+        <Modal
+          visible={isImagePreviewModalVisible}
+          animationType="slide"
+          transparent={false}
+          onRequestClose={() => {
+            setIsImagePreviewModalVisible(false);
+            setSelectedImageUri(null);
+          }}
+        >
+          <View style={[styles.modalSafeArea, { backgroundColor: "#000" }]}>
+            <SafeAreaView style={{ flex: 1 }}>
+              <View style={styles.enhancedChatHeader}>
+                <Pressable
+                  onPress={() => {
+                    setIsImagePreviewModalVisible(false);
+                    setSelectedImageUri(null);
+                  }}
+                  style={styles.backButton}
+                  accessibilityLabel="Go Back"
+                >
+                  <Ionicons name="arrow-back" size={24} color="#BB86FC" />
+                </Pressable>
+                <View style={{flex:1}} />
+                <Pressable
+                  onPress={confirmAddImage}
+                  style={styles.addImageButton}
+                  accessibilityLabel="Add Image"
+                  disabled={sending}
+                >
+                  {sending ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Ionicons name="checkmark" size={24} color="#BB86FC" />
+                  )}
+                </Pressable>
+              </View>
+
+              {selectedImageUri && (
+                <View style={styles.imagePreviewContainer}>
+                  <Image
+                    source={{ uri: selectedImageUri }}
+                    style={styles.previewImage}
+                    resizeMode="contain"
+                  />
+                </View>
+              )}
+            </SafeAreaView>
+          </View>
+        </Modal>
+
+        <BottomNavBar />
+      </SafeAreaView>
+    </View>
   );
 };
 
 export default MessagingScreen;
 
-// --- Styles ---
+const { width } = Dimensions.get("window");
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#121212",
-    padding: 20,
   },
-  header: {
-    fontSize: 24,
-    fontWeight: "bold",
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: 20,
+    marginTop: 20,
+    marginBottom: 5,
+    justifyContent: "space-between",
+  },
+  mainHeader: {
+    fontSize: 28,
+    fontWeight: "700",
     color: "#BB86FC",
+    fontFamily: "HelveticaNeue-Bold",
+  },
+  filterLabelButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: "#1E1E1E",
+    borderRadius: 20,
+  },
+  filterLabelText: {
+    color: "#BB86FC",
+    fontSize: 14,
+    fontFamily: "HelveticaNeue-Medium",
+  },
+  modalOverlay: {
+    flex:1,
+    backgroundColor:'rgba(0,0,0,0.7)',
+    justifyContent:'center',
+    alignItems:'center'
+  },
+  filterModalContainer: {
+    backgroundColor:"#1E1E1E",
+    borderRadius:8,
+    padding:20,
+    width:200,
+    alignItems:"stretch"
+  },
+  filterModalOption:{
+    paddingVertical:10,
+    alignItems:"center"
+  },
+  filterModalOptionText:{
+    color:"#FFFFFF",
+    fontSize:16,
+    fontFamily:"HelveticaNeue-Medium"
+  },
+  filterModalClose:{
+    marginTop:10,
+    borderTopWidth:1,
+    borderTopColor:"#333333"
+  },
+  horizontalListContainer: {
+    marginTop: 10,
+    paddingHorizontal: 20,
+  },
+  sectionTitle: {
+    color: "#BB86FC",
+    fontSize: 16,
+    fontFamily: "HelveticaNeue-Bold",
+    marginBottom: 5,
+  },
+  horizontalScroll: {
+    flexDirection: "row",
+  },
+  productGigItem: {
+    backgroundColor: "#1E1E1E",
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginRight: 10,
+  },
+  productGigItemText: {
+    color: "#FFFFFF",
+    fontFamily: "HelveticaNeue",
+  },
+  separatorAfterPurchases: {
+    height: 1,
+    backgroundColor: "#333333",
+    marginTop: 10,
     marginBottom: 10,
   },
   flatListContainer: {
@@ -480,127 +854,249 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  conversationItem: {
-    padding: 15,
-    borderRadius: 10,
-    backgroundColor: "#1F1F1F",
-    marginBottom: 10,
+  chatItemContainer: {
+    backgroundColor: "transparent",
+    paddingHorizontal: 20,
+    paddingVertical: 12,
   },
-  conversationDetails: {
+  chatItem: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
   },
-  participantName: {
+  profilePicWrapper: {
+    marginRight: 12,
+  },
+  profilePicPlaceholder: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: "#BB86FC",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  profilePicInitials: {
+    color: "#000",
+    fontSize: 18,
+    fontWeight: "700",
+    fontFamily: "HelveticaNeue-Bold",
+  },
+  chatDetails: {
+    flex: 1,
+    flexDirection: "column",
+  },
+  chatHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "baseline",
+  },
+  chatName: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#BB86FC",
-  },
-  productName: {
-    fontSize: 14,
-    color: "#ccc",
-  },
-  messageInfo: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginTop: 5,
-  },
-  latestMessage: {
-    fontSize: 12,
-    color: "#888",
+    color: "#FFFFFF",
+    fontFamily: "HelveticaNeue-Medium",
     flex: 1,
     marginRight: 10,
   },
-  timestamp: {
-    fontSize: 10,
-    color: "#888",
+  chatTime: {
+    fontSize: 12,
+    color: "#AAAAAA",
+    fontFamily: "HelveticaNeue",
+  },
+  chatProductName: {
+    fontSize: 13,
+    color: "#BBBBBB",
+    fontFamily: "HelveticaNeue",
+    marginTop: 2,
+    marginBottom: 3,
+  },
+  lastMessageRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 2,
+  },
+  unreadDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#BB86FC",
+    marginRight: 5,
+  },
+  lastMessage: {
+    fontSize: 14,
+    color: "#CCCCCC",
+    fontFamily: "HelveticaNeue",
+    flexShrink: 1,
+  },
+  separatorLine: {
+    height: 0.5,
+    backgroundColor: "#333333",
+    marginLeft: 82,
   },
   emptyContainer: {
     marginTop: 50,
     alignItems: "center",
   },
   emptyText: {
-    fontSize: 16,
-    color: "#888",
+    fontSize: 18,
+    color: "#888888",
+    fontFamily: "HelveticaNeue",
   },
   modalSafeArea: {
     flex: 1,
-    backgroundColor: "#121212",
   },
   modalContainer: {
     flex: 1,
-    padding: 10,
   },
-  chatHeader: {
+  enhancedChatHeader: {
+    backgroundColor: "#1F1F1F",
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#333333",
     flexDirection: "row",
     alignItems: "center",
-    padding: 10,
-    backgroundColor: "#BB86FC",
-    borderRadius: 10,
-    marginBottom: 10,
   },
   backButton: {
     marginRight: 10,
   },
-  chatTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#fff",
+  chatHeaderInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
+  headerProfilePicPlaceholder: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#BB86FC",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 10,
+  },
+  headerProfilePicInitials: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#000",
+    fontFamily: "HelveticaNeue-Bold",
+  },
+  chatHeaderTextContainer: {
+    flexDirection: "column",
     flexShrink: 1,
+  },
+  chatHeaderUserName: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#FFFFFF",
+    fontFamily: "HelveticaNeue-Bold",
+  },
+  chatHeaderSubTitle: {
+    fontSize: 13,
+    color: "#BBBBBB",
+    fontFamily: "HelveticaNeue",
+    marginTop: 2,
+  },
+  chatHeaderBottomLine: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 1,
+    backgroundColor: "#333333",
   },
   messagesList: {
     flexGrow: 1,
-    justifyContent: "flex-end",
+    paddingVertical: 10,
+    paddingHorizontal: 10,
   },
-  messageBubble: {
-    padding: 10,
-    borderRadius: 10,
-    marginBottom: 5,
+  messageContainer: {
+    marginBottom: 10,
+    flexDirection: "row",
     maxWidth: "80%",
   },
-  myMessage: {
+  myMessageContainer: {
     alignSelf: "flex-end",
+  },
+  theirMessageContainer: {
+    alignSelf: "flex-start",
+  },
+  messageBubble: {
+    borderRadius: 14,
+    padding: 8,
+    maxWidth: "100%",
+    flexDirection: "row",
+    alignItems: "flex-end",
+    flexWrap: "wrap",
+    position: "relative",
+  },
+  myMessage: {
     backgroundColor: "#BB86FC",
+    borderTopRightRadius: 0,
   },
   theirMessage: {
-    alignSelf: "flex-start",
-    backgroundColor: "#1F1F1F",
+    backgroundColor: "#FFFFFF",
+    borderTopLeftRadius: 0,
+  },
+  myMessageTextColor: {
+    color: "#000000",
+  },
+  theirMessageTextColor: {
+    color: "#000000",
   },
   messageText: {
-    color: "#fff",
-    fontSize: 14,
+    fontSize: 16,
+    fontFamily: "HelveticaNeue",
+    flexShrink: 1,
   },
   messageTimestamp: {
-    color: "#ddd",
-    fontSize: 10,
-    marginTop: 2,
-    alignSelf: "flex-end",
+    fontSize: 12,
+    fontFamily: "HelveticaNeue",
+    marginLeft: 5,
+  },
+  myTimestampColor: {
+    color: "#333333",
+  },
+  theirTimestampColor: {
+    color: "#555555",
+  },
+  messageImage: {
+    width: 200,
+    height: 200,
+    borderRadius: 10,
+    marginRight: 5,
+  },
+  inputBarContainer: {
+    backgroundColor: "#121212",
+  },
+  inputBarLine: {
+    height: 1,
+    backgroundColor: "#333333",
   },
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    borderTopWidth: 1,
-    borderColor: "#333",
-    padding: 10,
+    backgroundColor: "#1E1E1E",
+    paddingVertical: 8,
+    paddingHorizontal: 5,
   },
   messageInput: {
     flex: 1,
-    backgroundColor: "#333",
-    borderRadius: 20,
-    paddingHorizontal: 15,
-    color: "#fff",
-    marginRight: 10,
+    color: "#FFFFFF",
+    paddingHorizontal: 10,
+    fontSize: 16,
+    fontFamily: "HelveticaNeue",
     maxHeight: 100,
+  },
+  iconButton: {
+    marginHorizontal: 5,
   },
   sendButton: {
     backgroundColor: "#BB86FC",
     borderRadius: 20,
-    padding: 10,
+    padding: 12,
     justifyContent: "center",
     alignItems: "center",
+    marginLeft: 5,
   },
-
   emptyMessagesContainer: {
     flex: 1,
     justifyContent: "center",
@@ -608,8 +1104,23 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   emptyMessagesText: {
-    fontSize: 14,
-    color: "#888",
+    fontSize: 16,
+    color: "#888888",
     textAlign: "center",
+    fontFamily: "HelveticaNeue",
+  },
+  imagePreviewContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#000",
+  },
+  previewImage: {
+    width: width,
+    height: undefined,
+    aspectRatio: 1,
+  },
+  addImageButton: {
+    marginLeft: "auto",
   },
 });
