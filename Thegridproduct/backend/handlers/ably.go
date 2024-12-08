@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/ably/ably-go/ably"
+	"github.com/google/uuid"
 )
 
 var ablyClient *ably.Realtime
@@ -41,48 +42,59 @@ func SetAblyClient(client *ably.Realtime) {
 	ablyClient = client
 	log.Println("Ably client set successfully")
 }
+func generateMessageID() string {
+	return uuid.New().String()
+}
 
-// PublishMessageHandler publishes a message to a specific chat channel on Ably.
-// PublishMessageHandler publishes a message to a specific chat channel on Ably and persists it in MongoDB.
 func PublishMessageHandler(w http.ResponseWriter, r *http.Request) {
 	var msgReq MessageRequest
 	if err := json.NewDecoder(r.Body).Decode(&msgReq); err != nil {
-		WriteJSONError(w, "Invalid request payload", http.StatusBadRequest)
+		log.Printf("Error decoding request body: %v", err)
+		WriteJSONError(w, "Invalid JSON payload", http.StatusBadRequest)
 		return
 	}
 
 	// Validate required fields
 	if msgReq.ChatID == "" || msgReq.SenderID == "" || msgReq.Content == "" {
-		WriteJSONError(w, "ChatID, SenderID, and Content are required", http.StatusBadRequest)
+		log.Println("Validation error: Missing ChatID, SenderID, or Content")
+		WriteJSONError(w, "ChatID, SenderID, and Content fields are required", http.StatusBadRequest)
 		return
 	}
+
+	// Generate unique message ID
+	messageID := generateMessageID()
+	timestamp := time.Now().UTC()
 
 	// Publish the message to Ably
 	channel := ablyClient.Channels.Get(msgReq.ChatID)
 	err := channel.Publish(context.Background(), "message", map[string]interface{}{
+		"messageId": messageID,
+		"chatId":    msgReq.ChatID,
 		"senderId":  msgReq.SenderID,
 		"content":   msgReq.Content,
-		"timestamp": time.Now().Unix(),
+		"timestamp": timestamp.Unix(),
 	})
 	if err != nil {
-		log.Printf("Failed to publish message to chat %s: %v", msgReq.ChatID, err)
-		WriteJSONError(w, "Failed to publish message", http.StatusInternalServerError)
+		log.Printf("Failed to publish message to Ably for chat %s: %v", msgReq.ChatID, err)
+		WriteJSONError(w, "Failed to publish message to Ably", http.StatusInternalServerError)
 		return
 	}
 
 	// Persist the message in MongoDB
 	message := models.Message{
+		ID:        messageID,
 		SenderID:  msgReq.SenderID,
 		Content:   msgReq.Content,
-		Timestamp: time.Now(),
+		Timestamp: timestamp,
 	}
 
 	if err := db.AddMessageToChat(msgReq.ChatID, message); err != nil {
-		log.Printf("Failed to save message in MongoDB for chat %s: %v", msgReq.ChatID, err)
+		log.Printf("Failed to save message with ID %s in MongoDB for chat %s: %v", messageID, msgReq.ChatID, err)
 		WriteJSONError(w, "Failed to save message in MongoDB", http.StatusInternalServerError)
 		return
 	}
 
+	log.Printf("Message published and saved successfully: chatID=%s, senderID=%s, messageID=%s", msgReq.ChatID, msgReq.SenderID, messageID)
 	WriteJSON(w, map[string]string{"status": "Message published and saved successfully"}, http.StatusOK)
 }
 

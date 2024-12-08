@@ -297,3 +297,61 @@ func findUserInCollection(database string, collectionName string, userID string)
 	}
 	return &user, nil
 }
+
+func UpdateProductStatus(productID string, newStatus string) error {
+	collection := GetCollection("gridlyapp", "products")
+
+	objectID, err := primitive.ObjectIDFromHex(productID)
+	if err != nil {
+		log.Printf("Invalid product ID format %s: %v", productID, err)
+		return fmt.Errorf("invalid product ID format: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	update := bson.M{"$set": bson.M{"status": newStatus}}
+
+	result, err := collection.UpdateOne(ctx, bson.M{"_id": objectID}, update)
+	if err != nil {
+		log.Printf("Error updating product status: %v", err)
+		return fmt.Errorf("error updating product status: %v", err)
+	}
+
+	if result.MatchedCount == 0 {
+		log.Printf("Product with ID %s not found", productID)
+		return errors.New("product not found")
+	}
+
+	return nil
+}
+
+func GetProductsByStatus(status string, userID string) ([]models.Product, error) {
+	collection := GetCollection("gridlyapp", "products")
+
+	objectID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		log.Printf("Invalid user ID format %s: %v", userID, err)
+		return nil, fmt.Errorf("invalid user ID format: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	filter := bson.M{"status": status, "userId": bson.M{"$ne": objectID}}
+
+	cursor, err := collection.Find(ctx, filter)
+	if err != nil {
+		log.Printf("Error fetching products with status %s: %v", status, err)
+		return nil, fmt.Errorf("error fetching products: %v", err)
+	}
+	defer cursor.Close(ctx)
+
+	var products []models.Product
+	if err := cursor.All(ctx, &products); err != nil {
+		log.Printf("Error decoding products: %v", err)
+		return nil, fmt.Errorf("error decoding products: %v", err)
+	}
+
+	return products, nil
+}

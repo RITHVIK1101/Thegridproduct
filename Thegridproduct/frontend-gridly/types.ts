@@ -21,3 +21,29 @@ export interface Conversation {
   latestTimestamp?: string; // Optional: timestamp of the latest message
   messages?: Message[]; // Optional: array of messages in the conversation
 }
+export type Cart = {
+  userId: string;
+  items: Array<{
+    productId: string;
+    quantity: number;
+    cartStatus: 'current' | 'bought';
+  }>;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type Product = {
+  id: string;
+  title: string;
+  price: number;
+  userId: string;
+  description: string;
+  category: string;
+  images: string[];
+  university: string;
+  ownerId?: string;
+  postedDate: string;
+  rating?: number;
+  quality?: string;
+  productStatus: 'shop' | 'talks' | 'sold'; // Added productStatus as part of the definition
+};

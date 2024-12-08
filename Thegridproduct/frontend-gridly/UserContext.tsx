@@ -20,7 +20,7 @@ interface UserContextProps {
   token: string;
   institution: string;
   studentType: StudentType | null;
-  isLoading: boolean; // New State
+  isLoading: boolean;
   setUser: (user: User) => Promise<void>;
   clearUser: () => Promise<void>;
 }
@@ -30,7 +30,7 @@ export const UserContext = createContext<UserContextProps>({
   token: "",
   institution: "",
   studentType: null,
-  isLoading: true, // Initialize as loading
+  isLoading: true,
   setUser: async () => {},
   clearUser: async () => {},
 });
@@ -40,7 +40,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   const [token, setToken] = useState<string>("");
   const [institution, setInstitution] = useState<string>("");
   const [studentType, setStudentType] = useState<StudentType | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true); // Initialize as loading
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   useEffect(() => {
     const loadUserData = async () => {
@@ -63,9 +63,8 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         }
       } catch (error) {
         console.error("Error loading user data from SecureStore:", error);
-        // Optionally, handle specific errors or provide user feedback here.
       } finally {
-        setIsLoading(false); // Data loading complete
+        setIsLoading(false);
       }
     };
 
@@ -85,7 +84,6 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
       setStudentType(user.studentType);
     } catch (error) {
       console.error("Error setting user data:", error);
-      // Optionally, handle errors (e.g., show a toast or alert to the user).
       throw new Error("Failed to set user data.");
     }
   };
@@ -103,7 +101,6 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
       setStudentType(null);
     } catch (error) {
       console.error("Error clearing user data:", error);
-      // Optionally, handle errors (e.g., show a toast or alert to the user).
       throw new Error("Failed to clear user data.");
     }
   };
@@ -113,7 +110,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     token,
     institution,
     studentType,
-    isLoading, // Provide isLoading
+    isLoading,
     setUser,
     clearUser,
   };

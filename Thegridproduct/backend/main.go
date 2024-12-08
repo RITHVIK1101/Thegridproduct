@@ -19,13 +19,11 @@ import (
 )
 
 func main() {
-	// Load environment variables from .env file
 	err := godotenv.Load()
 	if err != nil {
 		log.Println("Error loading .env file, proceeding with system environment variables")
 	}
 
-	// Load and validate essential environment variables
 	jwtSecret := os.Getenv("JWT_SECRET_KEY")
 	if jwtSecret == "" {
 		log.Fatal("JWT_SECRET_KEY is not set in environment variables")
@@ -88,7 +86,6 @@ func main() {
 	protected.HandleFunc("/products/{id}", handlers.GetSingleProductHandler).Methods("GET")
 	protected.HandleFunc("/products/{id}", handlers.DeleteProductHandler).Methods("DELETE")
 	protected.HandleFunc("/products/{id}", handlers.UpdateProductHandler).Methods("PUT")
-	protected.HandleFunc("/products/bulk", handlers.AddMultipleProductsHandler).Methods("POST")
 
 	// Gig Routes
 	protected.HandleFunc("/gigs", handlers.AddGigHandler).Methods("POST")
@@ -99,7 +96,6 @@ func main() {
 	protected.HandleFunc("/cart", handlers.GetCartHandler).Methods("GET")
 	protected.HandleFunc("/cart/add", handlers.AddToCartHandler).Methods("POST")
 	protected.HandleFunc("/cart/remove", handlers.RemoveFromCartHandler).Methods("POST")
-	protected.HandleFunc("/cart/clear", handlers.ClearCartHandler).Methods("POST")
 
 	// User Routes
 	protected.HandleFunc("/users/{id}", handlers.GetUserHandler).Methods("GET")

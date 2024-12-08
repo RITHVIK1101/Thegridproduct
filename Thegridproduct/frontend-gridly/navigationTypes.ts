@@ -6,14 +6,18 @@ export type CartProduct = {
   price: number;
   images: string[];
   quantity: number;
-  description?: string;
-  category?: string;
-  university?: string;
-  ownerId?: string;
-  postedDate?: string;
+  description?: string; // Made optional
+  category?: string; // Made optional
+  university?: string; // Made optional
+  ownerId: string;
+  postedDate: string;
   rating?: number;
   quality?: string;
+  cartStatus: 'current' | 'bought' | string;
+productStatus: 'shop' | 'talks' | 'sold' | string;
+
 };
+
 
 export type RootStackParamList = {
   Login: undefined;
@@ -21,11 +25,10 @@ export type RootStackParamList = {
   AddProduct: undefined;
   Activity: undefined;
   Gigs: undefined;
-  Messaging: { chatId: string; userId: string; };
-  AddGig: undefined; 
+  Messaging: { chatId: string; userId: string };
+  AddGig: undefined;
   Cart: undefined;
   Payment: { product: CartProduct; buyerId: string; sellerId: string };
   Account: undefined;
   EditProduct: { productId: string };
-
 };

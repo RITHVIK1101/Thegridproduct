@@ -22,11 +22,19 @@ import { NGROK_URL, ABLY_API_KEY } from "@env"; // Ensure ABLY_API_KEY is define
 import { Conversation, Message } from "./types";
 import { UserContext } from "./UserContext";
 import Ably from "ably";
+import { RouteProp, useNavigation } from "@react-navigation/native";
+import { StackNavigationProp } from "@react-navigation/stack";
+import { RootStackParamList } from "./navigationTypes";
 
-type TabType = "marketplace" | "gigs";
+type MessagingScreenRouteProp = RouteProp<RootStackParamList, "Messaging">;
 
-const MessagingScreen: React.FC = () => {
-  const [selectedTab, setSelectedTab] = useState<TabType>("marketplace");
+type MessagingScreenProps = {
+  route: MessagingScreenRouteProp;
+};
+
+type NavigationProp = StackNavigationProp<RootStackParamList, "Messaging">;
+
+const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [isChatModalVisible, setChatModalVisible] = useState<boolean>(false);
   const [selectedConversation, setSelectedConversation] =
@@ -39,10 +47,16 @@ const MessagingScreen: React.FC = () => {
   const ablyRef = useRef<Ably.Realtime | null>(null);
   const channelRef = useRef<Ably.RealtimeChannel | null>(null);
 
+  const navigation = useNavigation<NavigationProp>();
+
+  // Extract chatId and userId from route params
+  const { chatId: routeChatId, userId: routeUserId } = route.params || {};
+
   useEffect(() => {
     if (userId && token) {
       fetchUserConversations();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, token]);
 
   useEffect(() => {
@@ -72,6 +86,7 @@ const MessagingScreen: React.FC = () => {
         ablyRef.current = null;
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -82,7 +97,46 @@ const MessagingScreen: React.FC = () => {
     return () => {
       unsubscribeFromChannel();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedConversation]);
+
+  useEffect(() => {
+    // If navigated with a specific chatId, open that chat
+    if (routeChatId && userId && token) {
+      const conversation = conversations.find(
+        (conv) => conv.chatID === routeChatId
+      );
+      if (conversation) {
+        openChat(conversation);
+      } else {
+        // Fetch the specific conversation if not already fetched
+        fetchSpecificConversation(routeChatId);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routeChatId, conversations]);
+
+  const fetchSpecificConversation = async (chatId: string) => {
+    setLoading(true);
+    try {
+      const specificConversation = await fetchConversations(
+        userId,
+        token,
+        chatId
+      );
+      if (specificConversation.length > 0) {
+        setConversations((prev) => [...prev, ...specificConversation]);
+        openChat(specificConversation[0]);
+      } else {
+        Alert.alert("Error", "Conversation not found.");
+      }
+    } catch (error) {
+      console.error("Error fetching specific conversation:", error);
+      Alert.alert("Error", "Failed to load the conversation.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const fetchUserConversations = async () => {
     if (!userId || !token) return;
@@ -92,6 +146,15 @@ const MessagingScreen: React.FC = () => {
       const fetchedConversations = await fetchConversations(userId, token);
       console.log("Fetched Conversations:", fetchedConversations);
       setConversations(fetchedConversations);
+      // If navigated with a chatId that exists in fetched conversations, open it
+      if (routeChatId) {
+        const conversation = fetchedConversations.find(
+          (conv) => conv.chatID === routeChatId
+        );
+        if (conversation) {
+          openChat(conversation);
+        }
+      }
     } catch (error) {
       console.error("Error fetching conversations:", error);
       Alert.alert("Error", "Failed to load conversations.");
@@ -179,15 +242,25 @@ const MessagingScreen: React.FC = () => {
     setLoading(true);
     try {
       const messages = await getMessages(conversation.chatID, token || "");
+
+      // If the response is null or invalid, fall back to an empty array
       setSelectedConversation({
         ...conversation,
-        messages: messages,
+        messages: Array.isArray(messages) ? messages : [], // Default to an empty array
       });
+
       setChatModalVisible(true);
       setNewMessage("");
     } catch (error) {
-      console.error("Error fetching messages:", error);
-      Alert.alert("Error", "Failed to load messages.");
+      console.error("getMessages error:", error);
+
+      // Fallback to an empty conversation with no alerts
+      setSelectedConversation({
+        ...conversation,
+        messages: [], // Default to an empty array
+      });
+
+      setChatModalVisible(true);
     } finally {
       setLoading(false);
     }
@@ -244,6 +317,7 @@ const MessagingScreen: React.FC = () => {
       <TouchableOpacity
         style={styles.conversationItem}
         onPress={() => openChat(item)}
+        accessibilityLabel={`Open chat with ${item.user.firstName} ${item.user.lastName}`}
       >
         <View style={styles.conversationDetails}>
           <View>
@@ -298,6 +372,9 @@ const MessagingScreen: React.FC = () => {
               <Text style={styles.emptyText}>No conversations found.</Text>
             </View>
           }
+          contentContainerStyle={
+            conversations.length === 0 && styles.flatListContainer
+          }
         />
       )}
 
@@ -324,6 +401,7 @@ const MessagingScreen: React.FC = () => {
                   unsubscribeFromChannel();
                 }}
                 style={styles.backButton}
+                accessibilityLabel="Go Back"
               >
                 <Ionicons name="arrow-back" size={24} color="#fff" />
               </TouchableOpacity>
@@ -334,13 +412,20 @@ const MessagingScreen: React.FC = () => {
             </View>
 
             <FlatList
-              data={selectedConversation?.messages || []} // Provide an empty array as fallback
+              data={selectedConversation?.messages || []}
               keyExtractor={(item, index) =>
                 item._id ? item._id : index.toString()
               }
               renderItem={renderMessage}
               contentContainerStyle={styles.messagesList}
               inverted
+              ListEmptyComponent={
+                <View style={styles.emptyMessagesContainer}>
+                  <Text style={styles.emptyMessagesText}>
+                    Start the conversation by sending a message!
+                  </Text>
+                </View>
+              }
             />
 
             <View style={styles.inputContainer}>
@@ -351,11 +436,13 @@ const MessagingScreen: React.FC = () => {
                 value={newMessage}
                 onChangeText={setNewMessage}
                 multiline
+                accessibilityLabel="Message Input"
               />
               <TouchableOpacity
                 style={styles.sendButton}
                 onPress={sendMessage}
                 disabled={sending}
+                accessibilityLabel="Send Message"
               >
                 {sending ? (
                   <ActivityIndicator color="#fff" />
@@ -375,7 +462,7 @@ const MessagingScreen: React.FC = () => {
 
 export default MessagingScreen;
 
-// Styles
+// --- Styles ---
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -387,6 +474,11 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#BB86FC",
     marginBottom: 10,
+  },
+  flatListContainer: {
+    flexGrow: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
   conversationItem: {
     padding: 15,
@@ -507,5 +599,17 @@ const styles = StyleSheet.create({
     padding: 10,
     justifyContent: "center",
     alignItems: "center",
+  },
+
+  emptyMessagesContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 20,
+  },
+  emptyMessagesText: {
+    fontSize: 14,
+    color: "#888",
+    textAlign: "center",
   },
 });

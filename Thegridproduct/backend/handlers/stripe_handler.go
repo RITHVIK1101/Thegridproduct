@@ -1,8 +1,10 @@
+// hadlers/stripe_handler.go
 package handlers
 
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"time"
@@ -27,6 +29,10 @@ type PaymentIntentRequest struct {
 func CreatePaymentIntentHandler(w http.ResponseWriter, r *http.Request) {
 	// Load Stripe secret key
 	stripe.Key = os.Getenv("STRIPE_SECRET_KEY")
+	if stripe.Key == "" {
+		http.Error(w, "Stripe secret key is not configured", http.StatusInternalServerError)
+		return
+	}
 
 	// Parse the request body
 	var request PaymentIntentRequest
@@ -41,17 +47,24 @@ func CreatePaymentIntentHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check if chat already exists
+	existingChat, err := db.GetChatByProductID(request.ProductID)
+	if err == nil && existingChat.BuyerID == request.BuyerID && existingChat.SellerID == request.SellerID {
+		http.Error(w, "Chat for this product already exists", http.StatusConflict)
+		return
+	}
+
 	// Fetch buyer details
-	buyer, err := db.GetUserByID(request.BuyerID) // Pass as string directly
+	buyer, err := db.GetUserByID(request.BuyerID)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to fetch buyer details: %v", err), http.StatusInternalServerError)
+		http.Error(w, "Buyer not found", http.StatusNotFound)
 		return
 	}
 
 	// Fetch seller details
-	seller, err := db.GetUserByID(request.SellerID) // Pass as string directly
+	seller, err := db.GetUserByID(request.SellerID)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to fetch seller details: %v", err), http.StatusInternalServerError)
+		http.Error(w, "Seller not found", http.StatusNotFound)
 		return
 	}
 
@@ -69,22 +82,25 @@ func CreatePaymentIntentHandler(w http.ResponseWriter, r *http.Request) {
 	// Create a chat session after successful PaymentIntent creation
 	chat := models.Chat{
 		ProductID: request.ProductID,
-		BuyerID:   request.BuyerID,    // Store as string
-		SellerID:  request.SellerID,   // Store as string
-		Messages:  []models.Message{}, // Start with an empty chat
+		BuyerID:   request.BuyerID,
+		SellerID:  request.SellerID,
+		Messages:  []models.Message{},
 		CreatedAt: time.Now(),
 	}
 
 	if err := db.CreateChat(&chat); err != nil {
-
 		http.Error(w, fmt.Sprintf("Failed to create chat session: %v", err), http.StatusInternalServerError)
 		return
 	}
 
+	// Log the successful creation
+	log.Printf("PaymentIntent created: %s for ProductID: %s", pi.ID, request.ProductID)
+	log.Printf("Chat created: %s between Buyer: %s and Seller: %s", chat.ID, request.BuyerID, request.SellerID)
+
 	// Respond with the client secret, chat ID, and confirmation message
 	response := map[string]string{
 		"clientSecret": pi.ClientSecret,
-		"chatId":       chat.ID, // Include chat ID for frontend reference
+		"chatId":       chat.ID,
 		"message":      fmt.Sprintf("Chat created between %s and %s.", buyer.FirstName, seller.FirstName),
 	}
 	w.Header().Set("Content-Type", "application/json")

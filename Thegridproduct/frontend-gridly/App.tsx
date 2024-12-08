@@ -6,7 +6,10 @@ import {
   NavigationContainerRef,
   CommonActions,
 } from "@react-navigation/native";
-import { createStackNavigator, StackNavigationOptions } from "@react-navigation/stack";
+import {
+  createStackNavigator,
+  StackNavigationOptions,
+} from "@react-navigation/stack";
 import {
   TouchableOpacity,
   View,
@@ -140,7 +143,7 @@ const AppNavigator: React.FC = () => {
 
   return (
     <StripeProvider
-      publishableKey="pk_live_51QQZb9Fg2PIykDNlxiX04AYjLnow7r1p0WCLBBFn2Q8eafoY1GJmzkBqcDL8KYUj3yEu2nw5oNUj7X8mfyOm8MOa009Sq3WAX3"
+      publishableKey="pk_test_51QQZb9Fg2PIykDNlba9E7bVR9EFKxmaS9F1mjlOXFb0meJuXTG5nWy1vYHBIIlWPwiheNa37T1snKDN2Urzs2Jwx00ywvbvMGE"
       merchantIdentifier="merchant.com.yourapp"
     >
       <NavigationContainer ref={navigationRef}>

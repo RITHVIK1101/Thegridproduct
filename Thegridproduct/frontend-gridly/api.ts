@@ -4,23 +4,34 @@ import { NGROK_URL, ABLY_API_KEY } from "@env"; // Ensure NGROK_URL and ABLY_API
 import { Conversation, Message } from "./types"; // Import necessary types
 
 // Fetch user conversations
-export const fetchConversations = async (userId: string, token: string): Promise<Conversation[]> => {
+export const fetchConversations = async (
+  userId: string,
+  token: string,
+  chatId?: string // Optional parameter
+): Promise<Conversation[]> => {
   try {
-    const response = await fetch(`${NGROK_URL}/chats/user/${userId}`, {
-      method: 'GET',
+    // If chatId is provided, fetch a specific chat
+    const url = chatId
+      ? `${NGROK_URL}/chats/${chatId}`
+      : `${NGROK_URL}/chats/user/${userId}`;
+
+    const response = await fetch(url, {
+      method: "GET",
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
       },
     });
 
     if (!response.ok) {
-      throw new Error('Failed to fetch conversations');
+      throw new Error("Failed to fetch conversations");
     }
 
     const data = await response.json();
-    if (!data.conversations) {
-      throw new Error('Invalid response structure');
+
+    if (!Array.isArray(data.conversations)) {
+      console.warn("Unexpected response format for conversations:", data);
+      return [];
     }
 
     return data.conversations;
@@ -67,27 +78,31 @@ export const postMessage = async (
 
 
 // Get messages for a specific chat from MongoDB
-export const getMessages = async (chatId: string, token: string): Promise<Message[]> => {
+export const getMessages = async (
+  chatId: string,
+  token: string
+): Promise<Message[]> => {
   try {
     const response = await fetch(`${NGROK_URL}/chats/${chatId}/messages`, {
-      method: 'GET',
+      method: "GET",
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
       },
     });
 
     if (!response.ok) {
-      throw new Error('Failed to fetch messages');
+      throw new Error("Failed to fetch messages");
     }
 
     const data = await response.json();
-    // Check if it's an array
+
     if (!Array.isArray(data)) {
-      throw new Error('Invalid response structure');
+      console.warn("Unexpected response format for messages:", data);
+      return [];
     }
 
-    return data; // data is already an array of messages
+    return data; // data is validated as an array
   } catch (error) {
     console.error("getMessages error:", error);
     throw error;
