@@ -570,11 +570,13 @@ func AddMultipleProductsHandler(w http.ResponseWriter, r *http.Request) {
 	var insertDocs []interface{}
 	for i, product := range products {
 		// Populate product fields
+		// Populate product fields
 		product.UserID = userObjID
 		product.University = university
 		product.StudentType = studentType
 		product.PostedDate = time.Now()
 		product.Expired = false
+		product.Status = "inshop" // New line to set default status
 
 		// Validate required fields
 		if product.Title == "" || product.Price == 0 || product.Description == "" ||
@@ -715,5 +717,33 @@ func DeleteProductHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"message": "Product deleted successfully",
 		"deleted": deleteResult.DeletedCount,
+	})
+}
+func ConfirmTransferHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method != http.MethodPost {
+		WriteJSONError(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Extract product ID and user confirmations (buyer/seller) from request
+	// Validate that both parties have confirmed...
+	productID := r.URL.Query().Get("productId")
+	if productID == "" {
+		WriteJSONError(w, "Product ID is required", http.StatusBadRequest)
+		return
+	}
+
+	// Perform your logic to check if both buyer and seller confirmed.
+	// For the sake of example, assume they did.
+	if err := db.UpdateProductStatus(productID, "sold"); err != nil {
+		log.Printf("Failed to update product status to 'sold': %v", err)
+		WriteJSONError(w, "Failed to update product status", http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]string{
+		"message": "Product marked as sold successfully",
 	})
 }

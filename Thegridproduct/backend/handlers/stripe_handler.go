@@ -92,7 +92,11 @@ func CreatePaymentIntentHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("Failed to create chat session: %v", err), http.StatusInternalServerError)
 		return
 	}
-
+	if err := db.UpdateProductStatus(request.ProductID, "talks"); err != nil {
+		log.Printf("Failed to update product status to 'talks': %v", err)
+		// You may decide what to do if updating the status fails
+		// For now, we just log it.
+	}
 	// Log the successful creation
 	log.Printf("PaymentIntent created: %s for ProductID: %s", pi.ID, request.ProductID)
 	log.Printf("Chat created: %s between Buyer: %s and Seller: %s", chat.ID, request.BuyerID, request.SellerID)
