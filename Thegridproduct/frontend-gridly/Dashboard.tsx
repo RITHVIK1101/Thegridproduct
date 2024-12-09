@@ -67,17 +67,26 @@ const Dashboard: React.FC<DashboardProps> = () => {
   const [isDetailsModalVisible, setIsDetailsModalVisible] = useState(false);
 
   // Description modal
-  const [isDescriptionModalVisible, setIsDescriptionModalVisible] = useState(false);
-  const [selectedProductDescription, setSelectedProductDescription] = useState<string>("");
+  const [isDescriptionModalVisible, setIsDescriptionModalVisible] =
+    useState(false);
+  const [selectedProductDescription, setSelectedProductDescription] =
+    useState<string>("");
 
   // Campus & search
-  const [campusMode, setCampusMode] = useState<"In Campus" | "Both">("In Campus");
+  const [campusMode, setCampusMode] = useState<"In Campus" | "Both">(
+    "In Campus"
+  );
   const [searchQuery, setSearchQuery] = useState<string>("");
 
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
   const { userId, token, institution, clearUser } = useContext(UserContext);
 
-  const categories = ["#Everything", "#FemaleClothing", "#MensClothing", "#Other"];
+  const categories = [
+    "#Everything",
+    "#FemaleClothing",
+    "#MensClothing",
+    "#Other",
+  ];
   const campusOptions: Array<{ label: string; value: "In Campus" | "Both" }> = [
     { label: "In Campus", value: "In Campus" },
     { label: "Both In and Out of Campus", value: "Both" },
@@ -85,7 +94,8 @@ const Dashboard: React.FC<DashboardProps> = () => {
 
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<string>("#Everything");
+  const [selectedCategory, setSelectedCategory] =
+    useState<string>("#Everything");
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -109,20 +119,24 @@ const Dashboard: React.FC<DashboardProps> = () => {
       });
 
       if (response.status === 401) {
-        Alert.alert("Session Expired", "Your session has expired. Please log in again.", [
-          {
-            text: "OK",
-            onPress: async () => {
-              await clearUser();
-              navigation.dispatch(
-                CommonActions.reset({
-                  index: 0,
-                  routes: [{ name: "Login" }],
-                })
-              );
+        Alert.alert(
+          "Session Expired",
+          "Your session has expired. Please log in again.",
+          [
+            {
+              text: "OK",
+              onPress: async () => {
+                await clearUser();
+                navigation.dispatch(
+                  CommonActions.reset({
+                    index: 0,
+                    routes: [{ name: "Login" }],
+                  })
+                );
+              },
             },
-          },
-        ]);
+          ]
+        );
         return;
       }
 
@@ -152,7 +166,9 @@ const Dashboard: React.FC<DashboardProps> = () => {
       return;
     }
 
-    const isAlreadyInCart = cartItems.some((item) => item.productId === product.id);
+    const isAlreadyInCart = cartItems.some(
+      (item) => item.productId === product.id
+    );
     if (isAlreadyInCart) {
       Alert.alert("Item in Cart", "This product is already in your cart.");
       return;
@@ -280,14 +296,17 @@ const Dashboard: React.FC<DashboardProps> = () => {
       let filtered = data;
       if (campusMode === "In Campus") {
         filtered = data.filter(
-          (product) => product.ownerId !== userId && product.university === institution
+          (product) =>
+            product.ownerId !== userId && product.university === institution
         );
       }
 
       // Filter by category & search
       let finalFiltered = filtered;
       if (selectedCategory !== "#Everything") {
-        finalFiltered = finalFiltered.filter((p) => p.category === selectedCategory);
+        finalFiltered = finalFiltered.filter(
+          (p) => p.category === selectedCategory
+        );
       }
       if (searchQuery.trim() !== "") {
         const query = searchQuery.trim().toLowerCase();
@@ -312,7 +331,9 @@ const Dashboard: React.FC<DashboardProps> = () => {
     if (allProducts.length > 0) {
       let finalFiltered = allProducts;
       if (selectedCategory !== "#Everything") {
-        finalFiltered = finalFiltered.filter((p) => p.category === selectedCategory);
+        finalFiltered = finalFiltered.filter(
+          (p) => p.category === selectedCategory
+        );
       }
       if (searchQuery.trim() !== "") {
         const query = searchQuery.trim().toLowerCase();
@@ -337,7 +358,8 @@ const Dashboard: React.FC<DashboardProps> = () => {
 
   // --- Modal Toggles ---
   const toggleAddModal = () => setIsAddModalVisible(!isAddModalVisible);
-  const toggleFilterModal = () => setIsFilterModalVisible(!isFilterModalVisible);
+  const toggleFilterModal = () =>
+    setIsFilterModalVisible(!isFilterModalVisible);
 
   // --- Add Options ---
   const handleAddOption = (option: "Product" | "Gig") => {
@@ -430,7 +452,8 @@ const Dashboard: React.FC<DashboardProps> = () => {
       if (!isTop) return;
 
       if (nativeEvent.state === State.END) {
-        const { translationY, translationX, velocityY, velocityX } = nativeEvent;
+        const { translationY, translationX, velocityY, velocityX } =
+          nativeEvent;
 
         if (translationY < -50 && velocityY < -0.5) {
           // Swipe up: show description
@@ -496,7 +519,9 @@ const Dashboard: React.FC<DashboardProps> = () => {
                 <View style={styles.productInfoBubble}>
                   <View style={styles.productInfoTextContainer}>
                     <Text style={styles.productInfoTitle}>{product.title}</Text>
-                    <Text style={styles.productInfoPrice}>${product.price.toFixed(2)}</Text>
+                    <Text style={styles.productInfoPrice}>
+                      ${product.price.toFixed(2)}
+                    </Text>
                   </View>
                   <View style={styles.productInfoActions}>
                     {/* Reject (X) */}
@@ -680,7 +705,8 @@ const Dashboard: React.FC<DashboardProps> = () => {
                     <Text
                       style={[
                         styles.categoryText,
-                        selectedCategory === item && styles.categoryTextSelected,
+                        selectedCategory === item &&
+                          styles.categoryTextSelected,
                       ]}
                     >
                       {item}
@@ -705,7 +731,8 @@ const Dashboard: React.FC<DashboardProps> = () => {
                     <Text
                       style={[
                         styles.categoryText,
-                        campusMode === item.value && styles.categoryTextSelected,
+                        campusMode === item.value &&
+                          styles.categoryTextSelected,
                       ]}
                     >
                       {item.label}
@@ -748,8 +775,12 @@ const Dashboard: React.FC<DashboardProps> = () => {
             <View style={styles.detailsModalContent}>
               {selectedProduct && (
                 <>
-                  <Text style={styles.detailsTitle}>{selectedProduct.title}</Text>
-                  <Text style={styles.detailsPrice}>Price: ${selectedProduct.price.toFixed(2)}</Text>
+                  <Text style={styles.detailsTitle}>
+                    {selectedProduct.title}
+                  </Text>
+                  <Text style={styles.detailsPrice}>
+                    Price: ${selectedProduct.price.toFixed(2)}
+                  </Text>
                   <Text style={styles.detailsRating}>
                     Rating: {selectedProduct.rating || "N/A"}
                   </Text>
@@ -789,7 +820,9 @@ const Dashboard: React.FC<DashboardProps> = () => {
             <View style={styles.descriptionModalContent}>
               <Text style={styles.modalTitle}>Product Description</Text>
               <ScrollView>
-                <Text style={styles.descriptionText}>{selectedProductDescription}</Text>
+                <Text style={styles.descriptionText}>
+                  {selectedProductDescription}
+                </Text>
               </ScrollView>
               <TouchableOpacity
                 onPress={() => setIsDescriptionModalVisible(false)}
@@ -935,8 +968,8 @@ const styles = StyleSheet.create({
     bottom: 20,
     left: 12,
     right: 12,
-    backgroundColor: "rgba(30, 30, 30, 0.85)",  // Slightly more opaque for a cleaner look
-    borderRadius: 14,  // Slightly smaller radius for a more compact feel
+    backgroundColor: "rgba(30, 30, 30, 0.85)", // Slightly more opaque for a cleaner look
+    borderRadius: 14, // Slightly smaller radius for a more compact feel
     paddingVertical: 10,
     paddingHorizontal: 18,
     flexDirection: "row",
@@ -946,58 +979,58 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 3 }, // Slightly softer shadow
     shadowOpacity: 0.3, // Reduced opacity for a cleaner effect
     shadowRadius: 5,
-    elevation: 5,  // Slightly lighter elevation
-    borderWidth: 1,  // Subtle border
-    borderColor: "#444",  // Dark border for contrast
+    elevation: 5, // Slightly lighter elevation
+    borderWidth: 1, // Subtle border
+    borderColor: "#444", // Dark border for contrast
   },
-  
+
   productInfoTextContainer: {
     flex: 1,
     marginRight: 10,
     justifyContent: "center", // Vertically centering content
-    marginLeft: 8,  // Slightly smaller margin for a tighter design
+    marginLeft: 8, // Slightly smaller margin for a tighter design
   },
-  
+
   productInfoTitle: {
     color: "#FFFFFF",
-    fontSize: 18,  // Smaller title size
-    fontWeight: "700",  // Bold weight for prominence but not overpowering
-    letterSpacing: 1,  // Slightly tighter spacing for a more refined look
+    fontSize: 18, // Smaller title size
+    fontWeight: "700", // Bold weight for prominence but not overpowering
+    letterSpacing: 1, // Slightly tighter spacing for a more refined look
     marginBottom: 4,
-    textShadowColor: "#000",  // Subtle shadow to enhance text readability
+    textShadowColor: "#000", // Subtle shadow to enhance text readability
     textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,  // Lighter shadow for a more sophisticated feel
+    textShadowRadius: 2, // Lighter shadow for a more sophisticated feel
   },
-  
+
   productInfoPrice: {
-    color: "#A1A1A1",  // Subtle, muted price color
-    fontSize: 16,  // Smaller font size
-    fontWeight: "600",  // Slightly lighter weight for a less bold feel
+    color: "#A1A1A1", // Subtle, muted price color
+    fontSize: 16, // Smaller font size
+    fontWeight: "600", // Slightly lighter weight for a less bold feel
     marginTop: 1,
     textShadowColor: "#000",
     textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 1,  // Finer shadow for a more elegant look
+    textShadowRadius: 1, // Finer shadow for a more elegant look
   },
-  
+
   productInfoActions: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "flex-start",  // Aligning the buttons slightly to the left
+    justifyContent: "flex-start", // Aligning the buttons slightly to the left
     marginLeft: 12,
   },
-  
+
   iconButton: {
-    backgroundColor: "#333",  // Darker background for buttons
-    padding: 8,  // Smaller padding for a tighter button
-    borderRadius: 50,  // Circular buttons for a modern touch
+    backgroundColor: "#333", // Darker background for buttons
+    padding: 8, // Smaller padding for a tighter button
+    borderRadius: 50, // Circular buttons for a modern touch
     marginLeft: 10,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,  // Softer shadow for a more minimal look
+    shadowOpacity: 0.25, // Softer shadow for a more minimal look
     shadowRadius: 3,
-    elevation: 3,  // Reduced elevation for a flatter look
+    elevation: 3, // Reduced elevation for a flatter look
   },
-   
+
   loadingContainer: {
     flex: 1,
     justifyContent: "center",

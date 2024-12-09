@@ -13,8 +13,6 @@ export type CartProduct = {
   postedDate: string;
   rating?: number;
   quality?: string;
-  cartStatus: 'current' | 'bought' | string;
-productStatus: 'shop' | 'talks' | 'sold' | string;
 
 };
 
