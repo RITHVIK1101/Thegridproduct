@@ -17,26 +17,63 @@ import Ionicons from "react-native-vector-icons/Ionicons";
 import { UserContext } from "./UserContext";
 import { CommonActions, useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
-import { RootStackParamList, CartProduct } from "./navigationTypes";
-import { Cart, Product } from "./types"; // Update the path to your type definitions
-
+import { RootStackParamList } from "./navigationTypes";
 import { NGROK_URL } from "@env";
+
+// Define Types
+type CartItem = {
+  productId: string;
+  quantity: number;
+};
+
+type Cart = {
+  userId: string;
+  items: CartItem[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+type Product = {
+  id: string;
+  title: string;
+  price: number;
+  description: string;
+  category: string;
+  images: string[];
+  university: string;
+  ownerId: string;
+  postedDate: string;
+  rating?: number;
+  quality?: string;
+};
+
+type CartProduct = {
+  id: string;
+  title: string;
+  price: number;
+  images: string[];
+  quantity: number;
+  description?: string;
+  category?: string;
+  university?: string;
+  ownerId?: string;
+  postedDate?: string;
+  rating?: number;
+  quality?: string;
+};
 
 const { width } = Dimensions.get("window");
 
 const CartScreen: React.FC = () => {
   const [cartProducts, setCartProducts] = useState<CartProduct[]>([]);
-  const [filteredProducts, setFilteredProducts] = useState<CartProduct[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"current" | "bought">("current");
-  const fadeAnim = useState(new Animated.Value(0))[0];
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const fadeAnim = useState(new Animated.Value(0))[0]; // For fade-in animation
 
   const { userId, token, clearUser } = useContext(UserContext);
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
 
-  // --- Fetch Cart ---
+  // Fetch cart items from backend
   const fetchCart = async () => {
     if (!userId || !token) {
       setError("User not logged in.");
@@ -54,6 +91,7 @@ const CartScreen: React.FC = () => {
       });
 
       if (response.status === 401) {
+        // Unauthorized: Clear user data and navigate to Login
         Alert.alert(
           "Session Expired",
           "Your session has expired. Please log in again.",
@@ -84,13 +122,14 @@ const CartScreen: React.FC = () => {
 
       if (cartData.items.length === 0) {
         setCartProducts([]);
-        setFilteredProducts([]);
         setLoading(false);
         return;
       }
 
+      // Extract product IDs
       const productIds = cartData.items.map((item) => item.productId);
 
+      // Fetch product details using the new /products/by-ids endpoint
       const productsResponse = await fetch(
         `${NGROK_URL}/products/by-ids?ids=${productIds.join(",")}`,
         {
@@ -108,11 +147,10 @@ const CartScreen: React.FC = () => {
       }
 
       const productsData: Product[] = await productsResponse.json();
-      console.log("Fetched Products Data:", productsData);
 
+      // Map products with quantities
       const combinedCartProducts: CartProduct[] = cartData.items.map((item) => {
         const product = productsData.find((prod) => prod.id === item.productId);
-
         if (product) {
           return {
             id: product.id,
@@ -123,43 +161,25 @@ const CartScreen: React.FC = () => {
             description: product.description,
             category: product.category,
             university: product.university,
-            ownerId: product.userId || "unknown",
+            ownerId: product.ownerId,
             postedDate: product.postedDate,
             rating: product.rating,
             quality: product.quality,
-            cartStatus: item.cartStatus, // Use cartStatus or map status to cartStatus
-            productStatus: product.productStatus || "shop", // Fallback to 'shop' if undefined
           };
         } else {
-          console.error(`Product not found for ID: ${item.productId}`);
+          // If product not found, handle accordingly
           return {
             id: item.productId,
             title: "Unknown Product",
             price: 0,
             images: [],
             quantity: item.quantity,
-            ownerId: "unknown",
-            postedDate: "",
-            rating: undefined,
-            quality: undefined,
-            cartStatus: item.cartStatus, // Handle cartStatus
-            productStatus: "shop", // Default for missing products
           };
         }
       });
 
-      // Debugging: Log statuses
-      combinedCartProducts.forEach((item) => {
-        console.log(
-          `Product ID: ${item.id}, Cart Status: ${item.cartStatus}, Product Status: ${item.productStatus}`
-        );
-      });
-
       setCartProducts(combinedCartProducts);
-      setFilteredProducts(
-        combinedCartProducts.filter((item) => item.cartStatus === activeTab)
-      );
-
+      // Start fade-in animation
       Animated.timing(fadeAnim, {
         toValue: 1,
         duration: 500,
@@ -177,13 +197,7 @@ const CartScreen: React.FC = () => {
     }
   };
 
-  // --- Switch Between "Current" and "Bought" ---
-  const switchTab = (tab: "current" | "bought") => {
-    setActiveTab(tab);
-    setFilteredProducts(cartProducts.filter((item) => item.cartStatus === tab));
-  };
-
-  // --- Remove from Cart ---
+  // Remove product from cart
   const removeFromCart = async (productId: string) => {
     try {
       const response = await fetch(`${NGROK_URL}/cart/remove`, {
@@ -196,6 +210,7 @@ const CartScreen: React.FC = () => {
       });
 
       if (response.status === 401) {
+        // Unauthorized: Clear user data and navigate to Login
         Alert.alert(
           "Session Expired",
           "Your session has expired. Please log in again.",
@@ -222,10 +237,8 @@ const CartScreen: React.FC = () => {
         throw new Error(errorData.message || "Failed to remove item.");
       }
 
+      // Update cart items locally
       setCartProducts((prevItems) =>
-        prevItems.filter((item) => item.id !== productId)
-      );
-      setFilteredProducts((prevItems) =>
         prevItems.filter((item) => item.id !== productId)
       );
       Alert.alert("Removed", "Product removed from your cart.");
@@ -238,33 +251,34 @@ const CartScreen: React.FC = () => {
     }
   };
 
-  // --- Buy Product ---
+  // Buy individual product
   const buyProduct = (product: CartProduct) => {
-    if (!product.ownerId) {
-      Alert.alert("Error", "Seller information is missing for this product.");
-      console.error("Seller ID is missing for product:", product);
+    Alert.alert("Buy Product", `Proceeding to buy "${product.title}"`, [
+      {
+        text: "OK",
+        onPress: () => {
+          navigation.navigate("Payment", { product });
+        },
+      },
+    ]);
+  };
+
+  // Navigate to Checkout
+  const proceedToCheckout = () => {
+    if (cartProducts.length === 0) {
+      Alert.alert("Empty Cart", "Your cart is empty.");
       return;
     }
-
-    navigation.navigate("Payment", {
-      product,
-      buyerId: userId, // Current user ID from context
-      sellerId: product.ownerId, // Map ownerId to sellerId
-    });
   };
 
   useEffect(() => {
     fetchCart();
+    // Optionally, add a focus listener to refresh cart when screen is focused
+    // const unsubscribe = navigation.addListener('focus', fetchCart);
+    // return unsubscribe;
   }, []);
 
-  useEffect(() => {
-    // Re-filter products when activeTab changes
-    setFilteredProducts(
-      cartProducts.filter((item) => item.cartStatus === activeTab)
-    );
-    setCurrentIndex(0);
-  }, [activeTab, cartProducts]);
-
+  // Separator Component
   const renderSeparator = () => <View style={styles.separator} />;
 
   const renderCartItem = ({ item }: { item: CartProduct }) => (
@@ -284,45 +298,32 @@ const CartScreen: React.FC = () => {
           {item.title}
         </Text>
         <Text style={styles.cartPrice}>${item.price.toFixed(2)}</Text>
-        <Text style={styles.cartQuantity}>Quantity: {item.quantity}</Text>
       </View>
       <View style={styles.actionButtons}>
-        {activeTab === "current" && (
-          <>
-            <TouchableOpacity
-              onPress={() => buyProduct(item)}
-              style={styles.buyButton}
-              accessibilityLabel={`Buy ${item.title}`}
-            >
-              <Ionicons name="cart-outline" size={18} color="#fff" />
-              <Text style={styles.buyButtonText}>Buy</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => removeFromCart(item.id)}
-              style={styles.removeButton}
-              accessibilityLabel={`Remove ${item.title} from Cart`}
-            >
-              <Ionicons name="trash-outline" size={22} color="#FF3B30" />
-            </TouchableOpacity>
-          </>
-        )}
-        {activeTab === "bought" && (
-          <TouchableOpacity
-            onPress={() => removeFromCart(item.id)}
-            style={styles.removeButton}
-            accessibilityLabel={`Remove ${item.title} from Cart`}
-          >
-            <Ionicons name="trash-outline" size={22} color="#FF3B30" />
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity
+          onPress={() => buyProduct(item)}
+          style={styles.buyButton}
+          accessibilityLabel={`Buy ${item.title}`}
+        >
+          <Ionicons name="cart-outline" size={18} color="#fff" />
+          <Text style={styles.buyButtonText}>Buy</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => removeFromCart(item.id)}
+          style={styles.removeButton}
+          accessibilityLabel={`Remove ${item.title} from Cart`}
+        >
+          <Ionicons name="trash-outline" size={22} color="#FF3B30" />
+        </TouchableOpacity>
       </View>
     </Animated.View>
   );
 
   const calculateTotal = () => {
-    return cartProducts
-      .filter((item) => item.cartStatus === "current")
-      .reduce((sum, item) => sum + item.price * item.quantity, 0);
+    return cartProducts.reduce(
+      (sum, item) => sum + item.price * item.quantity,
+      0
+    );
   };
 
   if (loading) {
@@ -366,114 +367,55 @@ const CartScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      {/* Tab Switcher */}
-      <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={[
-            styles.tabButton,
-            activeTab === "current" && styles.activeTab,
-          ]}
-          onPress={() => switchTab("current")}
-          accessibilityLabel="Show Current Items"
-        >
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === "current" && styles.activeTabText,
-            ]}
-          >
-            Current
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tabButton, activeTab === "bought" && styles.activeTab]}
-          onPress={() => switchTab("bought")}
-          accessibilityLabel="Show Bought Items"
-        >
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === "bought" && styles.activeTabText,
-            ]}
-          >
-            Bought
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Cart Items */}
       <FlatList
-        data={filteredProducts}
+        data={cartProducts}
         keyExtractor={(item) => item.id}
         renderItem={renderCartItem}
         ItemSeparatorComponent={renderSeparator}
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
       />
-
-      {/* Total Section for Current Items */}
-      {activeTab === "current" && (
-        <View style={styles.footer}>
-          <View style={styles.totalContainer}>
-            <Text style={styles.totalText}>Total:</Text>
-            <Text style={styles.totalAmount}>
-              ${calculateTotal().toFixed(2)}
-            </Text>
-          </View>
-          {/* You can add a Checkout button here if needed */}
+      {/* Total and Checkout Section */}
+      <View style={styles.footer}>
+        <View style={styles.totalContainer}>
+          <Text style={styles.totalText}>Total:</Text>
+          <Text style={styles.totalAmount}>${calculateTotal().toFixed(2)}</Text>
         </View>
-      )}
+        <TouchableOpacity
+          style={styles.checkoutButton}
+          onPress={proceedToCheckout}
+          accessibilityLabel="Proceed to Checkout"
+        >
+          <Text style={styles.checkoutButtonText}>Checkout</Text>
+          <Ionicons name="arrow-forward" size={20} color="#fff" />
+        </TouchableOpacity>
+      </View>
     </View>
   );
 };
 
 export default CartScreen;
 
-// --- Styles ---
+// Stylesheet
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#121212",
     paddingHorizontal: 20,
     paddingTop: 10,
-    paddingBottom: 60,
-  },
-  tabContainer: {
-    flexDirection: "row",
-    backgroundColor: "#1E1E1E",
-    borderRadius: 10,
-    marginHorizontal: 20,
-    marginVertical: 10,
-    overflow: "hidden",
-  },
-  tabButton: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#333",
-  },
-  activeTab: {
-    backgroundColor: "#007AFF",
-  },
-  tabText: {
-    color: "#fff",
-    fontSize: 16,
-  },
-  activeTabText: {
-    fontWeight: "700",
+    paddingBottom: 40, // Increased to raise the footer a bit
   },
   cartItem: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 12,
+    paddingVertical: 12, // Increased padding for larger listing
     paddingHorizontal: 15,
     borderRadius: 16,
-    backgroundColor: "#1E1E1E",
-    marginVertical: 5,
+    // Removed backgroundColor to eliminate grey container
+    // Added padding for better spacing
   },
   cartImage: {
-    width: width * 0.2,
+    width: width * 0.2, // Increased image size
     height: width * 0.2,
     borderRadius: 12,
     marginRight: 15,
@@ -494,11 +436,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
   },
-  cartQuantity: {
-    color: "#bbb",
-    fontSize: 14,
-    marginTop: 2,
-  },
   actionButtons: {
     flexDirection: "row",
     alignItems: "center",
@@ -506,7 +443,7 @@ const styles = StyleSheet.create({
   buyButton: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#34C759",
+    backgroundColor: "#34C759", // Green button
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 8,
@@ -529,7 +466,7 @@ const styles = StyleSheet.create({
   },
   separator: {
     height: 1,
-    backgroundColor: "#fff",
+    backgroundColor: "#fff", // White line for separation
     marginVertical: 5,
   },
   loadingContainer: {
@@ -584,11 +521,11 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   listContainer: {
-    paddingBottom: 150,
+    paddingBottom: 150, // Increased padding to accommodate footer
   },
   footer: {
     position: "absolute",
-    bottom: 20,
+    bottom: 20, // Raised the footer slightly
     left: 20,
     right: 20,
     backgroundColor: "#1E1E1E",
@@ -617,5 +554,24 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "700",
     marginTop: 4,
+  },
+  checkoutButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#BB86FC",
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 30,
+    shadowColor: "#BB86FC",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.8,
+    shadowRadius: 6,
+    elevation: 15,
+  },
+  checkoutButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "700",
+    marginRight: 6,
   },
 });
