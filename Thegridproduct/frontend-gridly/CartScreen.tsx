@@ -17,10 +17,9 @@ import Ionicons from "react-native-vector-icons/Ionicons";
 import { UserContext } from "./UserContext";
 import { CommonActions, useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
-import { RootStackParamList } from "./navigationTypes";
+import { RootStackParamList, CartProduct } from "./navigationTypes";
 import { NGROK_URL } from "@env";
 
-// Define Types
 type CartItem = {
   productId: string;
   quantity: number;
@@ -41,23 +40,8 @@ type Product = {
   category: string;
   images: string[];
   university: string;
-  ownerId: string;
+  userId: string; // Changed from ownerId to userId
   postedDate: string;
-  rating?: number;
-  quality?: string;
-};
-
-type CartProduct = {
-  id: string;
-  title: string;
-  price: number;
-  images: string[];
-  quantity: number;
-  description?: string;
-  category?: string;
-  university?: string;
-  ownerId?: string;
-  postedDate?: string;
   rating?: number;
   quality?: string;
 };
@@ -68,7 +52,7 @@ const CartScreen: React.FC = () => {
   const [cartProducts, setCartProducts] = useState<CartProduct[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const fadeAnim = useState(new Animated.Value(0))[0]; // For fade-in animation
+  const fadeAnim = useState(new Animated.Value(0))[0];
 
   const { userId, token, clearUser } = useContext(UserContext);
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
@@ -149,34 +133,32 @@ const CartScreen: React.FC = () => {
       const productsData: Product[] = await productsResponse.json();
 
       // Map products with quantities
-      const combinedCartProducts: CartProduct[] = cartData.items.map((item) => {
-        const product = productsData.find((prod) => prod.id === item.productId);
-        if (product) {
-          return {
-            id: product.id,
-            title: product.title,
-            price: product.price,
-            images: product.images,
-            quantity: item.quantity,
-            description: product.description,
-            category: product.category,
-            university: product.university,
-            ownerId: product.ownerId,
-            postedDate: product.postedDate,
-            rating: product.rating,
-            quality: product.quality,
-          };
-        } else {
-          // If product not found, handle accordingly
-          return {
-            id: item.productId,
-            title: "Unknown Product",
-            price: 0,
-            images: [],
-            quantity: item.quantity,
-          };
-        }
-      });
+      const combinedCartProducts: CartProduct[] = cartData.items
+        .map((item) => {
+          const product = productsData.find(
+            (prod) => prod.id === item.productId
+          );
+          if (product) {
+            return {
+              id: product.id,
+              title: product.title,
+              price: product.price,
+              images: product.images,
+              quantity: item.quantity,
+              description: product.description,
+              category: product.category,
+              university: product.university,
+              userId: product.userId, // Correctly assign userId
+              postedDate: product.postedDate,
+              rating: product.rating,
+              quality: product.quality,
+            };
+          } else {
+            // If product not found, handle accordingly
+            return null;
+          }
+        })
+        .filter((item): item is CartProduct => item !== null); // Filter out nulls
 
       setCartProducts(combinedCartProducts);
       // Start fade-in animation
@@ -269,6 +251,7 @@ const CartScreen: React.FC = () => {
       Alert.alert("Empty Cart", "Your cart is empty.");
       return;
     }
+    // Implement bulk checkout if needed
   };
 
   useEffect(() => {

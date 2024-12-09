@@ -17,11 +17,12 @@ import {
 } from "react-native";
 import { RouteProp, useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
-import { RootStackParamList } from "./navigationTypes";
+import { RootStackParamList, CartProduct } from "./navigationTypes";
 import { useStripe } from "@stripe/stripe-react-native";
 import { NGROK_URL } from "@env";
 import { UserContext } from "./UserContext";
 import { LinearGradient } from "expo-linear-gradient";
+import Ionicons from "react-native-vector-icons/Ionicons";
 
 type PaymentScreenRouteProp = RouteProp<RootStackParamList, "Payment">;
 type PaymentScreenProps = {
@@ -30,10 +31,19 @@ type PaymentScreenProps = {
 type NavigationProp = StackNavigationProp<RootStackParamList, "Payment">;
 
 const PaymentScreen: React.FC<PaymentScreenProps> = ({ route }) => {
-  const { product, buyerId, sellerId } = route.params;
+  const { product } = route.params; // Only product is received
   const navigation = useNavigation<NavigationProp>();
   const { confirmPayment } = useStripe();
-  const { token } = useContext(UserContext);
+  const { userId, token } = useContext(UserContext); // Extract userId and token from context
+
+  // Derive buyerId and sellerId
+  const buyerId = userId; // Current authenticated user
+  const sellerId = product.userId; // Correctly retrieve seller's ID from userId
+
+  // Debugging Statements
+  console.log("Buyer ID:", buyerId); // Should log authenticated user's ID
+  console.log("Seller ID:", sellerId); // Should log product's userId
+  console.log("Token:", token); // Should log the authentication token
 
   // Card states
   const [cardNumber, setCardNumber] = useState("");
@@ -63,7 +73,7 @@ const PaymentScreen: React.FC<PaymentScreenProps> = ({ route }) => {
   const cardCVCRef = useRef<TextInput>(null);
   const cardNameRef = useRef<TextInput>(null);
 
-  // Validation
+  // Validation Functions
   const validateNameOnCard = (): boolean => {
     if (!nameOnCard.trim()) {
       setNameOnCardError("Required.");
@@ -141,17 +151,18 @@ const PaymentScreen: React.FC<PaymentScreenProps> = ({ route }) => {
     return true;
   };
 
+  // Formatting Functions
   const formatCardNumber = (input: string) => {
     const cleaned = input.replace(/\D+/g, "");
     let formatted = cleaned;
     if (formatted.length > 4) {
-      formatted = formatted.slice(0,4) + " " + formatted.slice(4);
+      formatted = formatted.slice(0, 4) + " " + formatted.slice(4);
     }
     if (formatted.length > 9) {
-      formatted = formatted.slice(0,9) + " " + formatted.slice(9);
+      formatted = formatted.slice(0, 9) + " " + formatted.slice(9);
     }
     if (formatted.length > 14) {
-      formatted = formatted.slice(0,14) + " " + formatted.slice(14);
+      formatted = formatted.slice(0, 14) + " " + formatted.slice(14);
     }
     return formatted;
   };
@@ -160,11 +171,12 @@ const PaymentScreen: React.FC<PaymentScreenProps> = ({ route }) => {
     const cleaned = input.replace(/\D+/g, "");
     let formatted = cleaned;
     if (formatted.length > 2) {
-      formatted = formatted.slice(0,2) + "/" + formatted.slice(2,4);
+      formatted = formatted.slice(0, 2) + "/" + formatted.slice(2, 4);
     }
     return formatted;
   };
 
+  // Handle Payment Press
   const handlePayPress = async () => {
     const isNameValid = validateNameOnCard();
     const isAddressLine1Valid = validateAddressLine1();
@@ -201,7 +213,7 @@ const PaymentScreen: React.FC<PaymentScreenProps> = ({ route }) => {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          amount: Math.round(product.price * product.quantity * 100),
+          amount: Math.round(product.price * product.quantity * 100), // Amount in cents
           currency: "usd",
           productId: product.id,
           buyerId: buyerId,
@@ -247,25 +259,28 @@ const PaymentScreen: React.FC<PaymentScreenProps> = ({ route }) => {
       const century = Math.floor(currentYear / 100) * 100;
       const expYearNum = century + parseInt(expYearShort, 10);
 
-      const { paymentIntent, error: stripeError } = await confirmPayment(clientSecret, {
-        paymentMethodType: "Card",
-        paymentMethodData: {
-          billingDetails: {
-            name: nameOnCard.trim(),
-            address: {
-              line1: addressLine1.trim(),
-              city: city.trim(),
-              postalCode: postalCode.trim(),
+      const { paymentIntent, error: stripeError } = await confirmPayment(
+        clientSecret,
+        {
+          paymentMethodType: "Card",
+          paymentMethodData: {
+            billingDetails: {
+              name: nameOnCard.trim(),
+              address: {
+                line1: addressLine1.trim(),
+                city: city.trim(),
+                postalCode: postalCode.trim(),
+              },
+            },
+            card: {
+              number: cardNumber.replace(/\s+/g, ""),
+              cvc: cardCVC.trim(),
+              expMonth: expMonthNum,
+              expYear: expYearNum,
             },
           },
-          card: {
-            number: cardNumber.replace(/\s+/g, ""),
-            cvc: cardCVC.trim(),
-            expMonth: expMonthNum,
-            expYear: expYearNum,
-          },
-        },
-      });
+        }
+      );
 
       if (stripeError) {
         Alert.alert("Failed", stripeError.message);
@@ -292,12 +307,15 @@ const PaymentScreen: React.FC<PaymentScreenProps> = ({ route }) => {
 
           {/* Realistic Credit Card UI */}
           <View style={styles.cardWrapper}>
-            <LinearGradient colors={["#4e2d8f", "#a56be8"]} style={styles.cardBackground}>
+            <LinearGradient
+              colors={["#4e2d8f", "#a56be8"]}
+              style={styles.cardBackground}
+            >
               <View style={styles.chipContainer}>
                 <View style={styles.chip} />
               </View>
               <Text style={styles.fakeBankName}>BANK NAME</Text>
-              
+
               {/* Card Number Input (Positioned on Card) */}
               <TextInput
                 ref={cardNumberRef}
@@ -364,10 +382,18 @@ const PaymentScreen: React.FC<PaymentScreenProps> = ({ route }) => {
           </View>
 
           {/* Errors for Card Fields if any */}
-          {!!cardNumberError && <Text style={styles.errorText}>{cardNumberError}</Text>}
-          {!!nameOnCardError && <Text style={styles.errorText}>{nameOnCardError}</Text>}
-          {!!cardExpiryError && <Text style={styles.errorText}>{cardExpiryError}</Text>}
-          {!!cardCVCError && <Text style={styles.errorText}>{cardCVCError}</Text>}
+          {!!cardNumberError && (
+            <Text style={styles.errorText}>{cardNumberError}</Text>
+          )}
+          {!!nameOnCardError && (
+            <Text style={styles.errorText}>{nameOnCardError}</Text>
+          )}
+          {!!cardExpiryError && (
+            <Text style={styles.errorText}>{cardExpiryError}</Text>
+          )}
+          {!!cardCVCError && (
+            <Text style={styles.errorText}>{cardCVCError}</Text>
+          )}
 
           <View style={styles.formSection}>
             <Text style={styles.sectionTitle}>Billing Address</Text>
@@ -384,7 +410,9 @@ const PaymentScreen: React.FC<PaymentScreenProps> = ({ route }) => {
               }}
               onBlur={validateAddressLine1}
             />
-            {addressLine1Error ? <Text style={styles.errorText}>{addressLine1Error}</Text> : null}
+            {addressLine1Error ? (
+              <Text style={styles.errorText}>{addressLine1Error}</Text>
+            ) : null}
 
             <View style={styles.row}>
               <View style={styles.halfInputContainer}>
@@ -400,7 +428,9 @@ const PaymentScreen: React.FC<PaymentScreenProps> = ({ route }) => {
                   }}
                   onBlur={validateCity}
                 />
-                {cityError ? <Text style={styles.errorText}>{cityError}</Text> : null}
+                {cityError ? (
+                  <Text style={styles.errorText}>{cityError}</Text>
+                ) : null}
               </View>
               <View style={styles.halfInputContainer}>
                 <Text style={styles.inputLabel}>Postal</Text>
@@ -416,7 +446,9 @@ const PaymentScreen: React.FC<PaymentScreenProps> = ({ route }) => {
                   }}
                   onBlur={validatePostalCode}
                 />
-                {postalCodeError ? <Text style={styles.errorText}>{postalCodeError}</Text> : null}
+                {postalCodeError ? (
+                  <Text style={styles.errorText}>{postalCodeError}</Text>
+                ) : null}
               </View>
             </View>
 
@@ -427,7 +459,9 @@ const PaymentScreen: React.FC<PaymentScreenProps> = ({ route }) => {
                 trackColor={{ false: "#3e3566", true: "#c5a3ff" }}
                 thumbColor="#fff"
               />
-              <Text style={styles.saveCardText}>Save card for future payments</Text>
+              <Text style={styles.saveCardText}>
+                Save card for future payments
+              </Text>
             </View>
           </View>
 
@@ -442,8 +476,13 @@ const PaymentScreen: React.FC<PaymentScreenProps> = ({ route }) => {
               style={styles.payButton}
               onPress={handlePayPress}
               disabled={loading}
+              accessibilityLabel="Pay Now"
             >
-              {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.payButtonText}>Pay Now</Text>}
+              {loading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.payButtonText}>Pay Now</Text>
+              )}
             </TouchableOpacity>
           </View>
         </View>
@@ -454,6 +493,7 @@ const PaymentScreen: React.FC<PaymentScreenProps> = ({ route }) => {
 
 export default PaymentScreen;
 
+// Stylesheet
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   container: {

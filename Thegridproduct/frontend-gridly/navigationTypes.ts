@@ -1,19 +1,16 @@
-// navigationTypes.ts
-
 export type CartProduct = {
   id: string;
   title: string;
   price: number;
   images: string[];
   quantity: number;
-  description?: string; // Made optional
-  category?: string; // Made optional
-  university?: string; // Made optional
-  ownerId: string;
-  postedDate: string;
+  description?: string;
+  category?: string;
+  university?: string;
+  userId: string; // Seller's ID
+  postedDate?: string;
   rating?: number;
   quality?: string;
-
 };
 
 
@@ -26,7 +23,7 @@ export type RootStackParamList = {
   Messaging: { chatId: string; userId: string };
   AddGig: undefined;
   Cart: undefined;
-  Payment: { product: CartProduct; buyerId: string; sellerId: string };
+  Payment: { product: CartProduct};
   Account: undefined;
   EditProduct: { productId: string };
 };
