@@ -1,5 +1,3 @@
-// CartScreen.tsx
-
 import React, { useEffect, useState, useContext } from "react";
 import {
   View,
@@ -17,8 +15,9 @@ import Ionicons from "react-native-vector-icons/Ionicons";
 import { UserContext } from "./UserContext";
 import { CommonActions, useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
-import { RootStackParamList, CartProduct } from "./navigationTypes";
+import { RootStackParamList } from "./navigationTypes";
 import { NGROK_URL } from "@env";
+import { LinearGradient } from "expo-linear-gradient";
 
 type CartItem = {
   productId: string;
@@ -40,8 +39,23 @@ type Product = {
   category: string;
   images: string[];
   university: string;
-  userId: string; // Changed from ownerId to userId
+  ownerId: string;
   postedDate: string;
+  rating?: number;
+  quality?: string;
+};
+
+type CartProduct = {
+  id: string;
+  title: string;
+  price: number;
+  images: string[];
+  quantity: number;
+  description?: string;
+  category?: string;
+  university?: string;
+  ownerId?: string;
+  postedDate?: string;
   rating?: number;
   quality?: string;
 };
@@ -57,7 +71,6 @@ const CartScreen: React.FC = () => {
   const { userId, token, clearUser } = useContext(UserContext);
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
 
-  // Fetch cart items from backend
   const fetchCart = async () => {
     if (!userId || !token) {
       setError("User not logged in.");
@@ -75,25 +88,20 @@ const CartScreen: React.FC = () => {
       });
 
       if (response.status === 401) {
-        // Unauthorized: Clear user data and navigate to Login
-        Alert.alert(
-          "Session Expired",
-          "Your session has expired. Please log in again.",
-          [
-            {
-              text: "OK",
-              onPress: async () => {
-                await clearUser();
-                navigation.dispatch(
-                  CommonActions.reset({
-                    index: 0,
-                    routes: [{ name: "Login" }],
-                  })
-                );
-              },
+        Alert.alert("Session Expired", "Please log in again.", [
+          {
+            text: "OK",
+            onPress: async () => {
+              await clearUser();
+              navigation.dispatch(
+                CommonActions.reset({
+                  index: 0,
+                  routes: [{ name: "Login" }],
+                })
+              );
             },
-          ]
-        );
+          },
+        ]);
         return;
       }
 
@@ -101,6 +109,8 @@ const CartScreen: React.FC = () => {
         const errorData = await response.json();
         throw new Error(errorData.message || "Failed to fetch cart.");
       }
+
+
 
       const cartData: Cart = await response.json();
 
@@ -110,10 +120,8 @@ const CartScreen: React.FC = () => {
         return;
       }
 
-      // Extract product IDs
       const productIds = cartData.items.map((item) => item.productId);
 
-      // Fetch product details using the new /products/by-ids endpoint
       const productsResponse = await fetch(
         `${NGROK_URL}/products/by-ids?ids=${productIds.join(",")}`,
         {
@@ -132,54 +140,47 @@ const CartScreen: React.FC = () => {
 
       const productsData: Product[] = await productsResponse.json();
 
-      // Map products with quantities
-      const combinedCartProducts: CartProduct[] = cartData.items
-        .map((item) => {
-          const product = productsData.find(
-            (prod) => prod.id === item.productId
-          );
-          if (product) {
-            return {
-              id: product.id,
-              title: product.title,
-              price: product.price,
-              images: product.images,
-              quantity: item.quantity,
-              description: product.description,
-              category: product.category,
-              university: product.university,
-              userId: product.userId, // Correctly assign userId
-              postedDate: product.postedDate,
-              rating: product.rating,
-              quality: product.quality,
-            };
-          } else {
-            // If product not found, handle accordingly
-            return null;
-          }
-        })
-        .filter((item): item is CartProduct => item !== null); // Filter out nulls
+      const combinedCartProducts: CartProduct[] = cartData.items.map((item) => {
+        const product = productsData.find((prod) => prod.id === item.productId);
+        if (product) {
+          return {
+            id: product.id,
+            title: product.title,
+            price: product.price,
+            images: product.images,
+            quantity: item.quantity,
+            description: product.description,
+            category: product.category,
+            university: product.university,
+            ownerId: product.ownerId,
+            postedDate: product.postedDate,
+            rating: product.rating,
+            quality: product.quality,
+          };
+        } else {
+          return {
+            id: item.productId,
+            title: "Unknown Product",
+            price: 0,
+            images: [],
+            quantity: item.quantity,
+          };
+        }
+      });
 
       setCartProducts(combinedCartProducts);
-      // Start fade-in animation
       Animated.timing(fadeAnim, {
         toValue: 1,
         duration: 500,
         useNativeDriver: true,
       }).start();
     } catch (err) {
-      console.error("Fetch Cart Error:", err);
-      setError(
-        err instanceof Error
-          ? err.message
-          : "An unexpected error occurred while fetching the cart."
-      );
+      
     } finally {
       setLoading(false);
     }
   };
 
-  // Remove product from cart
   const removeFromCart = async (productId: string) => {
     try {
       const response = await fetch(`${NGROK_URL}/cart/remove`, {
@@ -192,25 +193,20 @@ const CartScreen: React.FC = () => {
       });
 
       if (response.status === 401) {
-        // Unauthorized: Clear user data and navigate to Login
-        Alert.alert(
-          "Session Expired",
-          "Your session has expired. Please log in again.",
-          [
-            {
-              text: "OK",
-              onPress: async () => {
-                await clearUser();
-                navigation.dispatch(
-                  CommonActions.reset({
-                    index: 0,
-                    routes: [{ name: "Login" }],
-                  })
-                );
-              },
+        Alert.alert("Session Expired", "Please log in again.", [
+          {
+            text: "OK",
+            onPress: async () => {
+              await clearUser();
+              navigation.dispatch(
+                CommonActions.reset({
+                  index: 0,
+                  routes: [{ name: "Login" }],
+                })
+              );
             },
-          ]
-        );
+          },
+        ]);
         return;
       }
 
@@ -219,11 +215,10 @@ const CartScreen: React.FC = () => {
         throw new Error(errorData.message || "Failed to remove item.");
       }
 
-      // Update cart items locally
       setCartProducts((prevItems) =>
         prevItems.filter((item) => item.id !== productId)
       );
-      Alert.alert("Removed", "Product removed from your cart.");
+      Alert.alert("Removed", "The product has been removed from your cart.");
     } catch (err) {
       console.error("Remove from Cart Error:", err);
       Alert.alert(
@@ -233,35 +228,37 @@ const CartScreen: React.FC = () => {
     }
   };
 
-  // Buy individual product
   const buyProduct = (product: CartProduct) => {
-    Alert.alert("Buy Product", `Proceeding to buy "${product.title}"`, [
+    Alert.alert("Buy Product", `Proceed to buy "${product.title}"?`, [
       {
         text: "OK",
         onPress: () => {
           navigation.navigate("Payment", { product });
         },
       },
+      { text: "Cancel", style: "cancel" },
     ]);
   };
 
-  // Navigate to Checkout
   const proceedToCheckout = () => {
     if (cartProducts.length === 0) {
       Alert.alert("Empty Cart", "Your cart is empty.");
       return;
     }
-    // Implement bulk checkout if needed
+    navigation.navigate("Checkout", { cartProducts });
   };
 
   useEffect(() => {
     fetchCart();
-    // Optionally, add a focus listener to refresh cart when screen is focused
-    // const unsubscribe = navigation.addListener('focus', fetchCart);
-    // return unsubscribe;
   }, []);
 
-  // Separator Component
+  const calculateTotal = () => {
+    return cartProducts.reduce(
+      (sum, item) => sum + item.price * item.quantity,
+      0
+    );
+  };
+
   const renderSeparator = () => <View style={styles.separator} />;
 
   const renderCartItem = ({ item }: { item: CartProduct }) => (
@@ -283,14 +280,21 @@ const CartScreen: React.FC = () => {
         <Text style={styles.cartPrice}>${item.price.toFixed(2)}</Text>
       </View>
       <View style={styles.actionButtons}>
-        <TouchableOpacity
-          onPress={() => buyProduct(item)}
-          style={styles.buyButton}
-          accessibilityLabel={`Buy ${item.title}`}
+        <LinearGradient
+          colors={["rgb(168, 237, 234)", "rgb(254, 214, 227)"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.buyButtonGradient}
         >
-          <Ionicons name="cart-outline" size={18} color="#fff" />
-          <Text style={styles.buyButtonText}>Buy</Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => buyProduct(item)}
+            style={styles.buyButton}
+            accessibilityLabel={`Buy ${item.title}`}
+          >
+            <Ionicons name="cart-outline" size={18} color="black" />
+            <Text style={styles.buyButtonText}>Buy</Text>
+          </TouchableOpacity>
+        </LinearGradient>
         <TouchableOpacity
           onPress={() => removeFromCart(item.id)}
           style={styles.removeButton}
@@ -302,18 +306,11 @@ const CartScreen: React.FC = () => {
     </Animated.View>
   );
 
-  const calculateTotal = () => {
-    return cartProducts.reduce(
-      (sum, item) => sum + item.price * item.quantity,
-      0
-    );
-  };
-
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#BB86FC" />
-        <Text style={styles.loadingText}>Loading Cart...</Text>
+        <Text style={styles.loadingText}>Loading your cart...</Text>
       </View>
     );
   }
@@ -358,10 +355,9 @@ const CartScreen: React.FC = () => {
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
       />
-      {/* Total and Checkout Section */}
       <View style={styles.footer}>
         <View style={styles.totalContainer}>
-          <Text style={styles.totalText}>Total:</Text>
+          <Text style={styles.totalText}>Total</Text>
           <Text style={styles.totalAmount}>${calculateTotal().toFixed(2)}</Text>
         </View>
         <TouchableOpacity
@@ -379,26 +375,23 @@ const CartScreen: React.FC = () => {
 
 export default CartScreen;
 
-// Stylesheet
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#121212",
+    backgroundColor: "black",
     paddingHorizontal: 20,
     paddingTop: 10,
-    paddingBottom: 40, // Increased to raise the footer a bit
+    paddingBottom: 40,
   },
   cartItem: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 12, // Increased padding for larger listing
+    paddingVertical: 12,
     paddingHorizontal: 15,
     borderRadius: 16,
-    // Removed backgroundColor to eliminate grey container
-    // Added padding for better spacing
   },
   cartImage: {
-    width: width * 0.2, // Increased image size
+    width: width * 0.2,
     height: width * 0.2,
     borderRadius: 12,
     marginRight: 15,
@@ -423,25 +416,25 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
-  buyButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#34C759", // Green button
-    paddingVertical: 6,
-    paddingHorizontal: 12,
+  buyButtonGradient: {
     borderRadius: 8,
-    justifyContent: "center",
     marginRight: 10,
-    shadowColor: "#34C759",
+    shadowColor: "#888",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.4,
     shadowRadius: 3,
     elevation: 5,
   },
+  buyButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+  },
   buyButtonText: {
-    color: "#FFFFFF",
+    color: "black",
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: "700",
     marginLeft: 4,
   },
   removeButton: {
@@ -449,7 +442,7 @@ const styles = StyleSheet.create({
   },
   separator: {
     height: 1,
-    backgroundColor: "#fff", // White line for separation
+    backgroundColor: "#2C2C2C",
     marginVertical: 5,
   },
   loadingContainer: {
@@ -504,11 +497,11 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   listContainer: {
-    paddingBottom: 150, // Increased padding to accommodate footer
+    paddingBottom: 150,
   },
   footer: {
     position: "absolute",
-    bottom: 20, // Raised the footer slightly
+    bottom: 20,
     left: 20,
     right: 20,
     backgroundColor: "#1E1E1E",

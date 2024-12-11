@@ -1,5 +1,3 @@
-// App.tsx
-
 import React, { useState, useContext } from "react";
 import {
   NavigationContainer,
@@ -28,6 +26,7 @@ import LoginScreen from "./LoginScreen";
 import Dashboard from "./Dashboard";
 import AddProductScreen from "./AddProductScreen";
 import AddGigScreen from "./AddGigScreen";
+import JobsScreen from "./JobsScreen"; // Make sure this import is correct and points to the actual JobsScreen file
 import ActivityScreen from "./ActivityScreen";
 import EditProduct from "./EditProductScreen";
 import MessagingScreen from "./MessagingScreen";
@@ -89,7 +88,7 @@ const getHeaderOptions = (
   showBackButton: boolean = false,
   enableAnimation: boolean = false
 ): StackNavigationOptions => ({
-  headerTitle: () => <HeaderTitleWithLogo title="The Gridly" />,
+  headerTitle: () => <HeaderTitleWithLogo title="Gridly" />,
   headerRight: () => HeaderRightComponent(setModalVisible),
   headerLeft: showBackButton
     ? () => (
@@ -168,6 +167,13 @@ const AppNavigator: React.FC = () => {
               <Stack.Screen
                 name="Dashboard"
                 component={Dashboard}
+                options={({ navigation }) =>
+                  getHeaderOptions(navigation, setModalVisible)
+                }
+              />
+              <Stack.Screen
+                name="Jobs"
+                component={JobsScreen}
                 options={({ navigation }) =>
                   getHeaderOptions(navigation, setModalVisible)
                 }
@@ -303,10 +309,9 @@ const AppNavigator: React.FC = () => {
               </TouchableOpacity>
               <ScrollView>
                 <Text style={styles.termsText}>
-                  Terms of Service: {"\n\n"}Welcome to The Gridly. By using our
+                  Terms of Service: {"\n\n"}Welcome to Gridly. By using our
                   platform, you agree to the following terms...
                   {"\n\n"}
-                  {/* Add more detailed terms as needed */}
                   Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla
                   facilisi. Phasellus non urna nec sapien dictum luctus.
                 </Text>

@@ -1,5 +1,3 @@
-// BottomNavBar.tsx
-
 import React, { useState, useRef, useEffect } from "react";
 import {
   View,
@@ -107,22 +105,22 @@ const BottomNavBar: React.FC = () => {
         </Text>
       </TouchableOpacity>
 
-      {/* Gigs Tab */}
+      {/* Jobs Tab */}
       <TouchableOpacity
         style={styles.navItem}
-        onPress={() => switchScreen("Gigs")}
-        accessibilityLabel="Navigate to Gigs"
+        onPress={() => switchScreen("Jobs")}
+        accessibilityLabel="Navigate to Jobs"
         hitSlop={hitSlopValue}
       >
         <Ionicons
-          name={isActive("Gigs") ? "briefcase" : "briefcase-outline"}
+          name={isActive("Jobs") ? "briefcase" : "briefcase-outline"}
           size={24}
           color="#FFFFFF"
         />
         <Text
-          style={[styles.navText, isActive("Gigs") && styles.navTextActive]}
+          style={[styles.navText, isActive("Jobs") && styles.navTextActive]}
         >
-          Gigs
+          Jobs
         </Text>
       </TouchableOpacity>
 

@@ -24,7 +24,7 @@ import { Conversation, Message } from "./types";
 import { UserContext } from "./UserContext";
 import Ably from "ably";
 import { RouteProp, useNavigation } from "@react-navigation/native";
-import { StackNavigationProp } from "@react-navigation/stack";
+import { StackNavigationProp } from "./navigationTypes";
 import { RootStackParamList } from "./navigationTypes";
 import * as ImagePicker from "expo-image-picker";
 
@@ -141,7 +141,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
 
   const fetchUserChats = async () => {
     if (!userId || !token) return;
-
     setLoading(true);
     try {
       const fetchedChats = await fetchConversations(userId, token);
@@ -404,7 +403,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
               <Text style={styles.chatTime}>{formattedTimestamp}</Text>
             </View>
             <Text style={styles.chatProductName} numberOfLines={1}>
-              {item.productTitle ? item.productTitle : "Gig"}
+              {item.productTitle ? item.productTitle : "Job"}
             </Text>
             {latestMessage && (
               <View style={styles.lastMessageRow}>
@@ -462,7 +461,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
 
   const productsOrGigs = chats.map((c) => ({
     chatID: c.chatID,
-    title: c.productTitle ? c.productTitle : "Gig",
+    title: c.productTitle ? c.productTitle : "Job",
     type: c.productTitle ? "product" : "gig",
   }));
 
@@ -473,15 +472,13 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }
   };
 
-  const currentHeaderTitle = filter === "all" ? "All Chats" : filter === "products" ? "Your Products" : "Your Gigs";
-  const currentFilterLabel = filter === "all" ? "All ×" : filter === "products" ? "Products ×" : "Gigs ×";
+  const currentHeaderTitle = filter === "all" ? "All Chats" : filter === "products" ? "Product Chats" : "Job Chats";
+  const currentFilterLabel = filter === "all" ? "All ×" : filter === "products" ? "Products ×" : "Jobs ×";
 
   const handleFilterPillPress = () => {
     if (filter === "all") {
-      // Open filter modal
       setFilterMenuVisible(true);
     } else {
-      // Reset to all
       setFilter("all");
     }
   };
@@ -526,7 +523,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                   setFilterMenuVisible(false);
                 }}
               >
-                <Text style={styles.filterModalOptionText}>Gigs</Text>
+                <Text style={styles.filterModalOptionText}>Jobs</Text>
               </Pressable>
               <Pressable
                 style={[styles.filterModalOption, styles.filterModalClose]}
@@ -538,8 +535,8 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
           </View>
         </Modal>
 
-        {/* Purchases Section */}
-        {productsOrGigs.length > 0 && (
+        {/* Purchases Section (only in all or products) */}
+        {(filter === "all" || filter === "products") && productsOrGigs.length > 0 && (
           <View style={styles.horizontalListContainer}>
             <Text style={styles.sectionTitle}>Your Purchases</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalScroll}>
@@ -556,7 +553,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
           </View>
         )}
 
-        {/* Separator Line after Purchases or just after filter */}
         <View style={styles.separatorAfterPurchases} />
 
         {loading ? (
@@ -589,7 +585,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
             unsubscribeFromChannel();
           }}
         >
-          <View style={[styles.modalSafeArea, { backgroundColor: "#121212" }]}>
+          <View style={[styles.modalSafeArea, { backgroundColor: "#000" }]}>
             <SafeAreaView style={{ flex: 1 }}>
               <KeyboardAvoidingView
                 behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -620,7 +616,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                           {selectedChat.user.firstName} {selectedChat.user.lastName}
                         </Text>
                         <Text style={styles.chatHeaderSubTitle}>
-                          {selectedChat.productTitle ? selectedChat.productTitle : "Gig"}
+                          {selectedChat.productTitle ? selectedChat.productTitle : "Job"}
                         </Text>
                       </View>
                     </View>
@@ -658,7 +654,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                       onPress={handleImagePress}
                       accessibilityLabel="Upload Image"
                     >
-                      <Ionicons name="image" size={24} color="#fff" />
+                      <Ionicons name="image" size={20} color="#fff" />
                     </Pressable>
 
                     <Pressable
@@ -668,13 +664,13 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                       }}
                       accessibilityLabel="Record Voice"
                     >
-                      <Ionicons name="mic" size={24} color="#fff" />
+                      <Ionicons name="mic" size={20} color="#fff" />
                     </Pressable>
 
                     <TextInput
                       style={styles.messageInput}
                       placeholder="Type a message..."
-                      placeholderTextColor="#888"
+                      placeholderTextColor="#555"
                       value={newMessage}
                       onChangeText={setNewMessage}
                       multiline
@@ -690,7 +686,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                       {sending ? (
                         <ActivityIndicator color="#fff" />
                       ) : (
-                        <Ionicons name="send" size={20} color="#fff" />
+                        <Ionicons name="send" size={18} color="#fff" />
                       )}
                     </Pressable>
                   </View>
@@ -765,7 +761,7 @@ const { width } = Dimensions.get("window");
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#121212",
+    backgroundColor: "#000",
   },
   headerRow: {
     flexDirection: "row",
@@ -776,7 +772,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   mainHeader: {
-    fontSize: 28,
+    fontSize: 20,
     fontWeight: "700",
     color: "#BB86FC",
     fontFamily: "HelveticaNeue-Bold",
@@ -845,7 +841,7 @@ const styles = StyleSheet.create({
   },
   separatorAfterPurchases: {
     height: 1,
-    backgroundColor: "#333333",
+    backgroundColor: "#222",
     marginTop: 10,
     marginBottom: 10,
   },
@@ -1033,14 +1029,14 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 0,
   },
   theirMessage: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#222",
     borderTopLeftRadius: 0,
   },
   myMessageTextColor: {
     color: "#000000",
   },
   theirMessageTextColor: {
-    color: "#000000",
+    color: "#FFFFFF",
   },
   messageText: {
     fontSize: 16,
@@ -1048,7 +1044,7 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   messageTimestamp: {
-    fontSize: 12,
+    fontSize: 11,
     fontFamily: "HelveticaNeue",
     marginLeft: 5,
   },
@@ -1056,7 +1052,7 @@ const styles = StyleSheet.create({
     color: "#333333",
   },
   theirTimestampColor: {
-    color: "#555555",
+    color: "#999999",
   },
   messageImage: {
     width: 200,
@@ -1065,7 +1061,7 @@ const styles = StyleSheet.create({
     marginRight: 5,
   },
   inputBarContainer: {
-    backgroundColor: "#121212",
+    backgroundColor: "#000",
   },
   inputBarLine: {
     height: 1,
@@ -1092,7 +1088,8 @@ const styles = StyleSheet.create({
   sendButton: {
     backgroundColor: "#BB86FC",
     borderRadius: 20,
-    padding: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     justifyContent: "center",
     alignItems: "center",
     marginLeft: 5,
