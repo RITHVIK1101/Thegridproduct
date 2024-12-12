@@ -53,7 +53,36 @@ const TermsOfServiceScreen: React.FC = () => (
   </View>
 );
 
-// User Menu Screen
+// Liked Items Screen
+const LikedItemsScreen: React.FC = () => {
+  const { favorites, allProducts } = useContext(UserContext);
+
+  const likedProducts = allProducts.filter((p) => favorites.includes(p.id));
+
+  return (
+    <View style={styles.screenContainer}>
+      <Text style={{ color: "#fff", fontSize: 22, fontWeight: "700", marginBottom: 20, textAlign: "center" }}>
+        Liked Items
+      </Text>
+      {likedProducts.length === 0 ? (
+        <View style={{alignItems: 'center', justifyContent: 'center', flex: 1}}>
+          <Text style={{ color: "#ccc", fontSize: 16 }}>No liked items yet.</Text>
+        </View>
+      ) : (
+        <ScrollView contentContainerStyle={{ padding: 20 }}>
+          {likedProducts.map((product) => (
+            <View key={product.id} style={{ marginBottom: 20, borderBottomWidth:1, borderBottomColor:'#333', paddingBottom:10 }}>
+              <Text style={{ color: "#fff", fontSize: 18, fontWeight: "600" }}>{product.title}</Text>
+              <Text style={{ color: "#fff", fontSize: 16 }}>${product.price.toFixed(2)}</Text>
+            </View>
+          ))}
+        </ScrollView>
+      )}
+    </View>
+  );
+};
+
+// User Menu Screen (Full Screen)
 const UserMenuScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { clearUser, firstName, lastName, institution, studentType } = useContext(UserContext);
 
@@ -74,65 +103,70 @@ const UserMenuScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   };
 
   return (
-    <View style={styles.bottomSheetOverlay}>
-      <View style={styles.bottomSheetContainer}>
-        <View style={styles.bottomSheetHeader}>
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            accessibilityLabel="Close User Menu"
-          >
-            <Ionicons name="close" size={24} color="#FFFFFF" />
-          </TouchableOpacity>
+    <View style={styles.fullScreenMenuContainer}>
+      <View style={styles.fullScreenMenuHeader}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          accessibilityLabel="Close User Menu"
+        >
+          <Ionicons name="close" size={24} color="#FFFFFF" />
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.fullScreenMenuContent}>
+        {/* User Info Section */}
+        <View style={styles.bottomSheetUserInfo}>
+          <View style={styles.bottomSheetAvatar}>
+            <Text style={styles.bottomSheetAvatarText}>
+              {firstName && firstName.length > 0 ? firstName.charAt(0).toUpperCase() : "?"}
+            </Text>
+          </View>
+          <Text style={styles.bottomSheetUserName}>
+            {firstName} {lastName}
+          </Text>
+          {institution && (
+            <Text style={styles.bottomSheetUserInstitution}>{institution}</Text>
+          )}
+          {studentType && (
+            <Text style={styles.bottomSheetUserInstitution}>
+              {studentType.charAt(0).toUpperCase() + studentType.slice(1)}
+            </Text>
+          )}
         </View>
 
-        <View style={styles.bottomSheetContent}>
-          {/* User Info Section */}
-          <View style={styles.bottomSheetUserInfo}>
-            <View style={styles.bottomSheetAvatar}>
-              <Text style={styles.bottomSheetAvatarText}>
-                {firstName && firstName.length > 0 ? firstName.charAt(0).toUpperCase() : "?"}
-              </Text>
-            </View>
-            <Text style={styles.bottomSheetUserName}>
-              {firstName} {lastName}
-            </Text>
-            {institution && (
-              <Text style={styles.bottomSheetUserInstitution}>{institution}</Text>
-            )}
-            {studentType && (
-              <Text style={styles.bottomSheetUserInstitution}>
-                {studentType.charAt(0).toUpperCase() + studentType.slice(1)}
-              </Text>
-            )}
-          </View>
-
-          <View style={styles.bottomSheetOptions}>
-            <TouchableOpacity style={styles.bottomSheetOption} onPress={handleLogout}>
-              <Ionicons name="log-out-outline" size={20} color="#FFFFFF" style={{ marginRight: 10 }} />
-              <Text style={styles.bottomSheetOptionText}>Logout</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.bottomSheetOption}
-              onPress={() => navigation.navigate("TermsOfService")}
-            >
-              <Ionicons name="document-text-outline" size={20} color="#FFFFFF" style={{ marginRight: 10 }} />
-              <Text style={styles.bottomSheetOptionText}>View Terms of Service</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.bottomSheetOption}
-              onPress={() => navigation.navigate("Account")}
-            >
-              <Ionicons name="person-circle-outline" size={20} color="#FFFFFF" style={{ marginRight: 10 }} />
-              <Text style={styles.bottomSheetOptionText}>My Account</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.bottomSheetOption}
-              onPress={() => navigation.navigate("AllOrders")}
-            >
-              <Ionicons name="reader-outline" size={20} color="#FFFFFF" style={{ marginRight: 10 }} />
-              <Text style={styles.bottomSheetOptionText}>All Orders</Text>
-            </TouchableOpacity>
-          </View>
+        <View style={styles.bottomSheetOptions}>
+          <TouchableOpacity style={styles.bottomSheetOption} onPress={handleLogout}>
+            <Ionicons name="log-out-outline" size={20} color="#FFFFFF" style={{ marginRight: 10 }} />
+            <Text style={styles.bottomSheetOptionText}>Logout</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.bottomSheetOption}
+            onPress={() => navigation.navigate("TermsOfService")}
+          >
+            <Ionicons name="document-text-outline" size={20} color="#FFFFFF" style={{ marginRight: 10 }} />
+            <Text style={styles.bottomSheetOptionText}>View Terms of Service</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.bottomSheetOption}
+            onPress={() => navigation.navigate("Account")}
+          >
+            <Ionicons name="person-circle-outline" size={20} color="#FFFFFF" style={{ marginRight: 10 }} />
+            <Text style={styles.bottomSheetOptionText}>My Account</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.bottomSheetOption}
+            onPress={() => navigation.navigate("AllOrders")}
+          >
+            <Ionicons name="reader-outline" size={20} color="#FFFFFF" style={{ marginRight: 10 }} />
+            <Text style={styles.bottomSheetOptionText}>All Orders</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.bottomSheetOption}
+            onPress={() => navigation.navigate("LikedItems")}
+          >
+            <Ionicons name="heart-outline" size={20} color="#FFFFFF" style={{ marginRight: 10 }} />
+            <Text style={styles.bottomSheetOptionText}>Liked Items</Text>
+          </TouchableOpacity>
         </View>
       </View>
     </View>
@@ -156,6 +190,7 @@ type RootStackParamList = {
   UserMenu: undefined;
   TermsOfService: undefined;
   AllOrders: undefined;
+  LikedItems: undefined;
 };
 
 /**
@@ -347,6 +382,13 @@ const AppNavigator: React.FC = () => {
               getHeaderOptions(navigation, firstName, true, true)
             }
           />
+          <Stack.Screen
+            name="LikedItems"
+            component={LikedItemsScreen}
+            options={({ navigation }) =>
+              getHeaderOptions(navigation, firstName, true, true)
+            }
+          />
         </>
       ) : (
         <Stack.Screen
@@ -431,10 +473,10 @@ const styles = StyleSheet.create({
   headerRightContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginRight: 20 // Shifted a bit to the left
+    marginRight: 20
   },
   headerIcon: {
-    marginRight: 15, // Slightly more spacing to the left for the avatar
+    marginRight: 15,
   },
   headerLeftButton: {
     paddingLeft: 15,
@@ -443,7 +485,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: "#6f42c1", // Slightly more subtle purple
+    backgroundColor: "#6f42c1",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -452,25 +494,21 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     fontSize: 14,
   },
-  bottomSheetOverlay: {
+  fullScreenMenuContainer: {
     flex: 1,
-    justifyContent: "flex-end",
-  },
-  bottomSheetContainer: {
     backgroundColor: "#000000",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingBottom: 30,
-    paddingTop: 10,
   },
-  bottomSheetHeader: {
+  fullScreenMenuHeader: {
     flexDirection: "row",
     justifyContent: "flex-end",
     paddingHorizontal: 20,
-    paddingBottom: 10,
+    paddingTop: 50,
+    paddingBottom: 20,
   },
-  bottomSheetContent: {
+  fullScreenMenuContent: {
+    flex: 1,
     paddingHorizontal: 20,
+    alignItems: "center",
   },
   bottomSheetUserInfo: {
     alignItems: "center",
@@ -502,6 +540,7 @@ const styles = StyleSheet.create({
   },
   bottomSheetOptions: {
     marginTop: 20,
+    width: '100%',
   },
   bottomSheetOption: {
     flexDirection: "row",
