@@ -8,7 +8,6 @@ import {
   TouchableOpacity,
   TextInput,
   ScrollView,
-  Alert,
   Modal,
   Image,
   Animated,
@@ -33,7 +32,7 @@ const PREDEFINED_CATEGORIES = [
   "Other",
 ];
 
-type Step = 1 | 2 | 3 | 4;
+type Step = 1 | 2 | 3 | 4 | 5;
 
 type AvailabilityDays = {
   Monday: boolean;
@@ -71,7 +70,6 @@ const AddGig: React.FC = () => {
   // Additional Links and Images
   const [additionalLinks, setAdditionalLinks] = useState<string[]>([]);
   const [newLink, setNewLink] = useState("");
-
   const [additionalImages, setAdditionalImages] = useState<string[]>([]);
 
   const [description, setDescription] = useState("");
@@ -84,6 +82,31 @@ const AddGig: React.FC = () => {
 
   // Animation for slide transitions
   const slideAnim = useRef(new Animated.Value(0)).current;
+
+  // Error Toast States
+  const [errorMessage, setErrorMessage] = useState("");
+  const errorOpacity = useRef(new Animated.Value(0)).current;
+
+  const showError = (msg: string) => {
+    setErrorMessage(msg);
+    Animated.timing(errorOpacity, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+      easing: Easing.out(Easing.ease),
+    }).start(() => {
+      setTimeout(() => {
+        Animated.timing(errorOpacity, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+          easing: Easing.in(Easing.ease),
+        }).start(() => {
+          setErrorMessage("");
+        });
+      }, 2500);
+    });
+  };
 
   const animateTransition = (forward: boolean) => {
     Animated.sequence([
@@ -103,7 +126,7 @@ const AddGig: React.FC = () => {
 
   const handleNext = () => {
     if (!validateCurrentStep()) return;
-    if (currentStep < 4) {
+    if (currentStep < 5) {
       animateTransition(true);
       setCurrentStep((prev) => (prev + 1) as Step);
     } else {
@@ -122,37 +145,39 @@ const AddGig: React.FC = () => {
     switch (currentStep) {
       case 1:
         if (!title.trim()) {
-          Alert.alert("Missing Field", "Please enter a Title.");
+          showError("Please enter a Title.");
           return false;
         }
         if (!category) {
-          Alert.alert("Missing Field", "Please select a Category.");
+          showError("Please select a Category.");
           return false;
         }
         if (!coverImage) {
-          Alert.alert("Missing Field", "Please upload a Headshot Image.");
+          showError("Please upload a Headshot Image.");
           return false;
         }
         return true;
       case 2:
         if (!isPriceOpenComm && !price.trim()) {
-          Alert.alert("Missing Field", "Please specify a price or choose 'Open to Communication'.");
+          showError("Please specify a price or choose 'Open to Communication'.");
           return false;
         }
-        // At least one availability must be chosen if not "Whenever"
         const anyDaySelected = Object.values(availabilityDays).some(Boolean);
         if (!isWhenever && !anyDaySelected) {
-          Alert.alert("Missing Field", "Please select availability days or choose 'Whenever'.");
+          showError("Please select availability days or choose 'Whenever'.");
           return false;
         }
         return true;
       case 3:
         if (!description.trim()) {
-          Alert.alert("Missing Field", "Please provide a description.");
+          showError("Please provide a description.");
           return false;
         }
         return true;
       case 4:
+        // Additional resources are optional, no strict validation needed
+        return true;
+      case 5:
         return true;
       default:
         return false;
@@ -164,7 +189,6 @@ const AddGig: React.FC = () => {
 
     let finalAvailability = "Open to Communicate";
     if (!isWhenever) {
-      // Construct a string of selected days if not Whenever
       const selectedDays = Object.entries(availabilityDays)
         .filter(([_, selected]) => selected)
         .map(([day]) => day)
@@ -197,7 +221,9 @@ const AddGig: React.FC = () => {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        console.error("Error:", response.status);
+        showError("Failed to post the service. Please try again.");
+        return;
       }
 
       setIsSuccessModalVisible(true);
@@ -228,7 +254,7 @@ const AddGig: React.FC = () => {
       }, 2000);
     } catch (error) {
       console.error("Error:", error);
-      Alert.alert("Error", "Failed to post the service. Please try again.");
+      showError("Failed to post the service. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -249,7 +275,7 @@ const AddGig: React.FC = () => {
 
   const pickAdditionalImage = async () => {
     if (additionalImages.length >= 5) {
-      Alert.alert("Limit Reached", "You can upload up to 5 additional images/documents.");
+      showError("You can upload up to 5 images/documents.");
       return;
     }
 
@@ -262,7 +288,7 @@ const AddGig: React.FC = () => {
     if (!result.canceled) {
       const newImages = result.assets.map((asset) => asset.uri);
       if (additionalImages.length + newImages.length > 5) {
-        Alert.alert("Limit Exceeded", "You can upload up to 5 images/documents total.");
+        showError("You can upload up to 5 images/documents total.");
       } else {
         setAdditionalImages((prev) => [...prev, ...newImages]);
       }
@@ -275,11 +301,11 @@ const AddGig: React.FC = () => {
 
   const addNewLink = () => {
     if (additionalLinks.length >= 5) {
-      Alert.alert("Limit Reached", "You can add up to 5 links.");
+      showError("You can add up to 5 links.");
       return;
     }
     if (!newLink.trim()) {
-      Alert.alert("Empty Link", "Please enter a valid link before adding.");
+      showError("Please enter a valid link before adding.");
       return;
     }
     setAdditionalLinks((prev) => [...prev, newLink.trim()]);
@@ -299,7 +325,6 @@ const AddGig: React.FC = () => {
 
   const handleWheneverToggle = () => {
     if (!isWhenever) {
-      // Clear all day selections if choosing Whenever
       setAvailabilityDays({
         Monday: false,
         Tuesday: false,
@@ -313,10 +338,44 @@ const AddGig: React.FC = () => {
     setIsWhenever(!isWhenever);
   };
 
-  const availabilityOptions = (
-    <View style={{ marginBottom: 20 }}>
-      <Text style={styles.subTitle}>Select your availability:</Text>
+  const priceSection = (
+    <View style={styles.sectionContainer}>
+      <Text style={styles.subTitle}>Pricing</Text>
+      <View style={styles.priceOptionContainer}>
+        <TouchableOpacity
+          style={[styles.priceOption, isPriceOpenComm && styles.priceOptionSelected]}
+          onPress={() => {
+            setIsPriceOpenComm(true);
+            setPrice("");
+          }}
+        >
+          <Text style={styles.priceOptionText}>Open to Communication</Text>
+        </TouchableOpacity>
 
+        <TouchableOpacity
+          style={[styles.priceOption, !isPriceOpenComm && styles.priceOptionSelected]}
+          onPress={() => {
+            setIsPriceOpenComm(false);
+          }}
+        >
+          <Text style={styles.priceOptionText}>Set a Price</Text>
+        </TouchableOpacity>
+      </View>
+      {!isPriceOpenComm && (
+        <TextInput
+          style={styles.input}
+          placeholder="Price (e.g., $25/hour)"
+          placeholderTextColor="#888"
+          value={price}
+          onChangeText={setPrice}
+        />
+      )}
+    </View>
+  );
+
+  const availabilitySection = (
+    <View style={styles.sectionContainer}>
+      <Text style={styles.subTitle}>Availability</Text>
       <TouchableOpacity
         style={[styles.availabilityOption, isWhenever && styles.availabilityOptionSelected]}
         onPress={handleWheneverToggle}
@@ -344,38 +403,11 @@ const AddGig: React.FC = () => {
     </View>
   );
 
-  const priceOptions = (
-    <View style={{ marginBottom: 20 }}>
-      <Text style={styles.subTitle}>Set Your Price:</Text>
-      <View style={styles.priceContainer}>
-        <TouchableOpacity
-          style={[styles.priceOption, isPriceOpenComm && styles.priceOptionSelected]}
-          onPress={() => {
-            setIsPriceOpenComm(!isPriceOpenComm);
-            if (!isPriceOpenComm) {
-              setPrice("");
-            }
-          }}
-        >
-          <Text style={styles.priceOptionText}>Open to Communication</Text>
-        </TouchableOpacity>
-      </View>
-
-      {!isPriceOpenComm && (
-        <TextInput
-          style={styles.input}
-          placeholder="Price (e.g., $25/hour)"
-          placeholderTextColor="#888"
-          value={price}
-          onChangeText={setPrice}
-        />
-      )}
-    </View>
-  );
-
   const additionalResourcesSection = (
-    <>
-      <Text style={styles.subTitle}>Links/Resume/Profiles (Optional):</Text>
+    <View style={styles.sectionContainer}>
+      <Text style={styles.subTitle}>Additional Resources</Text>
+      
+      <Text style={styles.helperText}>Links/Resume/Profiles (Optional):</Text>
       <View style={styles.addLinksContainer}>
         {additionalLinks.map((link, index) => (
           <View key={index} style={styles.linkItem}>
@@ -402,7 +434,9 @@ const AddGig: React.FC = () => {
         )}
       </View>
 
-      <Text style={styles.subTitle}>Additional Images/Documents (Optional):</Text>
+      <View style={styles.divider} />
+
+      <Text style={styles.helperText}>Additional Images/Documents (Optional):</Text>
       {additionalImages.length > 0 && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
           {additionalImages.map((img, index) => (
@@ -424,7 +458,7 @@ const AddGig: React.FC = () => {
           <Text style={styles.uploadButtonText}>Add Images/Documents</Text>
         </TouchableOpacity>
       )}
-    </>
+    </View>
   );
 
   const stepsContent = {
@@ -466,9 +500,9 @@ const AddGig: React.FC = () => {
     2: (
       <>
         <Text style={styles.sectionTitle}>Pricing & Availability</Text>
-        {priceOptions}
-        {availabilityOptions}
-        {additionalResourcesSection}
+        {priceSection}
+        <View style={styles.divider} />
+        {availabilitySection}
       </>
     ),
     3: (
@@ -486,6 +520,11 @@ const AddGig: React.FC = () => {
       </>
     ),
     4: (
+      <>
+        {additionalResourcesSection}
+      </>
+    ),
+    5: (
       <>
         <Text style={styles.sectionTitle}>Review & Submit</Text>
         <View style={styles.reviewContainer}>
@@ -542,11 +581,33 @@ const AddGig: React.FC = () => {
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
+      {/* Error Toast outside of innerContainer */}
+      {errorMessage ? (
+        <Animated.View
+          style={[
+            styles.errorToast,
+            {
+              opacity: errorOpacity,
+              transform: [
+                {
+                  translateY: errorOpacity.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [-50, 0],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
+          <Text style={styles.errorToastText}>{errorMessage}</Text>
+        </Animated.View>
+      ) : null}
+
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View style={styles.innerContainer}>
           {/* Progress Dots */}
           <View style={styles.progressContainer}>
-            {[1, 2, 3, 4].map((step) => (
+            {[1, 2, 3, 4, 5].map((step) => (
               <View
                 key={step}
                 style={[
@@ -573,12 +634,12 @@ const AddGig: React.FC = () => {
             ]}
           >
             <ScrollView
-              contentContainerStyle={{ paddingBottom: 40 }}
+              contentContainerStyle={{ paddingBottom: 60 }}
               showsVerticalScrollIndicator={false}
             >
               {stepsContent[currentStep]}
               
-              {/* Navigation Buttons inside the ScrollView to bring them closer */}
+              {/* Navigation Buttons */}
               <View style={styles.buttonContainer}>
                 {currentStep > 1 && (
                   <TouchableOpacity style={styles.backButton} onPress={handleBack}>
@@ -590,19 +651,19 @@ const AddGig: React.FC = () => {
                 <TouchableOpacity
                   style={[
                     styles.nextButton,
-                    (isLoading && currentStep === 4) && styles.buttonDisabled
+                    (isLoading && currentStep === 5) && styles.buttonDisabled
                   ]}
                   onPress={handleNext}
-                  disabled={(isLoading && currentStep === 4)}
+                  disabled={(isLoading && currentStep === 5)}
                 >
-                  {isLoading && currentStep === 4 ? (
+                  {isLoading && currentStep === 5 ? (
                     <ActivityIndicator size="small" color="#fff" />
                   ) : (
                     <>
                       <Text style={styles.nextButtonText}>
-                        {currentStep === 4 ? "Post Service" : "Next"}
+                        {currentStep === 5 ? "Post Service" : "Next"}
                       </Text>
-                      {currentStep < 4 && (
+                      {currentStep < 5 && (
                         <Ionicons name="arrow-forward" size={24} color="#fff" />
                       )}
                     </>
@@ -664,6 +725,22 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingHorizontal: 20,
   },
+  errorToast: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    paddingVertical: 15,
+    backgroundColor: "#FF6B6B",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 9999,
+  },
+  errorToastText: {
+    color: "#fff",
+    fontWeight: "700",
+    textAlign: "center",
+  },
   progressContainer: {
     flexDirection: "row",
     justifyContent: "center",
@@ -688,13 +765,22 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: "700",
     color: "#BB86FC",
-    marginBottom: 20,
+    marginBottom: 25,
     textAlign: "center",
   },
+  sectionContainer: {
+    marginBottom: 25,
+  },
   subTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "600",
     color: "#BB86FC",
+    marginBottom: 10,
+  },
+  helperText: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#aaa",
     marginBottom: 10,
   },
   input: {
@@ -753,7 +839,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#1E1E1E",
     borderRadius: 12,
     padding: 20,
-    marginBottom: 20,
     borderWidth: 1,
     borderColor: "#424242",
   },
@@ -770,15 +855,15 @@ const styles = StyleSheet.create({
     color: "#888",
     fontSize: 14,
     textAlign: "center",
-    marginTop: 10,
+    marginTop: 20,
     paddingHorizontal: 10,
   },
   buttonContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginTop: 10,
-    marginBottom: 20,
+    marginTop: 30,
+    marginBottom: 40,
   },
   backButton: {
     flexDirection: "row",
@@ -865,7 +950,7 @@ const styles = StyleSheet.create({
   daysContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
-    marginBottom: 15,
+    marginTop: 10,
     gap: 10,
   },
   dayButton: {
@@ -873,7 +958,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#424242",
     borderRadius: 8,
-    padding: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
   },
   dayButtonSelected: {
     borderColor: "#BB86FC",
@@ -882,16 +968,19 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 14,
   },
-  priceContainer: {
-    marginBottom: 10,
+  priceOptionContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 15,
   },
   priceOption: {
+    flex: 1,
     backgroundColor: "#1E1E1E",
     padding: 15,
     borderRadius: 10,
     borderWidth: 1,
     borderColor: "#424242",
-    marginBottom: 15,
+    marginRight: 10,
   },
   priceOptionSelected: {
     borderColor: "#BB86FC",
@@ -945,5 +1034,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#1E1E1E",
     borderRadius: 12,
     padding: 2,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: "#333",
+    marginVertical: 20,
   },
 });

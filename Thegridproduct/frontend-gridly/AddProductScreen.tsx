@@ -1,6 +1,6 @@
 // AddProduct.tsx
 
-import React, { useState, useContext } from "react";
+import React, { useState, useContext, useRef } from "react";
 import {
   View,
   Text,
@@ -9,10 +9,12 @@ import {
   Image,
   TextInput,
   ScrollView,
-  Alert,
   Modal,
   Animated,
   ActivityIndicator,
+  Keyboard,
+  TouchableWithoutFeedback,
+  Easing,
 } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import * as ImagePicker from "expo-image-picker";
@@ -22,19 +24,16 @@ import { useNavigation } from "@react-navigation/native";
 import { UserContext, StudentType } from "./UserContext";
 import axios from "axios";
 
-// Define explicit types for dropdown options
 type DurationUnit = "Hours" | "Days" | "Weeks" | "Months";
 type ListingType = "Selling" | "Renting" | "Both";
 type Availability = "In Campus Only" | "On and Off Campus";
 type Condition = "New" | "Used";
 
-// Define constant arrays with literal types
 const availableTags = ["#FemaleClothing", "#MensClothing", "#Other"] as const;
 const durationUnits: DurationUnit[] = ["Hours", "Days", "Weeks", "Months"];
 const listingTypes: ListingType[] = ["Selling", "Renting", "Both"];
 const conditions: Condition[] = ["New", "Used"];
 
-// Define the Product interface with condition and durationUnit
 interface Product {
   title: string;
   price?: number;
@@ -54,16 +53,15 @@ interface Product {
   durationUnit?: DurationUnit;
 }
 
-// Define the FormData interface with condition and durationUnit as optional
 interface FormData {
   condition?: Condition;
   durationUnit?: DurationUnit;
-  images: string[]; // Will store image URLs
+  images: string[];
   title: string;
   price: string;
   outOfCampusPrice: string;
   rentPrice: string;
-  rentDuration: string; // Numeric value for Rent Duration
+  rentDuration: string;
   description: string;
   selectedTags: string[];
   availability: Availability;
@@ -98,13 +96,35 @@ const AddProduct: React.FC = () => {
 
   const [isLoading, setIsLoading] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
-
   const [isSuccessModalVisible, setIsSuccessModalVisible] = useState(false);
   const [isInfoModalVisible, setIsInfoModalVisible] = useState(false);
 
-  // Replace with your Cloudinary credentials
-  const CLOUDINARY_URL =
-    "https://api.cloudinary.com/v1_1/ds0zpfht9/image/upload";
+  // Error Toast State
+  const [errorMessage, setErrorMessage] = useState("");
+  const errorOpacity = useRef(new Animated.Value(0)).current;
+
+  const showError = (msg: string) => {
+    setErrorMessage(msg);
+    Animated.timing(errorOpacity, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+      easing: Easing.out(Easing.ease),
+    }).start(() => {
+      setTimeout(() => {
+        Animated.timing(errorOpacity, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+          easing: Easing.in(Easing.ease),
+        }).start(() => {
+          setErrorMessage("");
+        });
+      }, 2500);
+    });
+  };
+
+  const CLOUDINARY_URL = "https://api.cloudinary.com/v1_1/ds0zpfht9/image/upload";
   const UPLOAD_PRESET = "gridly_preset";
 
   const animateSlide = (direction: "forward" | "backward") => {
@@ -123,6 +143,7 @@ const AddProduct: React.FC = () => {
   };
 
   const handleNext = () => {
+    if (!validateCurrentStep()) return;
     if (step < 4) {
       animateSlide("forward");
       setStep(step + 1);
@@ -140,7 +161,7 @@ const AddProduct: React.FC = () => {
 
   const pickImage = async () => {
     if (formData.images.length >= 3) {
-      Alert.alert("Image Limit Reached", "You can only upload up to 3 images.");
+      showError("You can only upload up to 3 images.");
       return;
     }
 
@@ -156,7 +177,6 @@ const AddProduct: React.FC = () => {
 
         setIsUploadingImage(true);
 
-        // Compress images
         const compressedImages = await Promise.all(
           selectedImages.map(async (uri) => {
             const manipulatedImage = await ImageManipulator.manipulateAsync(
@@ -169,15 +189,11 @@ const AddProduct: React.FC = () => {
         );
 
         if (formData.images.length + compressedImages.length > 3) {
-          Alert.alert(
-            "Image Limit Exceeded",
-            "You can only upload up to 3 images."
-          );
+          showError("You can only upload up to 3 images.");
           setIsUploadingImage(false);
           return;
         }
 
-        // Upload each image to Cloudinary
         const uploadedImageUrls = await Promise.all(
           compressedImages.map(async (uri) => {
             const formDataImage = new FormData();
@@ -198,7 +214,7 @@ const AddProduct: React.FC = () => {
               const imageUrl = response.data.secure_url;
               return imageUrl;
             } catch (error) {
-              console.error("Error uploading image to Cloudinary:", error);
+              console.error("Error uploading image:", error);
               throw new Error("Image upload failed. Please try again.");
             }
           })
@@ -210,11 +226,8 @@ const AddProduct: React.FC = () => {
         }));
       }
     } catch (error) {
-      console.error("Error picking/uploading images:", error);
-      Alert.alert(
-        "Image Picker Error",
-        "There was an error selecting or uploading images. Please try again."
-      );
+      console.error("Image Picker Error:", error);
+      showError("Error selecting or uploading images. Please try again.");
     } finally {
       setIsUploadingImage(false);
     }
@@ -243,43 +256,82 @@ const AddProduct: React.FC = () => {
   const validateCurrentStep = (): boolean => {
     switch (step) {
       case 1:
-        return formData.images.length > 0 && formData.title.trim().length > 0;
-      case 2:
-        return listingTypes.includes(formData.listingType);
-      case 3:
-        if (formData.listingType === "Selling") {
-          return formData.selectedTags.length > 0 && formData.rating > 0;
+        if (formData.images.length === 0) {
+          showError("Please upload at least one image.");
+          return false;
         }
+        if (!formData.title.trim()) {
+          showError("Please enter a product title.");
+          return false;
+        }
+        return true;
+      case 2:
+        if (!listingTypes.includes(formData.listingType)) {
+          showError("Please select a valid listing type.");
+          return false;
+        }
+        return true;
+      case 3:
+        if (formData.selectedTags.length === 0) {
+          showError("Please select at least one tag.");
+          return false;
+        }
+
+        if (formData.listingType === "Selling") {
+          if (formData.rating === 0 && formData.condition === "Used") {
+            showError("Please rate the product if it's used.");
+            return false;
+          }
+        }
+
         if (
           formData.listingType === "Renting" ||
           formData.listingType === "Both"
         ) {
-          return (
-            formData.selectedTags.length > 0 &&
-            formData.condition !== undefined &&
-            formData.rentDuration.trim().length > 0 &&
-            formData.durationUnit !== undefined
-          );
+          if (!formData.condition) {
+            showError("Please specify if the product is New or Used.");
+            return false;
+          }
+
+          if (!formData.rentDuration.trim()) {
+            showError("Please enter a rent duration.");
+            return false;
+          }
+          if (!formData.durationUnit) {
+            showError("Please select a rent duration unit.");
+            return false;
+          }
         }
-        return false;
+        return true;
       case 4:
         if (
-          formData.listingType === "Selling" ||
-          formData.listingType === "Both"
+          (formData.listingType === "Selling" ||
+            formData.listingType === "Both") &&
+          !formData.price.trim()
         ) {
-          return (
-            formData.price.trim().length > 0 &&
-            (formData.listingType === "Both"
-              ? formData.rentPrice.trim().length > 0
-              : true) &&
-            (formData.availability === "On and Off Campus"
-              ? formData.outOfCampusPrice.trim().length > 0
-              : true)
-          );
-        } else if (formData.listingType === "Renting") {
-          return formData.rentPrice.trim().length > 0;
+          showError("Please enter a price for selling.");
+          return false;
         }
-        return false;
+
+        if (
+          (formData.listingType === "Renting" ||
+            formData.listingType === "Both") &&
+          !formData.rentPrice.trim()
+        ) {
+          showError("Please enter a rent price.");
+          return false;
+        }
+
+        if (
+          formData.listingType === "Both" &&
+          formData.availability === "On and Off Campus" &&
+          !formData.outOfCampusPrice.trim()
+        ) {
+          showError("Please enter an off-campus price.");
+          return false;
+        }
+
+        return true;
       default:
         return false;
     }
@@ -287,20 +339,14 @@ const AddProduct: React.FC = () => {
 
   const handleSubmit = async () => {
     if (!userId || !token || !institution || !studentType) {
-      Alert.alert(
-        "Submission Error",
-        "User not logged in or incomplete profile."
-      );
+      showError("User not logged in or incomplete profile.");
       return;
     }
 
     setIsLoading(true);
 
     try {
-      // Convert string inputs to numbers and validate
-      const price = formData.price
-        ? parseFloat(formData.price.trim())
-        : undefined;
+      const price = formData.price ? parseFloat(formData.price.trim()) : undefined;
       const outOfCampusPrice = formData.outOfCampusPrice
         ? parseFloat(formData.outOfCampusPrice.trim())
         : undefined;
@@ -322,7 +368,6 @@ const AddProduct: React.FC = () => {
       if (formData.images.length === 0)
         throw new Error("Images cannot be empty.");
 
-      // Additional Validation for ListingType and Availability
       if (
         formData.listingType === "Both" &&
         formData.availability !== "On and Off Campus"
@@ -383,9 +428,7 @@ const AddProduct: React.FC = () => {
       if (contentType && contentType.includes("application/json")) {
         const data = await response.json();
         if (!response.ok) {
-          throw new Error(
-            data.message || `HTTP error! status: ${response.status}`
-          );
+          throw new Error(data.message || `HTTP error! status: ${response.status}`);
         }
         setFormData({
           images: [],
@@ -411,13 +454,12 @@ const AddProduct: React.FC = () => {
         }, 1500);
       } else {
         const errorText = await response.text();
-        console.error("Unexpected response format:", errorText);
+        console.error("Unexpected response:", errorText);
         throw new Error("Unexpected response format. Expected JSON.");
       }
     } catch (error: unknown) {
       console.error("Error:", error);
-      Alert.alert(
-        "Submission Error",
+      showError(
         error instanceof Error ? error.message : "An unknown error occurred."
       );
     } finally {
@@ -544,7 +586,6 @@ const AddProduct: React.FC = () => {
       title: "Select Tags, Condition & Rent Details",
       content: (
         <>
-          {/* Select Tags Section */}
           <View style={styles.sectionContainer}>
             <Text style={styles.sectionTitle}>Select Tags</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -574,7 +615,6 @@ const AddProduct: React.FC = () => {
             </ScrollView>
           </View>
 
-          {/* New or Used Section */}
           <View style={styles.sectionContainer}>
             <Text style={styles.sectionTitle}>Is the Product New or Used?</Text>
             <View style={styles.optionsContainer}>
@@ -610,13 +650,11 @@ const AddProduct: React.FC = () => {
             </View>
           </View>
 
-          {/* Rent Duration Section */}
           {(formData.listingType === "Renting" ||
             formData.listingType === "Both") && (
             <View style={styles.sectionContainer}>
               <Text style={styles.sectionTitle}>Rent Duration</Text>
               <View style={styles.rentDurationContainer}>
-                {/* Numeric Input for Duration */}
                 <TextInput
                   style={styles.durationInput}
                   placeholder="1"
@@ -627,7 +665,6 @@ const AddProduct: React.FC = () => {
                     setFormData({ ...formData, rentDuration: text })
                   }
                 />
-                {/* Dropdown for Unit Selection */}
                 <View style={styles.dropdown}>
                   {durationUnits.map((unit) => (
                     <TouchableOpacity
@@ -662,7 +699,6 @@ const AddProduct: React.FC = () => {
             </View>
           )}
 
-          {/* Rate Quality Section */}
           {formData.condition === "Used" && (
             <View style={styles.sectionContainer}>
               <Text style={styles.sectionTitle}>Rate Quality</Text>
@@ -704,7 +740,6 @@ const AddProduct: React.FC = () => {
       title: "Enter Prices & Description",
       content: (
         <>
-          {/* Conditionally Render Price Inputs Based on Listing Type */}
           {(formData.listingType === "Selling" ||
             formData.listingType === "Both") && (
             <TextInput
@@ -763,120 +798,160 @@ const AddProduct: React.FC = () => {
   };
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={{ paddingBottom: 40 }}
-    >
-      {/* Progress Dots */}
-      <View style={styles.progressContainer}>
-        {[1, 2, 3, 4].map((s) => (
-          <View
-            key={s}
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+      <View style={styles.outerContainer}>
+        {/* Error Toast */}
+        {errorMessage ? (
+          <Animated.View
             style={[
-              styles.progressDot,
-              s <= step ? styles.progressDotActive : null,
-            ]}
-          />
-        ))}
-      </View>
-
-      {/* Animated Slide */}
-      <Animated.View
-        style={[
-          styles.slideContainer,
-          {
-            transform: [
+              styles.errorToast,
               {
-                translateX: slideAnim.interpolate({
-                  inputRange: [-1, 0, 1],
-                  outputRange: [-50, 0, 50],
-                }),
+                opacity: errorOpacity,
+                transform: [
+                  {
+                    translateY: errorOpacity.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [-50, 0],
+                    }),
+                  },
+                ],
               },
-            ],
-          },
-        ]}
-      >
-        <Text style={styles.stepTitle}>
-          {slides[step as keyof typeof slides].title}
-        </Text>
-        {slides[step as keyof typeof slides].content}
-      </Animated.View>
+            ]}
+          >
+            <Text style={styles.errorToastText}>{errorMessage}</Text>
+          </Animated.View>
+        ) : null}
 
-      {/* Navigation Buttons */}
-      <View style={styles.buttonContainer}>
-        {step > 1 && (
-          <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-            <Ionicons name="arrow-back" size={24} color="#aaa" />
-            <Text style={styles.backButtonText}>Back</Text>
-          </TouchableOpacity>
-        )}
-
-        <TouchableOpacity
-          style={[
-            styles.nextButton,
-            (!validateCurrentStep() || isLoading) && styles.buttonDisabled,
-          ]}
-          onPress={handleNext}
-          disabled={!validateCurrentStep() || isLoading}
+        <ScrollView
+          style={styles.container}
+          contentContainerStyle={{ paddingBottom: 40 }}
         >
-          {isLoading && step === 4 ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <>
-              <Text style={styles.nextButtonText}>
-                {step === 4 ? "Add Product" : "Next"}
-              </Text>
-              {step < 4 && (
-                <Ionicons name="arrow-forward" size={24} color="#fff" />
-              )}
-            </>
-          )}
-        </TouchableOpacity>
-      </View>
-
-      {/* Success Modal */}
-      <Modal transparent visible={isSuccessModalVisible} animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Ionicons name="checkmark-circle" size={60} color="#9C27B0" />
-            <Text style={styles.modalText}>Product Posted Successfully!</Text>
+          {/* Progress Dots */}
+          <View style={styles.progressContainer}>
+            {[1, 2, 3, 4].map((s) => (
+              <View
+                key={s}
+                style={[
+                  styles.progressDot,
+                  s <= step ? styles.progressDotActive : null,
+                ]}
+              />
+            ))}
           </View>
-        </View>
-      </Modal>
 
-      {/* Information Modal */}
-      <Modal transparent visible={isInfoModalVisible} animationType="fade">
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPressOut={() => setIsInfoModalVisible(false)}
-        >
-          <View style={styles.infoModalContent}>
-            <Text style={styles.infoModalText}>
-              Upon the money transfer, the specified rent duration is the period
-              the renter has to use and return the product.
+          <Animated.View
+            style={[
+              styles.slideContainer,
+              {
+                transform: [
+                  {
+                    translateX: slideAnim.interpolate({
+                      inputRange: [-1, 0, 1],
+                      outputRange: [-50, 0, 50],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
+            <Text style={styles.stepTitle}>
+              {slides[step as keyof typeof slides].title}
             </Text>
+            {slides[step as keyof typeof slides].content}
+          </Animated.View>
+
+          {/* Navigation Buttons */}
+          <View style={styles.buttonContainer}>
+            {step > 1 && (
+              <TouchableOpacity style={styles.backButton} onPress={handleBack}>
+                <Ionicons name="arrow-back" size={24} color="#aaa" />
+                <Text style={styles.backButtonText}>Back</Text>
+              </TouchableOpacity>
+            )}
+
             <TouchableOpacity
-              style={styles.closeInfoButton}
-              onPress={() => setIsInfoModalVisible(false)}
+              style={styles.nextButton}
+              onPress={handleNext}
+              disabled={isLoading}
             >
-              <Text style={styles.closeInfoButtonText}>Close</Text>
+              {isLoading && step === 4 ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <Text style={styles.nextButtonText}>
+                    {step === 4 ? "Add Product" : "Next"}
+                  </Text>
+                  {step < 4 && (
+                    <Ionicons name="arrow-forward" size={24} color="#fff" />
+                  )}
+                </>
+              )}
             </TouchableOpacity>
           </View>
-        </TouchableOpacity>
-      </Modal>
-    </ScrollView>
+
+          {/* Success Modal */}
+          <Modal transparent visible={isSuccessModalVisible} animationType="fade">
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalContent}>
+                <Ionicons name="checkmark-circle" size={60} color="#9C27B0" />
+                <Text style={styles.modalText}>Product Posted Successfully!</Text>
+              </View>
+            </View>
+          </Modal>
+
+          {/* Information Modal */}
+          <Modal transparent visible={isInfoModalVisible} animationType="fade">
+            <TouchableOpacity
+              style={styles.modalOverlay}
+              activeOpacity={1}
+              onPressOut={() => setIsInfoModalVisible(false)}
+            >
+              <View style={styles.infoModalContent}>
+                <Text style={styles.infoModalText}>
+                  Upon the money transfer, the specified rent duration is the
+                  period the renter has to use and return the product.
+                </Text>
+                <TouchableOpacity
+                  style={styles.closeInfoButton}
+                  onPress={() => setIsInfoModalVisible(false)}
+                >
+                  <Text style={styles.closeInfoButtonText}>Close</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
+          </Modal>
+        </ScrollView>
+      </View>
+    </TouchableWithoutFeedback>
   );
 };
 
 export default AddProduct;
 
-// Stylesheet
 const styles = StyleSheet.create({
+  outerContainer: {
+    flex: 1,
+    backgroundColor: "#000000",
+  },
   container: {
     flex: 1,
-    backgroundColor: "#000000", // Pure black background
     padding: 20,
+  },
+  errorToast: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    paddingVertical: 15,
+    backgroundColor: "#FF6B6B",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 9999,
+  },
+  errorToastText: {
+    color: "#fff",
+    fontWeight: "700",
+    textAlign: "center",
   },
   progressContainer: {
     flexDirection: "row",
@@ -1068,9 +1143,6 @@ const styles = StyleSheet.create({
     marginTop: 10,
     textAlign: "center",
   },
-  infoButton: {
-    padding: 5,
-  },
   buttonContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -1096,9 +1168,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 30,
     borderRadius: 12,
     gap: 10,
-  },
-  buttonDisabled: {
-    backgroundColor: "#3A3A3A",
   },
   nextButtonText: {
     color: "#fff",
