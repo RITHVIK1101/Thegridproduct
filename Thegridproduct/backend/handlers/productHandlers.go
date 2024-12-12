@@ -664,8 +664,6 @@ func DeleteProductHandler(w http.ResponseWriter, r *http.Request) {
 		WriteJSONError(w, "Invalid user ID", http.StatusBadRequest)
 		return
 	}
-
-	// Extract product ID from URL parameters
 	vars := mux.Vars(r)
 	id := vars["id"]
 
@@ -679,8 +677,6 @@ func DeleteProductHandler(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	collection := db.GetCollection("gridlyapp", "products")
-
-	// Fetch the product to verify ownership
 	var existingProduct models.Product
 	err = collection.FindOne(ctx, bson.M{"_id": productID}).Decode(&existingProduct)
 	if err != nil {
@@ -692,8 +688,6 @@ func DeleteProductHandler(w http.ResponseWriter, r *http.Request) {
 		WriteJSONError(w, "Error fetching product data", http.StatusInternalServerError)
 		return
 	}
-
-	// Check if the authenticated user is the owner of the product
 	if existingProduct.UserID != userObjID {
 		WriteJSONError(w, "Unauthorized to delete this product", http.StatusUnauthorized)
 		return
