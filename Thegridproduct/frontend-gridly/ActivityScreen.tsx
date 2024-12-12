@@ -80,7 +80,6 @@ const ActivityScreen: React.FC = () => {
       if (!data || data.length === 0) {
         setProducts([]);
         setFilteredProducts([]);
-        setError("No products posted.");
       } else {
         setProducts(data);
         setFilteredProducts(data);

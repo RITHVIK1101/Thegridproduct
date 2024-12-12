@@ -1,6 +1,6 @@
 // AddGig.tsx
 
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   View,
   Text,
@@ -11,11 +11,18 @@ import {
   Alert,
   Modal,
   Image,
+  Animated,
+  Easing,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  TouchableWithoutFeedback,
+  Keyboard,
 } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import * as ImagePicker from "expo-image-picker";
-import { NGROK_URL } from "@env";
 import { useNavigation } from "@react-navigation/native";
+import { NGROK_URL } from "@env";
 
 const PREDEFINED_CATEGORIES = [
   "Tutoring",
@@ -26,71 +33,158 @@ const PREDEFINED_CATEGORIES = [
   "Other",
 ];
 
-const AddGig: React.FC = () => {
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [category, setCategory] = useState<string | null>(null);
-  const [price, setPrice] = useState("");
-  const [deliveryTime, setDeliveryTime] = useState("");
-  const [requirements, setRequirements] = useState("");
-  const [images, setImages] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSuccessModalVisible, setIsSuccessModalVisible] = useState(false);
-  const [showCategoriesModal, setShowCategoriesModal] = useState(false);
+type Step = 1 | 2 | 3 | 4;
 
+type AvailabilityDays = {
+  Monday: boolean;
+  Tuesday: boolean;
+  Wednesday: boolean;
+  Thursday: boolean;
+  Friday: boolean;
+  Saturday: boolean;
+  Sunday: boolean;
+};
+
+const AddGig: React.FC = () => {
   const navigation = useNavigation();
 
-  const handleImageUpload = async () => {
-    if (images.length >= 5) {
-      Alert.alert("Limit Reached", "You can upload up to 5 images.");
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsMultipleSelection: true,
-      quality: 1,
-    });
+  // Form fields
+  const [title, setTitle] = useState("");
+  const [category, setCategory] = useState<string | null>(null);
+  const [coverImage, setCoverImage] = useState<string | null>(null);
 
-    if (!result.canceled) {
-      const newImages = result.assets.map((asset) => asset.uri);
-      if (images.length + newImages.length > 5) {
-        Alert.alert("Limit Exceeded", "You can upload up to 5 images total.");
-      } else {
-        setImages((prev) => [...prev, ...newImages]);
+  const [price, setPrice] = useState("");
+  const [isPriceOpenComm, setIsPriceOpenComm] = useState(false);
+
+  // Availability states
+  const [availabilityDays, setAvailabilityDays] = useState<AvailabilityDays>({
+    Monday: false,
+    Tuesday: false,
+    Wednesday: false,
+    Thursday: false,
+    Friday: false,
+    Saturday: false,
+    Sunday: false,
+  });
+  const [isWhenever, setIsWhenever] = useState(false);
+
+  // Additional Links and Images
+  const [additionalLinks, setAdditionalLinks] = useState<string[]>([]);
+  const [newLink, setNewLink] = useState("");
+
+  const [additionalImages, setAdditionalImages] = useState<string[]>([]);
+
+  const [description, setDescription] = useState("");
+
+  // States
+  const [currentStep, setCurrentStep] = useState<Step>(1);
+  const [showCategoriesModal, setShowCategoriesModal] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSuccessModalVisible, setIsSuccessModalVisible] = useState(false);
+
+  // Animation for slide transitions
+  const slideAnim = useRef(new Animated.Value(0)).current;
+
+  const animateTransition = (forward: boolean) => {
+    Animated.sequence([
+      Animated.timing(slideAnim, {
+        toValue: forward ? 1 : -1,
+        duration: 200,
+        easing: Easing.ease,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 0,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const handleNext = () => {
+    if (!validateCurrentStep()) return;
+    if (currentStep < 4) {
+      animateTransition(true);
+      setCurrentStep((prev) => (prev + 1) as Step);
+    } else {
+      handleSubmit();
+    }
+  };
+
+  const handleBack = () => {
+    if (currentStep > 1) {
+      animateTransition(false);
+      setCurrentStep((prev) => (prev - 1) as Step);
+    }
+  };
+
+  const validateCurrentStep = (): boolean => {
+    switch (currentStep) {
+      case 1:
+        if (!title.trim()) {
+          Alert.alert("Missing Field", "Please enter a Title.");
+          return false;
+        }
+        if (!category) {
+          Alert.alert("Missing Field", "Please select a Category.");
+          return false;
+        }
+        if (!coverImage) {
+          Alert.alert("Missing Field", "Please upload a Headshot Image.");
+          return false;
+        }
+        return true;
+      case 2:
+        if (!isPriceOpenComm && !price.trim()) {
+          Alert.alert("Missing Field", "Please specify a price or choose 'Open to Communication'.");
+          return false;
+        }
+        // At least one availability must be chosen if not "Whenever"
+        const anyDaySelected = Object.values(availabilityDays).some(Boolean);
+        if (!isWhenever && !anyDaySelected) {
+          Alert.alert("Missing Field", "Please select availability days or choose 'Whenever'.");
+          return false;
+        }
+        return true;
+      case 3:
+        if (!description.trim()) {
+          Alert.alert("Missing Field", "Please provide a description.");
+          return false;
+        }
+        return true;
+      case 4:
+        return true;
+      default:
+        return false;
+    }
+  };
+
+  const handleSubmit = async () => {
+    setIsLoading(true);
+
+    let finalAvailability = "Open to Communicate";
+    if (!isWhenever) {
+      // Construct a string of selected days if not Whenever
+      const selectedDays = Object.entries(availabilityDays)
+        .filter(([_, selected]) => selected)
+        .map(([day]) => day)
+        .join(", ");
+      if (selectedDays.trim()) {
+        finalAvailability = selectedDays;
       }
     }
-  };
 
-  const removeImage = (index: number) => {
-    setImages((prev) => prev.filter((_, i) => i !== index));
-  };
+    const finalPrice = isPriceOpenComm ? "Open to Communication" : price.trim();
 
-  const validateForm = (): boolean => {
-    if (title.trim().length === 0) {
-      Alert.alert("Required Field Missing", "Please enter a title.");
-      return false;
-    }
-
-    if (description.trim().length === 0) {
-      Alert.alert("Required Field Missing", "Please enter a description.");
-      return false;
-    }
-
-    return true;
-  };
-
-  const handlePostService = async () => {
-    if (!validateForm()) return;
-
-    setIsLoading(true);
     const payload = {
       title: title.trim(),
       description: description.trim(),
       category: category || "Other",
-      price: price.trim(),
-      deliveryTime: deliveryTime.trim(),
-      requirements: requirements.trim(),
-      images,
+      price: finalPrice,
+      availability: finalAvailability,
+      links: additionalLinks,
+      documents: additionalImages,
+      images: [coverImage].filter(Boolean),
     };
 
     try {
@@ -107,14 +201,26 @@ const AddGig: React.FC = () => {
       }
 
       setIsSuccessModalVisible(true);
-      // Reset the form after success
+      // Reset after success
       setTitle("");
       setDescription("");
       setCategory(null);
       setPrice("");
-      setDeliveryTime("");
-      setRequirements("");
-      setImages([]);
+      setIsPriceOpenComm(false);
+      setAdditionalLinks([]);
+      setAdditionalImages([]);
+      setCoverImage(null);
+      setAvailabilityDays({
+        Monday: false,
+        Tuesday: false,
+        Wednesday: false,
+        Thursday: false,
+        Friday: false,
+        Saturday: false,
+        Sunday: false,
+      });
+      setIsWhenever(false);
+      setCurrentStep(1);
 
       setTimeout(() => {
         setIsSuccessModalVisible(false);
@@ -128,117 +234,421 @@ const AddGig: React.FC = () => {
     }
   };
 
-  return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
-      <Text style={styles.title}>Post a Service</Text>
+  const pickCoverImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: false,
+      quality: 1,
+    });
 
-      <TextInput
-        style={styles.input}
-        placeholder="Service Title (Required)"
-        placeholderTextColor="#888"
-        value={title}
-        onChangeText={setTitle}
-      />
+    if (!result.canceled) {
+      const uri = result.assets[0].uri;
+      setCoverImage(uri);
+    }
+  };
 
-      <TextInput
-        style={[styles.input, styles.textArea]}
-        placeholder="Service Description (Required)"
-        placeholderTextColor="#888"
-        multiline
-        numberOfLines={4}
-        value={description}
-        onChangeText={setDescription}
-      />
+  const pickAdditionalImage = async () => {
+    if (additionalImages.length >= 5) {
+      Alert.alert("Limit Reached", "You can upload up to 5 additional images/documents.");
+      return;
+    }
 
-      <TouchableOpacity style={styles.dropdown} onPress={() => setShowCategoriesModal(true)}>
-        <Text style={styles.dropdownText}>
-          {category ? category : "Select Category (Optional)"}
-        </Text>
-        <Ionicons name="chevron-down-outline" size={20} color="#ccc" />
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: true,
+      quality: 1,
+    });
+
+    if (!result.canceled) {
+      const newImages = result.assets.map((asset) => asset.uri);
+      if (additionalImages.length + newImages.length > 5) {
+        Alert.alert("Limit Exceeded", "You can upload up to 5 images/documents total.");
+      } else {
+        setAdditionalImages((prev) => [...prev, ...newImages]);
+      }
+    }
+  };
+
+  const removeAdditionalImage = (index: number) => {
+    setAdditionalImages((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const addNewLink = () => {
+    if (additionalLinks.length >= 5) {
+      Alert.alert("Limit Reached", "You can add up to 5 links.");
+      return;
+    }
+    if (!newLink.trim()) {
+      Alert.alert("Empty Link", "Please enter a valid link before adding.");
+      return;
+    }
+    setAdditionalLinks((prev) => [...prev, newLink.trim()]);
+    setNewLink("");
+  };
+
+  const removeLink = (index: number) => {
+    setAdditionalLinks((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const toggleDay = (day: keyof AvailabilityDays) => {
+    setAvailabilityDays((prev) => ({
+      ...prev,
+      [day]: !prev[day],
+    }));
+  };
+
+  const handleWheneverToggle = () => {
+    if (!isWhenever) {
+      // Clear all day selections if choosing Whenever
+      setAvailabilityDays({
+        Monday: false,
+        Tuesday: false,
+        Wednesday: false,
+        Thursday: false,
+        Friday: false,
+        Saturday: false,
+        Sunday: false,
+      });
+    }
+    setIsWhenever(!isWhenever);
+  };
+
+  const availabilityOptions = (
+    <View style={{ marginBottom: 20 }}>
+      <Text style={styles.subTitle}>Select your availability:</Text>
+
+      <TouchableOpacity
+        style={[styles.availabilityOption, isWhenever && styles.availabilityOptionSelected]}
+        onPress={handleWheneverToggle}
+      >
+        <Text style={styles.availabilityOptionText}>Whenever / Open to Communicate</Text>
       </TouchableOpacity>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Pricing (Optional, e.g., $25/hour)"
-        placeholderTextColor="#888"
-        value={price}
-        onChangeText={setPrice}
-      />
+      {!isWhenever && (
+        <View style={styles.daysContainer}>
+          {Object.keys(availabilityDays).map((day) => {
+            const dayKey = day as keyof AvailabilityDays;
+            const selected = availabilityDays[dayKey];
+            return (
+              <TouchableOpacity
+                key={day}
+                style={[styles.dayButton, selected && styles.dayButtonSelected]}
+                onPress={() => toggleDay(dayKey)}
+              >
+                <Text style={styles.dayButtonText}>{day}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
+    </View>
+  );
 
-      <TextInput
-        style={styles.input}
-        placeholder="Delivery Time (Optional, e.g., 2 days)"
-        placeholderTextColor="#888"
-        value={deliveryTime}
-        onChangeText={setDeliveryTime}
-      />
+  const priceOptions = (
+    <View style={{ marginBottom: 20 }}>
+      <Text style={styles.subTitle}>Set Your Price:</Text>
+      <View style={styles.priceContainer}>
+        <TouchableOpacity
+          style={[styles.priceOption, isPriceOpenComm && styles.priceOptionSelected]}
+          onPress={() => {
+            setIsPriceOpenComm(!isPriceOpenComm);
+            if (!isPriceOpenComm) {
+              setPrice("");
+            }
+          }}
+        >
+          <Text style={styles.priceOptionText}>Open to Communication</Text>
+        </TouchableOpacity>
+      </View>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Requirements (Optional)"
-        placeholderTextColor="#888"
-        value={requirements}
-        onChangeText={setRequirements}
-      />
+      {!isPriceOpenComm && (
+        <TextInput
+          style={styles.input}
+          placeholder="Price (e.g., $25/hour)"
+          placeholderTextColor="#888"
+          value={price}
+          onChangeText={setPrice}
+        />
+      )}
+    </View>
+  );
 
-      <TouchableOpacity style={styles.uploadButton} onPress={handleImageUpload}>
-        <Ionicons name="cloud-upload-outline" size={24} color="#BB86FC" />
-        <Text style={styles.uploadButtonText}>Upload Portfolio Images</Text>
-      </TouchableOpacity>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        {images.map((image, index) => (
-          <View key={index} style={styles.imageContainer}>
-            <Image source={{ uri: image }} style={styles.image} />
-            <TouchableOpacity style={styles.removeButton} onPress={() => removeImage(index)}>
-              <Ionicons name="close-circle-outline" size={24} color="#BB86FC" />
+  const additionalResourcesSection = (
+    <>
+      <Text style={styles.subTitle}>Links/Resume/Profiles (Optional):</Text>
+      <View style={styles.addLinksContainer}>
+        {additionalLinks.map((link, index) => (
+          <View key={index} style={styles.linkItem}>
+            <Text style={styles.linkText}>{link}</Text>
+            <TouchableOpacity onPress={() => removeLink(index)}>
+              <Ionicons name="close-circle-outline" size={20} color="#BB86FC" />
             </TouchableOpacity>
           </View>
         ))}
-      </ScrollView>
 
-      <TouchableOpacity
-        style={[styles.postButton, isLoading && styles.buttonDisabled]}
-        onPress={handlePostService}
-        disabled={isLoading}
-      >
-        <Text style={styles.postButtonText}>{isLoading ? "Posting..." : "Post Service"}</Text>
-      </TouchableOpacity>
-
-      {/* Success Modal */}
-      <Modal transparent visible={isSuccessModalVisible} animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Ionicons name="checkmark-circle" size={60} color="#9C27B0" />
-            <Text style={styles.modalText}>Service Posted Successfully!</Text>
+        {additionalLinks.length < 5 && (
+          <View style={styles.addLinkRow}>
+            <TextInput
+              style={[styles.input, { flex: 1 }]}
+              placeholder="Add a link..."
+              placeholderTextColor="#888"
+              value={newLink}
+              onChangeText={setNewLink}
+            />
+            <TouchableOpacity style={styles.addLinkButton} onPress={addNewLink}>
+              <Ionicons name="add-circle-outline" size={24} color="#BB86FC" />
+            </TouchableOpacity>
           </View>
-        </View>
-      </Modal>
+        )}
+      </View>
 
-      {/* Categories Modal */}
-      <Modal transparent visible={showCategoriesModal} animationType="fade">
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPressOut={() => setShowCategoriesModal(false)}
-        >
-          <View style={styles.modalPickerContent}>
-            <Text style={styles.modalTitle}>Select a Category</Text>
-            {PREDEFINED_CATEGORIES.map((cat) => (
+      <Text style={styles.subTitle}>Additional Images/Documents (Optional):</Text>
+      {additionalImages.length > 0 && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
+          {additionalImages.map((img, index) => (
+            <View key={index} style={styles.imageContainer}>
+              <Image source={{ uri: img }} style={styles.additionalImage} />
               <TouchableOpacity
-                key={cat}
-                style={styles.modalOption}
-                onPress={() => {
-                  setCategory(cat);
-                  setShowCategoriesModal(false);
-                }}
+                style={styles.removeButton}
+                onPress={() => removeAdditionalImage(index)}
               >
-                <Text style={styles.modalOptionText}>{cat}</Text>
+                <Ionicons name="close-circle-outline" size={24} color="#BB86FC" />
               </TouchableOpacity>
+            </View>
+          ))}
+        </ScrollView>
+      )}
+      {additionalImages.length < 5 && (
+        <TouchableOpacity style={styles.uploadButton} onPress={pickAdditionalImage}>
+          <Ionicons name="cloud-upload-outline" size={24} color="#BB86FC" />
+          <Text style={styles.uploadButtonText}>Add Images/Documents</Text>
+        </TouchableOpacity>
+      )}
+    </>
+  );
+
+  const stepsContent = {
+    1: (
+      <>
+        <Text style={styles.sectionTitle}>Basic Information</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Service Title"
+          placeholderTextColor="#888"
+          value={title}
+          onChangeText={setTitle}
+        />
+
+        <TouchableOpacity
+          style={styles.dropdown}
+          onPress={() => setShowCategoriesModal(true)}
+        >
+          <Text style={styles.dropdownText}>
+            {category ? category : "Select Category"}
+          </Text>
+          <Ionicons name="chevron-down-outline" size={20} color="#ccc" />
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.uploadButton} onPress={pickCoverImage}>
+          <Ionicons name="cloud-upload-outline" size={24} color="#BB86FC" />
+          <Text style={styles.uploadButtonText}>
+            {coverImage ? "Change Headshot Image" : "Upload Headshot Image"}
+          </Text>
+        </TouchableOpacity>
+
+        {coverImage && (
+          <View style={styles.coverImageContainer}>
+            <Image source={{ uri: coverImage }} style={styles.coverImage} />
+          </View>
+        )}
+      </>
+    ),
+    2: (
+      <>
+        <Text style={styles.sectionTitle}>Pricing & Availability</Text>
+        {priceOptions}
+        {availabilityOptions}
+        {additionalResourcesSection}
+      </>
+    ),
+    3: (
+      <>
+        <Text style={styles.sectionTitle}>Description</Text>
+        <TextInput
+          style={[styles.input, styles.textArea]}
+          placeholder="Describe your service in detail..."
+          placeholderTextColor="#888"
+          multiline
+          numberOfLines={6}
+          value={description}
+          onChangeText={setDescription}
+        />
+      </>
+    ),
+    4: (
+      <>
+        <Text style={styles.sectionTitle}>Review & Submit</Text>
+        <View style={styles.reviewContainer}>
+          <Text style={styles.reviewText}>
+            <Text style={styles.reviewLabel}>Title: </Text>
+            {title}
+          </Text>
+          <Text style={styles.reviewText}>
+            <Text style={styles.reviewLabel}>Category: </Text>
+            {category}
+          </Text>
+          <Text style={styles.reviewText}>
+            <Text style={styles.reviewLabel}>Price: </Text>
+            {isPriceOpenComm ? "Open to Communication" : price || "N/A"}
+          </Text>
+          <Text style={styles.reviewText}>
+            <Text style={styles.reviewLabel}>Availability: </Text>
+            {isWhenever
+              ? "Whenever/Open to Communicate"
+              : Object.entries(availabilityDays)
+                  .filter(([_, sel]) => sel)
+                  .map(([day]) => day)
+                  .join(", ") || "N/A"}
+          </Text>
+
+          <Text style={styles.reviewText}>
+            <Text style={styles.reviewLabel}>Links: </Text>
+            {additionalLinks.length > 0 ? additionalLinks.join(", ") : "N/A"}
+          </Text>
+
+          <Text style={styles.reviewText}>
+            <Text style={styles.reviewLabel}>Documents/Images: </Text>
+            {additionalImages.length > 0 ? `${additionalImages.length} Uploaded` : "N/A"}
+          </Text>
+
+          <Text style={styles.reviewText}>
+            <Text style={styles.reviewLabel}>Description: </Text>
+            {description || "N/A"}
+          </Text>
+          <Text style={styles.reviewText}>
+            <Text style={styles.reviewLabel}>Headshot Image: </Text>
+            {coverImage ? "Uploaded" : "None"}
+          </Text>
+        </View>
+        <Text style={styles.note}>
+          Please confirm all details are correct before posting.
+        </Text>
+      </>
+    ),
+  };
+
+  return (
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+    >
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <View style={styles.innerContainer}>
+          {/* Progress Dots */}
+          <View style={styles.progressContainer}>
+            {[1, 2, 3, 4].map((step) => (
+              <View
+                key={step}
+                style={[
+                  styles.progressDot,
+                  step <= currentStep ? styles.progressDotActive : null,
+                ]}
+              />
             ))}
           </View>
-        </TouchableOpacity>
-      </Modal>
-    </ScrollView>
+
+          <Animated.View
+            style={[
+              styles.slideContainer,
+              {
+                transform: [
+                  {
+                    translateX: slideAnim.interpolate({
+                      inputRange: [-1, 0, 1],
+                      outputRange: [-50, 0, 50],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
+            <ScrollView
+              contentContainerStyle={{ paddingBottom: 40 }}
+              showsVerticalScrollIndicator={false}
+            >
+              {stepsContent[currentStep]}
+              
+              {/* Navigation Buttons inside the ScrollView to bring them closer */}
+              <View style={styles.buttonContainer}>
+                {currentStep > 1 && (
+                  <TouchableOpacity style={styles.backButton} onPress={handleBack}>
+                    <Ionicons name="arrow-back" size={24} color="#aaa" />
+                    <Text style={styles.backButtonText}>Back</Text>
+                  </TouchableOpacity>
+                )}
+
+                <TouchableOpacity
+                  style={[
+                    styles.nextButton,
+                    (isLoading && currentStep === 4) && styles.buttonDisabled
+                  ]}
+                  onPress={handleNext}
+                  disabled={(isLoading && currentStep === 4)}
+                >
+                  {isLoading && currentStep === 4 ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <>
+                      <Text style={styles.nextButtonText}>
+                        {currentStep === 4 ? "Post Service" : "Next"}
+                      </Text>
+                      {currentStep < 4 && (
+                        <Ionicons name="arrow-forward" size={24} color="#fff" />
+                      )}
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </Animated.View>
+
+          {/* Success Modal */}
+          <Modal transparent visible={isSuccessModalVisible} animationType="fade">
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalContent}>
+                <Ionicons name="checkmark-circle" size={60} color="#9C27B0" />
+                <Text style={styles.modalText}>Service Posted Successfully!</Text>
+              </View>
+            </View>
+          </Modal>
+
+          {/* Categories Modal */}
+          <Modal transparent visible={showCategoriesModal} animationType="fade">
+            <TouchableOpacity
+              style={styles.modalOverlay}
+              activeOpacity={1}
+              onPressOut={() => setShowCategoriesModal(false)}
+            >
+              <View style={styles.modalPickerContent}>
+                <Text style={styles.modalTitle}>Select a Category</Text>
+                {PREDEFINED_CATEGORIES.map((cat) => (
+                  <TouchableOpacity
+                    key={cat}
+                    style={styles.modalOption}
+                    onPress={() => {
+                      setCategory(cat);
+                      setShowCategoriesModal(false);
+                    }}
+                  >
+                    <Text style={styles.modalOptionText}>{cat}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </TouchableOpacity>
+          </Modal>
+        </View>
+      </TouchableWithoutFeedback>
+    </KeyboardAvoidingView>
   );
 };
 
@@ -247,15 +657,45 @@ export default AddGig;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#121212",
-    padding: 20,
+    backgroundColor: "black",
   },
-  title: {
-    fontSize: 24,
+  innerContainer: {
+    flex: 1,
+    paddingTop: 20,
+    paddingHorizontal: 20,
+  },
+  progressContainer: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 30,
+  },
+  progressDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: "#424242",
+    marginHorizontal: 5,
+  },
+  progressDotActive: {
+    backgroundColor: "#BB86FC",
+    transform: [{ scale: 1.2 }],
+  },
+  slideContainer: {
+    flex: 1,
+  },
+  sectionTitle: {
+    fontSize: 22,
     fontWeight: "700",
     color: "#BB86FC",
     marginBottom: 20,
     textAlign: "center",
+  },
+  subTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#BB86FC",
+    marginBottom: 10,
   },
   input: {
     backgroundColor: "#1E1E1E",
@@ -280,7 +720,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 1,
     borderColor: "#424242",
-    marginBottom: 15,
+    marginBottom: 20,
   },
   dropdownText: {
     fontSize: 16,
@@ -292,44 +732,80 @@ const styles = StyleSheet.create({
     backgroundColor: "#1E1E1E",
     padding: 15,
     borderRadius: 10,
-    marginBottom: 15,
+    marginBottom: 20,
   },
   uploadButtonText: {
     color: "#BB86FC",
     fontSize: 16,
     marginLeft: 10,
   },
-  imageContainer: {
-    position: "relative",
-    marginRight: 10,
+  coverImageContainer: {
+    alignItems: "center",
+    marginBottom: 20,
   },
-  image: {
-    width: 80,
-    height: 80,
-    borderRadius: 10,
+  coverImage: {
+    width: 150,
+    height: 150,
+    borderRadius: 15,
+    resizeMode: "cover",
   },
-  removeButton: {
-    position: "absolute",
-    top: -5,
-    right: -5,
+  reviewContainer: {
     backgroundColor: "#1E1E1E",
     borderRadius: 12,
-    padding: 2,
+    padding: 20,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: "#424242",
   },
-  postButton: {
+  reviewText: {
+    color: "#fff",
+    fontSize: 16,
+    marginBottom: 10,
+  },
+  reviewLabel: {
+    color: "#BB86FC",
+    fontWeight: "700",
+  },
+  note: {
+    color: "#888",
+    fontSize: 14,
+    textAlign: "center",
+    marginTop: 10,
+    paddingHorizontal: 10,
+  },
+  buttonContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 10,
+    marginBottom: 20,
+  },
+  backButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  backButtonText: {
+    color: "#aaa",
+    fontSize: 16,
+    fontWeight: "500",
+  },
+  nextButton: {
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: "#BB86FC",
     padding: 15,
+    paddingHorizontal: 30,
     borderRadius: 12,
-    marginTop: 20,
+    gap: 10,
   },
   buttonDisabled: {
     backgroundColor: "#3A3A3A",
   },
-  postButtonText: {
+  nextButtonText: {
     color: "#fff",
     fontSize: 16,
     fontWeight: "600",
-    textAlign: "center",
   },
   modalOverlay: {
     flex: 1,
@@ -370,5 +846,104 @@ const styles = StyleSheet.create({
   modalOptionText: {
     fontSize: 16,
     color: "#fff",
+  },
+  availabilityOption: {
+    backgroundColor: "#1E1E1E",
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 15,
+    borderWidth: 1,
+    borderColor: "#424242",
+  },
+  availabilityOptionSelected: {
+    borderColor: "#BB86FC",
+  },
+  availabilityOptionText: {
+    color: "#fff",
+    fontSize: 16,
+  },
+  daysContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginBottom: 15,
+    gap: 10,
+  },
+  dayButton: {
+    backgroundColor: "#1E1E1E",
+    borderWidth: 1,
+    borderColor: "#424242",
+    borderRadius: 8,
+    padding: 10,
+  },
+  dayButtonSelected: {
+    borderColor: "#BB86FC",
+  },
+  dayButtonText: {
+    color: "#fff",
+    fontSize: 14,
+  },
+  priceContainer: {
+    marginBottom: 10,
+  },
+  priceOption: {
+    backgroundColor: "#1E1E1E",
+    padding: 15,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#424242",
+    marginBottom: 15,
+  },
+  priceOptionSelected: {
+    borderColor: "#BB86FC",
+  },
+  priceOptionText: {
+    color: "#fff",
+    fontSize: 16,
+  },
+  addLinksContainer: {
+    marginBottom: 20,
+  },
+  linkItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#1E1E1E",
+    borderColor: "#424242",
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 10,
+  },
+  linkText: {
+    color: "#fff",
+    flex: 1,
+    marginRight: 10,
+  },
+  addLinkRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  addLinkButton: {
+    backgroundColor: "#1E1E1E",
+    borderRadius: 10,
+    padding: 10,
+  },
+  imageContainer: {
+    position: "relative",
+    marginRight: 10,
+  },
+  additionalImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 10,
+  },
+  removeButton: {
+    position: "absolute",
+    top: -5,
+    right: -5,
+    backgroundColor: "#1E1E1E",
+    borderRadius: 12,
+    padding: 2,
   },
 });

@@ -19,7 +19,7 @@ import {
 import Ionicons from "react-native-vector-icons/Ionicons";
 import BottomNavBar from "./components/BottomNavbar";
 import { fetchConversations, postMessage, getMessages } from "./api";
-import { ABLY_API_KEY } from "@env";
+import { ABLY_API_KEY, CLOUDINARY_URL, UPLOAD_PRESET } from "@env";
 import { Conversation, Message } from "./types";
 import { UserContext } from "./UserContext";
 import Ably from "ably";
@@ -27,6 +27,8 @@ import { RouteProp, useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "./navigationTypes";
 import { RootStackParamList } from "./navigationTypes";
 import * as ImagePicker from "expo-image-picker";
+import * as ImageManipulator from "expo-image-manipulator";
+import axios from "axios";
 
 type Chat = Conversation;
 
@@ -46,6 +48,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
 
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
   const [isImagePreviewModalVisible, setIsImagePreviewModalVisible] = useState<boolean>(false);
+  const [isUploadingImage, setIsUploadingImage] = useState<boolean>(false);
 
   const [filterMenuVisible, setFilterMenuVisible] = useState<boolean>(false);
 
@@ -324,7 +327,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsMultipleSelection: false,
-        quality: 1,
+        quality: 0.7,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
@@ -340,12 +343,50 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }
   };
 
+  const uploadImageToCloudinary = async (uri: string): Promise<string> => {
+    setIsUploadingImage(true);
+    try {
+      // Compress image before upload
+      const manipulatedImage = await ImageManipulator.manipulateAsync(
+        uri,
+        [{ resize: { width: 800 } }],
+        { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
+      );
+
+      const formDataImage = new FormData();
+      formDataImage.append("file", {
+        uri: manipulatedImage.uri,
+        type: "image/jpeg",
+        name: `upload_${Date.now()}.jpg`,
+      } as any);
+      formDataImage.append("upload_preset", UPLOAD_PRESET);
+
+      const response = await axios.post(CLOUDINARY_URL, formDataImage, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      const imageUrl = response.data.secure_url;
+      return imageUrl;
+    } catch (error) {
+      console.error("Error uploading image to Cloudinary:", error);
+      Alert.alert("Error", "Image upload failed. Please try again.");
+      throw error;
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
   const confirmAddImage = async () => {
     if (!selectedChat || !selectedImageUri) return;
 
     setSending(true);
     try {
-      const imageMessage = `[Image] ${selectedImageUri}`;
+      // Upload to Cloudinary first
+      const uploadedImageUrl = await uploadImageToCloudinary(selectedImageUri);
+
+      const imageMessage = `[Image] ${uploadedImageUrl}`;
       await postMessage(selectedChat.chatID, imageMessage, token, userId);
       console.log("Image message sent successfully.");
     } catch (error: any) {
@@ -657,16 +698,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                       <Ionicons name="image" size={20} color="#fff" />
                     </Pressable>
 
-                    <Pressable
-                      style={styles.iconButton}
-                      onPress={() => {
-                        Alert.alert("Voice Recording", "Voice recording functionality here.");
-                      }}
-                      accessibilityLabel="Record Voice"
-                    >
-                      <Ionicons name="mic" size={20} color="#fff" />
-                    </Pressable>
-
                     <TextInput
                       style={styles.messageInput}
                       placeholder="Type a message..."
@@ -725,9 +756,9 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                   onPress={confirmAddImage}
                   style={styles.addImageButton}
                   accessibilityLabel="Add Image"
-                  disabled={sending}
+                  disabled={sending || isUploadingImage}
                 >
-                  {sending ? (
+                  {sending || isUploadingImage ? (
                     <ActivityIndicator color="#fff" />
                   ) : (
                     <Ionicons name="checkmark" size={24} color="#BB86FC" />

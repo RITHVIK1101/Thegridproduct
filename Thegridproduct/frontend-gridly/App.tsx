@@ -1,45 +1,162 @@
 import React, { useState, useContext } from "react";
 import {
-  NavigationContainer,
-  NavigationContainerRef,
-  CommonActions,
-} from "@react-navigation/native";
+  TouchableOpacity,
+  View,
+  Text,
+  StyleSheet,
+  Alert,
+  ActivityIndicator,
+  ScrollView,
+  Dimensions
+} from "react-native";
+import Icon from "react-native-vector-icons/MaterialIcons";
+import Ionicons from "react-native-vector-icons/Ionicons";
+import { NavigationContainer, CommonActions } from "@react-navigation/native";
 import {
   createStackNavigator,
   StackNavigationOptions,
 } from "@react-navigation/stack";
-import {
-  TouchableOpacity,
-  View,
-  Text,
-  Modal,
-  StyleSheet,
-  Alert,
-  ScrollView,
-  ActivityIndicator,
-} from "react-native";
-import Icon from "react-native-vector-icons/MaterialIcons";
-import Ionicons from "react-native-vector-icons/Ionicons";
+import { StripeProvider } from "@stripe/stripe-react-native";
+import { UserProvider, UserContext } from "./UserContext";
 import PaymentScreen from "./PaymentScreen";
 import SplashScreen from "./SplashScreen";
 import LoginScreen from "./LoginScreen";
 import Dashboard from "./Dashboard";
 import AddProductScreen from "./AddProductScreen";
 import AddGigScreen from "./AddGigScreen";
-import JobsScreen from "./JobsScreen"; // Make sure this import is correct and points to the actual JobsScreen file
+import JobsScreen from "./JobsScreen";
 import ActivityScreen from "./ActivityScreen";
 import EditProduct from "./EditProductScreen";
 import MessagingScreen from "./MessagingScreen";
 import CartScreen from "./CartScreen";
 import AccountScreen from "./AccountScreen";
-import { RootStackParamList } from "./navigationTypes";
-import { UserProvider, UserContext } from "./UserContext";
-import { StripeProvider } from "@stripe/stripe-react-native";
 
-export const navigationRef =
-  React.createRef<NavigationContainerRef<RootStackParamList>>();
+// Placeholder for AllOrdersScreen
+const AllOrdersScreen: React.FC = () => (
+  <View style={[styles.screenContainer, { justifyContent: 'center', alignItems: 'center' }]}>
+    <Text style={{ color: "#fff", fontSize: 18 }}>All Orders coming soon!</Text>
+  </View>
+);
 
-const Stack = createStackNavigator<RootStackParamList>();
+// Terms of Service Screen
+const TermsOfServiceScreen: React.FC = () => (
+  <View style={styles.termsScreenContainer}>
+    <Text style={styles.termsHeading}>Terms of Service</Text>
+    <ScrollView style={styles.termsScroll}>
+      <Text style={styles.termsText}>
+        Welcome to Gridly. By using our platform, you agree to the following terms...
+        {"\n\n"}
+        Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla facilisi.
+        Phasellus non urna nec sapien dictum luctus.
+      </Text>
+    </ScrollView>
+  </View>
+);
+
+// User Menu Screen
+const UserMenuScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
+  const { clearUser, firstName, lastName, institution, studentType } = useContext(UserContext);
+
+  const handleLogout = async () => {
+    try {
+      await clearUser();
+      Alert.alert("Logout Successful", "You have been logged out.");
+      navigation.dispatch(
+        CommonActions.reset({
+          index: 0,
+          routes: [{ name: "Login" }],
+        })
+      );
+    } catch (error) {
+      console.error("Logout Error:", error);
+      Alert.alert("Logout Error", "Failed to log out. Please try again.");
+    }
+  };
+
+  return (
+    <View style={styles.bottomSheetOverlay}>
+      <View style={styles.bottomSheetContainer}>
+        <View style={styles.bottomSheetHeader}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            accessibilityLabel="Close User Menu"
+          >
+            <Ionicons name="close" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.bottomSheetContent}>
+          {/* User Info Section */}
+          <View style={styles.bottomSheetUserInfo}>
+            <View style={styles.bottomSheetAvatar}>
+              <Text style={styles.bottomSheetAvatarText}>
+                {firstName && firstName.length > 0 ? firstName.charAt(0).toUpperCase() : "?"}
+              </Text>
+            </View>
+            <Text style={styles.bottomSheetUserName}>
+              {firstName} {lastName}
+            </Text>
+            {institution && (
+              <Text style={styles.bottomSheetUserInstitution}>{institution}</Text>
+            )}
+            {studentType && (
+              <Text style={styles.bottomSheetUserInstitution}>
+                {studentType.charAt(0).toUpperCase() + studentType.slice(1)}
+              </Text>
+            )}
+          </View>
+
+          <View style={styles.bottomSheetOptions}>
+            <TouchableOpacity style={styles.bottomSheetOption} onPress={handleLogout}>
+              <Ionicons name="log-out-outline" size={20} color="#FFFFFF" style={{ marginRight: 10 }} />
+              <Text style={styles.bottomSheetOptionText}>Logout</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.bottomSheetOption}
+              onPress={() => navigation.navigate("TermsOfService")}
+            >
+              <Ionicons name="document-text-outline" size={20} color="#FFFFFF" style={{ marginRight: 10 }} />
+              <Text style={styles.bottomSheetOptionText}>View Terms of Service</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.bottomSheetOption}
+              onPress={() => navigation.navigate("Account")}
+            >
+              <Ionicons name="person-circle-outline" size={20} color="#FFFFFF" style={{ marginRight: 10 }} />
+              <Text style={styles.bottomSheetOptionText}>My Account</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.bottomSheetOption}
+              onPress={() => navigation.navigate("AllOrders")}
+            >
+              <Ionicons name="reader-outline" size={20} color="#FFFFFF" style={{ marginRight: 10 }} />
+              <Text style={styles.bottomSheetOptionText}>All Orders</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+};
+
+export const navigationRef = React.createRef();
+
+type RootStackParamList = {
+  Dashboard: undefined;
+  Jobs: undefined;
+  AddProduct: undefined;
+  AddGig: undefined;
+  Activity: undefined;
+  EditProduct: undefined;
+  Messaging: { chatId?: string } | undefined;
+  Cart: undefined;
+  Payment: undefined;
+  Account: undefined;
+  Login: undefined;
+  UserMenu: undefined;
+  TermsOfService: undefined;
+  AllOrders: undefined;
+};
 
 /**
  * Custom Header Title Component with Logo and Text
@@ -52,44 +169,54 @@ const HeaderTitleWithLogo: React.FC<{ title: string }> = ({ title }) => (
 );
 
 /**
+ * Custom Avatar Component showing the first letter of user's first name
+ */
+const UserAvatar: React.FC<{
+  firstName?: string;
+  onPress: () => void;
+}> = ({ firstName, onPress }) => {
+  const initial = firstName && firstName.length > 0 ? firstName.charAt(0).toUpperCase() : "?";
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      style={styles.userAvatar}
+      accessibilityLabel="Open User Menu"
+    >
+      <Text style={styles.userAvatarText}>{initial}</Text>
+    </TouchableOpacity>
+  );
+};
+
+/**
  * Common header right component
  */
 const HeaderRightComponent = (
-  modalVisibleSetter: React.Dispatch<React.SetStateAction<boolean>>
+  navigation: any,
+  firstName?: string
 ) => (
   <View style={styles.headerRightContainer}>
     <TouchableOpacity
-      onPress={() => navigationRef.current?.navigate("Cart")}
+      onPress={() => navigation.navigate("Cart")}
       style={styles.headerIcon}
       accessibilityLabel="Go to Cart"
     >
-      <Ionicons name="cart-outline" size={28} color="#FFFFFF" />
+      <Ionicons name="cart-outline" size={26} color="#FFFFFF" />
     </TouchableOpacity>
-    <TouchableOpacity
-      onPress={() => modalVisibleSetter(true)}
-      style={styles.headerIcon}
-      accessibilityLabel="Open Options Modal"
-    >
-      <Icon name="more-vert" size={24} color="#FFFFFF" />
-    </TouchableOpacity>
+    <UserAvatar firstName={firstName} onPress={() => navigation.navigate("UserMenu")} />
   </View>
 );
 
 /**
  * Helper function to generate common header options
- * @param navigation The navigation prop provided by React Navigation
- * @param setModalVisible Function to toggle the options modal
- * @param showBackButton Boolean to determine if a back button should be displayed
- * @param enableAnimation Boolean to determine if screen animations should be enabled
  */
 const getHeaderOptions = (
   navigation: any,
-  setModalVisible: React.Dispatch<React.SetStateAction<boolean>>,
+  firstName?: string,
   showBackButton: boolean = false,
   enableAnimation: boolean = false
 ): StackNavigationOptions => ({
   headerTitle: () => <HeaderTitleWithLogo title="Gridly" />,
-  headerRight: () => HeaderRightComponent(setModalVisible),
+  headerRight: () => HeaderRightComponent(navigation, firstName),
   headerLeft: showBackButton
     ? () => (
         <TouchableOpacity
@@ -104,33 +231,10 @@ const getHeaderOptions = (
   animationEnabled: enableAnimation,
 });
 
+const Stack = createStackNavigator<RootStackParamList>();
+
 const AppNavigator: React.FC = () => {
-  const [modalVisible, setModalVisible] = useState(false);
-  const [showTerms, setShowTerms] = useState(false);
-
-  const { userId, token, clearUser, isLoading } = useContext(UserContext);
-
-  /**
-   * Handles user logout
-   */
-  const handleLogout = async () => {
-    setModalVisible(false);
-    try {
-      await clearUser();
-      Alert.alert("Logout Successful", "You have been logged out.");
-      if (navigationRef.current) {
-        navigationRef.current.dispatch(
-          CommonActions.reset({
-            index: 0,
-            routes: [{ name: "Login" }],
-          })
-        );
-      }
-    } catch (error) {
-      console.error("Logout Error:", error);
-      Alert.alert("Logout Error", "Failed to log out. Please try again.");
-    }
-  };
+  const { token, isLoading, firstName } = useContext(UserContext);
 
   if (isLoading) {
     return (
@@ -141,186 +245,117 @@ const AppNavigator: React.FC = () => {
   }
 
   return (
-    <StripeProvider
-      publishableKey="pk_test_51QQZb9Fg2PIykDNlba9E7bVR9EFKxmaS9F1mjlOXFb0meJuXTG5nWy1vYHBIIlWPwiheNa37T1snKDN2Urzs2Jwx00ywvbvMGE"
-      merchantIdentifier="merchant.com.yourapp"
+    <Stack.Navigator
+      screenOptions={{
+        headerStyle: {
+          backgroundColor: "#000000",
+          shadowOpacity: 0,
+          elevation: 0,
+        },
+        headerTintColor: "#FFFFFF",
+        headerTitleStyle: {
+          fontWeight: "700",
+          color: "#FFFFFF",
+        },
+        animationEnabled: false,
+      }}
     >
-      <NavigationContainer ref={navigationRef}>
-        <Stack.Navigator
-          screenOptions={{
-            headerStyle: {
-              backgroundColor: "#000000",
-              shadowOpacity: 0,
-              elevation: 0,
-            },
-            headerTintColor: "#FFFFFF",
-            headerTitleStyle: {
-              fontWeight: "700",
-              color: "#FFFFFF",
-            },
-            // Disable animations globally for instant navigation
-            animationEnabled: false,
-          }}
-        >
-          {token ? (
-            <>
-              <Stack.Screen
-                name="Dashboard"
-                component={Dashboard}
-                options={({ navigation }) =>
-                  getHeaderOptions(navigation, setModalVisible)
-                }
-              />
-              <Stack.Screen
-                name="Jobs"
-                component={JobsScreen}
-                options={({ navigation }) =>
-                  getHeaderOptions(navigation, setModalVisible)
-                }
-              />
-              <Stack.Screen
-                name="AddProduct"
-                component={AddProductScreen}
-                options={({ navigation }) =>
-                  getHeaderOptions(navigation, setModalVisible, true, true)
-                }
-              />
-              <Stack.Screen
-                name="AddGig"
-                component={AddGigScreen}
-                options={({ navigation }) =>
-                  getHeaderOptions(navigation, setModalVisible, true, true)
-                }
-              />
-              <Stack.Screen
-                name="Activity"
-                component={ActivityScreen}
-                options={({ navigation }) =>
-                  getHeaderOptions(navigation, setModalVisible)
-                }
-              />
-              <Stack.Screen
-                name="EditProduct"
-                component={EditProduct}
-                options={({ navigation }) =>
-                  getHeaderOptions(navigation, setModalVisible, true, true)
-                }
-              />
-              <Stack.Screen
-                name="Messaging"
-                component={MessagingScreen}
-                options={({ navigation }) =>
-                  getHeaderOptions(navigation, setModalVisible)
-                }
-              />
-              <Stack.Screen
-                name="Cart"
-                component={CartScreen}
-                options={({ navigation }) =>
-                  getHeaderOptions(navigation, setModalVisible, true, true)
-                }
-              />
-              <Stack.Screen
-                name="Payment"
-                component={PaymentScreen}
-                options={({ navigation }) =>
-                  getHeaderOptions(navigation, setModalVisible, true, true)
-                }
-              />
-              <Stack.Screen
-                name="Account"
-                component={AccountScreen}
-                options={({ navigation }) =>
-                  getHeaderOptions(navigation, setModalVisible, true, true)
-                }
-              />
-            </>
-          ) : (
-            <Stack.Screen
-              name="Login"
-              component={LoginScreen}
-              options={{ headerShown: false }}
-            />
-          )}
-        </Stack.Navigator>
-
-        {/* Modal for options */}
-        <Modal
-          transparent={true}
-          visible={modalVisible}
-          animationType="fade"
-          onRequestClose={() => setModalVisible(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <TouchableOpacity
-                onPress={() => setModalVisible(false)}
-                style={styles.closeButton}
-                accessibilityLabel="Close Options Modal"
-              >
-                <Icon name="close" size={24} color="#FFFFFF" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={handleLogout}
-                style={styles.option}
-                accessibilityLabel="Logout"
-              >
-                <Text style={styles.optionText}>Logout</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => {
-                  setShowTerms(true);
-                  setModalVisible(false);
-                }}
-                style={styles.option}
-                accessibilityLabel="View Terms of Service"
-              >
-                <Text style={styles.optionText}>View Terms of Service</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => {
-                  setModalVisible(false);
-                  navigationRef.current?.navigate("Account");
-                }}
-                style={styles.option}
-                accessibilityLabel="Go to My Account"
-              >
-                <Text style={styles.optionText}>My Account</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Modal>
-
-        {/* Modal for Terms of Service */}
-        <Modal
-          transparent={true}
-          visible={showTerms}
-          animationType="slide"
-          onRequestClose={() => setShowTerms(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.termsContent}>
-              <TouchableOpacity
-                onPress={() => setShowTerms(false)}
-                style={styles.closeButton}
-                accessibilityLabel="Close Terms Modal"
-              >
-                <Icon name="close" size={24} color="#FFFFFF" />
-              </TouchableOpacity>
-              <ScrollView>
-                <Text style={styles.termsText}>
-                  Terms of Service: {"\n\n"}Welcome to Gridly. By using our
-                  platform, you agree to the following terms...
-                  {"\n\n"}
-                  Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla
-                  facilisi. Phasellus non urna nec sapien dictum luctus.
-                </Text>
-              </ScrollView>
-            </View>
-          </View>
-        </Modal>
-      </NavigationContainer>
-    </StripeProvider>
+      {token ? (
+        <>
+          <Stack.Screen
+            name="Dashboard"
+            component={Dashboard}
+            options={({ navigation }) => getHeaderOptions(navigation, firstName)}
+          />
+          <Stack.Screen
+            name="Jobs"
+            component={JobsScreen}
+            options={({ navigation }) => getHeaderOptions(navigation, firstName)}
+          />
+          <Stack.Screen
+            name="AddProduct"
+            component={AddProductScreen}
+            options={({ navigation }) =>
+              getHeaderOptions(navigation, firstName, true, true)
+            }
+          />
+          <Stack.Screen
+            name="AddGig"
+            component={AddGigScreen}
+            options={({ navigation }) =>
+              getHeaderOptions(navigation, firstName, true, true)
+            }
+          />
+          <Stack.Screen
+            name="Activity"
+            component={ActivityScreen}
+            options={({ navigation }) => getHeaderOptions(navigation, firstName)}
+          />
+          <Stack.Screen
+            name="EditProduct"
+            component={EditProduct}
+            options={({ navigation }) =>
+              getHeaderOptions(navigation, firstName, true, true)
+            }
+          />
+          <Stack.Screen
+            name="Messaging"
+            component={MessagingScreen}
+            options={({ navigation }) => getHeaderOptions(navigation, firstName)}
+          />
+          <Stack.Screen
+            name="Cart"
+            component={CartScreen}
+            options={({ navigation }) =>
+              getHeaderOptions(navigation, firstName, true, true)
+            }
+          />
+          <Stack.Screen
+            name="Payment"
+            component={PaymentScreen}
+            options={({ navigation }) =>
+              getHeaderOptions(navigation, firstName, true, true)
+            }
+          />
+          <Stack.Screen
+            name="Account"
+            component={AccountScreen}
+            options={({ navigation }) =>
+              getHeaderOptions(navigation, firstName, true, true)
+            }
+          />
+          <Stack.Screen
+            name="UserMenu"
+            component={UserMenuScreen}
+            options={{
+              headerShown: false,
+              presentation: 'transparentModal',
+              animationEnabled: true
+            }}
+          />
+          <Stack.Screen
+            name="TermsOfService"
+            component={TermsOfServiceScreen}
+            options={({ navigation }) =>
+              getHeaderOptions(navigation, firstName, true, true)
+            }
+          />
+          <Stack.Screen
+            name="AllOrders"
+            component={AllOrdersScreen}
+            options={({ navigation }) =>
+              getHeaderOptions(navigation, firstName, true, true)
+            }
+          />
+        </>
+      ) : (
+        <Stack.Screen
+          name="Login"
+          component={LoginScreen}
+          options={{ headerShown: false }}
+        />
+      )}
+    </Stack.Navigator>
   );
 };
 
@@ -336,13 +371,22 @@ const App: React.FC = () => {
       {showSplash ? (
         <SplashScreen onAnimationEnd={handleSplashEnd} />
       ) : (
-        <AppNavigator />
+        <StripeProvider
+          publishableKey="pk_test_51QQZb9Fg2PIykDNlba9E7bVR9EFKxmaS9F1mjlOXFb0meJuXTG5nWy1vYHBIIlWPwiheNa37T1snKDN2Urzs2Jwx00ywvbvMGE"
+          merchantIdentifier="merchant.com.yourapp"
+        >
+          <NavigationContainer ref={navigationRef as any}>
+            <AppNavigator />
+          </NavigationContainer>
+        </StripeProvider>
       )}
     </UserProvider>
   );
 };
 
 export default App;
+
+const { width } = Dimensions.get("window");
 
 const styles = StyleSheet.create({
   loadingContainer: {
@@ -351,44 +395,28 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#000000",
   },
-  modalOverlay: {
+  screenContainer: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.7)",
-    justifyContent: "center",
-    alignItems: "center",
+    backgroundColor: "#000",
   },
-  modalContent: {
-    backgroundColor: "#000000",
-    padding: 20,
-    borderRadius: 10,
-    width: "80%",
-    position: "relative",
+  termsScreenContainer: {
+    flex: 1,
+    backgroundColor: "#000",
+    padding: 20
   },
-  termsContent: {
-    backgroundColor: "#000000",
-    padding: 20,
-    borderRadius: 10,
-    width: "90%",
-    height: "80%",
-    position: "relative",
+  termsHeading: {
+    color: "#fff",
+    fontSize: 22,
+    fontWeight: "700",
+    marginBottom: 20
   },
-  closeButton: {
-    position: "absolute",
-    top: 10,
-    right: 10,
-  },
-  option: {
-    padding: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: "#424242",
-  },
-  optionText: {
-    fontSize: 16,
-    color: "#FFFFFF",
+  termsScroll: {
+    flexGrow: 1
   },
   termsText: {
-    fontSize: 14,
-    color: "#FFFFFF",
+    color: "#ccc",
+    fontSize: 16,
+    lineHeight: 24
   },
   headerTitleContainer: {
     flexDirection: "row",
@@ -403,11 +431,87 @@ const styles = StyleSheet.create({
   headerRightContainer: {
     flexDirection: "row",
     alignItems: "center",
+    marginRight: 20 // Shifted a bit to the left
   },
   headerIcon: {
-    marginLeft: 15,
+    marginRight: 15, // Slightly more spacing to the left for the avatar
   },
   headerLeftButton: {
     paddingLeft: 15,
+  },
+  userAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "#6f42c1", // Slightly more subtle purple
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  userAvatarText: {
+    color: "#FFF",
+    fontWeight: "700",
+    fontSize: 14,
+  },
+  bottomSheetOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+  },
+  bottomSheetContainer: {
+    backgroundColor: "#000000",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: 30,
+    paddingTop: 10,
+  },
+  bottomSheetHeader: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    paddingHorizontal: 20,
+    paddingBottom: 10,
+  },
+  bottomSheetContent: {
+    paddingHorizontal: 20,
+  },
+  bottomSheetUserInfo: {
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  bottomSheetAvatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: "#8a2be2",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  bottomSheetAvatarText: {
+    color: "#FFF",
+    fontWeight: "700",
+    fontSize: 24,
+  },
+  bottomSheetUserName: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  bottomSheetUserInstitution: {
+    fontSize: 14,
+    color: "#CCCCCC",
+    marginTop: 5,
+  },
+  bottomSheetOptions: {
+    marginTop: 20,
+  },
+  bottomSheetOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 15,
+    borderBottomColor: "#333333",
+    borderBottomWidth: 1,
+  },
+  bottomSheetOptionText: {
+    color: "#FFFFFF",
+    fontSize: 16,
   },
 });

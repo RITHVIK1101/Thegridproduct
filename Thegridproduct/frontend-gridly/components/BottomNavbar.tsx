@@ -192,11 +192,12 @@ const BottomNavBar: React.FC = () => {
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Add Options</Text>
             <View style={styles.modalButtonsContainer}>
+              {/* Instead of resetting the stack, we navigate so that the back button works */}
               <TouchableOpacity
                 style={styles.modalButton}
                 onPress={() => {
                   toggleModal();
-                  switchScreen("AddProduct");
+                  navigation.navigate("AddProduct");
                 }}
                 accessibilityLabel="Add Product"
               >
@@ -206,11 +207,11 @@ const BottomNavBar: React.FC = () => {
                 style={styles.modalButton}
                 onPress={() => {
                   toggleModal();
-                  switchScreen("AddGig");
+                  navigation.navigate("AddGig");
                 }}
                 accessibilityLabel="Add Gig"
               >
-                <Text style={styles.modalButtonText}>Add Gig</Text>
+                <Text style={styles.modalButtonText}>Add Job</Text>
               </TouchableOpacity>
             </View>
             <TouchableOpacity
