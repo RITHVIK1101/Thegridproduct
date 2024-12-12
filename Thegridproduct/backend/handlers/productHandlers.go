@@ -576,7 +576,7 @@ func AddMultipleProductsHandler(w http.ResponseWriter, r *http.Request) {
 		product.StudentType = studentType
 		product.PostedDate = time.Now()
 		product.Expired = false
-		product.Status = "inshop" // New line to set default status
+		product.Status = "inshop"
 
 		// Validate required fields
 		if product.Title == "" || product.Price == 0 || product.Description == "" ||

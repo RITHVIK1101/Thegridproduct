@@ -77,8 +77,6 @@ func main() {
 	// Protected Routes
 	protected := router.PathPrefix("/").Subrouter()
 	protected.Use(handlers.AuthMiddleware)
-
-	// Product Routes
 	protected.HandleFunc("/products", handlers.AddProductHandler).Methods("POST")
 	protected.HandleFunc("/products/user", handlers.GetUserProductsHandler).Methods("GET")
 	protected.HandleFunc("/products/all", handlers.GetAllProductsHandler).Methods("GET")
@@ -109,6 +107,9 @@ func main() {
 
 	// Payment Route
 	protected.HandleFunc("/create-payment-intent", handlers.CreatePaymentIntentHandler).Methods("POST")
+	protected.HandleFunc("/payment/save-method", handlers.SavePaymentMethodHandler).Methods("POST")
+	protected.HandleFunc("/payment/saved-methods", handlers.GetSavedPaymentMethodsHandler).Methods("GET")
+	protected.HandleFunc("/payment/charge-saved-method", handlers.ChargeSavedPaymentMethodHandler).Methods("POST")
 
 	// Handle undefined routes
 	router.NotFoundHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

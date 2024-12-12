@@ -43,18 +43,29 @@ type DashboardProps = {
   route: RouteProp<RootStackParamList, "Dashboard">;
 };
 
+// Updated Product type to include necessary fields
 type Product = {
   id: string;
   title: string;
   price: number;
   description: string;
-  category: string;
+  category: string; // Ensure categories like "MaleClothing" and "FemaleClothing" are used
   images: string[];
   university: string;
   ownerId: string;
   postedDate: string;
   rating?: number;
   quality?: string;
+};
+
+// User type to store fetched user information
+type User = {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  institution: string;
+  // Add other fields as necessary
 };
 
 type CartItem = {
@@ -65,11 +76,12 @@ type CartItem = {
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
 
 const Dashboard: React.FC<DashboardProps> = () => {
-  // Default to "All" and "Both" on login
+  // Filter states
   const [campusMode, setCampusMode] = useState<"In Campus" | "Both">("Both");
   const [selectedCategory, setSelectedCategory] =
     useState<string>("#Everything");
 
+  // Modal visibility states
   const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isDetailsModalVisible, setIsDetailsModalVisible] = useState(false);
@@ -86,9 +98,9 @@ const Dashboard: React.FC<DashboardProps> = () => {
   const categories = [
     "#Everything",
     "#FemaleClothing",
-    "#MensClothing",
-    "#Other",
+    "#MaleClothing", // Corrected "MensClothing" to "MaleClothing" for consistency
   ];
+
   const campusOptions: Array<{ label: string; value: "In Campus" | "Both" }> = [
     { label: "In and Out of Campus", value: "Both" },
     { label: "In Campus", value: "In Campus" },
@@ -111,6 +123,9 @@ const Dashboard: React.FC<DashboardProps> = () => {
 
   const [successMessage, setSuccessMessage] = useState("");
   const successOpacity = useRef(new Animated.Value(0)).current;
+
+  // User Information State
+  const [userInfo, setUserInfo] = useState<User | null>(null);
 
   const showError = (msg: string) => {
     setErrorMessage(msg);
@@ -160,6 +175,51 @@ const Dashboard: React.FC<DashboardProps> = () => {
         ? prev.filter((id) => id !== productId)
         : [...prev, productId]
     );
+  };
+
+  // Fetch User Information
+  const fetchUserInfo = async () => {
+    if (!userId || !token) return;
+    try {
+      const response = await fetch(`${NGROK_URL}/users/${userId}`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (response.status === 401) {
+        Alert.alert("Session Expired", "Please log in again.", [
+          {
+            text: "OK",
+            onPress: async () => {
+              await clearUser();
+              navigation.dispatch(
+                CommonActions.reset({
+                  index: 0,
+                  routes: [{ name: "Login" }],
+                })
+              );
+            },
+          },
+        ]);
+        return;
+      }
+
+      if (!response.ok) {
+        const responseText = await response.text();
+        console.error("Error response text:", responseText);
+        throw new Error("Failed to fetch user info.");
+      }
+
+      const data: User = await response.json();
+      setUserInfo(data);
+    } catch (err) {
+      console.error("Fetch User Info Error:", err);
+      // Optionally show an error toast
+      showError("Failed to fetch user information.");
+    }
   };
 
   // Fetch cart
@@ -283,7 +343,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
     }
   }, [cartUpdated]);
 
-  // Fetch products
+  // Fetch products based on campus mode
   const fetchProducts = async () => {
     if (!userId || !token || !institution) {
       setLoading(false);
@@ -293,9 +353,10 @@ const Dashboard: React.FC<DashboardProps> = () => {
 
     try {
       let url = `${NGROK_URL}/products/all`;
-      if (campusMode === "Both") {
-        url += "?mode=outofcampus";
+      if (campusMode === "In Campus") {
+        url += "?mode=in";
       }
+      // If campusMode is "Both", fetch all products without mode filter
 
       const response = await fetch(url, {
         method: "GET",
@@ -353,8 +414,9 @@ const Dashboard: React.FC<DashboardProps> = () => {
 
       let finalFiltered = filtered;
       if (selectedCategory !== "#Everything") {
+        const categoryFilter = selectedCategory.replace("#", "");
         finalFiltered = finalFiltered.filter(
-          (p) => p.category === selectedCategory
+          (p) => p.category.toLowerCase() === categoryFilter.toLowerCase()
         );
       }
       if (searchQuery.trim() !== "") {
@@ -368,7 +430,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
       setFilteredProducts(finalFiltered);
       setError(null);
     } catch (err) {
-      console.error("Fetch Error:", err);
+      console.error("Fetch Products Error:", err);
       setError(err instanceof Error ? err.message : "Error fetching.");
     } finally {
       setLoading(false);
@@ -379,8 +441,9 @@ const Dashboard: React.FC<DashboardProps> = () => {
     if (allProducts.length > 0) {
       let finalFiltered = allProducts;
       if (selectedCategory !== "#Everything") {
+        const categoryFilter = selectedCategory.replace("#", "");
         finalFiltered = finalFiltered.filter(
-          (p) => p.category === selectedCategory
+          (p) => p.category.toLowerCase() === categoryFilter.toLowerCase()
         );
       }
       if (searchQuery.trim() !== "") {
@@ -399,11 +462,13 @@ const Dashboard: React.FC<DashboardProps> = () => {
     setError(null);
     fetchProducts();
     fetchCart();
+    fetchUserInfo(); // Fetch user info when dashboard mounts or campusMode changes
     setCurrentIndex(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [campusMode]);
 
-  const toggleFilterModal = () => setIsFilterModalVisible(!isFilterModalVisible);
+  const toggleFilterModal = () =>
+    setIsFilterModalVisible(!isFilterModalVisible);
 
   // Swipe handler
   const handleSwipe = (direction: "left" | "right" | "up") => {
@@ -575,7 +640,8 @@ const Dashboard: React.FC<DashboardProps> = () => {
       selectedCategory === "#Everything"
         ? "All"
         : selectedCategory.replace("#", "");
-    const modeDisplay = campusMode === "Both" ? "In&Out of Campus" : "In Campus";
+    const modeDisplay =
+      campusMode === "Both" ? "In & Out of Campus" : "In Campus";
 
     return (
       <View style={styles.filterTagsContainer}>
@@ -592,7 +658,10 @@ const Dashboard: React.FC<DashboardProps> = () => {
   return (
     <GestureHandlerRootView style={styles.rootContainer}>
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <LinearGradient colors={["#000000", "#000000"]} style={styles.gradientBackground}>
+        <LinearGradient
+          colors={["#000000", "#000000"]}
+          style={styles.gradientBackground}
+        >
           {/* Error Toast */}
           {errorMessage ? (
             <Animated.View
@@ -739,7 +808,8 @@ const Dashboard: React.FC<DashboardProps> = () => {
                     <TouchableOpacity
                       style={[
                         styles.filterOptionButton,
-                        selectedCategory === item && styles.filterOptionSelected,
+                        selectedCategory === item &&
+                          styles.filterOptionSelected,
                       ]}
                       onPress={() => setSelectedCategory(item)}
                       accessibilityLabel={`Filter by ${item}`}
@@ -767,7 +837,8 @@ const Dashboard: React.FC<DashboardProps> = () => {
                     <TouchableOpacity
                       style={[
                         styles.filterOptionButton,
-                        campusMode === item.value && styles.filterOptionSelected,
+                        campusMode === item.value &&
+                          styles.filterOptionSelected,
                       ]}
                       onPress={() => setCampusMode(item.value)}
                       accessibilityLabel={`Filter by ${item.label}`}
@@ -886,6 +957,15 @@ const Dashboard: React.FC<DashboardProps> = () => {
             </TouchableOpacity>
           </Modal>
 
+          {/* Display User Info (Optional) */}
+          {userInfo && (
+            <View style={styles.userInfoContainer}>
+              <Text style={styles.userInfoText}>
+                Welcome, {userInfo.firstName} {userInfo.lastName}
+              </Text>
+            </View>
+          )}
+
           <BottomNavBar />
         </LinearGradient>
       </TouchableWithoutFeedback>
@@ -895,6 +975,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
 
 export default Dashboard;
 
+// Updated styles to include userInfoContainer and userInfoText
 const styles = StyleSheet.create({
   rootContainer: {
     flex: 1,
@@ -1252,6 +1333,22 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 14,
     lineHeight: 20,
+    textAlign: "center",
+  },
+  userInfoContainer: {
+    position: "absolute",
+    top: Platform.OS === "ios" ? 70 : 50, // Adjust based on device
+    left: 20,
+    right: 20,
+    zIndex: 1000,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    padding: 10,
+    borderRadius: 10,
+  },
+  userInfoText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
     textAlign: "center",
   },
 });

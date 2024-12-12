@@ -114,6 +114,11 @@ func GetCartHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Combine cart items with their corresponding product details
+	for _, product := range products {
+		productMap[product.ID] = product
+	}
+
+	// Combine cart items with their corresponding product details
 	detailedCartItems := []map[string]interface{}{}
 	for _, item := range cart.Items {
 		product, exists := productMap[item.ProductID]
@@ -125,7 +130,7 @@ func GetCartHandler(w http.ResponseWriter, r *http.Request) {
 				"price":       product.Price,
 				"description": product.Description,
 				"images":      product.Images,
-				// Add other product fields as needed
+				"userId":      product.UserID.Hex(), // Include UserID here
 			}
 			detailedCartItems = append(detailedCartItems, detailedItem)
 		} else {
@@ -137,6 +142,7 @@ func GetCartHandler(w http.ResponseWriter, r *http.Request) {
 				"price":       0,
 				"description": "This product is no longer available.",
 				"images":      []string{},
+				"userId":      nil,
 			}
 			detailedCartItems = append(detailedCartItems, detailedItem)
 		}

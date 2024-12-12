@@ -1,5 +1,4 @@
 // db/db.go
-
 package db
 
 import (
@@ -253,6 +252,25 @@ func GetChatByID(chatID string) (*models.Chat, error) {
 		return nil, fmt.Errorf("error fetching chat: %v", err)
 	}
 	return &chat, nil
+}
+
+// db/db.go
+
+func UpdateUser(user *models.User) error {
+	collection := GetCollection("gridlyapp", "users")
+
+	filter := bson.M{"_id": user.ID}
+	update := bson.M{
+		"$set": bson.M{
+			"email":            user.Email,
+			"firstName":        user.FirstName,
+			"lastName":         user.LastName,
+			"stripeCustomerId": user.StripeCustomerID, // Update this field
+		},
+	}
+
+	_, err := collection.UpdateOne(context.TODO(), filter, update)
+	return err
 }
 
 // GetUserByID retrieves a user by their ID from university_users or highschool_users
