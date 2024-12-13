@@ -1,4 +1,4 @@
-// hadlers/stripe_handler.go
+// handlers/stripe_handler.go
 package handlers
 
 import (

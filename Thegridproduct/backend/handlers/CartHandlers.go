@@ -130,7 +130,7 @@ func GetCartHandler(w http.ResponseWriter, r *http.Request) {
 				"price":       product.Price,
 				"description": product.Description,
 				"images":      product.Images,
-				"userId":      product.UserID.Hex(), // Include UserID here
+				"sellerId":    product.UserID.Hex(), // Include UserID here
 			}
 			detailedCartItems = append(detailedCartItems, detailedItem)
 		} else {
