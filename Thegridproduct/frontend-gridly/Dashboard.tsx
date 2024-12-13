@@ -52,7 +52,7 @@ type Product = {
   category?: string; // Made optional to handle undefined cases
   images: string[];
   university: string;
-  ownerId: string;
+  userId: string;
   postedDate: string;
   rating?: number;
   quality?: string;
@@ -411,7 +411,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
       if (campusMode === "In Campus") {
         filtered = data.filter(
           (product) =>
-            product.ownerId !== userId && product.university === institution
+            product.userId !== userId && product.university === institution
         );
       }
       // Assuming 'mode=outofcampus' fetches both in and out of campus
@@ -964,15 +964,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
               </View>
             </TouchableOpacity>
           </Modal>
-
-          {/* Display User Info (Optional) */}
-          {userInfo && (
-            <View style={styles.userInfoContainer}>
-              <Text style={styles.userInfoText}>
-                Welcome, {userInfo.firstName} {userInfo.lastName}
-              </Text>
-            </View>
-          )}
 
           <BottomNavBar />
         </LinearGradient>
