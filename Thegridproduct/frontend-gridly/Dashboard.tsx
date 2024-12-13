@@ -49,7 +49,7 @@ type Product = {
   title: string;
   price: number;
   description: string;
-  category: string; // Ensure categories like "MaleClothing" and "FemaleClothing" are used
+  category?: string; // Made optional to handle undefined cases
   images: string[];
   university: string;
   ownerId: string;
@@ -98,7 +98,8 @@ const Dashboard: React.FC<DashboardProps> = () => {
   const categories = [
     "#Everything",
     "#FemaleClothing",
-    "#MaleClothing", // Corrected "MensClothing" to "MaleClothing" for consistency
+    "#MaleClothing",
+    "#Other",
   ];
 
   const campusOptions: Array<{ label: string; value: "In Campus" | "Both" }> = [
@@ -355,8 +356,9 @@ const Dashboard: React.FC<DashboardProps> = () => {
       let url = `${NGROK_URL}/products/all`;
       if (campusMode === "In Campus") {
         url += "?mode=in";
+      } else if (campusMode === "Both") {
+        url += "?mode=outofcampus"; // Adjusted as per your requirement
       }
-      // If campusMode is "Both", fetch all products without mode filter
 
       const response = await fetch(url, {
         method: "GET",
@@ -405,28 +407,34 @@ const Dashboard: React.FC<DashboardProps> = () => {
       }
 
       let filtered = data;
+      // Additional backend filtering based on campusMode if necessary
       if (campusMode === "In Campus") {
         filtered = data.filter(
           (product) =>
             product.ownerId !== userId && product.university === institution
         );
       }
-
-      let finalFiltered = filtered;
-      if (selectedCategory !== "#Everything") {
-        const categoryFilter = selectedCategory.replace("#", "");
-        finalFiltered = finalFiltered.filter(
-          (p) => p.category.toLowerCase() === categoryFilter.toLowerCase()
-        );
-      }
-      if (searchQuery.trim() !== "") {
-        const query = searchQuery.trim().toLowerCase();
-        finalFiltered = finalFiltered.filter((p) =>
-          p.title.toLowerCase().includes(query)
-        );
-      }
+      // Assuming 'mode=outofcampus' fetches both in and out of campus
+      // If 'mode=outofcampus' only fetches out of campus, adjust accordingly
 
       setAllProducts(filtered);
+      // Apply frontend filters
+      let finalFiltered = filtered;
+
+      if (selectedCategory !== "#Everything") {
+        const categoryFilter = selectedCategory.replace("#", "").toLowerCase();
+        finalFiltered = finalFiltered.filter(
+          (p) => p.category && p.category.toLowerCase() === categoryFilter
+        );
+      }
+
+      if (searchQuery.trim() !== "") {
+        const query = searchQuery.trim().toLowerCase();
+        finalFiltered = finalFiltered.filter(
+          (p) => p.title && p.title.toLowerCase().includes(query)
+        );
+      }
+
       setFilteredProducts(finalFiltered);
       setError(null);
     } catch (err) {
@@ -441,15 +449,15 @@ const Dashboard: React.FC<DashboardProps> = () => {
     if (allProducts.length > 0) {
       let finalFiltered = allProducts;
       if (selectedCategory !== "#Everything") {
-        const categoryFilter = selectedCategory.replace("#", "");
+        const categoryFilter = selectedCategory.replace("#", "").toLowerCase();
         finalFiltered = finalFiltered.filter(
-          (p) => p.category.toLowerCase() === categoryFilter.toLowerCase()
+          (p) => p.category && p.category.toLowerCase() === categoryFilter
         );
       }
       if (searchQuery.trim() !== "") {
         const query = searchQuery.trim().toLowerCase();
-        finalFiltered = finalFiltered.filter((p) =>
-          p.title.toLowerCase().includes(query)
+        finalFiltered = finalFiltered.filter(
+          (p) => p.title && p.title.toLowerCase().includes(query)
         );
       }
       setFilteredProducts(finalFiltered);

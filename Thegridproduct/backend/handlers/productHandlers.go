@@ -1,5 +1,3 @@
-// handlers/productHandlers.go
-
 package handlers
 
 import (
@@ -20,8 +18,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-// handlers/productHandlers.go
-
+// AddProductHandler handles the creation of a new product
 func AddProductHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -69,6 +66,26 @@ func AddProductHandler(w http.ResponseWriter, r *http.Request) {
 	product.PostedDate = time.Now()
 	product.Expired = false
 
+	//----------------------------------------------------
+	// Map frontend availability to final stored field:
+	// "In Campus"      => "In Campus Only"
+	// "Out of Campus"  => "Off Campus Only"
+	// "Both"           => "On and Off Campus"
+	//----------------------------------------------------
+	var mappedAvailability string
+	switch product.Availability {
+	case "In Campus":
+		mappedAvailability = "In Campus Only"
+	case "Out of Campus":
+		mappedAvailability = "Off Campus Only"
+	case "Both":
+		mappedAvailability = "On and Off Campus"
+	default:
+		mappedAvailability = product.Availability // fallback if unrecognized
+	}
+	product.Availability = mappedAvailability
+	//----------------------------------------------------
+
 	// Validate required fields
 	if product.Title == "" || product.Description == "" || len(product.SelectedTags) == 0 ||
 		len(product.Images) == 0 || (product.ListingType != "Renting" && (product.Rating < 1 || product.Rating > 5)) ||
@@ -80,31 +97,32 @@ func AddProductHandler(w http.ResponseWriter, r *http.Request) {
 	// Additional Validation based on ListingType
 	switch product.ListingType {
 	case "Selling":
-		// No additional fields required
+		// For Selling, no strict requirement for Availability, Condition, or RentDuration
+		// But the code still checks if Rating >= 1 if Condition is "Used"
+		// No extra mandatory checks needed here
 	case "Renting":
 		log.Printf("Validating Renting Product: %+v", product)
 
 		if product.Condition == "" {
-			log.Println("Condition is missing")
 			WriteJSONError(w, "Condition is required for Renting listing type", http.StatusBadRequest)
 			return
 		}
+		// Must be "In Campus Only"
 		if product.Availability != "In Campus Only" {
 			log.Printf("Invalid Availability: %s", product.Availability)
 			WriteJSONError(w, "Availability must be 'In Campus Only' for Renting listing type", http.StatusBadRequest)
 			return
 		}
 		if product.RentDuration == "" {
-			log.Println("Rent Duration is missing")
 			WriteJSONError(w, "Rent Duration is required for Renting listing type", http.StatusBadRequest)
 			return
 		}
-
 	case "Both":
 		if product.Condition == "" {
 			WriteJSONError(w, "Condition is required for Both listing type", http.StatusBadRequest)
 			return
 		}
+		// Must be "On and Off Campus"
 		if product.Availability != "On and Off Campus" {
 			WriteJSONError(w, "Availability must be 'On and Off Campus' for Both listing type", http.StatusBadRequest)
 			return
@@ -169,6 +187,7 @@ func GetSingleProductHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(product)
 }
 
+// GetAllProductsHandler handles fetching products for either 'in campus' or 'outofcampus' mode
 func GetAllProductsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -197,7 +216,7 @@ func GetAllProductsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse the 'mode' query parameter to determine if the user is in 'out of campus' mode
+	// Parse the 'mode' query parameter to determine campus mode
 	mode := r.URL.Query().Get("mode")
 	log.Println("Mode:", mode)
 
@@ -207,14 +226,13 @@ func GetAllProductsHandler(w http.ResponseWriter, r *http.Request) {
 	collection := db.GetCollection("gridlyapp", "products")
 
 	var filter bson.M
-
 	if mode == "outofcampus" || mode == "out" {
-		// Out-of-campus mode: Fetch all products except user's own
+		// Out-of-campus mode: show everything except user's own
 		filter = bson.M{
 			"userId": bson.M{"$ne": userObjID},
 		}
 	} else {
-		// In-campus mode (default): Fetch products from the same university, excluding user's own
+		// In-campus mode (default): fetch from same university, excluding user's own
 		filter = bson.M{
 			"university": university,
 			"userId":     bson.M{"$ne": userObjID},
@@ -298,7 +316,6 @@ func GetUserProductsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // UpdateProductHandler handles updating an existing product by ID with authentication
-// UpdateProductHandler handles updating an existing product by ID with authentication
 func UpdateProductHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if r.Method != http.MethodPut {
@@ -362,6 +379,7 @@ func UpdateProductHandler(w http.ResponseWriter, r *http.Request) {
 		SelectedTags           []string `json:"selectedTags,omitempty"`
 		Images                 []string `json:"images,omitempty"`
 		IsAvailableOutOfCampus *bool    `json:"isAvailableOutOfCampus,omitempty"`
+		Availability           string   `json:"availability,omitempty"`
 	}
 
 	var updatedData ProductUpdate
@@ -371,17 +389,43 @@ func UpdateProductHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	//----------------------------------------------------
+	// If the request body includes "Availability" in
+	// "In Campus", "Out of Campus", or "Both," let's
+	// map them to final stored values:
+	//----------------------------------------------------
+	var mappedAvailability string
+	if updatedData.Availability != "" {
+		switch updatedData.Availability {
+		case "In Campus":
+			mappedAvailability = "In Campus Only"
+		case "Out of Campus":
+			mappedAvailability = "Off Campus Only"
+		case "Both":
+			mappedAvailability = "On and Off Campus"
+		default:
+			mappedAvailability = updatedData.Availability // fallback
+		}
+	}
+	//----------------------------------------------------
+
 	// Validate updated fields based on existing ListingType
 	switch existingProduct.ListingType {
 	case "Selling":
 		// No additional fields required
 	case "Renting":
+		// If they provided a new rentDuration or new rentPrice, check them
 		if updatedData.RentDuration == "" && existingProduct.RentDuration == "" {
 			WriteJSONError(w, "Rent Duration is required for Renting listing type", http.StatusBadRequest)
 			return
 		}
 		if updatedData.RentPrice == nil && existingProduct.RentPrice == 0 {
 			WriteJSONError(w, "Rent Price is required for Renting listing type", http.StatusBadRequest)
+			return
+		}
+		// Availability must remain "In Campus Only"
+		if mappedAvailability != "" && mappedAvailability != "In Campus Only" {
+			WriteJSONError(w, "Availability must be 'In Campus Only' for Renting listing type", http.StatusBadRequest)
 			return
 		}
 	case "Both":
@@ -391,6 +435,11 @@ func UpdateProductHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		if updatedData.RentPrice == nil && existingProduct.RentPrice == 0 {
 			WriteJSONError(w, "Rent Price is required for Both listing type", http.StatusBadRequest)
+			return
+		}
+		// Availability must remain "On and Off Campus"
+		if mappedAvailability != "" && mappedAvailability != "On and Off Campus" {
+			WriteJSONError(w, "Availability must be 'On and Off Campus' for Both listing type", http.StatusBadRequest)
 			return
 		}
 	default:
@@ -428,6 +477,9 @@ func UpdateProductHandler(w http.ResponseWriter, r *http.Request) {
 	if updatedData.IsAvailableOutOfCampus != nil {
 		updateFields["isAvailableOutOfCampus"] = *updatedData.IsAvailableOutOfCampus
 	}
+	if mappedAvailability != "" {
+		updateFields["availability"] = mappedAvailability
+	}
 
 	// Check if there's any field to update
 	if len(updateFields) == 0 {
@@ -440,7 +492,10 @@ func UpdateProductHandler(w http.ResponseWriter, r *http.Request) {
 		"$set": updateFields,
 	}
 
-	result, err := collection.UpdateOne(ctx, bson.M{"_id": productID}, update)
+	ctxUpdate, cancelUpdate := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancelUpdate()
+
+	result, err := collection.UpdateOne(ctxUpdate, bson.M{"_id": productID}, update)
 	if err != nil {
 		log.Printf("Error updating product: %v", err)
 		WriteJSONError(w, "Error updating product", http.StatusInternalServerError)
@@ -459,17 +514,15 @@ func UpdateProductHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetProductsByIDsHandler retrieves multiple products by their IDs.
-// Endpoint: GET /products?ids=id1,id2,id3
+// Endpoint: GET /products/by-ids?ids=id1,id2,id3
 func GetProductsByIDsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	// Ensure the request method is GET
 	if r.Method != http.MethodGet {
 		WriteJSONError(w, "Invalid request method", http.StatusMethodNotAllowed)
 		return
 	}
 
-	// Retrieve 'ids' query parameter
 	idsParam := r.URL.Query().Get("ids")
 	if idsParam == "" {
 		WriteJSONError(w, "No product IDs provided", http.StatusBadRequest)
@@ -479,7 +532,7 @@ func GetProductsByIDsHandler(w http.ResponseWriter, r *http.Request) {
 	// Split the IDs by comma
 	idStrings := strings.Split(idsParam, ",")
 
-	// Convert string IDs to primitive.ObjectID
+	// Convert string IDs to ObjectID
 	var objectIDs []primitive.ObjectID
 	for _, idStr := range idStrings {
 		idStr = strings.TrimSpace(idStr)
@@ -566,53 +619,61 @@ func AddMultipleProductsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate and prepare each product
 	var insertDocs []interface{}
-	for i, product := range products {
+	for i, p := range products {
 		// Populate product fields
-		// Populate product fields
-		product.UserID = userObjID
-		product.University = university
-		product.StudentType = studentType
-		product.PostedDate = time.Now()
-		product.Expired = false
-		product.Status = "inshop"
+		p.UserID = userObjID
+		p.University = university
+		p.StudentType = studentType
+		p.PostedDate = time.Now()
+		p.Expired = false
+		p.Status = "inshop"
+
+		// Map availability from "In Campus"/"Out of Campus"/"Both" to final
+		switch p.Availability {
+		case "In Campus":
+			p.Availability = "In Campus Only"
+		case "Out of Campus":
+			p.Availability = "Off Campus Only"
+		case "Both":
+			p.Availability = "On and Off Campus"
+		}
 
 		// Validate required fields
-		if product.Title == "" || product.Price == 0 || product.Description == "" ||
-			len(product.SelectedTags) == 0 || len(product.Images) == 0 ||
-			product.Rating < 1 || product.Rating > 5 {
+		if p.Title == "" || p.Price == 0 || p.Description == "" ||
+			len(p.SelectedTags) == 0 || len(p.Images) == 0 ||
+			p.Rating < 1 || p.Rating > 5 {
 			WriteJSONError(w, fmt.Sprintf("Missing required fields or invalid input in product at index %d", i), http.StatusBadRequest)
 			return
 		}
 
 		// Additional Validation based on ListingType
-		switch product.ListingType {
+		switch p.ListingType {
 		case "Selling":
 			// No additional fields required
 		case "Renting":
-			if product.Condition == "" {
+			if p.Condition == "" {
 				WriteJSONError(w, fmt.Sprintf("Condition is required for Renting listing type in product at index %d", i), http.StatusBadRequest)
 				return
 			}
-			if product.Availability != "In Campus Only" {
+			if p.Availability != "In Campus Only" {
 				WriteJSONError(w, fmt.Sprintf("Availability must be 'In Campus Only' for Renting listing type in product at index %d", i), http.StatusBadRequest)
 				return
 			}
-			if product.RentDuration == "" {
+			if p.RentDuration == "" {
 				WriteJSONError(w, fmt.Sprintf("Rent Duration is required for Renting listing type in product at index %d", i), http.StatusBadRequest)
 				return
 			}
 		case "Both":
-			if product.Condition == "" {
+			if p.Condition == "" {
 				WriteJSONError(w, fmt.Sprintf("Condition is required for Both listing type in product at index %d", i), http.StatusBadRequest)
 				return
 			}
-			if product.Availability != "On and Off Campus" {
+			if p.Availability != "On and Off Campus" {
 				WriteJSONError(w, fmt.Sprintf("Availability must be 'On and Off Campus' for Both listing type in product at index %d", i), http.StatusBadRequest)
 				return
 			}
-			if product.RentDuration == "" {
+			if p.RentDuration == "" {
 				WriteJSONError(w, fmt.Sprintf("Rent Duration is required for Both listing type in product at index %d", i), http.StatusBadRequest)
 				return
 			}
@@ -621,7 +682,7 @@ func AddMultipleProductsHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		insertDocs = append(insertDocs, product)
+		insertDocs = append(insertDocs, p)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -646,7 +707,6 @@ func AddMultipleProductsHandler(w http.ResponseWriter, r *http.Request) {
 func DeleteProductHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	// Ensure the request method is DELETE
 	if r.Method != http.MethodDelete {
 		WriteJSONError(w, "Invalid request method", http.StatusMethodNotAllowed)
 		return
@@ -664,6 +724,8 @@ func DeleteProductHandler(w http.ResponseWriter, r *http.Request) {
 		WriteJSONError(w, "Invalid user ID", http.StatusBadRequest)
 		return
 	}
+
+	// Extract product ID from URL parameters
 	vars := mux.Vars(r)
 	id := vars["id"]
 
@@ -677,6 +739,8 @@ func DeleteProductHandler(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	collection := db.GetCollection("gridlyapp", "products")
+
+	// Fetch the product to verify ownership
 	var existingProduct models.Product
 	err = collection.FindOne(ctx, bson.M{"_id": productID}).Decode(&existingProduct)
 	if err != nil {
@@ -688,6 +752,8 @@ func DeleteProductHandler(w http.ResponseWriter, r *http.Request) {
 		WriteJSONError(w, "Error fetching product data", http.StatusInternalServerError)
 		return
 	}
+
+	// Check if the authenticated user is the owner of the product
 	if existingProduct.UserID != userObjID {
 		WriteJSONError(w, "Unauthorized to delete this product", http.StatusUnauthorized)
 		return
@@ -713,6 +779,8 @@ func DeleteProductHandler(w http.ResponseWriter, r *http.Request) {
 		"deleted": deleteResult.DeletedCount,
 	})
 }
+
+// ConfirmTransferHandler marks a product as "sold"
 func ConfirmTransferHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -721,16 +789,16 @@ func ConfirmTransferHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Extract product ID and user confirmations (buyer/seller) from request
-	// Validate that both parties have confirmed...
+	// Extract product ID from query
 	productID := r.URL.Query().Get("productId")
 	if productID == "" {
 		WriteJSONError(w, "Product ID is required", http.StatusBadRequest)
 		return
 	}
 
-	// Perform your logic to check if both buyer and seller confirmed.
-	// For the sake of example, assume they did.
+	// Perform logic to check if both buyer and seller confirmed
+	// For the sake of example, let's assume they did.
+
 	if err := db.UpdateProductStatus(productID, "sold"); err != nil {
 		log.Printf("Failed to update product status to 'sold': %v", err)
 		WriteJSONError(w, "Failed to update product status", http.StatusInternalServerError)

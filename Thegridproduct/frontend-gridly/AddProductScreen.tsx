@@ -26,47 +26,45 @@ import axios from "axios";
 
 type DurationUnit = "Hours" | "Days" | "Weeks" | "Months";
 type ListingType = "Selling" | "Renting" | "Both";
-type Availability = "In Campus Only" | "On and Off Campus";
+type AvailabilityUI = "In Campus" | "Out of Campus" | "Both"; // UI states
 type Condition = "New" | "Used";
 
-const availableTags = ["#FemaleClothing", "#MensClothing", "#Other"] as const;
+// The backend expects specific strings for product.Availability
+// We'll create a utility function to map UI availability to backend strings.
+function mapAvailabilityToBackend(availability: AvailabilityUI): string {
+  switch (availability) {
+    case "In Campus":
+      return "In Campus Only"; // Matches productHandlers.go
+    case "Out of Campus":
+      return "Off Campus Only"; // Or "Off Campus Only" if your backend expects that
+    case "Both":
+      return "On and Off Campus"; // Matches productHandlers.go for "Both"
+    default:
+      return "In Campus Only"; // Fallback
+  }
+}
+
+const availableTags = ["#FemaleClothing", "#MaleClothing", "#Other"] as const;
 const durationUnits: DurationUnit[] = ["Hours", "Days", "Weeks", "Months"];
 const listingTypes: ListingType[] = ["Selling", "Renting", "Both"];
 const conditions: Condition[] = ["New", "Used"];
 
-interface Product {
-  title: string;
-  price?: number;
-  outOfCampusPrice?: number;
-  rentPrice?: number;
-  rentDuration?: string;
-  description: string;
-  selectedTags: string[];
-  availability: Availability;
-  rating?: number;
-  listingType: ListingType;
-  isAvailableOutOfCampus: boolean;
-  university: string;
-  studentType: StudentType;
-  images: string[];
-  condition?: Condition;
-  durationUnit?: DurationUnit;
-}
-
+// We'll still store the user's choice as an AvailabilityUI in state
 interface FormData {
-  condition?: Condition;
-  durationUnit?: DurationUnit;
   images: string[];
   title: string;
   price: string;
   outOfCampusPrice: string;
   rentPrice: string;
   rentDuration: string;
+  durationUnit?: DurationUnit;
   description: string;
   selectedTags: string[];
-  availability: Availability;
+  // We'll store the user's availability selection as a UI string
+  availability: AvailabilityUI;
   rating: number;
   listingType: ListingType;
+  condition?: Condition;
   isAvailableOutOfCampus: boolean;
 }
 
@@ -87,11 +85,10 @@ const AddProduct: React.FC = () => {
     durationUnit: undefined,
     description: "",
     selectedTags: [],
-    availability: "In Campus Only",
+    availability: "In Campus", // default UI selection
     rating: 0,
     listingType: "Selling",
     isAvailableOutOfCampus: false,
-    condition: undefined,
   });
 
   const [isLoading, setIsLoading] = useState(false);
@@ -124,7 +121,8 @@ const AddProduct: React.FC = () => {
     });
   };
 
-  const CLOUDINARY_URL = "https://api.cloudinary.com/v1_1/ds0zpfht9/image/upload";
+  const CLOUDINARY_URL =
+    "https://api.cloudinary.com/v1_1/ds0zpfht9/image/upload";
   const UPLOAD_PRESET = "gridly_preset";
 
   const animateSlide = (direction: "forward" | "backward") => {
@@ -144,7 +142,7 @@ const AddProduct: React.FC = () => {
 
   const handleNext = () => {
     if (!validateCurrentStep()) return;
-    if (step < 4) {
+    if (step < 5) {
       animateSlide("forward");
       setStep(step + 1);
     } else {
@@ -168,68 +166,59 @@ const AddProduct: React.FC = () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsMultipleSelection: true,
+        allowsMultipleSelection: false, // single selection
         quality: 0.7,
       });
 
       if (!result.canceled) {
-        let selectedImages = result.assets.map((asset) => asset.uri);
+        const uri = result.assets[0].uri;
 
         setIsUploadingImage(true);
 
-        const compressedImages = await Promise.all(
-          selectedImages.map(async (uri) => {
-            const manipulatedImage = await ImageManipulator.manipulateAsync(
-              uri,
-              [{ resize: { width: 800 } }],
-              { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
-            );
-            return manipulatedImage.uri;
-          })
+        // Compress the image
+        const manipulatedImage = await ImageManipulator.manipulateAsync(
+          uri,
+          [{ resize: { width: 800 } }],
+          { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
         );
 
-        if (formData.images.length + compressedImages.length > 3) {
-          showError("You can only upload up to 3 images.");
+        const formDataImage = new FormData();
+        formDataImage.append("file", {
+          uri: manipulatedImage.uri,
+          type: "image/jpeg",
+          name: `upload_${Date.now()}.jpg`,
+        } as any);
+        formDataImage.append("upload_preset", UPLOAD_PRESET);
+
+        try {
+          const response = await axios.post(CLOUDINARY_URL, formDataImage, {
+            headers: {
+              "Content-Type": "multipart/form-data",
+            },
+          });
+
+          const imageUrl = response.data.secure_url;
+
+          if (formData.images.length + 1 > 3) {
+            showError("You can only upload up to 3 images.");
+            setIsUploadingImage(false);
+            return;
+          }
+
+          setFormData((prev) => ({
+            ...prev,
+            images: [...prev.images, imageUrl],
+          }));
+        } catch (error) {
+          console.error("Error uploading image:", error);
+          showError("Image upload failed. Please try again.");
+        } finally {
           setIsUploadingImage(false);
-          return;
         }
-
-        const uploadedImageUrls = await Promise.all(
-          compressedImages.map(async (uri) => {
-            const formDataImage = new FormData();
-            formDataImage.append("file", {
-              uri,
-              type: "image/jpeg",
-              name: `upload_${Date.now()}.jpg`,
-            } as any);
-            formDataImage.append("upload_preset", UPLOAD_PRESET);
-
-            try {
-              const response = await axios.post(CLOUDINARY_URL, formDataImage, {
-                headers: {
-                  "Content-Type": "multipart/form-data",
-                },
-              });
-
-              const imageUrl = response.data.secure_url;
-              return imageUrl;
-            } catch (error) {
-              console.error("Error uploading image:", error);
-              throw new Error("Image upload failed. Please try again.");
-            }
-          })
-        );
-
-        setFormData((prev) => ({
-          ...prev,
-          images: [...prev.images, ...uploadedImageUrls],
-        }));
       }
     } catch (error) {
       console.error("Image Picker Error:", error);
       showError("Error selecting or uploading images. Please try again.");
-    } finally {
-      setIsUploadingImage(false);
     }
   };
 
@@ -272,6 +261,17 @@ const AddProduct: React.FC = () => {
         }
         return true;
       case 3:
+        // We store UI states: "In Campus", "Out of Campus", "Both"
+        if (
+          !["In Campus", "Out of Campus", "Both"].includes(
+            formData.availability
+          )
+        ) {
+          showError("Please select a valid availability option.");
+          return false;
+        }
+        return true;
+      case 4:
         if (formData.selectedTags.length === 0) {
           showError("Please select at least one tag.");
           return false;
@@ -303,7 +303,7 @@ const AddProduct: React.FC = () => {
           }
         }
         return true;
-      case 4:
+      case 5:
         if (
           (formData.listingType === "Selling" ||
             formData.listingType === "Both") &&
@@ -324,7 +324,7 @@ const AddProduct: React.FC = () => {
 
         if (
           formData.listingType === "Both" &&
-          formData.availability === "On and Off Campus" &&
+          formData.availability === "Both" &&
           !formData.outOfCampusPrice.trim()
         ) {
           showError("Please enter an off-campus price.");
@@ -346,7 +346,9 @@ const AddProduct: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const price = formData.price ? parseFloat(formData.price.trim()) : undefined;
+      const price = formData.price
+        ? parseFloat(formData.price.trim())
+        : undefined;
       const outOfCampusPrice = formData.outOfCampusPrice
         ? parseFloat(formData.outOfCampusPrice.trim())
         : undefined;
@@ -363,54 +365,63 @@ const AddProduct: React.FC = () => {
         throw new Error("Please enter valid numerical values for prices.");
       }
 
-      if (formData.selectedTags.length === 0)
+      if (formData.selectedTags.length === 0) {
         throw new Error("Tags cannot be empty.");
-      if (formData.images.length === 0)
+      }
+      if (formData.images.length === 0) {
         throw new Error("Images cannot be empty.");
-
-      if (
-        formData.listingType === "Both" &&
-        formData.availability !== "On and Off Campus"
-      ) {
-        throw new Error(
-          "Availability must be 'On and Off Campus' for listing type 'Both'."
-        );
       }
 
-      if (
-        formData.listingType === "Renting" &&
-        formData.availability !== "In Campus Only"
-      ) {
-        throw new Error(
-          "Availability must be 'In Campus Only' for listing type 'Renting'."
-        );
+      // Map UI availability to the exact strings the backend expects
+      let backendAvailability = "";
+      if (formData.listingType === "Renting") {
+        backendAvailability = "In Campus Only"; // forced by the server
+      } else if (formData.listingType === "Both") {
+        backendAvailability = "On and Off Campus"; // forced by the server
+      } else {
+        // listingType = "Selling"
+        // We can decide how to set availability for Selling; let's map from UI
+        switch (formData.availability) {
+          case "In Campus":
+            backendAvailability = "In Campus Only";
+            break;
+          case "Out of Campus":
+            backendAvailability = "Off Campus Only"; // Or however your backend logic requires
+            break;
+          case "Both":
+            backendAvailability = "On and Off Campus";
+            break;
+          default:
+            backendAvailability = "In Campus Only";
+        }
       }
 
-      const payload: Partial<Product> = {
+      // If user selected 'Both' listing type but didn't set availability to "Both" in step 3,
+      // the server will reject it. But we handle logic here for a consistent approach.
+
+      const payload = {
         title: formData.title.trim(),
-        ...(price !== undefined ? { price } : {}),
-        ...(outOfCampusPrice !== undefined ? { outOfCampusPrice } : {}),
-        ...(rentPrice !== undefined ? { rentPrice } : {}),
-        ...(formData.listingType === "Both" ||
-        formData.listingType === "Renting"
-          ? {
-              rentDuration: `${formData.rentDuration.trim()} ${
-                formData.durationUnit
-              }`,
-            }
-          : {}),
+        category: formData.selectedTags[0], // map first selected tag to category
+        price: price ?? 0,
+        outOfCampusPrice: outOfCampusPrice ?? 0,
+        rentPrice: rentPrice ?? 0,
+        rentDuration:
+          formData.rentDuration.trim() && formData.durationUnit
+            ? `${formData.rentDuration.trim()} ${formData.durationUnit}`
+            : "",
         description: formData.description.trim(),
         selectedTags: formData.selectedTags,
         images: formData.images,
-        isAvailableOutOfCampus: formData.isAvailableOutOfCampus,
-        ...(formData.listingType === "Selling" ||
-        formData.listingType === "Both"
-          ? { rating: formData.rating }
-          : {}),
+        isAvailableOutOfCampus:
+          formData.availability === "Out of Campus" ||
+          formData.availability === "Both",
+        rating:
+          formData.listingType === "Selling" || formData.listingType === "Both"
+            ? formData.rating
+            : 0,
         listingType: formData.listingType,
-        availability: formData.availability,
-        university: institution,
-        studentType: studentType,
+        // The EXACT strings the backend expects for Availability
+        availability: backendAvailability,
         condition: formData.condition,
       };
 
@@ -428,8 +439,11 @@ const AddProduct: React.FC = () => {
       if (contentType && contentType.includes("application/json")) {
         const data = await response.json();
         if (!response.ok) {
-          throw new Error(data.message || `HTTP error! status: ${response.status}`);
+          throw new Error(
+            data.message || `HTTP error! status: ${response.status}`
+          );
         }
+        // Reset form
         setFormData({
           images: [],
           title: "",
@@ -440,11 +454,11 @@ const AddProduct: React.FC = () => {
           durationUnit: undefined,
           description: "",
           selectedTags: [],
-          availability: "In Campus Only",
-          condition: undefined,
+          availability: "In Campus",
           rating: 0,
           listingType: "Selling",
           isAvailableOutOfCampus: false,
+          condition: undefined,
         });
         setIsSuccessModalVisible(true);
 
@@ -467,7 +481,8 @@ const AddProduct: React.FC = () => {
     }
   };
 
-  const slides = {
+  // Define the slide content
+  const slides: Record<number, { title: string; content: JSX.Element }> = {
     1: {
       title: "Upload Images & Enter Title",
       content: (
@@ -545,14 +560,10 @@ const AddProduct: React.FC = () => {
                       listingType: type,
                       availability:
                         type === "Renting"
-                          ? "In Campus Only"
+                          ? "In Campus"
                           : formData.availability,
                       outOfCampusPrice: "",
                       rentPrice: "",
-                      isAvailableOutOfCampus:
-                        type === "Both"
-                          ? formData.isAvailableOutOfCampus
-                          : false,
                       rentDuration: "",
                       durationUnit: undefined,
                       condition: undefined,
@@ -582,7 +593,99 @@ const AddProduct: React.FC = () => {
         </>
       ),
     },
+
     3: {
+      title: "Select Availability",
+      content: (
+        <>
+          <View style={styles.sectionContainer}>
+            <Text style={styles.sectionTitle}>Availability</Text>
+            <View style={styles.optionsContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.optionButton,
+                  formData.availability === "In Campus"
+                    ? styles.optionButtonSelected
+                    : null,
+                ]}
+                onPress={() =>
+                  setFormData({
+                    ...formData,
+                    availability: "In Campus",
+                    isAvailableOutOfCampus: false,
+                  })
+                }
+              >
+                <Text
+                  style={[
+                    styles.optionText,
+                    formData.availability === "In Campus"
+                      ? styles.optionTextSelected
+                      : null,
+                  ]}
+                >
+                  In Campus
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.optionButton,
+                  formData.availability === "Out of Campus"
+                    ? styles.optionButtonSelected
+                    : null,
+                ]}
+                onPress={() =>
+                  setFormData({
+                    ...formData,
+                    availability: "Out of Campus",
+                    isAvailableOutOfCampus: true,
+                  })
+                }
+              >
+                <Text
+                  style={[
+                    styles.optionText,
+                    formData.availability === "Out of Campus"
+                      ? styles.optionTextSelected
+                      : null,
+                  ]}
+                >
+                  Out of Campus
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.optionButton,
+                  formData.availability === "Both"
+                    ? styles.optionButtonSelected
+                    : null,
+                ]}
+                onPress={() =>
+                  setFormData({
+                    ...formData,
+                    availability: "Both",
+                    isAvailableOutOfCampus: true,
+                  })
+                }
+              >
+                <Text
+                  style={[
+                    styles.optionText,
+                    formData.availability === "Both"
+                      ? styles.optionTextSelected
+                      : null,
+                  ]}
+                >
+                  Both
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </>
+      ),
+    },
+
+    4: {
       title: "Select Tags, Condition & Rent Details",
       content: (
         <>
@@ -736,7 +839,7 @@ const AddProduct: React.FC = () => {
       ),
     },
 
-    4: {
+    5: {
       title: "Enter Prices & Description",
       content: (
         <>
@@ -769,7 +872,7 @@ const AddProduct: React.FC = () => {
           )}
 
           {formData.listingType === "Both" &&
-            formData.availability === "On and Off Campus" && (
+            formData.availability === "Both" && (
               <TextInput
                 style={styles.input}
                 placeholder="Off-Campus Price (with Shipping) $"
@@ -828,7 +931,7 @@ const AddProduct: React.FC = () => {
         >
           {/* Progress Dots */}
           <View style={styles.progressContainer}>
-            {[1, 2, 3, 4].map((s) => (
+            {[1, 2, 3, 4, 5].map((s) => (
               <View
                 key={s}
                 style={[
@@ -854,14 +957,17 @@ const AddProduct: React.FC = () => {
               },
             ]}
           >
-            <Text style={styles.stepTitle}>
-              {slides[step as keyof typeof slides].title}
-            </Text>
-            {slides[step as keyof typeof slides].content}
+            <Text style={styles.stepTitle}>{slides[step].title}</Text>
+            {slides[step].content}
           </Animated.View>
 
           {/* Navigation Buttons */}
-          <View style={styles.buttonContainer}>
+          <View
+            style={[
+              styles.buttonContainer,
+              { justifyContent: step > 1 ? "space-between" : "flex-end" },
+            ]}
+          >
             {step > 1 && (
               <TouchableOpacity style={styles.backButton} onPress={handleBack}>
                 <Ionicons name="arrow-back" size={24} color="#aaa" />
@@ -874,14 +980,14 @@ const AddProduct: React.FC = () => {
               onPress={handleNext}
               disabled={isLoading}
             >
-              {isLoading && step === 4 ? (
+              {isLoading && step === 5 ? (
                 <ActivityIndicator size="small" color="#fff" />
               ) : (
                 <>
                   <Text style={styles.nextButtonText}>
-                    {step === 4 ? "Add Product" : "Next"}
+                    {step === 5 ? "Add Product" : "Next"}
                   </Text>
-                  {step < 4 && (
+                  {step < 5 && (
                     <Ionicons name="arrow-forward" size={24} color="#fff" />
                   )}
                 </>
@@ -890,11 +996,17 @@ const AddProduct: React.FC = () => {
           </View>
 
           {/* Success Modal */}
-          <Modal transparent visible={isSuccessModalVisible} animationType="fade">
+          <Modal
+            transparent
+            visible={isSuccessModalVisible}
+            animationType="fade"
+          >
             <View style={styles.modalOverlay}>
               <View style={styles.modalContent}>
                 <Ionicons name="checkmark-circle" size={60} color="#9C27B0" />
-                <Text style={styles.modalText}>Product Posted Successfully!</Text>
+                <Text style={styles.modalText}>
+                  Product Posted Successfully!
+                </Text>
               </View>
             </View>
           </Modal>
@@ -1095,6 +1207,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 15,
     marginBottom: 15,
+    flexWrap: "wrap",
   },
   optionButton: {
     flexDirection: "row",
@@ -1105,6 +1218,7 @@ const styles = StyleSheet.create({
     gap: 10,
     flex: 1,
     justifyContent: "center",
+    marginBottom: 10,
   },
   optionButtonSelected: {
     backgroundColor: "#BB86FC",
@@ -1145,9 +1259,9 @@ const styles = StyleSheet.create({
   },
   buttonContainer: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
     marginTop: 20,
+    // We'll override justifyContent in JSX with step logic
   },
   backButton: {
     flexDirection: "row",
