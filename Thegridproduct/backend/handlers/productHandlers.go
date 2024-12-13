@@ -227,15 +227,19 @@ func GetAllProductsHandler(w http.ResponseWriter, r *http.Request) {
 
 	var filter bson.M
 	if mode == "outofcampus" || mode == "out" {
-		// Out-of-campus mode: show everything except user's own
+		// Out-of-campus mode: fetch products that are either Off Campus Only OR On and Off Campus
+		// excluding the user's own products.
 		filter = bson.M{
-			"userId": bson.M{"$ne": userObjID},
+			"userId":       bson.M{"$ne": userObjID},
+			"availability": bson.M{"$in": []string{"Off Campus Only", "On and Off Campus"}},
 		}
 	} else {
-		// In-campus mode (default): fetch from same university, excluding user's own
+		// In-campus mode (default): fetch only "In Campus Only" from the same university,
+		// excluding user's own products.
 		filter = bson.M{
-			"university": university,
-			"userId":     bson.M{"$ne": userObjID},
+			"userId":       bson.M{"$ne": userObjID},
+			"university":   university,
+			"availability": "In Campus Only",
 		}
 	}
 
