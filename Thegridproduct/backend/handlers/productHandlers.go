@@ -231,7 +231,7 @@ func GetAllProductsHandler(w http.ResponseWriter, r *http.Request) {
 		// excluding the user's own products.
 		filter = bson.M{
 			"userId":       bson.M{"$ne": userObjID},
-			"availability": bson.M{"$in": []string{"Off Campus Only", "On and Off Campus"}},
+			"availability": bson.M{"$in": []string{"Off Campus Only", "On and Off Campus", "In Campus Only"}},
 		}
 	} else {
 		// In-campus mode (default): fetch only "In Campus Only" from the same university,

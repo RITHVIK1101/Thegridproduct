@@ -380,13 +380,12 @@ const AddProduct: React.FC = () => {
         backendAvailability = "On and Off Campus"; // forced by the server
       } else {
         // listingType = "Selling"
-        // We can decide how to set availability for Selling; let's map from UI
         switch (formData.availability) {
           case "In Campus":
             backendAvailability = "In Campus Only";
             break;
           case "Out of Campus":
-            backendAvailability = "Off Campus Only"; // Or however your backend logic requires
+            backendAvailability = "Off Campus Only";
             break;
           case "Both":
             backendAvailability = "On and Off Campus";
@@ -395,9 +394,6 @@ const AddProduct: React.FC = () => {
             backendAvailability = "In Campus Only";
         }
       }
-
-      // If user selected 'Both' listing type but didn't set availability to "Both" in step 3,
-      // the server will reject it. But we handle logic here for a consistent approach.
 
       const payload = {
         title: formData.title.trim(),
@@ -420,9 +416,9 @@ const AddProduct: React.FC = () => {
             ? formData.rating
             : 0,
         listingType: formData.listingType,
-        // The EXACT strings the backend expects for Availability
         availability: backendAvailability,
         condition: formData.condition,
+        status: "inshop", // Automatically set the status to "inshop"
       };
 
       const response = await fetch(`${NGROK_URL}/products`, {
