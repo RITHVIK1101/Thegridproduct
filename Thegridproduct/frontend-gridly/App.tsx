@@ -7,7 +7,7 @@ import {
   Alert,
   ActivityIndicator,
   ScrollView,
-  Dimensions
+  Dimensions,
 } from "react-native";
 import Icon from "react-native-vector-icons/MaterialIcons";
 import Ionicons from "react-native-vector-icons/Ionicons";
@@ -33,7 +33,12 @@ import AccountScreen from "./AccountScreen";
 
 // Placeholder for AllOrdersScreen
 const AllOrdersScreen: React.FC = () => (
-  <View style={[styles.screenContainer, { justifyContent: 'center', alignItems: 'center' }]}>
+  <View
+    style={[
+      styles.screenContainer,
+      { justifyContent: "center", alignItems: "center" },
+    ]}
+  >
     <Text style={{ color: "#fff", fontSize: 18 }}>All Orders coming soon!</Text>
   </View>
 );
@@ -44,7 +49,8 @@ const TermsOfServiceScreen: React.FC = () => (
     <Text style={styles.termsHeading}>Terms of Service</Text>
     <ScrollView style={styles.termsScroll}>
       <Text style={styles.termsText}>
-        Welcome to Gridly. By using our platform, you agree to the following terms...
+        Welcome to Gridly. By using our platform, you agree to the following
+        terms...
         {"\n\n"}
         Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla facilisi.
         Phasellus non urna nec sapien dictum luctus.
@@ -61,19 +67,43 @@ const LikedItemsScreen: React.FC = () => {
 
   return (
     <View style={styles.screenContainer}>
-      <Text style={{ color: "#fff", fontSize: 22, fontWeight: "700", marginBottom: 20, textAlign: "center" }}>
+      <Text
+        style={{
+          color: "#fff",
+          fontSize: 22,
+          fontWeight: "700",
+          marginBottom: 20,
+          textAlign: "center",
+        }}
+      >
         Liked Items
       </Text>
       {likedProducts.length === 0 ? (
-        <View style={{alignItems: 'center', justifyContent: 'center', flex: 1}}>
-          <Text style={{ color: "#ccc", fontSize: 16 }}>No liked items yet.</Text>
+        <View
+          style={{ alignItems: "center", justifyContent: "center", flex: 1 }}
+        >
+          <Text style={{ color: "#ccc", fontSize: 16 }}>
+            No liked items yet.
+          </Text>
         </View>
       ) : (
         <ScrollView contentContainerStyle={{ padding: 20 }}>
           {likedProducts.map((product) => (
-            <View key={product.id} style={{ marginBottom: 20, borderBottomWidth:1, borderBottomColor:'#333', paddingBottom:10 }}>
-              <Text style={{ color: "#fff", fontSize: 18, fontWeight: "600" }}>{product.title}</Text>
-              <Text style={{ color: "#fff", fontSize: 16 }}>${product.price.toFixed(2)}</Text>
+            <View
+              key={product.id}
+              style={{
+                marginBottom: 20,
+                borderBottomWidth: 1,
+                borderBottomColor: "#333",
+                paddingBottom: 10,
+              }}
+            >
+              <Text style={{ color: "#fff", fontSize: 18, fontWeight: "600" }}>
+                {product.title}
+              </Text>
+              <Text style={{ color: "#fff", fontSize: 16 }}>
+                ${product.price.toFixed(2)}
+              </Text>
             </View>
           ))}
         </ScrollView>
@@ -84,7 +114,8 @@ const LikedItemsScreen: React.FC = () => {
 
 // User Menu Screen (Full Screen)
 const UserMenuScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
-  const { clearUser, firstName, lastName, institution, studentType } = useContext(UserContext);
+  const { clearUser, firstName, lastName, institution, studentType } =
+    useContext(UserContext);
 
   const handleLogout = async () => {
     try {
@@ -118,7 +149,9 @@ const UserMenuScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         <View style={styles.bottomSheetUserInfo}>
           <View style={styles.bottomSheetAvatar}>
             <Text style={styles.bottomSheetAvatarText}>
-              {firstName && firstName.length > 0 ? firstName.charAt(0).toUpperCase() : "?"}
+              {firstName && firstName.length > 0
+                ? firstName.charAt(0).toUpperCase()
+                : "?"}
             </Text>
           </View>
           <Text style={styles.bottomSheetUserName}>
@@ -135,36 +168,66 @@ const UserMenuScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         </View>
 
         <View style={styles.bottomSheetOptions}>
-          <TouchableOpacity style={styles.bottomSheetOption} onPress={handleLogout}>
-            <Ionicons name="log-out-outline" size={20} color="#FFFFFF" style={{ marginRight: 10 }} />
+          <TouchableOpacity
+            style={styles.bottomSheetOption}
+            onPress={handleLogout}
+          >
+            <Ionicons
+              name="log-out-outline"
+              size={20}
+              color="#FFFFFF"
+              style={{ marginRight: 10 }}
+            />
             <Text style={styles.bottomSheetOptionText}>Logout</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.bottomSheetOption}
             onPress={() => navigation.navigate("TermsOfService")}
           >
-            <Ionicons name="document-text-outline" size={20} color="#FFFFFF" style={{ marginRight: 10 }} />
-            <Text style={styles.bottomSheetOptionText}>View Terms of Service</Text>
+            <Ionicons
+              name="document-text-outline"
+              size={20}
+              color="#FFFFFF"
+              style={{ marginRight: 10 }}
+            />
+            <Text style={styles.bottomSheetOptionText}>
+              View Terms of Service
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.bottomSheetOption}
             onPress={() => navigation.navigate("Account")}
           >
-            <Ionicons name="person-circle-outline" size={20} color="#FFFFFF" style={{ marginRight: 10 }} />
+            <Ionicons
+              name="person-circle-outline"
+              size={20}
+              color="#FFFFFF"
+              style={{ marginRight: 10 }}
+            />
             <Text style={styles.bottomSheetOptionText}>My Account</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.bottomSheetOption}
             onPress={() => navigation.navigate("AllOrders")}
           >
-            <Ionicons name="reader-outline" size={20} color="#FFFFFF" style={{ marginRight: 10 }} />
+            <Ionicons
+              name="reader-outline"
+              size={20}
+              color="#FFFFFF"
+              style={{ marginRight: 10 }}
+            />
             <Text style={styles.bottomSheetOptionText}>All Orders</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.bottomSheetOption}
             onPress={() => navigation.navigate("LikedItems")}
           >
-            <Ionicons name="heart-outline" size={20} color="#FFFFFF" style={{ marginRight: 10 }} />
+            <Ionicons
+              name="heart-outline"
+              size={20}
+              color="#FFFFFF"
+              style={{ marginRight: 10 }}
+            />
             <Text style={styles.bottomSheetOptionText}>Liked Items</Text>
           </TouchableOpacity>
         </View>
@@ -210,7 +273,8 @@ const UserAvatar: React.FC<{
   firstName?: string;
   onPress: () => void;
 }> = ({ firstName, onPress }) => {
-  const initial = firstName && firstName.length > 0 ? firstName.charAt(0).toUpperCase() : "?";
+  const initial =
+    firstName && firstName.length > 0 ? firstName.charAt(0).toUpperCase() : "?";
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -225,10 +289,7 @@ const UserAvatar: React.FC<{
 /**
  * Common header right component
  */
-const HeaderRightComponent = (
-  navigation: any,
-  firstName?: string
-) => (
+const HeaderRightComponent = (navigation: any, firstName?: string) => (
   <View style={styles.headerRightContainer}>
     <TouchableOpacity
       onPress={() => navigation.navigate("Cart")}
@@ -237,7 +298,10 @@ const HeaderRightComponent = (
     >
       <Ionicons name="cart-outline" size={26} color="#FFFFFF" />
     </TouchableOpacity>
-    <UserAvatar firstName={firstName} onPress={() => navigation.navigate("UserMenu")} />
+    <UserAvatar
+      firstName={firstName}
+      onPress={() => navigation.navigate("UserMenu")}
+    />
   </View>
 );
 
@@ -300,12 +364,16 @@ const AppNavigator: React.FC = () => {
           <Stack.Screen
             name="Dashboard"
             component={Dashboard}
-            options={({ navigation }) => getHeaderOptions(navigation, firstName)}
+            options={({ navigation }) =>
+              getHeaderOptions(navigation, firstName)
+            }
           />
           <Stack.Screen
             name="Jobs"
             component={JobsScreen}
-            options={({ navigation }) => getHeaderOptions(navigation, firstName)}
+            options={({ navigation }) =>
+              getHeaderOptions(navigation, firstName)
+            }
           />
           <Stack.Screen
             name="AddProduct"
@@ -324,7 +392,9 @@ const AppNavigator: React.FC = () => {
           <Stack.Screen
             name="Activity"
             component={ActivityScreen}
-            options={({ navigation }) => getHeaderOptions(navigation, firstName)}
+            options={({ navigation }) =>
+              getHeaderOptions(navigation, firstName)
+            }
           />
           <Stack.Screen
             name="EditProduct"
@@ -336,7 +406,9 @@ const AppNavigator: React.FC = () => {
           <Stack.Screen
             name="Messaging"
             component={MessagingScreen}
-            options={({ navigation }) => getHeaderOptions(navigation, firstName)}
+            options={({ navigation }) =>
+              getHeaderOptions(navigation, firstName)
+            }
           />
           <Stack.Screen
             name="Cart"
@@ -364,8 +436,8 @@ const AppNavigator: React.FC = () => {
             component={UserMenuScreen}
             options={{
               headerShown: false,
-              presentation: 'transparentModal',
-              animationEnabled: true
+              presentation: "transparentModal",
+              animationEnabled: true,
             }}
           />
           <Stack.Screen
@@ -444,21 +516,21 @@ const styles = StyleSheet.create({
   termsScreenContainer: {
     flex: 1,
     backgroundColor: "#000",
-    padding: 20
+    padding: 20,
   },
   termsHeading: {
     color: "#fff",
     fontSize: 22,
     fontWeight: "700",
-    marginBottom: 20
+    marginBottom: 20,
   },
   termsScroll: {
-    flexGrow: 1
+    flexGrow: 1,
   },
   termsText: {
     color: "#ccc",
     fontSize: 16,
-    lineHeight: 24
+    lineHeight: 24,
   },
   headerTitleContainer: {
     flexDirection: "row",
@@ -473,7 +545,7 @@ const styles = StyleSheet.create({
   headerRightContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginRight: 20
+    marginRight: 20,
   },
   headerIcon: {
     marginRight: 15,
@@ -540,7 +612,7 @@ const styles = StyleSheet.create({
   },
   bottomSheetOptions: {
     marginTop: 20,
-    width: '100%',
+    width: "100%",
   },
   bottomSheetOption: {
     flexDirection: "row",

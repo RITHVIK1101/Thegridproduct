@@ -7,23 +7,22 @@ export type CartProduct = {
   description?: string; 
   category?: string; 
   university?: string; 
-  sellerId: string; // Correctly renamed
+  sellerId: string;
   postedDate: string;
   rating?: number;
   quality?: string;
 };
-
 
 export type RootStackParamList = {
   Login: undefined;
   Dashboard: undefined;
   AddProduct: undefined;
   Activity: undefined;
-  Jobs: undefined; // Ensure Jobs is defined here
-  Messaging: { chatId: string; userId: string };
+  Jobs: undefined;
+  Messaging: { chatId?: string; userId?: string }; // Updated: Expect chatId and userId for navigation
   AddGig: undefined;
   Cart: undefined;
-  Payment: { product: CartProduct; buyerId: string; sellerId: string };
+  Payment: { product: CartProduct; buyerId: string; sellerId: string }; // Confirmed: Includes required parameters
   Account: undefined;
-  EditProduct: { productId: string };
+  EditProduct: { productId: string }; // Confirmed: Includes productId for editing
 };

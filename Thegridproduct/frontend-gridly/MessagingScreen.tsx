@@ -14,7 +14,7 @@ import {
   View,
   Dimensions,
   Image,
-  ScrollView
+  ScrollView,
 } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import BottomNavBar from "./components/BottomNavbar";
@@ -24,7 +24,6 @@ import { Conversation, Message } from "./types";
 import { UserContext } from "./UserContext";
 import Ably from "ably";
 import { RouteProp, useNavigation } from "@react-navigation/native";
-import { StackNavigationProp } from "./navigationTypes";
 import { RootStackParamList } from "./navigationTypes";
 import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from "expo-image-manipulator";
@@ -47,7 +46,8 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
   const [sending, setSending] = useState<boolean>(false);
 
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
-  const [isImagePreviewModalVisible, setIsImagePreviewModalVisible] = useState<boolean>(false);
+  const [isImagePreviewModalVisible, setIsImagePreviewModalVisible] =
+    useState<boolean>(false);
   const [isUploadingImage, setIsUploadingImage] = useState<boolean>(false);
 
   const [filterMenuVisible, setFilterMenuVisible] = useState<boolean>(false);
@@ -60,12 +60,19 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
   const navigation = useNavigation<NavigationProp>();
   const { chatId: routeChatId } = route.params || {};
 
-  const applyFilter = (chatsToFilter: Chat[], f: "all"|"products"|"gigs") => {
+  const applyFilter = (
+    chatsToFilter: Chat[],
+    f: "all" | "products" | "gigs"
+  ) => {
     if (f === "all") return chatsToFilter;
     if (f === "products") {
-      return chatsToFilter.filter(c => c.productTitle && c.productTitle.trim() !== "");
+      return chatsToFilter.filter(
+        (c) => c.productTitle && c.productTitle.trim() !== ""
+      );
     } else {
-      return chatsToFilter.filter(c => !c.productTitle || c.productTitle.trim() === "");
+      return chatsToFilter.filter(
+        (c) => !c.productTitle || c.productTitle.trim() === ""
+      );
     }
   };
 
@@ -315,7 +322,8 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
 
   const handleImagePress = async () => {
     try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const { status } =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== "granted") {
         Alert.alert(
           "Permission Required",
@@ -420,7 +428,9 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         })
       : "";
 
-    const initials = `${item.user.firstName.charAt(0)}${item.user.lastName.charAt(0)}`.toUpperCase();
+    const initials = `${item.user.firstName.charAt(
+      0
+    )}${item.user.lastName.charAt(0)}`.toUpperCase();
     const unread = item.unreadCount && item.unreadCount > 0;
 
     return (
@@ -462,7 +472,9 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
 
   const renderMessage = ({ item }: { item: Message }) => {
     const isImageMessage = item.content.startsWith("[Image] ");
-    const imageUri = isImageMessage ? item.content.replace("[Image] ", "") : null;
+    const imageUri = isImageMessage
+      ? item.content.replace("[Image] ", "")
+      : null;
     const isUser = item.sender === "user";
 
     return (
@@ -472,7 +484,12 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
           isUser ? styles.myMessageContainer : styles.theirMessageContainer,
         ]}
       >
-        <View style={[styles.messageBubble, isUser ? styles.myMessage : styles.theirMessage]}>
+        <View
+          style={[
+            styles.messageBubble,
+            isUser ? styles.myMessage : styles.theirMessage,
+          ]}
+        >
           {isImageMessage ? (
             <Image
               source={{ uri: imageUri! }}
@@ -480,7 +497,14 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
               resizeMode="cover"
             />
           ) : (
-            <Text style={[styles.messageText, isUser ? styles.myMessageTextColor : styles.theirMessageTextColor]}>
+            <Text
+              style={[
+                styles.messageText,
+                isUser
+                  ? styles.myMessageTextColor
+                  : styles.theirMessageTextColor,
+              ]}
+            >
               {item.content}
             </Text>
           )}
@@ -506,15 +530,29 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     type: c.productTitle ? "product" : "gig",
   }));
 
-  const handleNavigateFromProductOrGig = (item: { chatID: string; title: string; type: string; }) => {
+  const handleNavigateFromProductOrGig = (item: {
+    chatID: string;
+    title: string;
+    type: string;
+  }) => {
     const chat = chats.find((c) => c.chatID === item.chatID);
     if (chat) {
       openChat(chat);
     }
   };
 
-  const currentHeaderTitle = filter === "all" ? "All Chats" : filter === "products" ? "Product Chats" : "Job Chats";
-  const currentFilterLabel = filter === "all" ? "All ×" : filter === "products" ? "Products ×" : "Jobs ×";
+  const currentHeaderTitle =
+    filter === "all"
+      ? "All Chats"
+      : filter === "products"
+      ? "Product Chats"
+      : "Job Chats";
+  const currentFilterLabel =
+    filter === "all"
+      ? "All ×"
+      : filter === "products"
+      ? "Products ×"
+      : "Jobs ×";
 
   const handleFilterPillPress = () => {
     if (filter === "all") {
@@ -577,22 +615,27 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         </Modal>
 
         {/* Purchases Section (only in all or products) */}
-        {(filter === "all" || filter === "products") && productsOrGigs.length > 0 && (
-          <View style={styles.horizontalListContainer}>
-            <Text style={styles.sectionTitle}>Your Purchases</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalScroll}>
-              {productsOrGigs.map((item, index) => (
-                <Pressable
-                  key={item.chatID + index}
-                  style={styles.productGigItem}
-                  onPress={() => handleNavigateFromProductOrGig(item)}
-                >
-                  <Text style={styles.productGigItemText}>{item.title}</Text>
-                </Pressable>
-              ))}
-            </ScrollView>
-          </View>
-        )}
+        {(filter === "all" || filter === "products") &&
+          productsOrGigs.length > 0 && (
+            <View style={styles.horizontalListContainer}>
+              <Text style={styles.sectionTitle}>Your Purchases</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.horizontalScroll}
+              >
+                {productsOrGigs.map((item, index) => (
+                  <Pressable
+                    key={item.chatID + index}
+                    style={styles.productGigItem}
+                    onPress={() => handleNavigateFromProductOrGig(item)}
+                  >
+                    <Text style={styles.productGigItemText}>{item.title}</Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+          )}
 
         <View style={styles.separatorAfterPurchases} />
 
@@ -654,14 +697,17 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                       </View>
                       <View style={styles.chatHeaderTextContainer}>
                         <Text style={styles.chatHeaderUserName}>
-                          {selectedChat.user.firstName} {selectedChat.user.lastName}
+                          {selectedChat.user.firstName}{" "}
+                          {selectedChat.user.lastName}
                         </Text>
                         <Text style={styles.chatHeaderSubTitle}>
-                          {selectedChat.productTitle ? selectedChat.productTitle : "Job"}
+                          {selectedChat.productTitle
+                            ? selectedChat.productTitle
+                            : "Job"}
                         </Text>
                       </View>
                     </View>
-                    <View style={styles.chatHeaderBottomLine}/>
+                    <View style={styles.chatHeaderBottomLine} />
                   </View>
                 )}
 
@@ -751,7 +797,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                 >
                   <Ionicons name="arrow-back" size={24} color="#BB86FC" />
                 </Pressable>
-                <View style={{flex:1}} />
+                <View style={{ flex: 1 }} />
                 <Pressable
                   onPress={confirmAddImage}
                   style={styles.addImageButton}
@@ -820,31 +866,31 @@ const styles = StyleSheet.create({
     fontFamily: "HelveticaNeue-Medium",
   },
   modalOverlay: {
-    flex:1,
-    backgroundColor:'rgba(0,0,0,0.7)',
-    justifyContent:'center',
-    alignItems:'center'
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    justifyContent: "center",
+    alignItems: "center",
   },
   filterModalContainer: {
-    backgroundColor:"#1E1E1E",
-    borderRadius:8,
-    padding:20,
-    width:200,
-    alignItems:"stretch"
+    backgroundColor: "#1E1E1E",
+    borderRadius: 8,
+    padding: 20,
+    width: 200,
+    alignItems: "stretch",
   },
-  filterModalOption:{
-    paddingVertical:10,
-    alignItems:"center"
+  filterModalOption: {
+    paddingVertical: 10,
+    alignItems: "center",
   },
-  filterModalOptionText:{
-    color:"#FFFFFF",
-    fontSize:16,
-    fontFamily:"HelveticaNeue-Medium"
+  filterModalOptionText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontFamily: "HelveticaNeue-Medium",
   },
-  filterModalClose:{
-    marginTop:10,
-    borderTopWidth:1,
-    borderTopColor:"#333333"
+  filterModalClose: {
+    marginTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: "#333333",
   },
   horizontalListContainer: {
     marginTop: 10,
