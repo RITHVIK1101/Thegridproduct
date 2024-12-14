@@ -39,7 +39,7 @@ type Product = {
   category: string;
   images: string[];
   university: string;
-  ownerId: string;
+  userId: string; // Represents the seller's user ID
   postedDate: string;
   rating?: number;
   quality?: string;
@@ -54,7 +54,7 @@ type CartProduct = {
   description?: string;
   category?: string;
   university?: string;
-  ownerId?: string;
+  sellerId: string; // Renamed from ownerId to sellerId
   postedDate?: string;
   rating?: number;
   quality?: string;
@@ -110,8 +110,6 @@ const CartScreen: React.FC = () => {
         throw new Error(errorData.message || "Failed to fetch cart.");
       }
 
-
-
       const cartData: Cart = await response.json();
 
       if (cartData.items.length === 0) {
@@ -152,7 +150,7 @@ const CartScreen: React.FC = () => {
             description: product.description,
             category: product.category,
             university: product.university,
-            ownerId: product.ownerId,
+            sellerId: product.userId, // Mapped from product.userId
             postedDate: product.postedDate,
             rating: product.rating,
             quality: product.quality,
@@ -164,18 +162,28 @@ const CartScreen: React.FC = () => {
             price: 0,
             images: [],
             quantity: item.quantity,
+            sellerId: "unknown-seller", // Handle missing sellerId
+            postedDate: "",
+            rating: 0,
+            quality: "",
           };
         }
       });
 
-      setCartProducts(combinedCartProducts);
+      // Filter out products with unknown sellerId if necessary
+      const validCartProducts = combinedCartProducts.filter(
+        (product) => product.sellerId !== "unknown-seller"
+      );
+
+      setCartProducts(validCartProducts);
       Animated.timing(fadeAnim, {
         toValue: 1,
         duration: 500,
         useNativeDriver: true,
       }).start();
     } catch (err) {
-      
+      console.error("Fetch Cart Error:", err);
+      setError(err.message || "An unexpected error occurred.");
     } finally {
       setLoading(false);
     }
@@ -233,7 +241,30 @@ const CartScreen: React.FC = () => {
       {
         text: "OK",
         onPress: () => {
-          navigation.navigate("Payment", { product });
+          if (!userId) {
+            Alert.alert("Error", "User not authenticated.");
+            return;
+          }
+          if (!product.sellerId || product.sellerId === "unknown-seller") {
+            Alert.alert("Error", "Seller information is missing.");
+            return;
+          }
+          console.log("Navigating to Payment with:", {
+            product,
+            buyerId: userId,
+            sellerId: product.sellerId,
+          });
+          console.log("Navigating to Payment with:", {
+            product,
+            buyerId: userId,
+            sellerId: product.sellerId,
+          });
+
+          navigation.navigate("Payment", {
+            product,
+            buyerId: userId,
+            sellerId: product.sellerId,
+          });
         },
       },
       { text: "Cancel", style: "cancel" },

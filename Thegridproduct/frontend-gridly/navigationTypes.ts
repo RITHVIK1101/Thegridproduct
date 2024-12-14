@@ -7,7 +7,7 @@ export type CartProduct = {
   description?: string; 
   category?: string; 
   university?: string; 
-  ownerId: string;
+  sellerId: string;
   postedDate: string;
   rating?: number;
   quality?: string;
@@ -18,11 +18,11 @@ export type RootStackParamList = {
   Dashboard: undefined;
   AddProduct: undefined;
   Activity: undefined;
-  Jobs: undefined; // Ensure Jobs is defined here
+  Jobs: undefined;
   Messaging: { chatId: string; userId: string };
   AddGig: undefined;
   Cart: undefined;
-  Payment: { product: CartProduct; buyerId: string; sellerId: string };
+  Payment: { product: CartProduct; buyerId: string; sellerId: string }; // Confirmed
   Account: undefined;
   EditProduct: { productId: string };
 };

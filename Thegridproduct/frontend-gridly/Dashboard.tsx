@@ -43,7 +43,6 @@ type DashboardProps = {
   route: RouteProp<RootStackParamList, "Dashboard">;
 };
 
-// Updated Product type to include necessary fields
 type Product = {
   id: string;
   title: string;
@@ -56,6 +55,7 @@ type Product = {
   postedDate: string;
   rating?: number;
   quality?: string;
+  availability: string; // Add this line for availability
 };
 
 // User type to store fetched user information
@@ -344,7 +344,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
     }
   }, [cartUpdated]);
 
-  // Fetch products based on campus mode
   const fetchProducts = async () => {
     if (!userId || !token || !institution) {
       setLoading(false);
@@ -357,8 +356,10 @@ const Dashboard: React.FC<DashboardProps> = () => {
       if (campusMode === "In Campus") {
         url += "?mode=in";
       } else if (campusMode === "Both") {
-        url += "?mode=outofcampus"; // Adjusted as per your requirement
+        url += "?mode=outofcampus";
       }
+
+      console.log("Fetching products with URL:", url);
 
       const response = await fetch(url, {
         method: "GET",
@@ -369,7 +370,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
       });
 
       if (response.status === 401) {
-        Alert.alert("Session Expired", "Log in again.", [
+        Alert.alert("Session Expired", "Please log in again.", [
           {
             text: "OK",
             onPress: async () => {
@@ -397,7 +398,9 @@ const Dashboard: React.FC<DashboardProps> = () => {
         throw new Error("Invalid response.");
       }
 
-      const data: Product[] = await response.json();
+      const data: any[] = await response.json();
+      console.log("Raw Fetched Data:", data);
+
       if (!data || data.length === 0) {
         setAllProducts([]);
         setFilteredProducts([]);
@@ -406,18 +409,38 @@ const Dashboard: React.FC<DashboardProps> = () => {
         return;
       }
 
-      let filtered = data;
-      // Additional backend filtering based on campusMode if necessary
+      // **Mapping `_id` to `id` and ensuring `userId` is string**
+      const mappedData: Product[] = data.map((product) => ({
+        id: product._id || product.id || `product-${Math.random()}`,
+        title: product.title,
+        price: product.price,
+        description: product.description,
+        category: product.category,
+        images: product.images,
+        university: product.university,
+        userId: product.userId, // Ensure this is a string
+        postedDate: product.postedDate,
+        rating: product.rating,
+        quality: product.quality,
+        availability: product.availability, // Ensure availability is included
+      }));
+
+      console.log("Mapped Products:", mappedData);
+
+      let filtered = mappedData;
+
       if (campusMode === "In Campus") {
-        filtered = data.filter(
+        console.log("Filtering for In Campus mode");
+        filtered = mappedData.filter(
           (product) =>
-            product.userId !== userId && product.university === institution
+            product.userId !== userId && // Ensure both are strings
+            product.university.toLowerCase() === institution.toLowerCase() &&
+            product.availability === "In Campus Only" // Explicitly filter by availability
         );
       }
-      // Assuming 'mode=outofcampus' fetches both in and out of campus
-      // If 'mode=outofcampus' only fetches out of campus, adjust accordingly
 
-      setAllProducts(filtered);
+      console.log("Filtered Products:", filtered);
+
       // Apply frontend filters
       let finalFiltered = filtered;
 
@@ -435,7 +458,10 @@ const Dashboard: React.FC<DashboardProps> = () => {
         );
       }
 
+      console.log("Final Filtered Products:", finalFiltered);
+
       setFilteredProducts(finalFiltered);
+      setAllProducts(filtered);
       setError(null);
     } catch (err) {
       console.error("Fetch Products Error:", err);
@@ -444,7 +470,17 @@ const Dashboard: React.FC<DashboardProps> = () => {
       setLoading(false);
     }
   };
-
+  useEffect(() => {
+    console.log("Filtered Products Length:", filteredProducts.length);
+    console.log("Current Index:", currentIndex);
+    console.log(
+      "Slice Result:",
+      filteredProducts.slice(
+        currentIndex,
+        Math.min(currentIndex + 2, filteredProducts.length)
+      )
+    );
+  }, [filteredProducts, currentIndex]);
   useEffect(() => {
     if (allProducts.length > 0) {
       let finalFiltered = allProducts;
@@ -771,23 +807,32 @@ const Dashboard: React.FC<DashboardProps> = () => {
             </View>
           ) : (
             <View style={styles.productStack}>
-              {filteredProducts
-                .slice(currentIndex, currentIndex + 2)
-                .reverse()
-                .map((product, index) => (
-                  <ProductItem
-                    key={product.id}
-                    product={product}
-                    onSwipeLeft={() => handleSwipe("left")}
-                    onSwipeRight={() => handleSwipe("right")}
-                    onSwipeUp={() => handleSwipe("up")}
-                    isTop={index === 1}
-                    style={[
-                      { zIndex: index },
-                      index === 1 ? styles.topProduct : styles.bottomProduct,
-                    ]}
-                  />
-                ))}
+              {filteredProducts.length > 0 && (
+                <View style={styles.productStack}>
+                  {filteredProducts
+                    .slice(
+                      currentIndex,
+                      Math.min(currentIndex + 2, filteredProducts.length)
+                    )
+                    .reverse()
+                    .map((product, index, array) => (
+                      <ProductItem
+                        key={product.id}
+                        product={product}
+                        onSwipeLeft={() => handleSwipe("left")}
+                        onSwipeRight={() => handleSwipe("right")}
+                        onSwipeUp={() => handleSwipe("up")}
+                        isTop={index === array.length - 1}
+                        style={[
+                          { zIndex: index },
+                          index === array.length - 1
+                            ? styles.topProduct
+                            : styles.bottomProduct,
+                        ]}
+                      />
+                    ))}
+                </View>
+              )}
             </View>
           )}
 
