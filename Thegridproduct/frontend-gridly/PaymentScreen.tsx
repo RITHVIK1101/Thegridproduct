@@ -15,7 +15,6 @@ import {
 import { useStripe } from "@stripe/stripe-react-native";
 import { useNavigation } from "@react-navigation/native";
 import { UserContext } from "./UserContext";
-import { NGROK_URL } from "@env";
 
 type PaymentScreenProps = {
   route: {

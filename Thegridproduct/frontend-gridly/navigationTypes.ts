@@ -7,22 +7,23 @@ export type CartProduct = {
   description?: string; 
   category?: string; 
   university?: string; 
-  sellerId: string;
+  sellerId: string; // Correctly renamed
   postedDate: string;
   rating?: number;
   quality?: string;
 };
+
 
 export type RootStackParamList = {
   Login: undefined;
   Dashboard: undefined;
   AddProduct: undefined;
   Activity: undefined;
-  Jobs: undefined;
+  Jobs: undefined; // Ensure Jobs is defined here
   Messaging: { chatId: string; userId: string };
   AddGig: undefined;
   Cart: undefined;
-  Payment: { product: CartProduct; buyerId: string; sellerId: string }; // Confirmed
+  Payment: { product: CartProduct; buyerId: string; sellerId: string };
   Account: undefined;
   EditProduct: { productId: string };
 };
