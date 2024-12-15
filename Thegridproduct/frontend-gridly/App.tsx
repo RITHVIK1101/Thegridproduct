@@ -33,17 +33,7 @@ import MessagingScreen from "./MessagingScreen";
 import CartScreen from "./CartScreen";
 import AccountScreen from "./AccountScreen";
 
-// Placeholder for AllOrdersScreen
-const AllOrdersScreen: React.FC = () => (
-  <View
-    style={[
-      styles.screenContainer,
-      { justifyContent: "center", alignItems: "center" },
-    ]}
-  >
-    <Text style={{ color: "#fff", fontSize: 18 }}>All Orders coming soon!</Text>
-  </View>
-);
+import AllOrdersScreen from "./AllOrdersScreen";
 
 // Terms of Service Screen
 const TermsOfServiceScreen: React.FC = () => (
@@ -214,7 +204,7 @@ const UserMenuScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.bottomSheetOption}
-            onPress={() => navigation.navigate("AllOrdersScreen")}
+            onPress={() => navigation.navigate("AllOrders")}
           >
             <Ionicons
               name="reader-outline"
@@ -468,6 +458,7 @@ const AppNavigator: React.FC = () => {
               getHeaderOptions(navigation, firstName, lastName, true, true)
             }
           />
+
           <Stack.Screen
             name="LikedItems"
             component={LikedItemsScreen}

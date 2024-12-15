@@ -17,6 +17,7 @@ export type RootStackParamList = {
   Login: undefined;
   Dashboard: undefined;
   AddProduct: undefined;
+  AllOrders:undefined;
   Activity: undefined;
   Jobs: undefined;
   Messaging: { chatId?: string; userId?: string }; // Updated: Expect chatId and userId for navigation

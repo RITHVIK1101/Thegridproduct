@@ -189,6 +189,7 @@ func GetSingleProductHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetAllProductsHandler handles fetching products for either 'in campus' or 'outofcampus' mode
+// GetAllProductsHandler handles fetching products for either 'in campus' or 'outofcampus' mode
 func GetAllProductsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -217,30 +218,48 @@ func GetAllProductsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse the 'mode' query parameter to determine campus mode
+	// Parse the 'mode' and 'tag' query parameters
 	mode := r.URL.Query().Get("mode")
-	log.Println("Mode:", mode)
+	tag := r.URL.Query().Get("tag") // Tag filter is mandatory
+	if tag == "" {
+		WriteJSONError(w, "Tag filter is required", http.StatusBadRequest)
+		return
+	}
+	log.Println("Mode:", mode, "Tag:", tag)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	collection := db.GetCollection("gridlyapp", "products")
 
+	// Base filter to include only products with status `inshop`
+	baseFilter := bson.M{"status": "inshop"}
+
 	var filter bson.M
 	if mode == "outofcampus" || mode == "out" {
-		// Out-of-campus mode: fetch products that are either Off Campus Only OR On and Off Campus
-		// excluding the user's own products.
+		// Out-of-campus mode
 		filter = bson.M{
-			"userId":       bson.M{"$ne": userObjID},
-			"availability": bson.M{"$in": []string{"Off Campus Only", "On and Off Campus", "In Campus Only"}},
+			"$and": []bson.M{
+				baseFilter,
+				{
+					"userId":       bson.M{"$ne": userObjID},
+					"availability": bson.M{"$in": []string{"Off Campus Only", "On and Off Campus"}},
+				},
+				{"selectedTags": tag}, // Tag filter
+			},
 		}
 	} else {
-		// In-campus mode (default): fetch only "In Campus Only" from the same university,
-		// excluding user's own products.
+		// In-campus mode (default)
 		filter = bson.M{
-			"userId":       bson.M{"$ne": userObjID},
-			"university":   university,
-			"availability": "In Campus Only",
+			"$and": []bson.M{
+				baseFilter,
+				{
+					"userId":       bson.M{"$ne": userObjID},
+					"university":   university,
+					"availability": "In Campus Only",
+				},
+				{"selectedTags": tag}, // Tag filter
+			},
 		}
 	}
 

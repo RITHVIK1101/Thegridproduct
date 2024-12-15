@@ -353,10 +353,24 @@ const Dashboard: React.FC<DashboardProps> = () => {
 
     try {
       let url = `${NGROK_URL}/products/all`;
+      const queryParams: string[] = [];
+
+      // Add campus mode to query params
       if (campusMode === "In Campus") {
-        url += "?mode=in";
+        queryParams.push("mode=in");
       } else if (campusMode === "Both") {
-        url += "?mode=outofcampus";
+        queryParams.push("mode=outofcampus");
+      }
+
+      // Add selected category to query params
+      if (selectedCategory !== "#Everything") {
+        const categoryTag = selectedCategory.replace("#", "");
+        queryParams.push(`tag=${encodeURIComponent(categoryTag)}`);
+      }
+
+      // Append query parameters to URL
+      if (queryParams.length > 0) {
+        url += `?${queryParams.join("&")}`;
       }
 
       console.log("Fetching products with URL:", url);
@@ -393,13 +407,8 @@ const Dashboard: React.FC<DashboardProps> = () => {
         throw new Error("Failed to fetch products.");
       }
 
-      const contentType = response.headers.get("content-type");
-      if (!contentType || !contentType.includes("application/json")) {
-        throw new Error("Invalid response.");
-      }
-
       const data: any[] = await response.json();
-      console.log("Raw Fetched Data:", data);
+      console.log("Fetched Products:", data);
 
       if (!data || data.length === 0) {
         setAllProducts([]);
@@ -409,8 +418,8 @@ const Dashboard: React.FC<DashboardProps> = () => {
         return;
       }
 
-      // **Mapping `_id` to `id` and ensuring `userId` is string**
-      const mappedData: Product[] = data.map((product) => ({
+      // Map products to correct format
+      const mappedProducts: Product[] = data.map((product) => ({
         id: product._id || product.id || `product-${Math.random()}`,
         title: product.title,
         price: product.price,
@@ -418,50 +427,15 @@ const Dashboard: React.FC<DashboardProps> = () => {
         category: product.category,
         images: product.images,
         university: product.university,
-        userId: product.userId, // Ensure this is a string
+        userId: product.userId,
         postedDate: product.postedDate,
         rating: product.rating,
         quality: product.quality,
-        availability: product.availability, // Ensure availability is included
+        availability: product.availability,
       }));
 
-      console.log("Mapped Products:", mappedData);
-
-      let filtered = mappedData;
-
-      if (campusMode === "In Campus") {
-        console.log("Filtering for In Campus mode");
-        filtered = mappedData.filter(
-          (product) =>
-            product.userId !== userId && // Ensure both are strings
-            product.university.toLowerCase() === institution.toLowerCase() &&
-            product.availability === "In Campus Only" // Explicitly filter by availability
-        );
-      }
-
-      console.log("Filtered Products:", filtered);
-
-      // Apply frontend filters
-      let finalFiltered = filtered;
-
-      if (selectedCategory !== "#Everything") {
-        const categoryFilter = selectedCategory.replace("#", "").toLowerCase();
-        finalFiltered = finalFiltered.filter(
-          (p) => p.category && p.category.toLowerCase() === categoryFilter
-        );
-      }
-
-      if (searchQuery.trim() !== "") {
-        const query = searchQuery.trim().toLowerCase();
-        finalFiltered = finalFiltered.filter(
-          (p) => p.title && p.title.toLowerCase().includes(query)
-        );
-      }
-
-      console.log("Final Filtered Products:", finalFiltered);
-
-      setFilteredProducts(finalFiltered);
-      setAllProducts(filtered);
+      setAllProducts(mappedProducts);
+      setFilteredProducts(mappedProducts); // Since filtering is done by the backend
       setError(null);
     } catch (err) {
       console.error("Fetch Products Error:", err);
@@ -470,6 +444,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
       setLoading(false);
     }
   };
+
   useEffect(() => {
     console.log("Filtered Products Length:", filteredProducts.length);
     console.log("Current Index:", currentIndex);
@@ -504,12 +479,11 @@ const Dashboard: React.FC<DashboardProps> = () => {
   useEffect(() => {
     setLoading(true);
     setError(null);
-    fetchProducts();
+    fetchProducts(); // Fetch products whenever filters change
     fetchCart();
-    fetchUserInfo(); // Fetch user info when dashboard mounts or campusMode changes
+    fetchUserInfo();
     setCurrentIndex(0);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [campusMode]);
+  }, [campusMode, selectedCategory]);
 
   const toggleFilterModal = () =>
     setIsFilterModalVisible(!isFilterModalVisible);
