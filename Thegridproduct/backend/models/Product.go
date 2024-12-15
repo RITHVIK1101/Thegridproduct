@@ -6,10 +6,10 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-// Product represents the structure of a product in MongoDB
 type Product struct {
 	ID                     primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
-	UserID                 primitive.ObjectID `json:"userId" bson:"userId"`
+	UserID                 primitive.ObjectID `json:"userId" bson:"userId"`                       // Seller
+	BuyerID                primitive.ObjectID `json:"buyerId,omitempty" bson:"buyerId,omitempty"` // NEW
 	Title                  string             `json:"title" bson:"title"`
 	Price                  float64            `json:"price" bson:"price"`
 	OutOfCampusPrice       float64            `json:"outOfCampusPrice,omitempty" bson:"outOfCampusPrice,omitempty"`
@@ -27,5 +27,5 @@ type Product struct {
 	University             string             `json:"university" bson:"university"`
 	StudentType            string             `json:"studentType" bson:"studentType"`
 	Condition              string             `json:"condition,omitempty" bson:"condition,omitempty"`
-	Status                 string             `json:"status" bson:"status"` // Add this field
+	Status                 string             `json:"status" bson:"status"`
 }

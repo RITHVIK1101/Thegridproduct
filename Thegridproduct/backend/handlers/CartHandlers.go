@@ -56,7 +56,7 @@ func GetCartHandler(w http.ResponseWriter, r *http.Request) {
 	err = cartCollection.FindOne(ctx, bson.M{"userId": userID}).Decode(&cart)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
-			// Cart doesn't exist; return empty cart
+			// Cart doesn't exist; return an empty cart
 			emptyCartResponse := map[string]interface{}{
 				"userId":    userIDStr,
 				"items":     []interface{}{},
@@ -113,28 +113,13 @@ func GetCartHandler(w http.ResponseWriter, r *http.Request) {
 		productMap[product.ID] = product
 	}
 
-	// Combine cart items with their corresponding product details
-	for _, product := range products {
-		productMap[product.ID] = product
-	}
-
-	// Combine cart items with their corresponding product details
 	detailedCartItems := []map[string]interface{}{}
+
+	// Combine cart items with corresponding product details, filtering out "talks", "sold", etc.
 	for _, item := range cart.Items {
 		product, exists := productMap[item.ProductID]
-		if exists {
-			detailedItem := map[string]interface{}{
-				"productId":   item.ProductID.Hex(),
-				"quantity":    item.Quantity,
-				"title":       product.Title,
-				"price":       product.Price,
-				"description": product.Description,
-				"images":      product.Images,
-				"sellerId":    product.UserID.Hex(), // Include UserID here
-			}
-			detailedCartItems = append(detailedCartItems, detailedItem)
-		} else {
-			// Handle case where product no longer exists
+		if !exists {
+			// Product no longer exists in the DB
 			detailedItem := map[string]interface{}{
 				"productId":   item.ProductID.Hex(),
 				"quantity":    item.Quantity,
@@ -142,10 +127,28 @@ func GetCartHandler(w http.ResponseWriter, r *http.Request) {
 				"price":       0,
 				"description": "This product is no longer available.",
 				"images":      []string{},
-				"userId":      nil,
+				"sellerId":    nil,
 			}
 			detailedCartItems = append(detailedCartItems, detailedItem)
+			continue
 		}
+
+		// If product status is NOT "inshop", skip displaying it in the cart
+		if product.Status != "inshop" {
+			continue
+		}
+
+		// Build the cart item response
+		detailedItem := map[string]interface{}{
+			"productId":   item.ProductID.Hex(),
+			"quantity":    item.Quantity,
+			"title":       product.Title,
+			"price":       product.Price,
+			"description": product.Description,
+			"images":      product.Images,
+			"sellerId":    product.UserID.Hex(),
+		}
+		detailedCartItems = append(detailedCartItems, detailedItem)
 	}
 
 	// Prepare the final response

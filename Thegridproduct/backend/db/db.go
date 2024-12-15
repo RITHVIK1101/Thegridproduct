@@ -316,28 +316,36 @@ func findUserInCollection(database string, collectionName string, userID string)
 	return &user, nil
 }
 
-func UpdateProductStatus(productID string, newStatus string) error {
-	collection := GetCollection("gridlyapp", "products")
-
-	objectID, err := primitive.ObjectIDFromHex(productID)
-	if err != nil {
-		log.Printf("Invalid product ID format %s: %v", productID, err)
-		return fmt.Errorf("invalid product ID format: %v", err)
-	}
-
+// UpdateProductStatusAndBuyer sets the product's status and buyerId simultaneously
+func UpdateProductStatusAndBuyer(productID string, buyerID string, newStatus string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	update := bson.M{"$set": bson.M{"status": newStatus}}
-
-	result, err := collection.UpdateOne(ctx, bson.M{"_id": objectID}, update)
+	productObjID, err := primitive.ObjectIDFromHex(productID)
 	if err != nil {
-		log.Printf("Error updating product status: %v", err)
-		return fmt.Errorf("error updating product status: %v", err)
+		return fmt.Errorf("invalid product ID format: %v", err)
+	}
+	buyerObjID, err := primitive.ObjectIDFromHex(buyerID)
+	if err != nil {
+		return fmt.Errorf("invalid buyer ID format: %v", err)
 	}
 
+	productCollection := GetCollection("gridlyapp", "products")
+
+	filter := bson.M{"_id": productObjID}
+	update := bson.M{
+		"$set": bson.M{
+			"status":  newStatus,
+			"buyerId": buyerObjID,
+		},
+	}
+
+	result, err := productCollection.UpdateOne(ctx, filter, update)
+	if err != nil {
+		log.Printf("Error updating product status/buyer: %v", err)
+		return err
+	}
 	if result.MatchedCount == 0 {
-		log.Printf("Product with ID %s not found", productID)
 		return errors.New("product not found")
 	}
 

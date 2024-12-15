@@ -94,6 +94,7 @@ func main() {
 	protected.HandleFunc("/cart", handlers.GetCartHandler).Methods("GET")
 	protected.HandleFunc("/cart/add", handlers.AddToCartHandler).Methods("POST")
 	protected.HandleFunc("/cart/remove", handlers.RemoveFromCartHandler).Methods("POST")
+	protected.HandleFunc("/orders", handlers.GetAllOrdersHandler).Methods("GET")
 
 	// User Routes
 	protected.HandleFunc("/users/{id}", handlers.GetUserHandler).Methods("GET")

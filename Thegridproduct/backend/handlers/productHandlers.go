@@ -1,3 +1,4 @@
+// handlers/productHandlers.go
 package handlers
 
 import (
@@ -797,15 +798,6 @@ func ConfirmTransferHandler(w http.ResponseWriter, r *http.Request) {
 	productID := r.URL.Query().Get("productId")
 	if productID == "" {
 		WriteJSONError(w, "Product ID is required", http.StatusBadRequest)
-		return
-	}
-
-	// Perform logic to check if both buyer and seller confirmed
-	// For the sake of example, let's assume they did.
-
-	if err := db.UpdateProductStatus(productID, "sold"); err != nil {
-		log.Printf("Failed to update product status to 'sold': %v", err)
-		WriteJSONError(w, "Failed to update product status", http.StatusInternalServerError)
 		return
 	}
 

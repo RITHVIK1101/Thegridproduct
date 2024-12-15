@@ -214,7 +214,7 @@ const UserMenuScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.bottomSheetOption}
-            onPress={() => navigation.navigate("AllOrders")}
+            onPress={() => navigation.navigate("AllOrdersScreen")}
           >
             <Ionicons
               name="reader-outline"

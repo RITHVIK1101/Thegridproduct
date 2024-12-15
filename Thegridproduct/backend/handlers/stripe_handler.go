@@ -94,8 +94,8 @@ func CreatePaymentIntentHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("Failed to create chat session: %v", err), http.StatusInternalServerError)
 		return
 	}
-	if err := db.UpdateProductStatus(request.ProductID, "talks"); err != nil {
-		log.Printf("Failed to update product status to 'talks': %v", err)
+	if err := db.UpdateProductStatusAndBuyer(request.ProductID, request.BuyerID, "talks"); err != nil {
+		log.Printf("Failed to update product status/buyer: %v", err)
 		// You may decide what to do if updating the status fails
 		// For now, we just log it.
 	}
