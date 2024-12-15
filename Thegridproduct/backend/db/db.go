@@ -381,3 +381,98 @@ func GetProductsByStatus(status string, userID string) ([]models.Product, error)
 
 	return products, nil
 }
+func AddLikedProduct(userID string, productID string) error {
+	collection := GetCollection("gridlyapp", "users")
+
+	userObjID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return fmt.Errorf("invalid user ID format: %v", err)
+	}
+
+	productObjID, err := primitive.ObjectIDFromHex(productID)
+	if err != nil {
+		return fmt.Errorf("invalid product ID format: %v", err)
+	}
+
+	update := bson.M{
+		"$addToSet": bson.M{
+			"likedProducts": productObjID,
+		},
+	}
+
+	_, err = collection.UpdateOne(context.TODO(), bson.M{"_id": userObjID}, update)
+	if err != nil {
+		log.Printf("Error adding liked product: %v", err)
+		return fmt.Errorf("failed to add liked product: %v", err)
+	}
+
+	return nil
+}
+func RemoveLikedProduct(userID string, productID string) error {
+	collection := GetCollection("gridlyapp", "users")
+
+	userObjID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return fmt.Errorf("invalid user ID format: %v", err)
+	}
+
+	productObjID, err := primitive.ObjectIDFromHex(productID)
+	if err != nil {
+		return fmt.Errorf("invalid product ID format: %v", err)
+	}
+
+	update := bson.M{
+		"$pull": bson.M{
+			"likedProducts": productObjID,
+		},
+	}
+
+	_, err = collection.UpdateOne(context.TODO(), bson.M{"_id": userObjID}, update)
+	if err != nil {
+		log.Printf("Error removing liked product: %v", err)
+		return fmt.Errorf("failed to remove liked product: %v", err)
+	}
+
+	return nil
+}
+func GetLikedProducts(userID string) ([]models.Product, error) {
+	// Get the user document to retrieve liked products
+	userCollection := GetCollection("gridlyapp", "users")
+	productCollection := GetCollection("gridlyapp", "products")
+
+	userObjID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid user ID format: %v", err)
+	}
+
+	var user models.User
+	err = userCollection.FindOne(context.TODO(), bson.M{"_id": userObjID}).Decode(&user)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			log.Printf("User with ID %s not found", userID)
+			return nil, fmt.Errorf("user not found")
+		}
+		log.Printf("Error fetching user: %v", err)
+		return nil, fmt.Errorf("error fetching user: %v", err)
+	}
+
+	// If the user has no liked products, return an empty list
+	if len(user.LikedProducts) == 0 {
+		return []models.Product{}, nil
+	}
+	// Fetch all liked products
+	cursor, err := productCollection.Find(context.TODO(), bson.M{"_id": bson.M{"$in": user.LikedProducts}})
+	if err != nil {
+		log.Printf("Error fetching liked products: %v", err)
+		return nil, fmt.Errorf("error fetching liked products: %v", err)
+	}
+	defer cursor.Close(context.TODO())
+
+	var likedProducts []models.Product
+	if err := cursor.All(context.TODO(), &likedProducts); err != nil {
+		log.Printf("Error decoding liked products: %v", err)
+		return nil, fmt.Errorf("error decoding liked products: %v", err)
+	}
+
+	return likedProducts, nil
+}

@@ -1,4 +1,3 @@
-// handlers/productHandlers.go
 package handlers
 
 import (
@@ -66,6 +65,7 @@ func AddProductHandler(w http.ResponseWriter, r *http.Request) {
 	product.StudentType = studentType
 	product.PostedDate = time.Now()
 	product.Expired = false
+	product.LikeCount = 0 // Initialize LikeCount to 0
 
 	//----------------------------------------------------
 	// Map frontend availability to final stored field:
@@ -185,7 +185,7 @@ func GetSingleProductHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	json.NewEncoder(w).Encode(product)
+	json.NewEncoder(w).Encode(product) // LikeCount is included in the product struct
 }
 
 // GetAllProductsHandler handles fetching products for either 'in campus' or 'outofcampus' mode
@@ -643,6 +643,7 @@ func AddMultipleProductsHandler(w http.ResponseWriter, r *http.Request) {
 		p.PostedDate = time.Now()
 		p.Expired = false
 		p.Status = "inshop"
+		p.LikeCount = 0 // Initialize LikeCount to 0
 
 		// Map availability from "In Campus"/"Out of Campus"/"Both" to final
 		switch p.Availability {
@@ -787,6 +788,20 @@ func DeleteProductHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Optionally, remove the product from all users' likedProducts arrays
+	// to maintain consistency. This can be done using an UpdateMany operation.
+
+	userCollection := db.GetCollection("gridlyapp", "users")
+	_, err = userCollection.UpdateMany(
+		ctx,
+		bson.M{"likedProducts": productID},
+		bson.M{"$pull": bson.M{"likedProducts": productID}},
+	)
+	if err != nil {
+		log.Printf("Error removing product from users' likedProducts: %v", err)
+		// Not critical, so you might choose not to return an error
+	}
+
 	// Respond with a success message
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]interface{}{
@@ -811,7 +826,352 @@ func ConfirmTransferHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Convert to ObjectID
+	objID, err := primitive.ObjectIDFromHex(productID)
+	if err != nil {
+		WriteJSONError(w, "Invalid product ID format", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	collection := db.GetCollection("gridlyapp", "products")
+
+	// Update the product status to "sold"
+	update := bson.M{
+		"$set": bson.M{
+			"status": "sold",
+		},
+	}
+	result, err := collection.UpdateOne(ctx, bson.M{"_id": objID}, update)
+	if err != nil {
+		log.Printf("Error updating product status: %v", err)
+		WriteJSONError(w, "Error updating product status", http.StatusInternalServerError)
+		return
+	}
+
+	if result.MatchedCount == 0 {
+		WriteJSONError(w, "Product not found", http.StatusNotFound)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{
 		"message": "Product marked as sold successfully",
 	})
+}
+
+// LikeProductHandler handles liking a product
+func LikeProductHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Ensure the request method is POST
+	if r.Method != http.MethodPost {
+		WriteJSONError(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Retrieve authenticated user details from context
+	userId, ok := r.Context().Value(userIDKey).(string)
+	if !ok || userId == "" {
+		WriteJSONError(w, "User not authenticated", http.StatusUnauthorized)
+		return
+	}
+
+	userObjID, err := primitive.ObjectIDFromHex(userId)
+	if err != nil {
+		WriteJSONError(w, "Invalid user ID format", http.StatusBadRequest)
+		return
+	}
+
+	// Get product ID from URL
+	vars := mux.Vars(r)
+	productID := vars["id"]
+	if productID == "" {
+		WriteJSONError(w, "Product ID is required", http.StatusBadRequest)
+		return
+	}
+
+	productObjID, err := primitive.ObjectIDFromHex(productID)
+	if err != nil {
+		WriteJSONError(w, "Invalid product ID format", http.StatusBadRequest)
+		return
+	}
+
+	// Set up context
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Start a session for transaction (optional but recommended for atomicity)
+	session, err := db.MongoDBClient.StartSession()
+	if err != nil {
+		log.Printf("Error starting MongoDB session: %v", err)
+		WriteJSONError(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	defer session.EndSession(ctx)
+
+	callback := func(sc mongo.SessionContext) (interface{}, error) {
+		// Check if the user has already liked the product
+		userCollection := db.GetCollection("gridlyapp", "users")
+		var user models.User
+		err := userCollection.FindOne(sc, bson.M{"_id": userObjID}).Decode(&user)
+		if err != nil {
+			if err == mongo.ErrNoDocuments {
+				return nil, fmt.Errorf("user not found")
+			}
+			return nil, fmt.Errorf("error fetching user: %v", err)
+		}
+
+		// If the product is already liked, return an error
+		for _, pid := range user.LikedProducts {
+			if pid == productObjID {
+				return nil, fmt.Errorf("product already liked")
+			}
+		}
+
+		// Add product to user's likedProducts
+		updateUser := bson.M{
+			"$addToSet": bson.M{
+				"likedProducts": productObjID,
+			},
+		}
+		_, err = userCollection.UpdateOne(sc, bson.M{"_id": userObjID}, updateUser)
+		if err != nil {
+			return nil, fmt.Errorf("error adding product to likedProducts: %v", err)
+		}
+
+		// Increment product's LikeCount
+		productCollection := db.GetCollection("gridlyapp", "products")
+		updateProduct := bson.M{
+			"$inc": bson.M{
+				"likeCount": 1,
+			},
+		}
+		result, err := productCollection.UpdateOne(sc, bson.M{"_id": productObjID}, updateProduct)
+		if err != nil {
+			return nil, fmt.Errorf("error incrementing likeCount: %v", err)
+		}
+		if result.MatchedCount == 0 {
+			return nil, fmt.Errorf("product not found")
+		}
+
+		return nil, nil
+	}
+
+	// Execute transaction
+	_, err = session.WithTransaction(ctx, callback)
+	if err != nil {
+		log.Printf("Transaction error: %v", err)
+		if strings.Contains(err.Error(), "already liked") {
+			WriteJSONError(w, "Product already liked", http.StatusBadRequest)
+		} else if strings.Contains(err.Error(), "user not found") {
+			WriteJSONError(w, "User not found", http.StatusNotFound)
+		} else if strings.Contains(err.Error(), "product not found") {
+			WriteJSONError(w, "Product not found", http.StatusNotFound)
+		} else {
+			WriteJSONError(w, "Failed to like product", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]string{"message": "Product liked successfully"})
+}
+
+// UnlikeProductHandler handles unliking a product
+func UnlikeProductHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Ensure the request method is POST
+	if r.Method != http.MethodPost {
+		WriteJSONError(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Retrieve authenticated user details from context
+	userId, ok := r.Context().Value(userIDKey).(string)
+	if !ok || userId == "" {
+		WriteJSONError(w, "User not authenticated", http.StatusUnauthorized)
+		return
+	}
+
+	userObjID, err := primitive.ObjectIDFromHex(userId)
+	if err != nil {
+		WriteJSONError(w, "Invalid user ID format", http.StatusBadRequest)
+		return
+	}
+
+	// Get product ID from URL
+	vars := mux.Vars(r)
+	productID := vars["id"]
+	if productID == "" {
+		WriteJSONError(w, "Product ID is required", http.StatusBadRequest)
+		return
+	}
+
+	productObjID, err := primitive.ObjectIDFromHex(productID)
+	if err != nil {
+		WriteJSONError(w, "Invalid product ID format", http.StatusBadRequest)
+		return
+	}
+
+	// Set up context
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Start a session for transaction (optional but recommended for atomicity)
+	session, err := db.MongoDBClient.StartSession()
+	if err != nil {
+		log.Printf("Error starting MongoDB session: %v", err)
+		WriteJSONError(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	defer session.EndSession(ctx)
+
+	callback := func(sc mongo.SessionContext) (interface{}, error) {
+		// Check if the user has liked the product
+		userCollection := db.GetCollection("gridlyapp", "users")
+		var user models.User
+		err := userCollection.FindOne(sc, bson.M{"_id": userObjID}).Decode(&user)
+		if err != nil {
+			if err == mongo.ErrNoDocuments {
+				return nil, fmt.Errorf("user not found")
+			}
+			return nil, fmt.Errorf("error fetching user: %v", err)
+		}
+
+		// Check if the product is actually liked
+		found := false
+		for _, pid := range user.LikedProducts {
+			if pid == productObjID {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, fmt.Errorf("product not liked yet")
+		}
+
+		// Remove product from user's likedProducts
+		updateUser := bson.M{
+			"$pull": bson.M{
+				"likedProducts": productObjID,
+			},
+		}
+		_, err = userCollection.UpdateOne(sc, bson.M{"_id": userObjID}, updateUser)
+		if err != nil {
+			return nil, fmt.Errorf("error removing product from likedProducts: %v", err)
+		}
+
+		// Decrement product's LikeCount, ensuring it doesn't go below zero
+		productCollection := db.GetCollection("gridlyapp", "products")
+		updateProduct := bson.M{
+			"$inc": bson.M{
+				"likeCount": -1,
+			},
+		}
+		// Optionally, ensure LikeCount doesn't go negative
+		filter := bson.M{
+			"_id":       productObjID,
+			"likeCount": bson.M{"$gt": 0},
+		}
+		result, err := productCollection.UpdateOne(sc, filter, updateProduct)
+		if err != nil {
+			return nil, fmt.Errorf("error decrementing likeCount: %v", err)
+		}
+		if result.MatchedCount == 0 {
+			return nil, fmt.Errorf("product not found or likeCount already zero")
+		}
+
+		return nil, nil
+	}
+
+	// Execute transaction
+	_, err = session.WithTransaction(ctx, callback)
+	if err != nil {
+		log.Printf("Transaction error: %v", err)
+		if strings.Contains(err.Error(), "not liked yet") {
+			WriteJSONError(w, "Product not liked yet", http.StatusBadRequest)
+		} else if strings.Contains(err.Error(), "user not found") {
+			WriteJSONError(w, "User not found", http.StatusNotFound)
+		} else if strings.Contains(err.Error(), "product not found") {
+			WriteJSONError(w, "Product not found", http.StatusNotFound)
+		} else if strings.Contains(err.Error(), "likeCount already zero") {
+			WriteJSONError(w, "Like count cannot be negative", http.StatusBadRequest)
+		} else {
+			WriteJSONError(w, "Failed to unlike product", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]string{"message": "Product unliked successfully"})
+}
+
+// GetLikedProductsHandler retrieves all liked products for the authenticated user
+func GetLikedProductsHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Ensure the request method is GET
+	if r.Method != http.MethodGet {
+		WriteJSONError(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Retrieve authenticated user details from context
+	userId, ok := r.Context().Value(userIDKey).(string)
+	if !ok || userId == "" {
+		WriteJSONError(w, "User not authenticated", http.StatusUnauthorized)
+		return
+	}
+
+	userObjID, err := primitive.ObjectIDFromHex(userId)
+	if err != nil {
+		WriteJSONError(w, "Invalid user ID format", http.StatusBadRequest)
+		return
+	}
+
+	// Set up context
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Fetch user's likedProducts
+	userCollection := db.GetCollection("gridlyapp", "users")
+	var user models.User
+	err = userCollection.FindOne(ctx, bson.M{"_id": userObjID}).Decode(&user)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			WriteJSONError(w, "User not found", http.StatusNotFound)
+		} else {
+			log.Printf("Error fetching user: %v", err)
+			WriteJSONError(w, "Failed to fetch liked products", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	// If the user has no liked products, return an empty list
+	if len(user.LikedProducts) == 0 {
+		json.NewEncoder(w).Encode([]models.Product{})
+		return
+	}
+
+	// Fetch liked products' details
+	productCollection := db.GetCollection("gridlyapp", "products")
+	cursor, err := productCollection.Find(ctx, bson.M{"_id": bson.M{"$in": user.LikedProducts}})
+	if err != nil {
+		log.Printf("Error fetching liked products: %v", err)
+		WriteJSONError(w, "Failed to fetch liked products", http.StatusInternalServerError)
+		return
+	}
+	defer cursor.Close(ctx)
+
+	var likedProducts []models.Product
+	if err := cursor.All(ctx, &likedProducts); err != nil {
+		log.Printf("Error decoding liked products: %v", err)
+		WriteJSONError(w, "Failed to decode liked products", http.StatusInternalServerError)
+		return
+	}
+
+	// Respond with the list of liked products
+	json.NewEncoder(w).Encode(likedProducts)
 }

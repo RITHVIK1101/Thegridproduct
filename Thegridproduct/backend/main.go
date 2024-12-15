@@ -85,6 +85,11 @@ func main() {
 	protected.HandleFunc("/products/{id}", handlers.DeleteProductHandler).Methods("DELETE")
 	protected.HandleFunc("/products/{id}", handlers.UpdateProductHandler).Methods("PUT")
 
+	// Liked Product Routes
+	protected.HandleFunc("/products/{id}/like", handlers.LikeProductHandler).Methods("POST")
+	protected.HandleFunc("/products/{id}/unlike", handlers.UnlikeProductHandler).Methods("POST")
+	protected.HandleFunc("/products/liked", handlers.GetLikedProductsHandler).Methods("GET")
+
 	// Gig Routes
 	protected.HandleFunc("/gigs", handlers.AddGigHandler).Methods("POST")
 	protected.HandleFunc("/gigs/all", handlers.GetGigsHandler).Methods("GET")

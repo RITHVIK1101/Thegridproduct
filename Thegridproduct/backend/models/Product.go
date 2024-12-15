@@ -16,8 +16,8 @@ type Product struct {
 	RentPrice              float64            `json:"rentPrice,omitempty" bson:"rentPrice,omitempty"`
 	RentDuration           string             `json:"rentDuration,omitempty" bson:"rentDuration,omitempty"`
 	Description            string             `json:"description" bson:"description"`
-	SelectedTags           []string           `json:"selectedTags" bson:"selectedTags"`
-	Images                 []string           `json:"images" bson:"images"`
+	SelectedTags           []string           `json:"selectedTags"`
+	Images                 []string           `json:"images"`
 	PostedDate             time.Time          `json:"postedDate,omitempty" bson:"postedDate,omitempty"`
 	Expired                bool               `json:"expired,omitempty" bson:"expired,omitempty"`
 	IsAvailableOutOfCampus bool               `json:"isAvailableOutOfCampus" bson:"isAvailableOutOfCampus"`
@@ -28,4 +28,5 @@ type Product struct {
 	StudentType            string             `json:"studentType" bson:"studentType"`
 	Condition              string             `json:"condition,omitempty" bson:"condition,omitempty"`
 	Status                 string             `json:"status" bson:"status"`
+	LikeCount              int                `json:"likeCount" bson:"likeCount"` // Add this field
 }
