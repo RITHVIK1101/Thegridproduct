@@ -153,7 +153,6 @@ func SavePaymentMethodHandler(w http.ResponseWriter, r *http.Request) {
 		customerID = customer.ID
 		// Save the customer ID to the database
 		user.StripeCustomerID = customerID
-		db.UpdateUser(user)
 	} else {
 		customerID = user.StripeCustomerID
 	}

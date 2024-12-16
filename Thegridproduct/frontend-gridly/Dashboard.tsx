@@ -171,11 +171,11 @@ const Dashboard: React.FC<DashboardProps> = () => {
   };
 
   const toggleFavorite = (productId: string) => {
-    setFavorites((prev) =>
-      prev.includes(productId)
-        ? prev.filter((id) => id !== productId)
-        : [...prev, productId]
-    );
+    if (favorites.includes(productId)) {
+      unlikeProduct(productId);
+    } else {
+      likeProduct(productId);
+    }
   };
 
   // Fetch User Information
@@ -220,6 +220,68 @@ const Dashboard: React.FC<DashboardProps> = () => {
       console.error("Fetch User Info Error:", err);
       // Optionally show an error toast
       showError("Failed to fetch user information.");
+    }
+  };
+  const fetchLikedProducts = async () => {
+    try {
+      const response = await fetch(`${NGROK_URL}/products/liked`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const likedProductIds = await response.json();
+        setFavorites(likedProductIds.map((product: Product) => product.id));
+      } else {
+        throw new Error("Failed to fetch liked products");
+      }
+    } catch (error) {
+      console.error("Error fetching liked products:", error);
+    }
+  };
+  const likeProduct = async (productId: string) => {
+    try {
+      const response = await fetch(`${NGROK_URL}/products/${productId}/like`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      if (!response.ok) {
+        throw new Error("Failed to like product");
+      }
+      setFavorites((prev) => [...prev, productId]);
+      showSuccess("Liked the product!");
+    } catch (error) {
+      console.error("Error liking product:", error);
+      showError("Failed to like product.");
+    }
+  };
+
+  const unlikeProduct = async (productId: string) => {
+    try {
+      const response = await fetch(
+        `${NGROK_URL}/products/${productId}/unlike`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      if (!response.ok) {
+        throw new Error("Failed to unlike product");
+      }
+      setFavorites((prev) => prev.filter((id) => id !== productId));
+      showSuccess("Unliked the product!");
+    } catch (error) {
+      console.error("Error unliking product:", error);
+      showError("Failed to unlike product.");
     }
   };
 
@@ -470,6 +532,12 @@ const Dashboard: React.FC<DashboardProps> = () => {
       setLoading(false);
     }
   };
+  useEffect(() => {
+    if (token) {
+      fetchLikedProducts();
+    }
+  }, [token]);
+
   useEffect(() => {
     console.log("Filtered Products Length:", filteredProducts.length);
     console.log("Current Index:", currentIndex);

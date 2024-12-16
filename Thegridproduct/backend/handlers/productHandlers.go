@@ -862,17 +862,14 @@ func ConfirmTransferHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// LikeProductHandler handles liking a product
 func LikeProductHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	// Ensure the request method is POST
 	if r.Method != http.MethodPost {
 		WriteJSONError(w, "Invalid request method", http.StatusMethodNotAllowed)
 		return
 	}
 
-	// Retrieve authenticated user details from context
 	userId, ok := r.Context().Value(userIDKey).(string)
 	if !ok || userId == "" {
 		WriteJSONError(w, "User not authenticated", http.StatusUnauthorized)
@@ -885,7 +882,6 @@ func LikeProductHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get product ID from URL
 	vars := mux.Vars(r)
 	productID := vars["id"]
 	if productID == "" {
@@ -899,11 +895,9 @@ func LikeProductHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Set up context
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Start a session for transaction (optional but recommended for atomicity)
 	session, err := db.MongoDBClient.StartSession()
 	if err != nil {
 		log.Printf("Error starting MongoDB session: %v", err)
@@ -913,36 +907,44 @@ func LikeProductHandler(w http.ResponseWriter, r *http.Request) {
 	defer session.EndSession(ctx)
 
 	callback := func(sc mongo.SessionContext) (interface{}, error) {
-		// Check if the user has already liked the product
-		userCollection := db.GetCollection("gridlyapp", "users")
+		collections := []string{"university_users", "highschool_users"}
 		var user models.User
-		err := userCollection.FindOne(sc, bson.M{"_id": userObjID}).Decode(&user)
-		if err != nil {
-			if err == mongo.ErrNoDocuments {
-				return nil, fmt.Errorf("user not found")
+		var userCollection *mongo.Collection
+		var foundUser bool
+
+		for _, collectionName := range collections {
+			tempCollection := db.GetCollection("gridlyapp", collectionName)
+			err := tempCollection.FindOne(sc, bson.M{"_id": userObjID}).Decode(&user)
+			if err == nil {
+				foundUser = true
+				userCollection = tempCollection
+				break
 			}
-			return nil, fmt.Errorf("error fetching user: %v", err)
+			if err != mongo.ErrNoDocuments {
+				return nil, fmt.Errorf("error fetching user from %s: %v", collectionName, err)
+			}
 		}
 
-		// If the product is already liked, return an error
+		if !foundUser {
+			return nil, fmt.Errorf("user not found in any collection")
+		}
+
 		for _, pid := range user.LikedProducts {
 			if pid == productObjID {
 				return nil, fmt.Errorf("product already liked")
 			}
 		}
 
-		// Add product to user's likedProducts
 		updateUser := bson.M{
 			"$addToSet": bson.M{
 				"likedProducts": productObjID,
 			},
 		}
-		_, err = userCollection.UpdateOne(sc, bson.M{"_id": userObjID}, updateUser)
+		_, err := userCollection.UpdateOne(sc, bson.M{"_id": userObjID}, updateUser)
 		if err != nil {
 			return nil, fmt.Errorf("error adding product to likedProducts: %v", err)
 		}
 
-		// Increment product's LikeCount
 		productCollection := db.GetCollection("gridlyapp", "products")
 		updateProduct := bson.M{
 			"$inc": bson.M{
@@ -960,17 +962,17 @@ func LikeProductHandler(w http.ResponseWriter, r *http.Request) {
 		return nil, nil
 	}
 
-	// Execute transaction
 	_, err = session.WithTransaction(ctx, callback)
 	if err != nil {
 		log.Printf("Transaction error: %v", err)
-		if strings.Contains(err.Error(), "already liked") {
+		switch {
+		case strings.Contains(err.Error(), "already liked"):
 			WriteJSONError(w, "Product already liked", http.StatusBadRequest)
-		} else if strings.Contains(err.Error(), "user not found") {
+		case strings.Contains(err.Error(), "user not found"):
 			WriteJSONError(w, "User not found", http.StatusNotFound)
-		} else if strings.Contains(err.Error(), "product not found") {
+		case strings.Contains(err.Error(), "product not found"):
 			WriteJSONError(w, "Product not found", http.StatusNotFound)
-		} else {
+		default:
 			WriteJSONError(w, "Failed to like product", http.StatusInternalServerError)
 		}
 		return
