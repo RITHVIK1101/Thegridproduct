@@ -6,7 +6,6 @@ import {
   View,
   Text,
   StyleSheet,
-  Alert,
   ActivityIndicator,
   ScrollView,
   Dimensions,
@@ -32,7 +31,6 @@ import EditProduct from "./EditProductScreen";
 import MessagingScreen from "./MessagingScreen";
 import CartScreen from "./CartScreen";
 import AccountScreen from "./AccountScreen";
-
 import AllOrdersScreen from "./AllOrdersScreen";
 
 // Terms of Service Screen
@@ -112,7 +110,6 @@ const UserMenuScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const handleLogout = async () => {
     try {
       await clearUser();
-      Alert.alert("Logout Successful", "You have been logged out.");
       navigation.dispatch(
         CommonActions.reset({
           index: 0,
@@ -121,7 +118,7 @@ const UserMenuScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       );
     } catch (error) {
       console.error("Logout Error:", error);
-      Alert.alert("Logout Error", "Failed to log out. Please try again.");
+      // Removed Alert.alert to prevent popup on logout failure
     }
   };
 

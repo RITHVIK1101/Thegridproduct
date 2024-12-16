@@ -13,7 +13,6 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  Alert,
   Animated,
   Dimensions,
   Platform,
@@ -26,13 +25,12 @@ import {
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "./navigationTypes";
-import { UserContext, StudentType } from "./UserContext"; 
+import { UserContext, StudentType } from "./UserContext";
 import { NGROK_URL } from "@env";
 import * as SecureStore from "expo-secure-store";
 import DropDownPicker from "react-native-dropdown-picker";
 import { collegeList, College } from "./data/collegeList";
 import { highSchoolList, HighSchool } from "./data/highschoolList";
-import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, "Login">;
@@ -61,6 +59,7 @@ const LoginScreen: React.FC = () => {
   );
 
   const [studentType, setStudentType] = useState<"highschool" | "university" | null>(null);
+  const [error, setError] = useState<string>("");
 
   // Animations
   const formOpacity = useRef(new Animated.Value(0)).current;
@@ -77,6 +76,7 @@ const LoginScreen: React.FC = () => {
     setSelectedInstitution("");
     setStudentType(null);
     setOpen(false);
+    setError("");
 
     // Animate form entrance
     Animated.timing(formOpacity, {
@@ -101,7 +101,7 @@ const LoginScreen: React.FC = () => {
     Animated.loop(
       Animated.timing(spinAnim, {
         toValue: 1,
-        duration: 10000, 
+        duration: 10000,
         useNativeDriver: true,
         easing: Easing.linear,
       })
@@ -125,8 +125,6 @@ const LoginScreen: React.FC = () => {
   const handleApiRequest = async (url: string, payload: object) => {
     try {
       const fullUrl = `${NGROK_URL}${url}`;
-      console.log(`Making request to: ${fullUrl}`);
-      console.log(`Payload:`, payload);
 
       const response = await fetch(fullUrl, {
         method: "POST",
@@ -137,125 +135,134 @@ const LoginScreen: React.FC = () => {
       });
 
       const contentType = response.headers.get("content-type");
-      console.log("Response status:", response.status);
-      console.log("Content-Type:", contentType);
 
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Error response text:", errorText);
-        throw new Error(`Request failed with status ${response.status}: ${errorText}`);
+        // If it's a login request and fails, show a generic incorrect credentials message
+        if (url === "/login") {
+          setError("Incorrect email or password.");
+          return null;
+        } else {
+          // For signup or other requests, show the error from the server if available
+          const errorText = await response.text();
+          setError(errorText || "An error occurred. Please try again.");
+          return null;
+        }
       } else if (!contentType || !contentType.includes("application/json")) {
-        const errorText = await response.text();
-        console.error("Unexpected response format. Response text:", errorText);
-        throw new Error("Unexpected response format. Expected JSON.");
+        setError("An unexpected error occurred. Please try again.");
+        return null;
       }
 
       const data = await response.json();
-      console.log("Response data:", data);
       return data;
     } catch (error) {
-      console.error("API request error:", error);
+      setError("An error occurred. Please try again.");
       throw error;
     }
   };
 
   const handleLogin = async () => {
+    setError("");
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      Alert.alert("Invalid Email", "Please enter a valid email address.");
-      return;
-    }
-    if (password.length < 6) {
-      Alert.alert("Weak Password", "Password must be at least 6 characters long.");
+      setError("Please enter a valid email address.");
       return;
     }
 
-    try {
-      const payload = { email, password };
-      const data = await handleApiRequest("/login", payload);
+    const payload = { email, password };
+    const data = await handleApiRequest("/login", payload);
 
-      console.log("Login Data:", data);
+    if (data) {
       const { token, userId, institution, studentType: responseStudentType } = data;
 
-      await SecureStore.setItemAsync("userToken", token);
-      await SecureStore.setItemAsync("userId", userId.toString());
-
-      if (!institution) throw new Error("Institution information is missing.");
-      if (!responseStudentType) throw new Error("Student type information is missing.");
+      if (!institution) {
+        setError("Institution information is missing.");
+        return;
+      }
+      if (!responseStudentType) {
+        setError("Student type information is missing.");
+        return;
+      }
 
       if (responseStudentType !== "highschool" && responseStudentType !== "university") {
-        throw new Error("Invalid student type from server.");
+        setError("Invalid student type from server.");
+        return;
       }
 
       const mappedStudentType =
         responseStudentType === "highschool" ? StudentType.HighSchool : StudentType.University;
 
+      await SecureStore.setItemAsync("userToken", token);
+      await SecureStore.setItemAsync("userId", userId.toString());
+
       await saveUserData(token, userId, institution, mappedStudentType);
-    } catch (error) {
-      Alert.alert("Login Error", error instanceof Error ? error.message : "An unknown error occurred.");
     }
   };
 
   const handleSignup = async () => {
+    setError("");
     if (!firstName.trim() || !lastName.trim()) {
-      Alert.alert("Missing Fields", "Please enter your first and last name.");
+      setError("Please enter your first and last name.");
       return;
     }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      Alert.alert("Invalid Email", "Please enter a valid email address.");
+      setError("Please enter a valid email address.");
       return;
     }
-    if (password.length < 6) {
-      Alert.alert("Weak Password", "Password must be at least 6 characters long.");
+    // Password must be greater than 6 characters
+    if (password.length <= 6) {
+      setError("Password must be longer than 6 characters.");
       return;
     }
     if (password !== confirmPassword) {
-      Alert.alert("Passwords do not match", "Please ensure your passwords match.");
+      setError("Passwords do not match.");
       return;
     }
     if (!studentType) {
-      Alert.alert("Select Student Type", "Please select your student type first.");
+      setError("Please select your student type.");
       return;
     }
     if (!selectedInstitution) {
-      Alert.alert(
-        "Missing Field",
+      setError(
         `Please select your ${studentType === "university" ? "university" : "high school"}.`
       );
       return;
     }
 
-    try {
-      const payload = {
-        email,
-        password,
-        firstName,
-        lastName,
-        studentType,
-        institution: selectedInstitution,
-      };
-      const data = await handleApiRequest("/signup", payload);
+    const payload = {
+      email,
+      password,
+      firstName,
+      lastName,
+      studentType,
+      institution: selectedInstitution,
+    };
+    const data = await handleApiRequest("/signup", payload);
 
-      console.log("Signup Data:", data);
+    if (data) {
       const { token, userId, institution, studentType: responseStudentType } = data;
 
-      await SecureStore.setItemAsync("userToken", token);
-      await SecureStore.setItemAsync("userId", userId.toString());
-
-      if (!institution) throw new Error("Institution missing from response.");
-      if (!responseStudentType) throw new Error("Student type missing from response.");
+      if (!institution) {
+        setError("Institution information is missing.");
+        return;
+      }
+      if (!responseStudentType) {
+        setError("Student type information is missing.");
+        return;
+      }
 
       if (responseStudentType !== "highschool" && responseStudentType !== "university") {
-        throw new Error("Invalid student type from server.");
+        setError("Invalid student type from server.");
+        return;
       }
 
       const mappedStudentType =
         responseStudentType === "highschool" ? StudentType.HighSchool : StudentType.University;
 
+      await SecureStore.setItemAsync("userToken", token);
+      await SecureStore.setItemAsync("userId", userId.toString());
+
       await saveUserData(token, userId, institution, mappedStudentType);
-    } catch (error) {
-      Alert.alert("Signup Error", error instanceof Error ? error.message : "An unknown error occurred.");
     }
   };
 
@@ -269,12 +276,17 @@ const LoginScreen: React.FC = () => {
     navigation.navigate("Dashboard");
   };
 
+  const renderError = () => {
+    if (!error) return null;
+    return <Text style={styles.errorText}>{error}</Text>;
+  };
+
   const renderLoginForm = () => (
     <Animated.View style={{ opacity: formOpacity }}>
       <TextInput
         style={styles.input}
         placeholder="Email"
-        placeholderTextColor="#cccccc"
+        placeholderTextColor="#888"
         value={email}
         onChangeText={setEmail}
         keyboardType="email-address"
@@ -284,21 +296,17 @@ const LoginScreen: React.FC = () => {
       <TextInput
         style={styles.input}
         placeholder="Password"
-        placeholderTextColor="#cccccc"
+        placeholderTextColor="#888"
         value={password}
         onChangeText={setPassword}
         secureTextEntry
         autoCapitalize="none"
         autoComplete="password"
       />
-      <TouchableOpacity style={styles.button} onPress={handleLogin}>
-        <LinearGradient
-          colors={["#8a2be2", "#4c2e93"]}
-          style={styles.gradientButton}
-        >
-          <Text style={styles.buttonText}>Login</Text>
-          <Ionicons name="log-in-outline" size={20} color="#fff" style={{ marginLeft: 8 }} />
-        </LinearGradient>
+      {renderError()}
+      <TouchableOpacity style={[styles.button, styles.simpleButton]} onPress={handleLogin}>
+        <Text style={styles.buttonText}>Login</Text>
+        <Ionicons name="log-in-outline" size={20} color="#fff" style={{ marginLeft: 8 }} />
       </TouchableOpacity>
     </Animated.View>
   );
@@ -350,7 +358,7 @@ const LoginScreen: React.FC = () => {
           <TextInput
             style={styles.input}
             placeholder="First Name"
-            placeholderTextColor="#cccccc"
+            placeholderTextColor="#888"
             value={firstName}
             onChangeText={setFirstName}
             autoCapitalize="words"
@@ -358,7 +366,7 @@ const LoginScreen: React.FC = () => {
           <TextInput
             style={styles.input}
             placeholder="Last Name"
-            placeholderTextColor="#cccccc"
+            placeholderTextColor="#888"
             value={lastName}
             onChangeText={setLastName}
             autoCapitalize="words"
@@ -366,7 +374,7 @@ const LoginScreen: React.FC = () => {
           <TextInput
             style={styles.input}
             placeholder="Email"
-            placeholderTextColor="#cccccc"
+            placeholderTextColor="#888"
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
@@ -375,7 +383,7 @@ const LoginScreen: React.FC = () => {
           <TextInput
             style={styles.input}
             placeholder="Password"
-            placeholderTextColor="#cccccc"
+            placeholderTextColor="#888"
             value={password}
             onChangeText={setPassword}
             secureTextEntry
@@ -384,12 +392,14 @@ const LoginScreen: React.FC = () => {
           <TextInput
             style={styles.input}
             placeholder="Confirm Password"
-            placeholderTextColor="#cccccc"
+            placeholderTextColor="#888"
             value={confirmPassword}
             onChangeText={setConfirmPassword}
             secureTextEntry
             autoCapitalize="none"
           />
+
+          {renderError()}
 
           <View style={styles.dropdownContainer}>
             <DropDownPicker
@@ -417,10 +427,8 @@ const LoginScreen: React.FC = () => {
               selectedItemLabelStyle={styles.dropdownSelectedLabel}
               searchTextInputStyle={styles.searchInput}
               listMode="MODAL"
-              modalProps={{
-                animationType: "slide",
-              }}
-              activityIndicatorColor="#8a2be2"
+              modalProps={{ animationType: "slide" }}
+              activityIndicatorColor="#A78BFA"
               theme="DARK"
               modalContentContainerStyle={styles.modalContentContainer}
               modalTitle={
@@ -432,19 +440,14 @@ const LoginScreen: React.FC = () => {
             />
           </View>
 
-          <TouchableOpacity style={styles.button} onPress={handleSignup}>
-            <LinearGradient
-              colors={["#8a2be2", "#4c2e93"]}
-              style={styles.gradientButton}
-            >
-              <Text style={styles.buttonText}>Signup</Text>
-              <Ionicons
-                name="person-add-outline"
-                size={20}
-                color="#fff"
-                style={{ marginLeft: 8 }}
-              />
-            </LinearGradient>
+          <TouchableOpacity style={[styles.button, styles.simpleButton]} onPress={handleSignup}>
+            <Text style={styles.buttonText}>Signup</Text>
+            <Ionicons
+              name="person-add-outline"
+              size={20}
+              color="#fff"
+              style={{ marginLeft: 8 }}
+            />
           </TouchableOpacity>
         </>
       )}
@@ -452,7 +455,7 @@ const LoginScreen: React.FC = () => {
   );
 
   return (
-    <LinearGradient colors={["#141E30", "#243B55"]} style={styles.container}>
+    <View style={styles.container}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -467,7 +470,7 @@ const LoginScreen: React.FC = () => {
               {/* Animated Header */}
               <Animated.View style={[styles.headerContainer, { transform: [{ scale: headerScale }] }]}>
                 <Animated.View style={{ transform: [{ rotate: spin }] }}>
-                  <Ionicons name="grid-outline" size={42} color="#8a2be2" />
+                  <Ionicons name="grid-outline" size={42} color="#A78BFA" />
                 </Animated.View>
                 <Text style={styles.title}>Gridly</Text>
               </Animated.View>
@@ -509,7 +512,7 @@ const LoginScreen: React.FC = () => {
                         {
                           translateX: toggleAnim.interpolate({
                             inputRange: [0, 1],
-                            outputRange: [0, width / 2 ],
+                            outputRange: [0, width / 2],
                           }),
                         },
                       ],
@@ -525,7 +528,7 @@ const LoginScreen: React.FC = () => {
           </ScrollView>
         </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
-    </LinearGradient>
+    </View>
   );
 };
 
@@ -534,6 +537,7 @@ export default LoginScreen;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: "#0D0D0D",
   },
   scrollViewContent: {
     flexGrow: 1,
@@ -563,7 +567,7 @@ const styles = StyleSheet.create({
   },
   slogan: {
     fontSize: 16,
-    color: "#ccc",
+    color: "#bbb",
     textAlign: "center",
     marginBottom: 25,
     fontFamily: Platform.OS === "ios" ? "HelveticaNeue" : "Roboto",
@@ -572,7 +576,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     marginBottom: 15,
     borderRadius: 25,
-    backgroundColor: "#2c2c2c",
+    backgroundColor: "#222",
     position: "relative",
     width: "100%",
     overflow: "hidden",
@@ -597,7 +601,7 @@ const styles = StyleSheet.create({
     color: "#fff",
   },
   inactiveToggleText: {
-    color: "#aaa",
+    color: "#777",
   },
   slider: {
     position: "absolute",
@@ -605,28 +609,28 @@ const styles = StyleSheet.create({
     left: 0,
     width: width / 2 - 40,
     height: 3,
-    backgroundColor: "#8a2be2",
+    backgroundColor: "#A78BFA",
     borderRadius: 2,
   },
   formCard: {
     width: "100%",
-    backgroundColor: "rgba(255,255,255,0.05)",
+    backgroundColor: "#131313",
     borderRadius: 15,
     padding: 20,
     marginTop: 10,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
+    borderColor: "rgba(255,255,255,0.05)",
   },
   input: {
     height: 50,
-    borderColor: "#444",
+    borderColor: "#333",
     borderWidth: 1,
     borderRadius: 12,
     paddingHorizontal: 15,
     marginBottom: 12,
     color: "#fff",
     fontSize: 15,
-    backgroundColor: "rgba(0,0,0,0.3)",
+    backgroundColor: "#1D1D1D",
     fontFamily: Platform.OS === "ios" ? "HelveticaNeue" : "Roboto",
   },
   dropdownContainer: {
@@ -634,15 +638,15 @@ const styles = StyleSheet.create({
     zIndex: 1000,
   },
   dropdown: {
-    backgroundColor: "rgba(0,0,0,0.3)",
-    borderColor: "#444",
+    backgroundColor: "#1D1D1D",
+    borderColor: "#333",
     height: 50,
     borderRadius: 12,
     paddingHorizontal: 10,
   },
   dropdownList: {
-    backgroundColor: "#2c2c2c",
-    borderColor: "#444",
+    backgroundColor: "#1A1A1A",
+    borderColor: "#333",
     borderRadius: 12,
     paddingHorizontal: 10,
   },
@@ -653,28 +657,29 @@ const styles = StyleSheet.create({
   },
   dropdownPlaceholder: {
     fontSize: 16,
-    color: "#cccccc",
+    color: "#666",
   },
   dropdownSelectedLabel: {
-    color: "#8a2be2",
+    color: "#A78BFA",
     fontWeight: "600",
   },
   searchInput: {
     height: 40,
-    borderColor: "#555",
+    borderColor: "#444",
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 10,
     fontSize: 16,
     color: "#fff",
-    backgroundColor: "#3a3a3a",
+    backgroundColor: "#111",
   },
   button: {
     borderRadius: 30,
     overflow: "hidden",
     marginTop: 10,
   },
-  gradientButton: {
+  simpleButton: {
+    backgroundColor: "#A78BFA",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -688,12 +693,12 @@ const styles = StyleSheet.create({
     fontFamily: Platform.OS === "ios" ? "HelveticaNeue-Bold" : "Roboto",
   },
   modalContentContainer: {
-    backgroundColor: "#2c2c2c",
+    backgroundColor: "#1A1A1A",
   },
   modalTitleStyle: {
     fontSize: 18,
     fontWeight: "bold",
-    color: "#8a2be2",
+    color: "#A78BFA",
     textAlign: "center",
     marginVertical: 10,
     fontFamily: Platform.OS === "ios" ? "HelveticaNeue-Bold" : "Roboto",
@@ -714,9 +719,9 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   studentTypeButton: {
-    backgroundColor: "rgba(255,255,255,0.05)",
+    backgroundColor: "#1A1A1A",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.1)",
+    borderColor: "#333",
     borderRadius: 12,
     paddingVertical: 15,
     paddingHorizontal: 20,
@@ -724,8 +729,8 @@ const styles = StyleSheet.create({
     width: "45%",
   },
   selectedType: {
-    borderColor: "#8a2be2",
-    backgroundColor: "rgba(138,43,226,0.1)",
+    borderColor: "#A78BFA",
+    backgroundColor: "rgba(167,139,250,0.1)",
   },
   studentTypeButtonText: {
     color: "#fff",
@@ -733,5 +738,11 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     fontFamily: Platform.OS === "ios" ? "HelveticaNeue" : "Roboto",
   },
+  errorText: {
+    color: "#FF6B6B",
+    textAlign: "center",
+    marginBottom: 10,
+    fontSize: 14,
+    fontFamily: Platform.OS === "ios" ? "HelveticaNeue" : "Roboto",
+  },
 });
- 
