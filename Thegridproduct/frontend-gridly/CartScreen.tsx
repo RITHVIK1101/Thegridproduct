@@ -10,6 +10,7 @@ import {
   Alert,
   Dimensions,
   Animated,
+  Modal,
 } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { UserContext } from "./UserContext";
@@ -67,6 +68,10 @@ const CartScreen: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const fadeAnim = useState(new Animated.Value(0))[0];
+  
+  // State for delete confirmation
+  const [itemToDelete, setItemToDelete] = useState<CartProduct | null>(null);
+  const [isDeleteModalVisible, setIsDeleteModalVisible] = useState<boolean>(false);
 
   const { userId, token, clearUser } = useContext(UserContext);
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
@@ -189,7 +194,16 @@ const CartScreen: React.FC = () => {
     }
   };
 
-  const removeFromCart = async (productId: string) => {
+  // Function to initiate delete confirmation
+  const confirmRemoveFromCart = (product: CartProduct) => {
+    setItemToDelete(product);
+    setIsDeleteModalVisible(true);
+  };
+
+  // Function to handle actual deletion after confirmation
+  const handleDelete = async () => {
+    if (!itemToDelete) return;
+
     try {
       const response = await fetch(`${NGROK_URL}/cart/remove`, {
         method: "POST",
@@ -197,7 +211,7 @@ const CartScreen: React.FC = () => {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ productId }),
+        body: JSON.stringify({ productId: itemToDelete.id }),
       });
 
       if (response.status === 401) {
@@ -224,51 +238,37 @@ const CartScreen: React.FC = () => {
       }
 
       setCartProducts((prevItems) =>
-        prevItems.filter((item) => item.id !== productId)
+        prevItems.filter((item) => item.id !== itemToDelete.id)
       );
-      Alert.alert("Removed", "The product has been removed from your cart.");
+      // Removed the Alert after deletion for a smoother UX
     } catch (err) {
       console.error("Remove from Cart Error:", err);
       Alert.alert(
         "Error",
         "An unexpected error occurred while removing the item."
       );
+    } finally {
+      setIsDeleteModalVisible(false);
+      setItemToDelete(null);
     }
   };
 
   const buyProduct = (product: CartProduct) => {
-    Alert.alert("Buy Product", `Proceed to buy "${product.title}"?`, [
-      {
-        text: "OK",
-        onPress: () => {
-          if (!userId) {
-            Alert.alert("Error", "User not authenticated.");
-            return;
-          }
-          if (!product.sellerId || product.sellerId === "unknown-seller") {
-            Alert.alert("Error", "Seller information is missing.");
-            return;
-          }
-          console.log("Navigating to Payment with:", {
-            product,
-            buyerId: userId,
-            sellerId: product.sellerId,
-          });
-          console.log("Navigating to Payment with:", {
-            product,
-            buyerId: userId,
-            sellerId: product.sellerId,
-          });
+    if (!userId) {
+      Alert.alert("Error", "User not authenticated.");
+      return;
+    }
+    if (!product.sellerId || product.sellerId === "unknown-seller") {
+      Alert.alert("Error", "Seller information is missing.");
+      return;
+    }
 
-          navigation.navigate("Payment", {
-            product,
-            buyerId: userId,
-            sellerId: product.sellerId,
-          });
-        },
-      },
-      { text: "Cancel", style: "cancel" },
-    ]);
+    // Directly navigate to Payment without confirmation
+    navigation.navigate("Payment", {
+      product,
+      buyerId: userId,
+      sellerId: product.sellerId,
+    });
   };
 
   const proceedToCheckout = () => {
@@ -327,7 +327,7 @@ const CartScreen: React.FC = () => {
           </TouchableOpacity>
         </LinearGradient>
         <TouchableOpacity
-          onPress={() => removeFromCart(item.id)}
+          onPress={() => confirmRemoveFromCart(item)}
           style={styles.removeButton}
           accessibilityLabel={`Remove ${item.title} from Cart`}
         >
@@ -337,69 +337,101 @@ const CartScreen: React.FC = () => {
     </Animated.View>
   );
 
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#BB86FC" />
-        <Text style={styles.loadingText}>Loading your cart...</Text>
-      </View>
-    );
-  }
-
-  if (error) {
-    return (
-      <View style={styles.errorContainer}>
-        <Ionicons name="alert-circle-outline" size={60} color="#FF3B30" />
-        <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity
-          style={styles.retryButton}
-          onPress={() => {
-            setLoading(true);
-            setError(null);
-            fetchCart();
-          }}
-          accessibilityLabel="Retry Fetching Cart"
-        >
-          <Ionicons name="refresh-outline" size={20} color="#fff" />
-          <Text style={styles.retryButtonText}>Retry</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
-  if (cartProducts.length === 0) {
-    return (
-      <View style={styles.emptyContainer}>
-        <Ionicons name="cart-outline" size={100} color="#bbb" />
-        <Text style={styles.emptyText}>Your cart is empty.</Text>
-      </View>
-    );
-  }
-
   return (
     <View style={styles.container}>
-      <FlatList
-        data={cartProducts}
-        keyExtractor={(item) => item.id}
-        renderItem={renderCartItem}
-        ItemSeparatorComponent={renderSeparator}
-        contentContainerStyle={styles.listContainer}
-        showsVerticalScrollIndicator={false}
-      />
-      <View style={styles.footer}>
-        <View style={styles.totalContainer}>
-          <Text style={styles.totalText}>Total</Text>
-          <Text style={styles.totalAmount}>${calculateTotal().toFixed(2)}</Text>
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#BB86FC" />
+          <Text style={styles.loadingText}>Loading your cart...</Text>
         </View>
-        <TouchableOpacity
-          style={styles.checkoutButton}
-          onPress={proceedToCheckout}
-          accessibilityLabel="Proceed to Checkout"
-        >
-          <Text style={styles.checkoutButtonText}>Checkout</Text>
-          <Ionicons name="arrow-forward" size={20} color="#fff" />
-        </TouchableOpacity>
-      </View>
+      ) : error ? (
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle-outline" size={60} color="#FF3B30" />
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={() => {
+              setLoading(true);
+              setError(null);
+              fetchCart();
+            }}
+            accessibilityLabel="Retry Fetching Cart"
+          >
+            <Ionicons name="refresh-outline" size={20} color="#fff" />
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      ) : cartProducts.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Ionicons name="cart-outline" size={100} color="#bbb" />
+          <Text style={styles.emptyText}>Your cart is empty.</Text>
+        </View>
+      ) : (
+        <>
+          <FlatList
+            data={cartProducts}
+            keyExtractor={(item) => item.id}
+            renderItem={renderCartItem}
+            ItemSeparatorComponent={renderSeparator}
+            contentContainerStyle={styles.listContainer}
+            showsVerticalScrollIndicator={false}
+          />
+          <View style={styles.footer}>
+            <View style={styles.totalContainer}>
+              <Text style={styles.totalText}>Total</Text>
+              <Text style={styles.totalAmount}>${calculateTotal().toFixed(2)}</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.checkoutButton}
+              onPress={proceedToCheckout}
+              accessibilityLabel="Proceed to Checkout"
+            >
+              <Text style={styles.checkoutButtonText}>Checkout</Text>
+              <Ionicons name="arrow-forward" size={20} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        </>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        transparent={true}
+        animationType="fade"
+        visible={isDeleteModalVisible}
+        onRequestClose={() => {
+          setIsDeleteModalVisible(false);
+          setItemToDelete(null);
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Ionicons name="trash-outline" size={40} color="#FF3B30" />
+            <Text style={styles.modalTitle}>Remove Item</Text>
+            <Text style={styles.modalMessage}>
+              Remove "{itemToDelete?.title}" from your cart?
+            </Text>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.modalButtonYes}
+                onPress={handleDelete}
+                accessibilityLabel="Confirm Delete"
+              >
+                <Text style={styles.modalButtonText}>Yes</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalButtonNo}
+                onPress={() => {
+                  setIsDeleteModalVisible(false);
+                  setItemToDelete(null);
+                }}
+                accessibilityLabel="Cancel Delete"
+              >
+                <Text style={styles.modalButtonText}>No</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -580,5 +612,58 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700",
     marginRight: 6,
+  },
+  // Styles for Delete Confirmation Modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContainer: {
+    width: width * 0.7,
+    backgroundColor: "#1E1E1E",
+    borderRadius: 15,
+    padding: 15,
+    alignItems: "center",
+  },
+  modalTitle: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "600",
+    marginTop: 10,
+    marginBottom: 5,
+  },
+  modalMessage: {
+    color: "#bbb",
+    fontSize: 14,
+    textAlign: "center",
+    marginBottom: 15,
+  },
+  modalButtons: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    width: "100%",
+  },
+  modalButtonYes: {
+    flex: 1,
+    backgroundColor: "#BB86FC",
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginRight: 5,
+    alignItems: "center",
+  },
+  modalButtonNo: {
+    flex: 1,
+    backgroundColor: "#FF3B30",
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginLeft: 5,
+    alignItems: "center",
+  },
+  modalButtonText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "600",
   },
 });
