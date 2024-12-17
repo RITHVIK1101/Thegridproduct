@@ -58,7 +58,9 @@ const LoginScreen: React.FC = () => {
     }))
   );
 
-  const [studentType, setStudentType] = useState<"highschool" | "university" | null>(null);
+  const [studentType, setStudentType] = useState<
+    "highschool" | "university" | null
+  >(null);
   const [error, setError] = useState<string>("");
 
   // Animations
@@ -172,7 +174,12 @@ const LoginScreen: React.FC = () => {
     const data = await handleApiRequest("/login", payload);
 
     if (data) {
-      const { token, userId, institution, studentType: responseStudentType } = data;
+      const {
+        token,
+        userId,
+        institution,
+        studentType: responseStudentType,
+      } = data;
 
       if (!institution) {
         setError("Institution information is missing.");
@@ -183,13 +190,18 @@ const LoginScreen: React.FC = () => {
         return;
       }
 
-      if (responseStudentType !== "highschool" && responseStudentType !== "university") {
+      if (
+        responseStudentType !== "highschool" &&
+        responseStudentType !== "university"
+      ) {
         setError("Invalid student type from server.");
         return;
       }
 
       const mappedStudentType =
-        responseStudentType === "highschool" ? StudentType.HighSchool : StudentType.University;
+        responseStudentType === "highschool"
+          ? StudentType.HighSchool
+          : StudentType.University;
 
       await SecureStore.setItemAsync("userToken", token);
       await SecureStore.setItemAsync("userId", userId.toString());
@@ -224,7 +236,9 @@ const LoginScreen: React.FC = () => {
     }
     if (!selectedInstitution) {
       setError(
-        `Please select your ${studentType === "university" ? "university" : "high school"}.`
+        `Please select your ${
+          studentType === "university" ? "university" : "high school"
+        }.`
       );
       return;
     }
@@ -240,7 +254,12 @@ const LoginScreen: React.FC = () => {
     const data = await handleApiRequest("/signup", payload);
 
     if (data) {
-      const { token, userId, institution, studentType: responseStudentType } = data;
+      const {
+        token,
+        userId,
+        institution,
+        studentType: responseStudentType,
+      } = data;
 
       if (!institution) {
         setError("Institution information is missing.");
@@ -251,13 +270,18 @@ const LoginScreen: React.FC = () => {
         return;
       }
 
-      if (responseStudentType !== "highschool" && responseStudentType !== "university") {
+      if (
+        responseStudentType !== "highschool" &&
+        responseStudentType !== "university"
+      ) {
         setError("Invalid student type from server.");
         return;
       }
 
       const mappedStudentType =
-        responseStudentType === "highschool" ? StudentType.HighSchool : StudentType.University;
+        responseStudentType === "highschool"
+          ? StudentType.HighSchool
+          : StudentType.University;
 
       await SecureStore.setItemAsync("userToken", token);
       await SecureStore.setItemAsync("userId", userId.toString());
@@ -273,7 +297,6 @@ const LoginScreen: React.FC = () => {
     studentType: StudentType
   ) => {
     setUser({ userId, token, institution, studentType });
-    navigation.navigate("Dashboard");
   };
 
   const renderError = () => {
@@ -304,9 +327,17 @@ const LoginScreen: React.FC = () => {
         autoComplete="password"
       />
       {renderError()}
-      <TouchableOpacity style={[styles.button, styles.simpleButton]} onPress={handleLogin}>
+      <TouchableOpacity
+        style={[styles.button, styles.simpleButton]}
+        onPress={handleLogin}
+      >
         <Text style={styles.buttonText}>Login</Text>
-        <Ionicons name="log-in-outline" size={20} color="#fff" style={{ marginLeft: 8 }} />
+        <Ionicons
+          name="log-in-outline"
+          size={20}
+          color="#fff"
+          style={{ marginLeft: 8 }}
+        />
       </TouchableOpacity>
     </Animated.View>
   );
@@ -316,7 +347,10 @@ const LoginScreen: React.FC = () => {
       <Text style={styles.studentTypeTitle}>Select your student type</Text>
       <View style={styles.studentTypeButtons}>
         <TouchableOpacity
-          style={[styles.studentTypeButton, studentType === "highschool" && styles.selectedType]}
+          style={[
+            styles.studentTypeButton,
+            studentType === "highschool" && styles.selectedType,
+          ]}
           onPress={() => {
             setStudentType("highschool");
             setItems(
@@ -327,12 +361,20 @@ const LoginScreen: React.FC = () => {
             );
           }}
         >
-          <Ionicons name="school-outline" size={24} color="#fff" style={{ marginBottom: 5 }} />
+          <Ionicons
+            name="school-outline"
+            size={24}
+            color="#fff"
+            style={{ marginBottom: 5 }}
+          />
           <Text style={styles.studentTypeButtonText}>High School</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.studentTypeButton, studentType === "university" && styles.selectedType]}
+          style={[
+            styles.studentTypeButton,
+            studentType === "university" && styles.selectedType,
+          ]}
           onPress={() => {
             setStudentType("university");
             setItems(
@@ -343,7 +385,12 @@ const LoginScreen: React.FC = () => {
             );
           }}
         >
-          <Ionicons name="book-outline" size={24} color="#fff" style={{ marginBottom: 5 }} />
+          <Ionicons
+            name="book-outline"
+            size={24}
+            color="#fff"
+            style={{ marginBottom: 5 }}
+          />
           <Text style={styles.studentTypeButtonText}>University</Text>
         </TouchableOpacity>
       </View>
@@ -440,7 +487,10 @@ const LoginScreen: React.FC = () => {
             />
           </View>
 
-          <TouchableOpacity style={[styles.button, styles.simpleButton]} onPress={handleSignup}>
+          <TouchableOpacity
+            style={[styles.button, styles.simpleButton]}
+            onPress={handleSignup}
+          >
             <Text style={styles.buttonText}>Signup</Text>
             <Ionicons
               name="person-add-outline"
@@ -468,37 +518,54 @@ const LoginScreen: React.FC = () => {
           >
             <View style={styles.innerContainer}>
               {/* Animated Header */}
-              <Animated.View style={[styles.headerContainer, { transform: [{ scale: headerScale }] }]}>
+              <Animated.View
+                style={[
+                  styles.headerContainer,
+                  { transform: [{ scale: headerScale }] },
+                ]}
+              >
                 <Animated.View style={{ transform: [{ rotate: spin }] }}>
                   <Ionicons name="grid-outline" size={42} color="#A78BFA" />
                 </Animated.View>
                 <Text style={styles.title}>Gridly</Text>
               </Animated.View>
-              <Text style={styles.slogan}>Connect Students. Build Communities.</Text>
+              <Text style={styles.slogan}>
+                Connect Students. Build Communities.
+              </Text>
 
               {/* Toggle Container */}
               <View style={styles.toggleContainer}>
                 <TouchableOpacity
-                  style={[styles.toggleButton, isLogin ? styles.activeToggle : styles.inactiveToggle]}
+                  style={[
+                    styles.toggleButton,
+                    isLogin ? styles.activeToggle : styles.inactiveToggle,
+                  ]}
                   onPress={() => !isLogin && toggleForm()}
                 >
                   <Text
                     style={[
                       styles.toggleButtonText,
-                      isLogin ? styles.activeToggleText : styles.inactiveToggleText,
+                      isLogin
+                        ? styles.activeToggleText
+                        : styles.inactiveToggleText,
                     ]}
                   >
                     Login
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.toggleButton, !isLogin ? styles.activeToggle : styles.inactiveToggle]}
+                  style={[
+                    styles.toggleButton,
+                    !isLogin ? styles.activeToggle : styles.inactiveToggle,
+                  ]}
                   onPress={() => isLogin && toggleForm()}
                 >
                   <Text
                     style={[
                       styles.toggleButtonText,
-                      !isLogin ? styles.activeToggleText : styles.inactiveToggleText,
+                      !isLogin
+                        ? styles.activeToggleText
+                        : styles.inactiveToggleText,
                     ]}
                   >
                     Signup

@@ -81,6 +81,7 @@ func main() {
 	protected.HandleFunc("/products/user", handlers.GetUserProductsHandler).Methods("GET")
 	protected.HandleFunc("/products/all", handlers.GetAllProductsHandler).Methods("GET")
 	protected.HandleFunc("/products/by-ids", handlers.GetProductsByIDsHandler).Methods("GET")
+	protected.HandleFunc("/products/liked", handlers.GetLikedProductsHandler).Methods("GET")
 	protected.HandleFunc("/products/{id}", handlers.GetSingleProductHandler).Methods("GET")
 	protected.HandleFunc("/products/{id}", handlers.DeleteProductHandler).Methods("DELETE")
 	protected.HandleFunc("/products/{id}", handlers.UpdateProductHandler).Methods("PUT")
@@ -88,7 +89,6 @@ func main() {
 	// Liked Product Routes
 	protected.HandleFunc("/products/{id}/like", handlers.LikeProductHandler).Methods("POST")
 	protected.HandleFunc("/products/{id}/unlike", handlers.UnlikeProductHandler).Methods("POST")
-	protected.HandleFunc("/products/liked", handlers.GetLikedProductsHandler).Methods("GET")
 
 	// Gig Routes
 	protected.HandleFunc("/gigs", handlers.AddGigHandler).Methods("POST")

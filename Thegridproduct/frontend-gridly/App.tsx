@@ -10,6 +10,7 @@ import {
   ScrollView,
   Dimensions,
 } from "react-native";
+import LikedProductScreen from "./LikedProductScreen";
 import Icon from "react-native-vector-icons/MaterialIcons";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { NavigationContainer, CommonActions } from "@react-navigation/native";
@@ -110,12 +111,7 @@ const UserMenuScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const handleLogout = async () => {
     try {
       await clearUser();
-      navigation.dispatch(
-        CommonActions.reset({
-          index: 0,
-          routes: [{ name: "Login" }],
-        })
-      );
+      navigation.dispatch();
     } catch (error) {
       console.error("Logout Error:", error);
       // Removed Alert.alert to prevent popup on logout failure
@@ -458,7 +454,7 @@ const AppNavigator: React.FC = () => {
 
           <Stack.Screen
             name="LikedItems"
-            component={LikedItemsScreen}
+            component={LikedProductScreen} // Updated here
             options={({ navigation }) =>
               getHeaderOptions(navigation, firstName, lastName, true, true)
             }

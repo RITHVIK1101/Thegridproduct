@@ -222,26 +222,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
       showError("Failed to fetch user information.");
     }
   };
-  const fetchLikedProducts = async () => {
-    try {
-      const response = await fetch(`${NGROK_URL}/products/liked`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      });
 
-      if (response.ok) {
-        const likedProductIds = await response.json();
-        setFavorites(likedProductIds.map((product: Product) => product.id));
-      } else {
-        throw new Error("Failed to fetch liked products");
-      }
-    } catch (error) {
-      console.error("Error fetching liked products:", error);
-    }
-  };
   const likeProduct = async (productId: string) => {
     try {
       const response = await fetch(`${NGROK_URL}/products/${productId}/like`, {
@@ -274,9 +255,11 @@ const Dashboard: React.FC<DashboardProps> = () => {
           },
         }
       );
+
       if (!response.ok) {
         throw new Error("Failed to unlike product");
       }
+
       setFavorites((prev) => prev.filter((id) => id !== productId));
       showSuccess("Unliked the product!");
     } catch (error) {
@@ -532,11 +515,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
       setLoading(false);
     }
   };
-  useEffect(() => {
-    if (token) {
-      fetchLikedProducts();
-    }
-  }, [token]);
 
   useEffect(() => {
     console.log("Filtered Products Length:", filteredProducts.length);
