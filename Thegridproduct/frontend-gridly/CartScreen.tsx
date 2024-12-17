@@ -305,7 +305,7 @@ const CartScreen: React.FC = () => {
         resizeMode="cover"
       />
       <View style={styles.cartDetails}>
-        <Text style={styles.cartTitle} numberOfLines={2}>
+        <Text style={styles.cartTitle}>
           {item.title}
         </Text>
         <Text style={styles.cartPrice}>${item.price.toFixed(2)}</Text>
@@ -322,7 +322,7 @@ const CartScreen: React.FC = () => {
             style={styles.buyButton}
             accessibilityLabel={`Buy ${item.title}`}
           >
-            <Ionicons name="cart-outline" size={18} color="black" />
+            <Ionicons name="cart-outline" size={16} color="black" />
             <Text style={styles.buyButtonText}>Buy</Text>
           </TouchableOpacity>
         </LinearGradient>
@@ -448,27 +448,29 @@ const styles = StyleSheet.create({
   },
   cartItem: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start", // Changed from 'center' to 'flex-start'
     paddingVertical: 12,
     paddingHorizontal: 15,
     borderRadius: 16,
   },
   cartImage: {
-    width: width * 0.2,
-    height: width * 0.2,
+    width: width * 0.18, // Reduced from 0.2 to 0.18
+    height: width * 0.18,
     borderRadius: 12,
     marginRight: 15,
     backgroundColor: "#2C2C2C",
   },
   cartDetails: {
     flex: 1,
-    justifyContent: "center",
+    justifyContent: "flex-start",
+    paddingRight: 10, // Added padding to prevent text from overlapping buttons
   },
   cartTitle: {
     color: "#fff",
-    fontSize: 16,
+    fontSize: 14, // Reduced font size
     fontWeight: "700",
     marginBottom: 4,
+    flexWrap: "wrap",
   },
   cartPrice: {
     color: "#BB86FC",
@@ -477,7 +479,7 @@ const styles = StyleSheet.create({
   },
   actionButtons: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start", // Changed from 'center' to 'flex-start'
   },
   buyButtonGradient: {
     borderRadius: 8,
@@ -491,12 +493,12 @@ const styles = StyleSheet.create({
   buyButton: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 8,
-    paddingHorizontal: 15,
+    paddingVertical: 6, // Reduced padding
+    paddingHorizontal: 10, // Reduced padding
   },
   buyButtonText: {
     color: "black",
-    fontSize: 14,
+    fontSize: 12, // Reduced font size
     fontWeight: "700",
     marginLeft: 4,
   },
