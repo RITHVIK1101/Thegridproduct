@@ -1,6 +1,6 @@
 // AddGig.tsx
 
-import React, { useState, useRef } from "react";
+import React, { useState, useContext, useRef } from "react";
 import {
   View,
   Text,
@@ -21,6 +21,7 @@ import {
 import Ionicons from "react-native-vector-icons/Ionicons";
 import * as ImagePicker from "expo-image-picker";
 import { useNavigation } from "@react-navigation/native";
+import { UserContext } from "./UserContext";
 import { NGROK_URL } from "@env";
 
 const PREDEFINED_CATEGORIES = [
@@ -46,6 +47,7 @@ type AvailabilityDays = {
 
 const AddGig: React.FC = () => {
   const navigation = useNavigation();
+  const { userId, token, institution, studentType } = useContext(UserContext);
 
   // Form fields
   const [title, setTitle] = useState("");
@@ -218,6 +220,7 @@ const AddGig: React.FC = () => {
       const response = await fetch(`${NGROK_URL}/services`, {
         method: "POST",
         headers: {
+          Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify(payload),

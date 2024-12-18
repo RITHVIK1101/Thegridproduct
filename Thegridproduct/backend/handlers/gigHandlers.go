@@ -218,11 +218,27 @@ func GetSingleGigHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetAllGigsHandler handles fetching all gigs with optional pagination and filtering
+// GetAllGigsHandler handles fetching all gigs with optional pagination and filtering,
+// excluding gigs posted by the current authenticated user.
 func GetAllGigsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	if r.Method != http.MethodGet {
 		WriteJSONError(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Retrieve authenticated user details from context
+	userID, ok := r.Context().Value(userIDKey).(string)
+	if !ok || userID == "" {
+		WriteJSONError(w, "User not authenticated", http.StatusUnauthorized)
+		return
+	}
+
+	// Convert userID string to ObjectID
+	currentUserObjID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		WriteJSONError(w, "Invalid user ID format", http.StatusBadRequest)
 		return
 	}
 
@@ -250,7 +266,12 @@ func GetAllGigsHandler(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	collection := db.GetCollection("gridlyapp", "gigs")
-	filter := bson.M{"status": "active"} // Example filter; modify as needed
+
+	// Modify filter to exclude gigs posted by the current user
+	filter := bson.M{
+		"status": "active",
+		"userId": bson.M{"$ne": currentUserObjID},
+	}
 
 	// Create FindOptions with proper *int64 types
 	findOptions := options.Find()
