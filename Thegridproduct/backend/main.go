@@ -1,3 +1,5 @@
+// main.go
+
 package main
 
 import (
@@ -19,11 +21,13 @@ import (
 )
 
 func main() {
+	// Load environment variables from .env file if available
 	err := godotenv.Load()
 	if err != nil {
 		log.Println("Error loading .env file, proceeding with system environment variables")
 	}
 
+	// Retrieve and validate JWT secret key
 	jwtSecret := os.Getenv("JWT_SECRET_KEY")
 	if jwtSecret == "" {
 		log.Fatal("JWT_SECRET_KEY is not set in environment variables")
@@ -31,12 +35,14 @@ func main() {
 		log.Println("JWT_SECRET_KEY loaded successfully")
 	}
 
+	// Retrieve and set Stripe secret key
 	stripeKey := os.Getenv("STRIPE_SECRET_KEY")
 	if stripeKey == "" {
 		log.Fatal("STRIPE_SECRET_KEY is not set in environment variables")
 	}
 	stripe.Key = stripeKey
 
+	// Retrieve and validate Ably API key
 	ablyAPIKey := os.Getenv("ABLY_API_KEY")
 	if ablyAPIKey == "" {
 		log.Fatal("ABLY_API_KEY is not set in environment variables")
@@ -76,7 +82,9 @@ func main() {
 
 	// Protected Routes
 	protected := router.PathPrefix("/").Subrouter()
-	protected.Use(handlers.AuthMiddleware)
+	protected.Use(handlers.AuthMiddleware) // Ensure AuthMiddleware is implemented
+
+	// Product Routes
 	protected.HandleFunc("/products", handlers.AddProductHandler).Methods("POST")
 	protected.HandleFunc("/products/user", handlers.GetUserProductsHandler).Methods("GET")
 	protected.HandleFunc("/products/all", handlers.GetAllProductsHandler).Methods("GET")
@@ -89,11 +97,6 @@ func main() {
 	// Liked Product Routes
 	protected.HandleFunc("/products/{id}/like", handlers.LikeProductHandler).Methods("POST")
 	protected.HandleFunc("/products/{id}/unlike", handlers.UnlikeProductHandler).Methods("POST")
-
-	// Gig Routes
-	protected.HandleFunc("/gigs", handlers.AddGigHandler).Methods("POST")
-	protected.HandleFunc("/gigs/all", handlers.GetGigsHandler).Methods("GET")
-	protected.HandleFunc("/gigs/{id}", handlers.GetGigByIDHandler).Methods("GET")
 
 	// Cart Routes
 	protected.HandleFunc("/cart", handlers.GetCartHandler).Methods("GET")
@@ -108,14 +111,25 @@ func main() {
 	protected.HandleFunc("/chats/{chatId}/messages", handlers.AddMessageHandler).Methods("POST")
 	protected.HandleFunc("/chats/{chatId}/messages", handlers.GetMessagesHandler).Methods("GET")
 
-	// Real-time messaging route using Ably
+	// Real-time Messaging Route using Ably
 	protected.HandleFunc("/messages", handlers.PublishMessageHandler).Methods("POST")
 
-	// Payment Route
+	// Payment Routes
 	protected.HandleFunc("/create-payment-intent", handlers.CreatePaymentIntentHandler).Methods("POST")
 	protected.HandleFunc("/payment/save-method", handlers.SavePaymentMethodHandler).Methods("POST")
 	protected.HandleFunc("/payment/saved-methods", handlers.GetSavedPaymentMethodsHandler).Methods("GET")
 	protected.HandleFunc("/payment/charge-saved-method", handlers.ChargeSavedPaymentMethodHandler).Methods("POST")
+
+	// === Gig (Service) Routes ===
+	// Aligning endpoints with frontend's expectation of "/services"
+	protected.HandleFunc("/services", handlers.AddGigHandler).Methods("POST")           // Create a new gig
+	protected.HandleFunc("/services", handlers.GetAllGigsHandler).Methods("GET")        // Retrieve all gigs
+	protected.HandleFunc("/services/{id}", handlers.GetSingleGigHandler).Methods("GET") // Retrieve a single gig by ID
+	protected.HandleFunc("/services/{id}", handlers.UpdateGigHandler).Methods("PUT")    // Update a gig by ID
+	protected.HandleFunc("/services/{id}", handlers.DeleteGigHandler).Methods("DELETE") // Delete a gig by ID
+	// Add more gig-specific routes if needed, e.g., liking a gig
+	// protected.HandleFunc("/services/{id}/like", handlers.LikeGigHandler).Methods("POST")
+	// protected.HandleFunc("/services/{id}/unlike", handlers.UnlikeGigHandler).Methods("POST")
 
 	// Handle undefined routes
 	router.NotFoundHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

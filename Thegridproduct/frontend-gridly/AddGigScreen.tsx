@@ -67,10 +67,10 @@ const AddGig: React.FC = () => {
   });
   const [isWhenever, setIsWhenever] = useState(false);
 
-  // Additional Links and Images
+  // Additional Links and Documents
   const [additionalLinks, setAdditionalLinks] = useState<string[]>([]);
   const [newLink, setNewLink] = useState("");
-  const [additionalImages, setAdditionalImages] = useState<string[]>([]);
+  const [additionalDocuments, setAdditionalDocuments] = useState<string[]>([]);
 
   const [description, setDescription] = useState("");
 
@@ -159,7 +159,9 @@ const AddGig: React.FC = () => {
         return true;
       case 2:
         if (!isPriceOpenComm && !price.trim()) {
-          showError("Please specify a price or choose 'Open to Communication'.");
+          showError(
+            "Please specify a price or choose 'Open to Communication'."
+          );
           return false;
         }
         const anyDaySelected = Object.values(availabilityDays).some(Boolean);
@@ -187,7 +189,7 @@ const AddGig: React.FC = () => {
   const handleSubmit = async () => {
     setIsLoading(true);
 
-    let finalAvailability = "Open to Communicate";
+    let finalAvailability = "Open to Communication";
     if (!isWhenever) {
       const selectedDays = Object.entries(availabilityDays)
         .filter(([_, selected]) => selected)
@@ -206,9 +208,10 @@ const AddGig: React.FC = () => {
       category: category || "Other",
       price: finalPrice,
       availability: finalAvailability,
-      links: additionalLinks,
-      documents: additionalImages,
-      images: [coverImage].filter(Boolean),
+      additionalLinks: additionalLinks,
+      additionalDocuments: additionalDocuments,
+      coverImage: coverImage,
+      images: additionalDocuments, // Assuming additionalDocuments are images/documents
     };
 
     try {
@@ -221,8 +224,11 @@ const AddGig: React.FC = () => {
       });
 
       if (!response.ok) {
-        console.error("Error:", response.status);
-        showError("Failed to post the service. Please try again.");
+        const errorData = await response.json();
+        console.error("Error:", response.status, errorData);
+        showError(
+          errorData.error || "Failed to post the service. Please try again."
+        );
         return;
       }
 
@@ -234,7 +240,7 @@ const AddGig: React.FC = () => {
       setPrice("");
       setIsPriceOpenComm(false);
       setAdditionalLinks([]);
-      setAdditionalImages([]);
+      setAdditionalDocuments([]);
       setCoverImage(null);
       setAvailabilityDays({
         Monday: false,
@@ -273,30 +279,30 @@ const AddGig: React.FC = () => {
     }
   };
 
-  const pickAdditionalImage = async () => {
-    if (additionalImages.length >= 5) {
+  const pickAdditionalDocument = async () => {
+    if (additionalDocuments.length >= 5) {
       showError("You can upload up to 5 images/documents.");
       return;
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ImagePicker.MediaTypeOptions.All, // Allow both images and documents
       allowsMultipleSelection: true,
       quality: 1,
     });
 
     if (!result.canceled) {
-      const newImages = result.assets.map((asset) => asset.uri);
-      if (additionalImages.length + newImages.length > 5) {
+      const newDocuments = result.assets.map((asset) => asset.uri);
+      if (additionalDocuments.length + newDocuments.length > 5) {
         showError("You can upload up to 5 images/documents total.");
       } else {
-        setAdditionalImages((prev) => [...prev, ...newImages]);
+        setAdditionalDocuments((prev) => [...prev, ...newDocuments]);
       }
     }
   };
 
-  const removeAdditionalImage = (index: number) => {
-    setAdditionalImages((prev) => prev.filter((_, i) => i !== index));
+  const removeAdditionalDocument = (index: number) => {
+    setAdditionalDocuments((prev) => prev.filter((_, i) => i !== index));
   };
 
   const addNewLink = () => {
@@ -308,6 +314,7 @@ const AddGig: React.FC = () => {
       showError("Please enter a valid link before adding.");
       return;
     }
+    // Optional: Add URL validation here
     setAdditionalLinks((prev) => [...prev, newLink.trim()]);
     setNewLink("");
   };
@@ -343,7 +350,10 @@ const AddGig: React.FC = () => {
       <Text style={styles.subTitle}>Pricing</Text>
       <View style={styles.priceOptionContainer}>
         <TouchableOpacity
-          style={[styles.priceOption, isPriceOpenComm && styles.priceOptionSelected]}
+          style={[
+            styles.priceOption,
+            isPriceOpenComm && styles.priceOptionSelected,
+          ]}
           onPress={() => {
             setIsPriceOpenComm(true);
             setPrice("");
@@ -353,7 +363,10 @@ const AddGig: React.FC = () => {
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.priceOption, !isPriceOpenComm && styles.priceOptionSelected]}
+          style={[
+            styles.priceOption,
+            !isPriceOpenComm && styles.priceOptionSelected,
+          ]}
           onPress={() => {
             setIsPriceOpenComm(false);
           }}
@@ -377,10 +390,15 @@ const AddGig: React.FC = () => {
     <View style={styles.sectionContainer}>
       <Text style={styles.subTitle}>Availability</Text>
       <TouchableOpacity
-        style={[styles.availabilityOption, isWhenever && styles.availabilityOptionSelected]}
+        style={[
+          styles.availabilityOption,
+          isWhenever && styles.availabilityOptionSelected,
+        ]}
         onPress={handleWheneverToggle}
       >
-        <Text style={styles.availabilityOptionText}>Whenever / Open to Communicate</Text>
+        <Text style={styles.availabilityOptionText}>
+          Whenever / Open to Communicate
+        </Text>
       </TouchableOpacity>
 
       {!isWhenever && (
@@ -406,7 +424,7 @@ const AddGig: React.FC = () => {
   const additionalResourcesSection = (
     <View style={styles.sectionContainer}>
       <Text style={styles.subTitle}>Additional Resources</Text>
-      
+
       <Text style={styles.helperText}>Links/Resume/Profiles (Optional):</Text>
       <View style={styles.addLinksContainer}>
         {additionalLinks.map((link, index) => (
@@ -436,24 +454,37 @@ const AddGig: React.FC = () => {
 
       <View style={styles.divider} />
 
-      <Text style={styles.helperText}>Additional Images/Documents (Optional):</Text>
-      {additionalImages.length > 0 && (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
-          {additionalImages.map((img, index) => (
+      <Text style={styles.helperText}>
+        Additional Images/Documents (Optional):
+      </Text>
+      {additionalDocuments.length > 0 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={{ marginBottom: 10 }}
+        >
+          {additionalDocuments.map((doc, index) => (
             <View key={index} style={styles.imageContainer}>
-              <Image source={{ uri: img }} style={styles.additionalImage} />
+              <Image source={{ uri: doc }} style={styles.additionalImage} />
               <TouchableOpacity
                 style={styles.removeButton}
-                onPress={() => removeAdditionalImage(index)}
+                onPress={() => removeAdditionalDocument(index)}
               >
-                <Ionicons name="close-circle-outline" size={24} color="#BB86FC" />
+                <Ionicons
+                  name="close-circle-outline"
+                  size={24}
+                  color="#BB86FC"
+                />
               </TouchableOpacity>
             </View>
           ))}
         </ScrollView>
       )}
-      {additionalImages.length < 5 && (
-        <TouchableOpacity style={styles.uploadButton} onPress={pickAdditionalImage}>
+      {additionalDocuments.length < 5 && (
+        <TouchableOpacity
+          style={styles.uploadButton}
+          onPress={pickAdditionalDocument}
+        >
           <Ionicons name="cloud-upload-outline" size={24} color="#BB86FC" />
           <Text style={styles.uploadButtonText}>Add Images/Documents</Text>
         </TouchableOpacity>
@@ -519,11 +550,7 @@ const AddGig: React.FC = () => {
         />
       </>
     ),
-    4: (
-      <>
-        {additionalResourcesSection}
-      </>
-    ),
+    4: <>{additionalResourcesSection}</>,
     5: (
       <>
         <Text style={styles.sectionTitle}>Review & Submit</Text>
@@ -543,7 +570,7 @@ const AddGig: React.FC = () => {
           <Text style={styles.reviewText}>
             <Text style={styles.reviewLabel}>Availability: </Text>
             {isWhenever
-              ? "Whenever/Open to Communicate"
+              ? "Whenever/Open to Communication"
               : Object.entries(availabilityDays)
                   .filter(([_, sel]) => sel)
                   .map(([day]) => day)
@@ -557,7 +584,9 @@ const AddGig: React.FC = () => {
 
           <Text style={styles.reviewText}>
             <Text style={styles.reviewLabel}>Documents/Images: </Text>
-            {additionalImages.length > 0 ? `${additionalImages.length} Uploaded` : "N/A"}
+            {additionalDocuments.length > 0
+              ? `${additionalDocuments.length} Uploaded`
+              : "N/A"}
           </Text>
 
           <Text style={styles.reviewText}>
@@ -638,11 +667,14 @@ const AddGig: React.FC = () => {
               showsVerticalScrollIndicator={false}
             >
               {stepsContent[currentStep]}
-              
+
               {/* Navigation Buttons */}
               <View style={styles.buttonContainer}>
                 {currentStep > 1 && (
-                  <TouchableOpacity style={styles.backButton} onPress={handleBack}>
+                  <TouchableOpacity
+                    style={styles.backButton}
+                    onPress={handleBack}
+                  >
                     <Ionicons name="arrow-back" size={24} color="#aaa" />
                     <Text style={styles.backButtonText}>Back</Text>
                   </TouchableOpacity>
@@ -651,10 +683,10 @@ const AddGig: React.FC = () => {
                 <TouchableOpacity
                   style={[
                     styles.nextButton,
-                    (isLoading && currentStep === 5) && styles.buttonDisabled
+                    isLoading && currentStep === 5 && styles.buttonDisabled,
                   ]}
                   onPress={handleNext}
-                  disabled={(isLoading && currentStep === 5)}
+                  disabled={isLoading && currentStep === 5}
                 >
                   {isLoading && currentStep === 5 ? (
                     <ActivityIndicator size="small" color="#fff" />
@@ -674,11 +706,17 @@ const AddGig: React.FC = () => {
           </Animated.View>
 
           {/* Success Modal */}
-          <Modal transparent visible={isSuccessModalVisible} animationType="fade">
+          <Modal
+            transparent
+            visible={isSuccessModalVisible}
+            animationType="fade"
+          >
             <View style={styles.modalOverlay}>
               <View style={styles.modalContent}>
                 <Ionicons name="checkmark-circle" size={60} color="#9C27B0" />
-                <Text style={styles.modalText}>Service Posted Successfully!</Text>
+                <Text style={styles.modalText}>
+                  Service Posted Successfully!
+                </Text>
               </View>
             </View>
           </Modal>

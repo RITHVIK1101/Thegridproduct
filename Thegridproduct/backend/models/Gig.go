@@ -1,4 +1,4 @@
-// models/Gig.go
+// models/gig.go
 
 package models
 
@@ -8,17 +8,22 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-// Gig represents the structure of a gig in MongoDB
+// Gig represents a service gig posted by a user
 type Gig struct {
-	ID          primitive.ObjectID `json:"id,omitempty" bson:"_id,omitempty"`
-	UserID      string             `json:"userId" bson:"userId"`
-	IsAnonymous bool               `json:"isAnonymous" bson:"isAnonymous"`
-	IsOnline    bool               `json:"isOnline" bson:"isOnline"`
-	TaskName    string             `json:"taskName" bson:"taskName"`
-	Description string             `json:"description" bson:"description"`
-	DueDate     time.Time          `json:"dueDate" bson:"dueDate"`
-	Budget      string             `json:"budget" bson:"budget"`
-	Images      []string           `json:"images" bson:"images"`
-	CreatedAt   time.Time          `json:"createdAt,omitempty" bson:"createdAt,omitempty"`
-	UpdatedAt   time.Time          `json:"updatedAt,omitempty" bson:"updatedAt,omitempty"`
+	ID                  primitive.ObjectID `bson:"_id,omitempty" json:"id,omitempty"`
+	UserID              primitive.ObjectID `bson:"userId" json:"userId"`
+	University          string             `bson:"university" json:"university"`
+	StudentType         string             `bson:"studentType" json:"studentType"`
+	Title               string             `bson:"title" json:"title"`
+	Category            string             `bson:"category" json:"category"`
+	CoverImage          string             `bson:"coverImage" json:"coverImage"`
+	Price               string             `bson:"price" json:"price"`               // Can be a price string or "Open to Communication"
+	Availability        string             `bson:"availability" json:"availability"` // Mapped to "In Campus Only", etc.
+	AdditionalLinks     []string           `bson:"additionalLinks" json:"additionalLinks"`
+	AdditionalDocuments []string           `bson:"additionalDocuments" json:"additionalDocuments"`
+	Description         string             `bson:"description" json:"description"`
+	PostedDate          time.Time          `bson:"postedDate" json:"postedDate"`
+	Expired             bool               `bson:"expired" json:"expired"`
+	Status              string             `bson:"status" json:"status"` // e.g., "active", "completed"
+	LikeCount           int                `bson:"likeCount" json:"likeCount"`
 }
