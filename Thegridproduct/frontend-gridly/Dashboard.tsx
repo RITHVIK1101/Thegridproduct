@@ -169,7 +169,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
       }, 2500);
     });
   };
-
   const toggleFavorite = (productId: string) => {
     if (favorites.includes(productId)) {
       unlikeProduct(productId);
@@ -177,6 +176,35 @@ const Dashboard: React.FC<DashboardProps> = () => {
       likeProduct(productId);
     }
   };
+
+  const fetchLikedProducts = async () => {
+    if (!userId || !token) return;
+    try {
+      const response = await fetch(`${NGROK_URL}/products/liked`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const responseText = await response.text();
+        console.error("Error response text:", responseText);
+        throw new Error("Failed to fetch liked products.");
+      }
+
+      const likedProducts: Product[] = await response.json();
+      setFavorites(likedProducts.map((product) => product.id));
+    } catch (err) {
+      console.error("Fetch Liked Products Error:", err);
+      showError("Failed to fetch liked products.");
+    }
+  };
+
+  useEffect(() => {
+    fetchLikedProducts();
+  }, []);
 
   // Fetch User Information
   const fetchUserInfo = async () => {
@@ -605,7 +633,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
   }) => {
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
     const [isAdding, setIsAdding] = useState(false);
-
+    const isFavorite = favorites.includes(product.id);
     const handleImageTap = ({ nativeEvent }: any) => {
       if (nativeEvent.state === State.ACTIVE) {
         setCurrentImageIndex((prev) =>
@@ -648,8 +676,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
         ))}
       </View>
     );
-
-    const isFavorite = favorites.includes(product.id);
 
     return (
       <PanGestureHandler onHandlerStateChange={handleGestureStateChange}>
