@@ -1,3 +1,5 @@
+// navigationtypes.ts
+
 export type CartProduct = {
   id: string;
   title: string;
@@ -17,13 +19,17 @@ export type RootStackParamList = {
   Login: undefined;
   Dashboard: undefined;
   AddProduct: undefined;
-  AllOrders:undefined;
+  AllOrders: undefined;
   Activity: undefined;
   Jobs: undefined;
-  Messaging: { chatId?: string; userId?: string }; // Updated: Expect chatId and userId for navigation
+  JobDetail: { jobId: string };
+  Messaging: { chatId?: string; userId?: string };
   AddGig: undefined;
   Cart: undefined;
-  Payment: { product: CartProduct; buyerId: string; sellerId: string }; // Confirmed: Includes required parameters
+  Payment: { product: CartProduct; buyerId: string; sellerId: string };
   Account: undefined;
-  EditProduct: { productId: string }; // Confirmed: Includes productId for editing
+  EditProduct: { productId: string };
+  UserMenu: undefined;
+  TermsOfService: undefined;
+  LikedItems: undefined;
 };

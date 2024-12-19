@@ -1,4 +1,5 @@
 // JobsScreen.tsx
+
 import React, { useState, useRef, useEffect, useContext } from "react";
 import {
   View,
@@ -16,12 +17,16 @@ import {
   ActivityIndicator,
   Alert,
   Pressable,
+  Image,
 } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
 import BottomNavBar from "./components/BottomNavbar"; 
 import { NGROK_URL } from "@env";
 import { UserContext } from "./UserContext";
+import { StackNavigationProp } from '@react-navigation/stack';
+import { RootStackParamList } from './navigationtypes'; // Adjust the path if necessary
+import { useNavigation } from '@react-navigation/native';
 
 const { width } = Dimensions.get("window");
 
@@ -32,6 +37,7 @@ interface Gig {
   category: string;
   price: string;
   userId: string;
+  coverImage: string; // Ensure this field is included
 }
 
 interface Message {
@@ -59,7 +65,40 @@ const categoryIcons: { [key: string]: string } = {
 
 const categoriesFilter = ["All", "Tutoring", "Design", "Writing", "Delivery", "Coding", "Other"];
 
+// Helper function to get the current cycle based on 12-hour intervals
+const getCurrentCycle = (): number => {
+  const now = new Date();
+  // Calculate the number of 12-hour periods since epoch
+  const cycle = Math.floor(now.getTime() / (12 * 60 * 60 * 1000));
+  return cycle;
+};
+
+// Helper function to get featured gigs based on the current cycle
+const getFeaturedGigs = (gigs: Gig[]): Gig[] => {
+  if (gigs.length === 0) return [];
+
+  const cycle = getCurrentCycle();
+
+  // Use cycle number to determine indices
+  const firstIndex = cycle % gigs.length;
+  const secondIndex = (cycle + 1) % gigs.length;
+
+  // If there is only one gig, return it
+  if (gigs.length === 1) {
+    return [gigs[0]];
+  }
+
+  return [gigs[firstIndex], gigs[secondIndex]];
+};
+
+// Define the navigation prop type
+type JobsScreenNavigationProp = StackNavigationProp<
+  RootStackParamList,
+  'Jobs'
+>;
+
 const JobsScreen: React.FC = () => {
+  const navigation = useNavigation<JobsScreenNavigationProp>();
   const { token } = useContext(UserContext);
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -108,6 +147,9 @@ const JobsScreen: React.FC = () => {
         throw new Error("Invalid data format received from server.");
       }
 
+      // Debugging: Log the fetched gigs
+      console.log("Fetched Gigs:", data.gigs);
+
       setGigs(data.gigs);
     } catch (error) {
       console.error(error);
@@ -117,7 +159,8 @@ const JobsScreen: React.FC = () => {
     }
   };
 
-  const featuredGigs = gigs.slice(0, 2);
+  // Determine featured gigs based on the current cycle
+  const featuredGigs = getFeaturedGigs(gigs);
 
   const filteredGigs = gigs.filter((gig) => {
     const matchSearch =
@@ -379,25 +422,49 @@ const JobsScreen: React.FC = () => {
         ) : (
           <>
             {filteredGigs.map((gig, index) => (
-              <View key={gig.id}>
-                <View style={styles.serviceRow}>
-                  <Ionicons
-                    name={categoryIcons[gig.category] || "grid-outline"}
-                    size={24}
-                    color="#BB86FC"
-                    style={{ marginRight: 15 }}
-                  />
-                  <View style={styles.serviceInfo}>
-                    <Text style={styles.serviceTitle}>{gig.title}</Text>
-                    <Text style={styles.serviceCategory}>{gig.category}</Text>
-                    <Text style={styles.serviceDescription}>
-                      {truncateDescription(gig.description, 80)}
-                    </Text>
-                    <Text style={styles.servicePrice}>{gig.price}</Text>
+              <TouchableOpacity
+                key={gig.id}
+                onPress={() => navigation.navigate('JobDetail', { jobId: gig.id })}
+                activeOpacity={0.7}
+              >
+                <View>
+                  <View style={styles.serviceRow}>
+                    {/* Cover Image */}
+                    {gig.coverImage ? (
+                      <Image
+                        source={{ uri: gig.coverImage }}
+                        style={styles.coverImage}
+                        resizeMode="cover"
+                        onError={(e) => {
+                          console.log(`Failed to load image for gig ID ${gig.id}:`, e.nativeEvent.error);
+                        }}
+                      />
+                    ) : (
+                      <View style={styles.coverPlaceholder}>
+                        <Ionicons name="image-outline" size={24} color="#555" />
+                      </View>
+                    )}
+                    
+                    <View style={styles.serviceInfo}>
+                      <Text style={styles.serviceTitle}>{gig.title}</Text>
+                      <View style={styles.categoryRow}>
+                        <Ionicons
+                          name={categoryIcons[gig.category] || "grid-outline"}
+                          size={16}
+                          color="#BB86FC"
+                          style={{ marginRight: 5 }}
+                        />
+                        <Text style={styles.serviceCategory}>{gig.category}</Text>
+                      </View>
+                      <Text style={styles.serviceDescription}>
+                        {truncateDescription(gig.description, 80)}
+                      </Text>
+                      <Text style={styles.servicePrice}>{gig.price}</Text>
+                    </View>
                   </View>
+                  {index < filteredGigs.length - 1 && <View style={styles.divider} />}
                 </View>
-                {index < filteredGigs.length - 1 && <View style={styles.divider} />}
-              </View>
+              </TouchableOpacity>
             ))}
 
             {!loading && filteredGigs.length === 0 && (
@@ -631,6 +698,22 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     paddingHorizontal: 20,
   },
+  coverImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    marginRight: 15,
+    backgroundColor: "#333", // Placeholder background color
+  },
+  coverPlaceholder: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    marginRight: 15,
+    backgroundColor: "#333",
+    justifyContent: "center",
+    alignItems: "center",
+  },
   serviceInfo: {
     flex: 1,
   },
@@ -640,10 +723,14 @@ const styles = StyleSheet.create({
     color: "#fff",
     marginBottom: 2,
   },
+  categoryRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 2,
+  },
   serviceCategory: {
     fontSize: 14,
     color: "#BB86FC",
-    marginBottom: 2,
   },
   serviceDescription: {
     fontSize: 13,

@@ -1,3 +1,4 @@
+// BottomNavBar.tsx
 import React, { useState, useRef, useEffect } from "react";
 import {
   View,
@@ -79,7 +80,8 @@ const BottomNavBar: React.FC = () => {
     );
   };
 
-  const hitSlopValue = { top: 30, bottom: 30, left: 30, right: 30 };
+  // Reduced hitSlop values for smaller touchable areas
+  const hitSlopValue = { top: 10, bottom: 10, left: 10, right: 10 };
 
   return (
     <View style={styles.container}>
@@ -181,7 +183,7 @@ const BottomNavBar: React.FC = () => {
       <Modal
         visible={isModalVisible}
         transparent
-        animationType="none"
+        animationType="fade"
         onRequestClose={toggleModal}
       >
         <TouchableOpacity

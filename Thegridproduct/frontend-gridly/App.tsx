@@ -33,6 +33,8 @@ import MessagingScreen from "./MessagingScreen";
 import CartScreen from "./CartScreen";
 import AccountScreen from "./AccountScreen";
 import AllOrdersScreen from "./AllOrdersScreen";
+import JobDetails from "./JobDetails"; // Import the new JobDetails screen
+import { RootStackParamList } from "./navigationtypes"; // Import RootStackParamList
 
 // Terms of Service Screen
 const TermsOfServiceScreen: React.FC = () => (
@@ -111,7 +113,12 @@ const UserMenuScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const handleLogout = async () => {
     try {
       await clearUser();
-      navigation.dispatch();
+      navigation.dispatch(
+        CommonActions.reset({
+          index: 0,
+          routes: [{ name: "Login" }],
+        })
+      );
     } catch (error) {
       console.error("Logout Error:", error);
       // Removed Alert.alert to prevent popup on logout failure
@@ -227,23 +234,7 @@ const UserMenuScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 
 export const navigationRef = React.createRef();
 
-type RootStackParamList = {
-  Dashboard: undefined;
-  Jobs: undefined;
-  AddProduct: undefined;
-  AddGig: undefined;
-  Activity: undefined;
-  EditProduct: undefined;
-  Messaging: { chatId?: string } | undefined;
-  Cart: undefined;
-  Payment: undefined;
-  Account: undefined;
-  Login: undefined;
-  UserMenu: undefined;
-  TermsOfService: undefined;
-  AllOrders: undefined;
-  LikedItems: undefined;
-};
+const Stack = createStackNavigator<RootStackParamList>();
 
 /**
  * Custom Header Title Component with Logo and Text
@@ -326,8 +317,6 @@ const getHeaderOptions = (
     : undefined,
   animationEnabled: enableAnimation,
 });
-
-const Stack = createStackNavigator<RootStackParamList>();
 
 const AppNavigator: React.FC = () => {
   const { token, isLoading, firstName, lastName } = useContext(UserContext);
@@ -451,10 +440,16 @@ const AppNavigator: React.FC = () => {
               getHeaderOptions(navigation, firstName, lastName, true, true)
             }
           />
-
           <Stack.Screen
             name="LikedItems"
-            component={LikedProductScreen} // Updated here
+            component={LikedProductScreen}
+            options={({ navigation }) =>
+              getHeaderOptions(navigation, firstName, lastName, true, true)
+            }
+          />
+          <Stack.Screen
+            name="JobDetail"
+            component={JobDetails}
             options={({ navigation }) =>
               getHeaderOptions(navigation, firstName, lastName, true, true)
             }
