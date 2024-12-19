@@ -21,26 +21,24 @@ import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from "expo-image-manipulator";
 import { NGROK_URL } from "@env";
 import { useNavigation } from "@react-navigation/native";
-import { UserContext, StudentType } from "./UserContext";
+import { UserContext } from "./UserContext";
 import axios from "axios";
 
 type DurationUnit = "Hours" | "Days" | "Weeks" | "Months";
 type ListingType = "Selling" | "Renting" | "Both";
-type AvailabilityUI = "In Campus" | "Out of Campus" | "Both"; // UI states
+type AvailabilityUI = "In Campus" | "Out of Campus" | "Both";
 type Condition = "New" | "Used";
 
-// The backend expects specific strings for product.Availability
-// We'll create a utility function to map UI availability to backend strings.
 function mapAvailabilityToBackend(availability: AvailabilityUI): string {
   switch (availability) {
     case "In Campus":
-      return "In Campus Only"; // Matches productHandlers.go
+      return "In Campus Only";
     case "Out of Campus":
-      return "Off Campus Only"; // Or "Off Campus Only" if your backend expects that
+      return "Off Campus Only";
     case "Both":
-      return "On and Off Campus"; // Matches productHandlers.go for "Both"
+      return "On and Off Campus";
     default:
-      return "In Campus Only"; // Fallback
+      return "In Campus Only";
   }
 }
 
@@ -49,7 +47,6 @@ const durationUnits: DurationUnit[] = ["Hours", "Days", "Weeks", "Months"];
 const listingTypes: ListingType[] = ["Selling", "Renting", "Both"];
 const conditions: Condition[] = ["New", "Used"];
 
-// We'll still store the user's choice as an AvailabilityUI in state
 interface FormData {
   images: string[];
   title: string;
@@ -60,7 +57,6 @@ interface FormData {
   durationUnit?: DurationUnit;
   description: string;
   selectedTags: string[];
-  // We'll store the user's availability selection as a UI string
   availability: AvailabilityUI;
   rating: number;
   listingType: ListingType;
@@ -85,7 +81,7 @@ const AddProduct: React.FC = () => {
     durationUnit: undefined,
     description: "",
     selectedTags: [],
-    availability: "In Campus", // default UI selection
+    availability: "In Campus",
     rating: 0,
     listingType: "Selling",
     isAvailableOutOfCampus: false,
@@ -94,9 +90,11 @@ const AddProduct: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [isSuccessModalVisible, setIsSuccessModalVisible] = useState(false);
-  const [isInfoModalVisible, setIsInfoModalVisible] = useState(false);
 
-  // Error Toast State
+  // Info Modal State
+  const [infoModalVisible, setInfoModalVisible] = useState(false);
+  const [infoModalText, setInfoModalText] = useState("");
+
   const [errorMessage, setErrorMessage] = useState("");
   const errorOpacity = useRef(new Animated.Value(0)).current;
 
@@ -166,55 +164,58 @@ const AddProduct: React.FC = () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsMultipleSelection: false, // single selection
+        allowsMultipleSelection: true,
         quality: 0.7,
+        selectionLimit: 3 - formData.images.length,
       });
 
-      if (!result.canceled) {
-        const uri = result.assets[0].uri;
-
+      if (!result.canceled && result.assets && result.assets.length > 0) {
         setIsUploadingImage(true);
 
-        // Compress the image
-        const manipulatedImage = await ImageManipulator.manipulateAsync(
-          uri,
-          [{ resize: { width: 800 } }],
-          { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
-        );
+        const selectedAssets = result.assets.slice(0, 3 - formData.images.length);
 
-        const formDataImage = new FormData();
-        formDataImage.append("file", {
-          uri: manipulatedImage.uri,
-          type: "image/jpeg",
-          name: `upload_${Date.now()}.jpg`,
-        } as any);
-        formDataImage.append("upload_preset", UPLOAD_PRESET);
+        for (const asset of selectedAssets) {
+          const uri = asset.uri;
+          const manipulatedImage = await ImageManipulator.manipulateAsync(
+            uri,
+            [{ resize: { width: 800 } }],
+            { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
+          );
 
-        try {
-          const response = await axios.post(CLOUDINARY_URL, formDataImage, {
-            headers: {
-              "Content-Type": "multipart/form-data",
-            },
-          });
+          const formDataImage = new FormData();
+          formDataImage.append("file", {
+            uri: manipulatedImage.uri,
+            type: "image/jpeg",
+            name: `upload_${Date.now()}.jpg`,
+          } as any);
+          formDataImage.append("upload_preset", UPLOAD_PRESET);
 
-          const imageUrl = response.data.secure_url;
+          try {
+            const response = await axios.post(CLOUDINARY_URL, formDataImage, {
+              headers: {
+                "Content-Type": "multipart/form-data",
+              },
+            });
 
-          if (formData.images.length + 1 > 3) {
-            showError("You can only upload up to 3 images.");
-            setIsUploadingImage(false);
-            return;
+            const imageUrl = response.data.secure_url;
+
+            if (formData.images.length >= 3) {
+              showError("You can only upload up to 3 images.");
+              setIsUploadingImage(false);
+              return;
+            }
+
+            setFormData((prev) => ({
+              ...prev,
+              images: [...prev.images, imageUrl],
+            }));
+          } catch (error) {
+            console.error("Error uploading image:", error);
+            showError("Image upload failed. Please try again.");
           }
-
-          setFormData((prev) => ({
-            ...prev,
-            images: [...prev.images, imageUrl],
-          }));
-        } catch (error) {
-          console.error("Error uploading image:", error);
-          showError("Image upload failed. Please try again.");
-        } finally {
-          setIsUploadingImage(false);
         }
+
+        setIsUploadingImage(false);
       }
     } catch (error) {
       console.error("Image Picker Error:", error);
@@ -261,14 +262,11 @@ const AddProduct: React.FC = () => {
         }
         return true;
       case 3:
-        // We store UI states: "In Campus", "Out of Campus", "Both"
-        if (
-          !["In Campus", "Out of Campus", "Both"].includes(
-            formData.availability
-          )
-        ) {
-          showError("Please select a valid availability option.");
-          return false;
+        if (formData.listingType !== "Renting") {
+          if (!["In Campus", "Out of Campus", "Both"].includes(formData.availability)) {
+            showError("Please select a valid availability option.");
+            return false;
+          }
         }
         return true;
       case 4:
@@ -277,17 +275,12 @@ const AddProduct: React.FC = () => {
           return false;
         }
 
-        if (formData.listingType === "Selling") {
-          if (formData.rating === 0 && formData.condition === "Used") {
-            showError("Please rate the product if it's used.");
-            return false;
-          }
+        if (formData.listingType === "Selling" && formData.condition === "Used" && formData.rating === 0) {
+          showError("Please rate the product if it's used.");
+          return false;
         }
 
-        if (
-          formData.listingType === "Renting" ||
-          formData.listingType === "Both"
-        ) {
+        if ((formData.listingType === "Renting" || formData.listingType === "Both")) {
           if (!formData.condition) {
             showError("Please specify if the product is New or Used.");
             return false;
@@ -304,21 +297,13 @@ const AddProduct: React.FC = () => {
         }
         return true;
       case 5:
-        if (
-          (formData.listingType === "Selling" ||
-            formData.listingType === "Both") &&
-          !formData.price.trim()
-        ) {
-          showError("Please enter a price for selling.");
+        if ((formData.listingType === "Selling" || formData.listingType === "Both") && !formData.price.trim()) {
+          showError("Please enter a buying price (In Campus).");
           return false;
         }
 
-        if (
-          (formData.listingType === "Renting" ||
-            formData.listingType === "Both") &&
-          !formData.rentPrice.trim()
-        ) {
-          showError("Please enter a rent price.");
+        if ((formData.listingType === "Renting" || formData.listingType === "Both") && !formData.rentPrice.trim()) {
+          showError("Please enter a renting price (In Campus).");
           return false;
         }
 
@@ -327,7 +312,16 @@ const AddProduct: React.FC = () => {
           formData.availability === "Both" &&
           !formData.outOfCampusPrice.trim()
         ) {
-          showError("Please enter an off-campus price.");
+          showError("Please enter a buying price (Out of Campus).");
+          return false;
+        }
+
+        if (
+          formData.listingType === "Selling" &&
+          (formData.availability === "Out of Campus" || formData.availability === "Both") &&
+          !formData.outOfCampusPrice.trim()
+        ) {
+          showError("Please enter a buying price (Out of Campus).");
           return false;
         }
 
@@ -346,23 +340,18 @@ const AddProduct: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const price = formData.price
-        ? parseFloat(formData.price.trim())
-        : undefined;
+      const price = formData.price ? parseFloat(formData.price.trim()) : undefined;
       const outOfCampusPrice = formData.outOfCampusPrice
         ? parseFloat(formData.outOfCampusPrice.trim())
         : undefined;
-      const rentPrice = formData.rentPrice
-        ? parseFloat(formData.rentPrice.trim())
-        : undefined;
+      const rentPrice = formData.rentPrice ? parseFloat(formData.rentPrice.trim()) : undefined;
 
       if (
         (formData.price && (isNaN(price!) || price! < 0)) ||
-        (formData.outOfCampusPrice &&
-          (isNaN(outOfCampusPrice!) || outOfCampusPrice! < 0)) ||
+        (formData.outOfCampusPrice && (isNaN(outOfCampusPrice!) || outOfCampusPrice! < 0)) ||
         (formData.rentPrice && (isNaN(rentPrice!) || rentPrice! < 0))
       ) {
-        throw new Error("Please enter valid numerical values for prices.");
+        throw new Error("Please enter valid positive numerical values for prices.");
       }
 
       if (formData.selectedTags.length === 0) {
@@ -372,14 +361,13 @@ const AddProduct: React.FC = () => {
         throw new Error("Images cannot be empty.");
       }
 
-      // Map UI availability to the exact strings the backend expects
       let backendAvailability = "";
       if (formData.listingType === "Renting") {
-        backendAvailability = "In Campus Only"; // forced by the server
+        backendAvailability = "In Campus Only";
       } else if (formData.listingType === "Both") {
-        backendAvailability = "On and Off Campus"; // forced by the server
+        backendAvailability = "On and Off Campus";
       } else {
-        // listingType = "Selling"
+        // selling only
         switch (formData.availability) {
           case "In Campus":
             backendAvailability = "In Campus Only";
@@ -397,7 +385,7 @@ const AddProduct: React.FC = () => {
 
       const payload = {
         title: formData.title.trim(),
-        category: formData.selectedTags[0], // map first selected tag to category
+        category: formData.selectedTags[0],
         price: price ?? 0,
         outOfCampusPrice: outOfCampusPrice ?? 0,
         rentPrice: rentPrice ?? 0,
@@ -410,7 +398,8 @@ const AddProduct: React.FC = () => {
         images: formData.images,
         isAvailableOutOfCampus:
           formData.availability === "Out of Campus" ||
-          formData.availability === "Both",
+          formData.availability === "Both" ||
+          formData.listingType === "Both",
         rating:
           formData.listingType === "Selling" || formData.listingType === "Both"
             ? formData.rating
@@ -418,7 +407,7 @@ const AddProduct: React.FC = () => {
         listingType: formData.listingType,
         availability: backendAvailability,
         condition: formData.condition,
-        status: "inshop", // Automatically set the status to "inshop"
+        status: "inshop",
       };
 
       const response = await fetch(`${NGROK_URL}/products`, {
@@ -435,11 +424,8 @@ const AddProduct: React.FC = () => {
       if (contentType && contentType.includes("application/json")) {
         const data = await response.json();
         if (!response.ok) {
-          throw new Error(
-            data.message || `HTTP error! status: ${response.status}`
-          );
+          throw new Error(data.message || `HTTP error! status: ${response.status}`);
         }
-        // Reset form
         setFormData({
           images: [],
           title: "",
@@ -469,23 +455,28 @@ const AddProduct: React.FC = () => {
       }
     } catch (error: unknown) {
       console.error("Error:", error);
-      showError(
-        error instanceof Error ? error.message : "An unknown error occurred."
-      );
+      showError(error instanceof Error ? error.message : "An unknown error occurred.");
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Define the slide content
+  const openInfoModal = (text: string) => {
+    setInfoModalText(text);
+    setInfoModalVisible(true);
+  };
+
+  const closeInfoModal = () => {
+    setInfoModalVisible(false);
+    setInfoModalText("");
+  };
+
   const slides: Record<number, { title: string; content: JSX.Element }> = {
     1: {
       title: "Upload Images & Enter Title",
       content: (
         <>
-          <Text style={styles.imageCounter}>
-            {`${formData.images.length}/3 Images`}
-          </Text>
+          <Text style={styles.imageCounter}>{`${formData.images.length}/3 Images`}</Text>
           <View style={styles.imageUploadContainer}>
             <TouchableOpacity
               style={styles.uploadButton}
@@ -496,11 +487,7 @@ const AddProduct: React.FC = () => {
                 <ActivityIndicator size="small" color="#BB86FC" />
               ) : (
                 <>
-                  <Ionicons
-                    name="cloud-upload-outline"
-                    size={30}
-                    color="#BB86FC"
-                  />
+                  <Ionicons name="cloud-upload-outline" size={30} color="#BB86FC" />
                   <Text style={styles.uploadButtonText}>Upload Images</Text>
                 </>
               )}
@@ -513,11 +500,7 @@ const AddProduct: React.FC = () => {
                     style={styles.removeButton}
                     onPress={() => removeImage(index)}
                   >
-                    <Ionicons
-                      name="close-circle-outline"
-                      size={24}
-                      color="#BB86FC"
-                    />
+                    <Ionicons name="close-circle-outline" size={24} color="#BB86FC" />
                   </TouchableOpacity>
                 </View>
               ))}
@@ -539,25 +522,26 @@ const AddProduct: React.FC = () => {
       content: (
         <>
           <View style={styles.sectionContainer}>
-            <Text style={styles.sectionTitle}>Listing Type</Text>
+            <View style={styles.titleWithInfo}>
+              <Text style={styles.sectionTitle}>Listing Type</Text>
+              <TouchableOpacity onPress={() => openInfoModal("Select how you want to offer your product:\n- Selling: In-campus (hand) or Out-of-campus (ship in 7 days).\n- Renting: Always in-campus.\n- Both: Offer both buying and renting.")}>
+                <Ionicons name="information-circle-outline" size={20} color="#BB86FC" />
+              </TouchableOpacity>
+            </View>
             <View style={styles.optionsContainer}>
               {listingTypes.map((type) => (
                 <TouchableOpacity
                   key={type}
                   style={[
                     styles.optionButton,
-                    formData.listingType === type
-                      ? styles.optionButtonSelected
-                      : null,
+                    formData.listingType === type ? styles.optionButtonSelected : null,
                   ]}
                   onPress={() =>
                     setFormData({
                       ...formData,
                       listingType: type,
                       availability:
-                        type === "Renting"
-                          ? "In Campus"
-                          : formData.availability,
+                        type === "Renting" ? "In Campus" : formData.availability,
                       outOfCampusPrice: "",
                       rentPrice: "",
                       rentDuration: "",
@@ -570,9 +554,7 @@ const AddProduct: React.FC = () => {
                   <Text
                     style={[
                       styles.optionText,
-                      formData.listingType === type
-                        ? styles.optionTextSelected
-                        : null,
+                      formData.listingType === type ? styles.optionTextSelected : null,
                     ]}
                   >
                     {type}
@@ -580,11 +562,6 @@ const AddProduct: React.FC = () => {
                 </TouchableOpacity>
               ))}
             </View>
-            {formData.listingType === "Renting" && (
-              <Text style={styles.noteText}>
-                Renting is available for In Campus only.
-              </Text>
-            )}
           </View>
         </>
       ),
@@ -592,119 +569,135 @@ const AddProduct: React.FC = () => {
 
     3: {
       title: "Select Availability",
-      content: (
-        <>
-          <View style={styles.sectionContainer}>
-            <Text style={styles.sectionTitle}>Availability</Text>
-            <View style={styles.optionsContainer}>
-              <TouchableOpacity
-                style={[
-                  styles.optionButton,
-                  formData.availability === "In Campus"
-                    ? styles.optionButtonSelected
-                    : null,
-                ]}
-                onPress={() =>
-                  setFormData({
-                    ...formData,
-                    availability: "In Campus",
-                    isAvailableOutOfCampus: false,
-                  })
-                }
-              >
-                <Text
-                  style={[
-                    styles.optionText,
-                    formData.availability === "In Campus"
-                      ? styles.optionTextSelected
-                      : null,
-                  ]}
-                >
-                  In Campus
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.optionButton,
-                  formData.availability === "Out of Campus"
-                    ? styles.optionButtonSelected
-                    : null,
-                ]}
-                onPress={() =>
-                  setFormData({
-                    ...formData,
-                    availability: "Out of Campus",
-                    isAvailableOutOfCampus: true,
-                  })
-                }
-              >
-                <Text
-                  style={[
-                    styles.optionText,
-                    formData.availability === "Out of Campus"
-                      ? styles.optionTextSelected
-                      : null,
-                  ]}
-                >
-                  Out of Campus
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.optionButton,
-                  formData.availability === "Both"
-                    ? styles.optionButtonSelected
-                    : null,
-                ]}
-                onPress={() =>
-                  setFormData({
-                    ...formData,
-                    availability: "Both",
-                    isAvailableOutOfCampus: true,
-                  })
-                }
-              >
-                <Text
-                  style={[
-                    styles.optionText,
-                    formData.availability === "Both"
-                      ? styles.optionTextSelected
-                      : null,
-                  ]}
-                >
-                  Both
-                </Text>
-              </TouchableOpacity>
+      content:
+        formData.listingType === "Renting" ? (
+          <>
+            <View style={styles.sectionContainer}>
+              <View style={styles.titleWithInfo}>
+                <Text style={styles.sectionTitle}>Availability</Text>
+                <TouchableOpacity onPress={() => openInfoModal("Renting is always in-campus only. You will hand over the product directly without shipping.")}>
+                  <Ionicons name="information-circle-outline" size={20} color="#BB86FC" />
+                </TouchableOpacity>
+              </View>
+              <View style={styles.lockedAvailability}>
+                <Ionicons name="lock-closed" size={20} color="#BB86FC" />
+                <Text style={styles.lockedAvailabilityText}>In Campus (Forced)</Text>
+              </View>
             </View>
-          </View>
-        </>
-      ),
+          </>
+        ) : (
+          <>
+            <View style={styles.sectionContainer}>
+              <View style={styles.titleWithInfo}>
+                <Text style={styles.sectionTitle}>Availability</Text>
+                <TouchableOpacity onPress={() => openInfoModal("In Campus: Hand delivery.\nOut of Campus: Must ship within 7 days.\nBoth: Provide separate prices for in-campus and out-of-campus.")}>
+                  <Ionicons name="information-circle-outline" size={20} color="#BB86FC" />
+                </TouchableOpacity>
+              </View>
+              <View style={styles.optionsContainer}>
+                <TouchableOpacity
+                  style={[
+                    styles.optionButton,
+                    formData.availability === "In Campus" ? styles.optionButtonSelected : null,
+                  ]}
+                  onPress={() =>
+                    setFormData({
+                      ...formData,
+                      availability: "In Campus",
+                      isAvailableOutOfCampus: false,
+                    })
+                  }
+                >
+                  <Text
+                    style={[
+                      styles.optionText,
+                      formData.availability === "In Campus"
+                        ? styles.optionTextSelected
+                        : null,
+                    ]}
+                  >
+                    In Campus
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.optionButton,
+                    formData.availability === "Out of Campus"
+                      ? styles.optionButtonSelected
+                      : null,
+                  ]}
+                  onPress={() =>
+                    setFormData({
+                      ...formData,
+                      availability: "Out of Campus",
+                      isAvailableOutOfCampus: true,
+                    })
+                  }
+                >
+                  <Text
+                    style={[
+                      styles.optionText,
+                      formData.availability === "Out of Campus"
+                        ? styles.optionTextSelected
+                        : null,
+                    ]}
+                  >
+                    Out of Campus
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.optionButton,
+                    formData.availability === "Both" ? styles.optionButtonSelected : null,
+                  ]}
+                  onPress={() =>
+                    setFormData({
+                      ...formData,
+                      availability: "Both",
+                      isAvailableOutOfCampus: true,
+                    })
+                  }
+                >
+                  <Text
+                    style={[
+                      styles.optionText,
+                      formData.availability === "Both" ? styles.optionTextSelected : null,
+                    ]}
+                  >
+                    Both
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </>
+        ),
     },
 
     4: {
-      title: "Select Tags, Condition & Rent Details",
+      title: "Tags, Condition & Rent Details",
       content: (
         <>
           <View style={styles.sectionContainer}>
-            <Text style={styles.sectionTitle}>Select Tags</Text>
+            <View style={styles.titleWithInfo}>
+              <Text style={styles.sectionTitle}>Select Tags</Text>
+              <TouchableOpacity onPress={() => openInfoModal("Tags help categorize your product (e.g. #FemaleClothing). Select at least one.")}>
+                <Ionicons name="information-circle-outline" size={20} color="#BB86FC" />
+              </TouchableOpacity>
+            </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               {availableTags.map((tag) => (
                 <TouchableOpacity
                   key={tag}
                   style={[
                     styles.tag,
-                    formData.selectedTags.includes(tag)
-                      ? styles.tagSelected
-                      : null,
+                    formData.selectedTags.includes(tag) ? styles.tagSelected : null,
                   ]}
                   onPress={() => toggleTag(tag)}
                 >
                   <Text
                     style={[
                       styles.tagText,
-                      formData.selectedTags.includes(tag)
-                        ? styles.tagTextSelected
-                        : null,
+                      formData.selectedTags.includes(tag) ? styles.tagTextSelected : null,
                     ]}
                   >
                     {tag}
@@ -714,65 +707,89 @@ const AddProduct: React.FC = () => {
             </ScrollView>
           </View>
 
-          <View style={styles.sectionContainer}>
-            <Text style={styles.sectionTitle}>Is the Product New or Used?</Text>
-            <View style={styles.optionsContainer}>
-              {conditions.map((condition) => (
-                <TouchableOpacity
-                  key={condition}
-                  style={[
-                    styles.optionButton,
-                    formData.condition === condition
-                      ? styles.optionButtonSelected
-                      : null,
-                  ]}
-                  onPress={() =>
-                    setFormData({
-                      ...formData,
-                      condition: condition,
-                      rating: condition === "New" ? 0 : formData.rating,
-                    })
-                  }
-                >
-                  <Text
-                    style={[
-                      styles.optionText,
-                      formData.condition === condition
-                        ? styles.optionTextSelected
-                        : null,
-                    ]}
-                  >
-                    {condition}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          {(formData.listingType === "Renting" ||
-            formData.listingType === "Both") && (
+          {(formData.listingType === "Selling" || formData.listingType === "Both") && (
             <View style={styles.sectionContainer}>
-              <Text style={styles.sectionTitle}>Rent Duration</Text>
+              <View style={styles.titleWithInfo}>
+                <Text style={styles.sectionTitle}>Condition</Text>
+                <TouchableOpacity onPress={() => openInfoModal("Select 'New' or 'Used'. Used items can be rated for quality.")}>
+                  <Ionicons name="information-circle-outline" size={20} color="#BB86FC" />
+                </TouchableOpacity>
+              </View>
+              <View style={styles.optionsContainer}>
+                {conditions.map((condition) => (
+                  <TouchableOpacity
+                    key={condition}
+                    style={[
+                      styles.optionButton,
+                      formData.condition === condition ? styles.optionButtonSelected : null,
+                    ]}
+                    onPress={() =>
+                      setFormData({
+                        ...formData,
+                        condition: condition,
+                        rating: condition === "New" ? 0 : formData.rating,
+                      })
+                    }
+                  >
+                    <Text
+                      style={[
+                        styles.optionText,
+                        formData.condition === condition ? styles.optionTextSelected : null,
+                      ]}
+                    >
+                      {condition}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              {formData.condition === "Used" && (
+                <View style={styles.sectionContainer}>
+                  <View style={styles.titleWithInfo}>
+                    <Text style={styles.sectionTitle}>Rate Quality</Text>
+                    <TouchableOpacity onPress={() => openInfoModal("Rate the quality of the used item, from 1 (Poor) to 5 (Excellent).")}>
+                      <Ionicons name="information-circle-outline" size={20} color="#BB86FC" />
+                    </TouchableOpacity>
+                  </View>
+                  <View style={styles.ratingContainer}>
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <TouchableOpacity key={star} onPress={() => setRatingValue(star)}>
+                        <Ionicons
+                          name="star"
+                          size={30}
+                          color={formData.rating >= star ? "#FFD700" : "#ccc"}
+                        />
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )}
+            </View>
+          )}
+
+          {(formData.listingType === "Renting" || formData.listingType === "Both") && (
+            <View style={styles.sectionContainer}>
+              <View style={styles.titleWithInfo}>
+                <Text style={styles.sectionTitle}>Rent Duration</Text>
+                <TouchableOpacity onPress={() => openInfoModal("Rent duration sets how long the renter can use the product before returning it to you on-campus.")}>
+                  <Ionicons name="information-circle-outline" size={20} color="#BB86FC" />
+                </TouchableOpacity>
+              </View>
               <View style={styles.rentDurationContainer}>
                 <TextInput
-                  style={styles.durationInput}
-                  placeholder="1"
+                  style={[styles.durationInput]}
+                  placeholder="Duration"
                   placeholderTextColor="#888"
                   keyboardType="numeric"
                   value={formData.rentDuration}
-                  onChangeText={(text) =>
-                    setFormData({ ...formData, rentDuration: text })
-                  }
+                  onChangeText={(text) => setFormData({ ...formData, rentDuration: text })}
                 />
-                <View style={styles.dropdown}>
+                <View style={styles.durationUnitContainer}>
                   {durationUnits.map((unit) => (
                     <TouchableOpacity
                       key={unit}
                       style={[
-                        styles.dropdownItem,
-                        formData.durationUnit === unit
-                          ? styles.dropdownItemSelected
-                          : null,
+                        styles.durationUnitButton,
+                        formData.durationUnit === unit ? styles.durationUnitButtonSelected : null,
                       ]}
                       onPress={() =>
                         setFormData({
@@ -783,9 +800,9 @@ const AddProduct: React.FC = () => {
                     >
                       <Text
                         style={[
-                          styles.dropdownText,
+                          styles.durationUnitText,
                           formData.durationUnit === unit
-                            ? styles.dropdownTextSelected
+                            ? styles.durationUnitTextSelected
                             : null,
                         ]}
                       >
@@ -797,100 +814,90 @@ const AddProduct: React.FC = () => {
               </View>
             </View>
           )}
-
-          {formData.condition === "Used" && (
-            <View style={styles.sectionContainer}>
-              <Text style={styles.sectionTitle}>Rate Quality</Text>
-              <View style={styles.ratingContainer}>
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <TouchableOpacity
-                    key={star}
-                    onPress={() => setRatingValue(star)}
-                  >
-                    <Ionicons
-                      name="star"
-                      size={30}
-                      color={formData.rating >= star ? "#FFD700" : "#ccc"}
-                    />
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              <Text style={styles.ratingDescription}>
-                {formData.rating === 1
-                  ? "Poor"
-                  : formData.rating === 2
-                  ? "Fair"
-                  : formData.rating === 3
-                  ? "Good"
-                  : formData.rating === 4
-                  ? "Very Good"
-                  : formData.rating === 5
-                  ? "Excellent"
-                  : "Select a rating"}
-              </Text>
-            </View>
-          )}
         </>
       ),
     },
 
     5: {
-      title: "Enter Prices & Description",
+      title: "Prices & Description",
       content: (
         <>
-          {(formData.listingType === "Selling" ||
-            formData.listingType === "Both") && (
-            <TextInput
-              style={styles.input}
-              placeholder={`Price${
-                formData.listingType === "Both" ? " (In Campus Selling)" : ""
-              } $`}
-              placeholderTextColor="#888"
-              keyboardType="numeric"
-              value={formData.price}
-              onChangeText={(text) => setFormData({ ...formData, price: text })}
-            />
-          )}
-
-          {(formData.listingType === "Renting" ||
-            formData.listingType === "Both") && (
-            <TextInput
-              style={styles.input}
-              placeholder="Renting Price (In Campus Only) $"
-              placeholderTextColor="#888"
-              keyboardType="numeric"
-              value={formData.rentPrice}
-              onChangeText={(text) =>
-                setFormData({ ...formData, rentPrice: text })
-              }
-            />
-          )}
-
-          {formData.listingType === "Both" &&
-            formData.availability === "Both" && (
+          {(formData.listingType === "Selling" || formData.listingType === "Both") && (
+            <>
+              <View style={styles.titleWithInfoRow}>
+                <Text style={styles.sectionSubtitle}>Buying Price (In Campus) $</Text>
+                <TouchableOpacity onPress={() => openInfoModal("In-campus transactions are done by hand, no shipping required.")}>
+                  <Ionicons name="information-circle-outline" size={18} color="#BB86FC" />
+                </TouchableOpacity>
+              </View>
               <TextInput
                 style={styles.input}
-                placeholder="Off-Campus Price (with Shipping) $"
+                placeholder="Enter In-Campus Buying Price"
                 placeholderTextColor="#888"
                 keyboardType="numeric"
-                value={formData.outOfCampusPrice}
+                value={formData.price}
+                onChangeText={(text) => setFormData({ ...formData, price: text })}
+              />
+
+              {((formData.listingType === "Both" && formData.availability === "Both") ||
+                (formData.listingType === "Selling" &&
+                  (formData.availability === "Both" || formData.availability === "Out of Campus"))) && (
+                <>
+                  <View style={styles.titleWithInfoRow}>
+                    <Text style={styles.sectionSubtitle}>Buying Price (Out of Campus) $</Text>
+                    <TouchableOpacity onPress={() => openInfoModal("Out-of-campus requires you to ship the product within 7 days. Price should cover shipping.")}>
+                      <Ionicons name="information-circle-outline" size={18} color="#BB86FC" />
+                    </TouchableOpacity>
+                  </View>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Enter Out-Of-Campus Buying Price"
+                    placeholderTextColor="#888"
+                    keyboardType="numeric"
+                    value={formData.outOfCampusPrice}
+                    onChangeText={(text) =>
+                      setFormData({ ...formData, outOfCampusPrice: text })
+                    }
+                  />
+                </>
+              )}
+            </>
+          )}
+
+          {(formData.listingType === "Renting" || formData.listingType === "Both") && (
+            <>
+              <View style={styles.titleWithInfoRow}>
+                <Text style={styles.sectionSubtitle}>Renting Price (In Campus) $</Text>
+                <TouchableOpacity onPress={() => openInfoModal("Renting is always on-campus, so you'll hand over and take back the item in person.")}>
+                  <Ionicons name="information-circle-outline" size={18} color="#BB86FC" />
+                </TouchableOpacity>
+              </View>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter In-Campus Renting Price"
+                placeholderTextColor="#888"
+                keyboardType="numeric"
+                value={formData.rentPrice}
                 onChangeText={(text) =>
-                  setFormData({ ...formData, outOfCampusPrice: text })
+                  setFormData({ ...formData, rentPrice: text })
                 }
               />
-            )}
+            </>
+          )}
 
-          <TextInput
-            style={[styles.input, styles.descriptionInput]}
-            placeholder="Description"
-            placeholderTextColor="#888"
-            multiline
-            value={formData.description}
-            onChangeText={(text) =>
-              setFormData({ ...formData, description: text })
-            }
-          />
+          <View style={{ marginTop: 20 }}>
+            <View style={styles.titleWithInfoRow}>
+              <Text style={styles.sectionSubtitle}>Additional Description (Optional)</Text>
+            </View>
+            <TextInput
+              style={[styles.input, styles.descriptionInput]}
+              placeholder="Describe your product..."
+              placeholderTextColor="#888"
+              multiline
+              value={formData.description}
+              onChangeText={(text) => setFormData({ ...formData, description: text })}
+            />
+          </View>
         </>
       ),
     },
@@ -899,7 +906,6 @@ const AddProduct: React.FC = () => {
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
       <View style={styles.outerContainer}>
-        {/* Error Toast */}
         {errorMessage ? (
           <Animated.View
             style={[
@@ -925,7 +931,6 @@ const AddProduct: React.FC = () => {
           style={styles.container}
           contentContainerStyle={{ paddingBottom: 40 }}
         >
-          {/* Progress Dots */}
           <View style={styles.progressContainer}>
             {[1, 2, 3, 4, 5].map((s) => (
               <View
@@ -957,7 +962,6 @@ const AddProduct: React.FC = () => {
             {slides[step].content}
           </Animated.View>
 
-          {/* Navigation Buttons */}
           <View
             style={[
               styles.buttonContainer,
@@ -991,37 +995,26 @@ const AddProduct: React.FC = () => {
             </TouchableOpacity>
           </View>
 
-          {/* Success Modal */}
-          <Modal
-            transparent
-            visible={isSuccessModalVisible}
-            animationType="fade"
-          >
+          <Modal transparent visible={isSuccessModalVisible} animationType="fade">
             <View style={styles.modalOverlay}>
               <View style={styles.modalContent}>
                 <Ionicons name="checkmark-circle" size={60} color="#9C27B0" />
-                <Text style={styles.modalText}>
-                  Product Posted Successfully!
-                </Text>
+                <Text style={styles.modalText}>Product Posted Successfully!</Text>
               </View>
             </View>
           </Modal>
 
-          {/* Information Modal */}
-          <Modal transparent visible={isInfoModalVisible} animationType="fade">
+          <Modal transparent visible={infoModalVisible} animationType="fade">
             <TouchableOpacity
               style={styles.modalOverlay}
               activeOpacity={1}
-              onPressOut={() => setIsInfoModalVisible(false)}
+              onPressOut={closeInfoModal}
             >
               <View style={styles.infoModalContent}>
-                <Text style={styles.infoModalText}>
-                  Upon the money transfer, the specified rent duration is the
-                  period the renter has to use and return the product.
-                </Text>
+                <Text style={styles.infoModalText}>{infoModalText}</Text>
                 <TouchableOpacity
                   style={styles.closeInfoButton}
-                  onPress={() => setIsInfoModalVisible(false)}
+                  onPress={closeInfoModal}
                 >
                   <Text style={styles.closeInfoButtonText}>Close</Text>
                 </TouchableOpacity>
@@ -1136,46 +1129,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#424242",
   },
-  rentDurationContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginVertical: 10,
-  },
-  durationInput: {
-    width: "30%",
-    padding: 15,
-    borderRadius: 12,
-    backgroundColor: "#1E1E1E",
-    color: "#fff",
-    textAlign: "center",
-  },
-  dropdown: {
-    flex: 1,
-    borderRadius: 12,
-    backgroundColor: "#1E1E1E",
-    padding: 10,
-  },
-  dropdownItem: {
-    padding: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "#424242",
-  },
-  dropdownItemSelected: {
-    backgroundColor: "#BB86FC",
-  },
-  dropdownText: {
-    color: "#ccc",
-    fontSize: 16,
-    textAlign: "center",
-  },
-  dropdownTextSelected: {
-    color: "#fff",
-    fontWeight: "bold",
-  },
   descriptionInput: {
-    height: 100,
+    height: 120,
     textAlignVertical: "top",
+    marginTop: 10,
   },
   sectionTitle: {
     fontSize: 18,
@@ -1184,20 +1141,19 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     marginTop: 20,
   },
+  sectionSubtitle: {
+    fontSize: 16,
+    fontWeight: "500",
+    color: "#BB86FC",
+  },
+  sectionContainer: {
+    marginBottom: 20,
+  },
   ratingContainer: {
     flexDirection: "row",
     gap: 5,
     justifyContent: "center",
     marginVertical: 10,
-  },
-  ratingDescription: {
-    textAlign: "center",
-    color: "#ccc",
-    fontSize: 14,
-    marginTop: 5,
-  },
-  sectionContainer: {
-    marginBottom: 20,
   },
   optionsContainer: {
     flexDirection: "row",
@@ -1257,7 +1213,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginTop: 20,
-    // We'll override justifyContent in JSX with step logic
   },
   backButton: {
     flexDirection: "row",
@@ -1289,6 +1244,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0, 0, 0, 0.7)",
     justifyContent: "center",
     alignItems: "center",
+    padding: 20,
   },
   modalContent: {
     backgroundColor: "#1E1E1E",
@@ -1307,7 +1263,7 @@ const styles = StyleSheet.create({
     padding: 20,
     borderRadius: 15,
     alignItems: "center",
-    width: "80%",
+    width: "100%",
   },
   infoModalText: {
     fontSize: 16,
@@ -1325,5 +1281,80 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     fontWeight: "600",
+  },
+  rentDurationContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 10,
+    backgroundColor: "#1E1E1E",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#424242",
+    overflow: "hidden",
+  },
+  durationInput: {
+    width: "30%",
+    padding: 15,
+    borderRightWidth: 1,
+    borderRightColor: "#424242",
+    backgroundColor: "#1E1E1E",
+    color: "#fff",
+    textAlign: "center",
+    fontSize: 16,
+  },
+  durationUnitContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    flex: 1,
+    justifyContent: "center",
+  },
+  durationUnitButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    margin: 5,
+    borderRadius: 10,
+    backgroundColor: "#1E1E1E",
+    borderWidth: 1,
+    borderColor: "#424242",
+  },
+  durationUnitButtonSelected: {
+    backgroundColor: "#BB86FC",
+    borderColor: "#BB86FC",
+  },
+  durationUnitText: {
+    color: "#ccc",
+    fontSize: 14,
+  },
+  durationUnitTextSelected: {
+    color: "#fff",
+    fontWeight: "600",
+  },
+  titleWithInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  titleWithInfoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 5,
+  },
+  lockedAvailability: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#1E1E1E",
+    borderRadius: 12,
+    padding: 15,
+    marginTop: 15,
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#424242",
+  },
+  lockedAvailabilityText: {
+    color: "#fff",
+    fontSize: 16,
+    marginLeft: 10,
+    fontWeight: "500",
   },
 });

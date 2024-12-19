@@ -48,24 +48,22 @@ type Product = {
   title: string;
   price: number;
   description: string;
-  category?: string; // Made optional to handle undefined cases
+  category?: string;
   images: string[];
   university: string;
   userId: string;
   postedDate: string;
   rating?: number;
   quality?: string;
-  availability: string; // Add this line for availability
+  availability: string;
 };
 
-// User type to store fetched user information
 type User = {
   id: string;
   email: string;
   firstName: string;
   lastName: string;
   institution: string;
-  // Add other fields as necessary
 };
 
 type CartItem = {
@@ -75,13 +73,12 @@ type CartItem = {
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
 
-const Dashboard: React.FC<DashboardProps> = () => {
-  // Filter states
-  const [campusMode, setCampusMode] = useState<"In Campus" | "Both">("Both");
-  const [selectedCategory, setSelectedCategory] =
-    useState<string>("#Everything");
+const SWIPE_THRESHOLD = 80;
+const DIRECTION_LOCK_THRESHOLD = 10;
 
-  // Modal visibility states
+const Dashboard: React.FC<DashboardProps> = () => {
+  const [campusMode, setCampusMode] = useState<"In Campus" | "Both">("Both");
+  const [selectedCategory, setSelectedCategory] = useState<string>("#Everything");
   const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isDetailsModalVisible, setIsDetailsModalVisible] = useState(false);
@@ -89,7 +86,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
     useState(false);
   const [selectedProductDescription, setSelectedProductDescription] =
     useState<string>("");
-
   const [searchQuery, setSearchQuery] = useState<string>("");
 
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
@@ -115,17 +111,17 @@ const Dashboard: React.FC<DashboardProps> = () => {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [cartUpdated, setCartUpdated] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
-
   const [favorites, setFavorites] = useState<string[]>([]);
+
+  // Manage currentImageIndex in Dashboard
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   // Toast Animations
   const [errorMessage, setErrorMessage] = useState("");
   const errorOpacity = useRef(new Animated.Value(0)).current;
-
   const [successMessage, setSuccessMessage] = useState("");
   const successOpacity = useRef(new Animated.Value(0)).current;
 
-  // User Information State
   const [userInfo, setUserInfo] = useState<User | null>(null);
 
   const showError = (msg: string) => {
@@ -169,6 +165,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
       }, 2500);
     });
   };
+
   const toggleFavorite = (productId: string) => {
     if (favorites.includes(productId)) {
       unlikeProduct(productId);
@@ -177,36 +174,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
     }
   };
 
-  const fetchLikedProducts = async () => {
-    if (!userId || !token) return;
-    try {
-      const response = await fetch(`${NGROK_URL}/products/liked`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        const responseText = await response.text();
-        console.error("Error response text:", responseText);
-        throw new Error("Failed to fetch liked products.");
-      }
-
-      const likedProducts: Product[] = await response.json();
-      setFavorites(likedProducts.map((product) => product.id));
-    } catch (err) {
-      console.error("Fetch Liked Products Error:", err);
-      showError("Failed to fetch liked products.");
-    }
-  };
-
-  useEffect(() => {
-    fetchLikedProducts();
-  }, []);
-
-  // Fetch User Information
   const fetchUserInfo = async () => {
     if (!userId || !token) return;
     try {
@@ -246,7 +213,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
       setUserInfo(data);
     } catch (err) {
       console.error("Fetch User Info Error:", err);
-      // Optionally show an error toast
       showError("Failed to fetch user information.");
     }
   };
@@ -296,7 +262,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
     }
   };
 
-  // Fetch cart
   const fetchCart = async () => {
     if (!userId || !token) return;
     try {
@@ -340,18 +305,15 @@ const Dashboard: React.FC<DashboardProps> = () => {
       }
     } catch (err) {
       console.error("Fetch Cart Error:", err);
-      // We'll not show an alert here since user might be offline or something
     }
   };
 
-  // Add to cart
   const addToCart = async (product: Product) => {
     if (!userId || !token) {
       showError("Log in first.");
       return;
     }
 
-    // Always fetch cart before add to ensure we have updated cart
     await fetchCart();
 
     if (cartItems.some((item) => item.productId === product.id)) {
@@ -397,7 +359,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
         throw new Error(errorData.message || "Failed to add item.");
       }
 
-      // Re-fetch cart after successful add
       await fetchCart();
       showSuccess("Added to cart!");
       setCartUpdated(true);
@@ -431,8 +392,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
       } else if (campusMode === "Both") {
         url += "?mode=outofcampus";
       }
-
-      console.log("Fetching products with URL:", url);
 
       const response = await fetch(url, {
         method: "GET",
@@ -472,7 +431,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
       }
 
       const data: any[] = await response.json();
-      console.log("Raw Fetched Data:", data);
 
       if (!data || data.length === 0) {
         setAllProducts([]);
@@ -482,7 +440,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
         return;
       }
 
-      // **Mapping `_id` to `id` and ensuring `userId` is string**
       const mappedData: Product[] = data.map((product) => ({
         id: product._id || product.id || `product-${Math.random()}`,
         title: product.title,
@@ -491,30 +448,24 @@ const Dashboard: React.FC<DashboardProps> = () => {
         category: product.category,
         images: product.images,
         university: product.university,
-        userId: product.userId, // Ensure this is a string
+        userId: product.userId,
         postedDate: product.postedDate,
         rating: product.rating,
         quality: product.quality,
-        availability: product.availability, // Ensure availability is included
+        availability: product.availability,
       }));
-
-      console.log("Mapped Products:", mappedData);
 
       let filtered = mappedData;
 
       if (campusMode === "In Campus") {
-        console.log("Filtering for In Campus mode");
         filtered = mappedData.filter(
           (product) =>
-            product.userId !== userId && // Ensure both are strings
+            product.userId !== userId &&
             product.university.toLowerCase() === institution.toLowerCase() &&
-            product.availability === "In Campus Only" // Explicitly filter by availability
+            product.availability === "In Campus Only"
         );
       }
 
-      console.log("Filtered Products:", filtered);
-
-      // Apply frontend filters
       let finalFiltered = filtered;
 
       if (selectedCategory !== "#Everything") {
@@ -531,8 +482,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
         );
       }
 
-      console.log("Final Filtered Products:", finalFiltered);
-
       setFilteredProducts(finalFiltered);
       setAllProducts(filtered);
       setError(null);
@@ -544,17 +493,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
     }
   };
 
-  useEffect(() => {
-    console.log("Filtered Products Length:", filteredProducts.length);
-    console.log("Current Index:", currentIndex);
-    console.log(
-      "Slice Result:",
-      filteredProducts.slice(
-        currentIndex,
-        Math.min(currentIndex + 2, filteredProducts.length)
-      )
-    );
-  }, [filteredProducts, currentIndex]);
   useEffect(() => {
     if (allProducts.length > 0) {
       let finalFiltered = allProducts;
@@ -572,6 +510,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
       }
       setFilteredProducts(finalFiltered);
       setCurrentIndex(0);
+      setCurrentImageIndex(0); // Reset image index when products change
     }
   }, [allProducts, selectedCategory, searchQuery]);
 
@@ -580,174 +519,338 @@ const Dashboard: React.FC<DashboardProps> = () => {
     setError(null);
     fetchProducts();
     fetchCart();
-    fetchUserInfo(); // Fetch user info when dashboard mounts or campusMode changes
+    fetchUserInfo();
     setCurrentIndex(0);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setCurrentImageIndex(0); // Reset image index when campusMode changes
   }, [campusMode]);
 
   const toggleFilterModal = () =>
     setIsFilterModalVisible(!isFilterModalVisible);
 
-  // Swipe handler
-  const handleSwipe = (direction: "left" | "right" | "up") => {
-    const product = filteredProducts[currentIndex];
-    if (!product) return;
-
-    if (direction === "up") {
-      setSelectedProductDescription(product.description);
-      setIsDescriptionModalVisible(true);
-      return;
-    }
-
-    if (direction === "right") {
-      addToCart(product);
-      return;
-    }
-
-    if (direction === "left") {
-      if (currentIndex < filteredProducts.length - 1) {
-        setCurrentIndex(currentIndex + 1);
-      } else {
-        showError("No more products.");
-        setCurrentIndex(0);
-      }
+  const goToNextProduct = () => {
+    if (currentIndex < filteredProducts.length - 1) {
+      setCurrentIndex(currentIndex + 1);
+      setCurrentImageIndex(0); // Reset image index when moving to next product
+    } else {
+      showError("No more products.");
+      setCurrentIndex(0);
+      setCurrentImageIndex(0);
     }
   };
 
+  const nextProduct = filteredProducts[currentIndex + 1] || null;
+
   type ProductItemProps = {
     product: Product;
-    onSwipeLeft: () => void;
-    onSwipeRight: () => void;
-    onSwipeUp: () => void;
-    isTop: boolean;
-    style?: any;
+    nextProduct: Product | null;
+    index: number;
+    currentIndex: number;
+    onAddToCart: (product: Product) => void;
+    onToggleFavorite: (id: string) => void;
+    onShowDescription: (desc: string) => void;
+    onNextProduct: () => void;
+    isFavorite: boolean;
+    currentImageIndex: number;
+    setCurrentImageIndex: (index: number) => void;
   };
 
   const ProductItem: React.FC<ProductItemProps> = ({
     product,
-    onSwipeLeft,
-    onSwipeRight,
-    onSwipeUp,
-    isTop,
-    style,
+    nextProduct,
+    index,
+    currentIndex,
+    onAddToCart,
+    onToggleFavorite,
+    onShowDescription,
+    onNextProduct,
+    isFavorite,
+    currentImageIndex,
+    setCurrentImageIndex,
   }) => {
-    const [currentImageIndex, setCurrentImageIndex] = useState(0);
-    const [isAdding, setIsAdding] = useState(false);
-    const isFavorite = favorites.includes(product.id);
-    const handleImageTap = ({ nativeEvent }: any) => {
-      if (nativeEvent.state === State.ACTIVE) {
-        setCurrentImageIndex((prev) =>
-          prev < product.images.length - 1 ? prev + 1 : 0
-        );
+    const translateX = useRef(new Animated.Value(0)).current;
+    const translateY = useRef(new Animated.Value(0)).current;
+
+    const doubleTapRef = useRef(null);
+    const singleTapRef = useRef(null);
+
+    // Use a ref for direction locking so it resets after each gesture
+    const directionLockedRef = useRef<"horizontal" | "vertical" | null>(null);
+
+    const onHandlerStateChange = ({ nativeEvent }: any) => {
+      if (nativeEvent.state === State.END) {
+        const { translationX, translationY } = nativeEvent;
+
+        if (directionLockedRef.current === "horizontal") {
+          if (translationX < -SWIPE_THRESHOLD) {
+            // Swipe Left: Show next image or product
+            Animated.timing(translateX, {
+              toValue: -SCREEN_WIDTH,
+              duration: 300,
+              useNativeDriver: true,
+            }).start(() => {
+              translateX.setValue(0);
+              const nextIdx =
+                currentImageIndex < product.images.length - 1
+                  ? currentImageIndex + 1
+                  : 0;
+              setCurrentImageIndex(nextIdx);
+            });
+            directionLockedRef.current = null;
+            return;
+          }
+          if (translationX > SWIPE_THRESHOLD) {
+            // Swipe Right: Add to cart without moving the image
+            onAddToCart(product);
+            directionLockedRef.current = null;
+            return;
+          }
+
+          Animated.spring(translateX, {
+            toValue: 0,
+            useNativeDriver: true,
+          }).start();
+        } else if (directionLockedRef.current === "vertical") {
+          if (translationY < -SWIPE_THRESHOLD) {
+            // Swipe Up: Navigate to next product
+            Animated.timing(translateY, {
+              toValue: -SCREEN_HEIGHT * 0.67,
+              duration: 300,
+              useNativeDriver: true,
+            }).start(() => {
+              translateY.setValue(0);
+              onNextProduct();
+            });
+            directionLockedRef.current = null;
+            return;
+          }
+
+          Animated.spring(translateY, {
+            toValue: 0,
+            useNativeDriver: true,
+          }).start();
+        } else {
+          Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
+          Animated.spring(translateY, { toValue: 0, useNativeDriver: true }).start();
+        }
+
+        // Reset direction lock at the end of gesture
+        directionLockedRef.current = null;
       }
     };
 
-    const handleGestureStateChange = ({ nativeEvent }: any) => {
-      if (!isTop) return;
+    const onGestureEvent = ({ nativeEvent }: any) => {
+      const { translationX, translationY } = nativeEvent;
+      const absX = Math.abs(translationX);
+      const absY = Math.abs(translationY);
 
-      if (nativeEvent.state === State.END) {
-        const { translationY, translationX, velocityY, velocityX } =
-          nativeEvent;
-
-        if (translationY < -50 && velocityY < -0.5) {
-          onSwipeUp();
-        } else if (translationX > 50 && velocityX > 0.5) {
-          if (!isAdding) {
-            setIsAdding(true);
-            onSwipeRight();
-            setTimeout(() => setIsAdding(false), 1000);
-          }
-        } else if (translationX < -50 && velocityX < -0.5) {
-          onSwipeLeft();
+      if (!directionLockedRef.current) {
+        if (absX > absY && absX > DIRECTION_LOCK_THRESHOLD) {
+          directionLockedRef.current = "horizontal";
+        } else if (absY > absX && absY > DIRECTION_LOCK_THRESHOLD) {
+          directionLockedRef.current = "vertical";
         }
       }
+
+      if (directionLockedRef.current === "horizontal") {
+        if (translationX < 0) { // Allow only left swipe (negative translationX)
+          translateX.setValue(translationX);
+        } else {
+          // Prevent right swipe movement
+          translateX.setValue(0);
+        }
+        translateY.setValue(0);
+      } else if (directionLockedRef.current === "vertical") {
+        translateY.setValue(translationY);
+        translateX.setValue(0);
+      }
     };
 
-    const renderImageIndicators = () => (
-      <View style={styles.imageIndicatorsContainer}>
-        {product.images.map((_, idx) => (
-          <View
-            key={idx}
-            style={[
-              styles.imageIndicatorDot,
-              idx === currentImageIndex && styles.imageIndicatorDotActive,
-            ]}
-          />
-        ))}
-      </View>
-    );
+    const onDoubleTap = () => {
+      onToggleFavorite(product.id);
+    };
+
+    const onSingleTap = () => {
+      onShowDescription(product.description);
+    };
+
+    const isTop = index === currentIndex;
+
+    const getNextImageIndex = () =>
+      currentImageIndex < product.images.length - 1 ? currentImageIndex + 1 : 0;
+    const nextImageIndex = getNextImageIndex();
+
+    const currentImageURI =
+      product.images && product.images.length > 0
+        ? product.images[currentImageIndex]
+        : "https://via.placeholder.com/150";
+    const nextImageURI =
+      product.images && product.images.length > 0
+        ? product.images[nextImageIndex]
+        : "https://via.placeholder.com/150";
+
+    const actualNextProduct = nextProduct || product;
+    const nextProductImage =
+      actualNextProduct.images && actualNextProduct.images.length > 0
+        ? actualNextProduct.images[0]
+        : "https://via.placeholder.com/150";
 
     return (
-      <PanGestureHandler onHandlerStateChange={handleGestureStateChange}>
-        <View style={[styles.stackedProduct, style]}>
-          {isTop && (
-            <View style={styles.topIconsContainer}>
-              <TouchableOpacity
-                style={[styles.iconContainer]}
-                onPress={() => toggleFavorite(product.id)}
-                accessibilityLabel="Toggle Favorite"
-              >
-                <Ionicons
-                  name={isFavorite ? "heart" : "heart-outline"}
-                  size={22}
-                  color={isFavorite ? "#FF3B30" : "#FFFFFF"}
-                />
-              </TouchableOpacity>
-            </View>
-          )}
+      <View style={[styles.stackedProduct, isTop ? styles.topProduct : styles.bottomProduct]}>
+        {isTop && (
+          <View style={styles.topIconsContainer}>
+            <TouchableOpacity
+              style={[styles.iconContainer]}
+              onPress={() => onToggleFavorite(product.id)}
+              accessibilityLabel="Toggle Favorite"
+            >
+              <Ionicons
+                name={isFavorite ? "heart" : "heart-outline"}
+                size={22}
+                color={isFavorite ? "#FF3B30" : "#FFFFFF"}
+              />
+            </TouchableOpacity>
+          </View>
+        )}
 
-          <TapGestureHandler onActivated={handleImageTap}>
-            <View style={styles.imageContainer}>
+        <PanGestureHandler onGestureEvent={onGestureEvent} onHandlerStateChange={onHandlerStateChange}>
+          {/* Removed overflow: "hidden" so we can see next images/products immediately */}
+          <Animated.View
+            style={{
+              width: SCREEN_WIDTH,
+              height: SCREEN_HEIGHT * 0.67,
+              transform: [{ translateX: translateX }, { translateY: translateY }],
+            }}
+          >
+            {/* Next product below current product */}
+            <View style={{ position: "absolute", top: SCREEN_HEIGHT * 0.67, width: SCREEN_WIDTH, height: SCREEN_HEIGHT * 0.67 }}>
+              <Image
+                source={{ uri: nextProductImage }}
+                style={styles.productImage}
+                resizeMode="cover"
+              />
               <LinearGradient
                 colors={["rgba(0,0,0,0.5)", "transparent"]}
                 style={styles.topGradientOverlay}
               />
-              <Image
-                source={{
-                  uri:
-                    product.images && product.images.length > 0
-                      ? product.images[currentImageIndex]
-                      : "https://via.placeholder.com/150",
-                }}
-                style={styles.productImage}
-                resizeMode="cover"
-              />
-              {isTop && renderImageIndicators()}
               <LinearGradient
                 colors={["transparent", "rgba(0,0,0,0.6)"]}
                 style={styles.bottomGradientOverlay}
               />
+            </View>
 
-              {isTop && (
-                <View style={styles.productInfoBubble}>
-                  <View style={styles.productInfoTextContainer}>
-                    <Text style={styles.productInfoTitle}>{product.title}</Text>
-                    <Text style={styles.productInfoPrice}>
-                      ${product.price.toFixed(2)}
-                    </Text>
+            <TapGestureHandler
+              ref={doubleTapRef}
+              numberOfTaps={2}
+              onActivated={onDoubleTap}
+            >
+              <TapGestureHandler
+                ref={singleTapRef}
+                waitFor={doubleTapRef}
+                numberOfTaps={1}
+                onActivated={onSingleTap}
+              >
+                <View
+                  style={{
+                    width: SCREEN_WIDTH * 2,
+                    height: "100%",
+                    flexDirection: "row",
+                  }}
+                >
+                  {/* Current image */}
+                  <View style={{ width: SCREEN_WIDTH, height: "100%" }}>
+                    <LinearGradient
+                      colors={["rgba(0,0,0,0.5)", "transparent"]}
+                      style={styles.topGradientOverlay}
+                    />
+                    <Image
+                      source={{ uri: currentImageURI }}
+                      style={styles.productImage}
+                      resizeMode="cover"
+                    />
+                    <LinearGradient
+                      colors={["transparent", "rgba(0,0,0,0.6)"]}
+                      style={styles.bottomGradientOverlay}
+                    />
                   </View>
-                  <View style={styles.productInfoActions}>
-                    <TouchableOpacity
-                      style={styles.iconButton}
-                      onPress={() => handleSwipe("left")}
-                      accessibilityLabel="Next"
-                    >
-                      <Ionicons name="close" size={20} color="#FF3B30" />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.iconButton}
-                      onPress={() => handleSwipe("right")}
-                      accessibilityLabel="Add to Cart"
-                    >
-                      <Ionicons name="cart" size={20} color="#34C759" />
-                    </TouchableOpacity>
+
+                  {/* Next image horizontally */}
+                  <View style={{ width: SCREEN_WIDTH, height: "100%" }}>
+                    <LinearGradient
+                      colors={["rgba(0,0,0,0.5)", "transparent"]}
+                      style={styles.topGradientOverlay}
+                    />
+                    <Image
+                      source={{ uri: nextImageURI }}
+                      style={styles.productImage}
+                      resizeMode="cover"
+                    />
+                    <LinearGradient
+                      colors={["transparent", "rgba(0,0,0,0.6)"]}
+                      style={styles.bottomGradientOverlay}
+                    />
                   </View>
                 </View>
-              )}
-            </View>
-          </TapGestureHandler>
-        </View>
-      </PanGestureHandler>
+              </TapGestureHandler>
+            </TapGestureHandler>
+
+            {isTop && (
+              <View style={styles.productInfoBubble}>
+                <View style={styles.productInfoTextContainer}>
+                  <Text style={styles.productInfoTitle}>{product.title}</Text>
+                  <Text style={styles.productInfoPrice}>
+                    ${product.price.toFixed(2)}
+                  </Text>
+                </View>
+                <View style={styles.productInfoActions}>
+                  <TouchableOpacity
+                    style={styles.iconButton}
+                    onPress={() => {
+                      const newIdx =
+                        currentImageIndex < product.images.length - 1
+                          ? currentImageIndex + 1
+                          : 0;
+                      setCurrentImageIndex(newIdx);
+                    }}
+                    accessibilityLabel="Next Image"
+                  >
+                    <Ionicons name="close" size={20} color="#FF3B30" />
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.iconButton}
+                    onPress={() => onShowDescription(product.description)}
+                    accessibilityLabel="Info"
+                  >
+                    <Ionicons name="information-circle" size={20} color="#FFFFFF" />
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.iconButton}
+                    onPress={() => onAddToCart(product)}
+                    accessibilityLabel="Add to Cart"
+                  >
+                    <Ionicons name="cart" size={20} color="#34C759" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
+            {isTop && (
+              <View style={styles.imageIndicatorsContainer}>
+                {product.images.map((_, idx) => (
+                  <View
+                    key={idx}
+                    style={[
+                      styles.imageIndicatorDot,
+                      idx === currentImageIndex && styles.imageIndicatorDotActive,
+                    ]}
+                  />
+                ))}
+              </View>
+            )}
+          </Animated.View>
+        </PanGestureHandler>
+      </View>
     );
   };
 
@@ -778,18 +881,17 @@ const Dashboard: React.FC<DashboardProps> = () => {
           colors={["#000000", "#000000"]}
           style={styles.gradientBackground}
         >
-          {/* Error Toast */}
           {errorMessage ? (
             <Animated.View
               style={[
-                styles.toastContainer,
+                styles.smallToastContainer,
                 { backgroundColor: "#FF6B6B", opacity: errorOpacity },
                 {
                   transform: [
                     {
                       translateY: errorOpacity.interpolate({
                         inputRange: [0, 1],
-                        outputRange: [-50, 0],
+                        outputRange: [-20, 0],
                       }),
                     },
                   ],
@@ -800,18 +902,17 @@ const Dashboard: React.FC<DashboardProps> = () => {
             </Animated.View>
           ) : null}
 
-          {/* Success Toast */}
           {successMessage ? (
             <Animated.View
               style={[
-                styles.toastContainer,
+                styles.smallToastContainer,
                 { backgroundColor: "#81C784", opacity: successOpacity },
                 {
                   transform: [
                     {
                       translateY: successOpacity.interpolate({
                         inputRange: [0, 1],
-                        outputRange: [-50, 0],
+                        outputRange: [-20, 0],
                       }),
                     },
                   ],
@@ -822,7 +923,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
             </Animated.View>
           ) : null}
 
-          {/* Top Bar with search and filter */}
           <View style={styles.topBar}>
             <View style={styles.searchBarContainer}>
               <Ionicons
@@ -867,6 +967,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
                   fetchProducts();
                   fetchCart();
                   setCurrentIndex(0);
+                  setCurrentImageIndex(0);
                 }}
                 accessibilityLabel="Retry"
               >
@@ -879,32 +980,27 @@ const Dashboard: React.FC<DashboardProps> = () => {
             </View>
           ) : (
             <View style={styles.productStack}>
-              {filteredProducts.length > 0 && (
-                <View style={styles.productStack}>
-                  {filteredProducts
-                    .slice(
-                      currentIndex,
-                      Math.min(currentIndex + 2, filteredProducts.length)
-                    )
-                    .reverse()
-                    .map((product, index, array) => (
-                      <ProductItem
-                        key={product.id}
-                        product={product}
-                        onSwipeLeft={() => handleSwipe("left")}
-                        onSwipeRight={() => handleSwipe("right")}
-                        onSwipeUp={() => handleSwipe("up")}
-                        isTop={index === array.length - 1}
-                        style={[
-                          { zIndex: index },
-                          index === array.length - 1
-                            ? styles.topProduct
-                            : styles.bottomProduct,
-                        ]}
-                      />
-                    ))}
-                </View>
-              )}
+              {filteredProducts
+                .slice(currentIndex, currentIndex + 1)
+                .map((product, idx) => (
+                  <ProductItem
+                    key={product.id}
+                    product={product}
+                    nextProduct={filteredProducts[currentIndex + 1] || null}
+                    index={currentIndex + idx}
+                    currentIndex={currentIndex}
+                    onAddToCart={addToCart}
+                    onToggleFavorite={toggleFavorite}
+                    onShowDescription={(desc) => {
+                      setSelectedProductDescription(desc);
+                      setIsDescriptionModalVisible(true);
+                    }}
+                    onNextProduct={goToNextProduct}
+                    isFavorite={favorites.includes(product.id)}
+                    currentImageIndex={currentImageIndex}
+                    setCurrentImageIndex={setCurrentImageIndex}
+                  />
+                ))}
             </View>
           )}
 
@@ -933,8 +1029,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
                     <TouchableOpacity
                       style={[
                         styles.filterOptionButton,
-                        selectedCategory === item &&
-                          styles.filterOptionSelected,
+                        selectedCategory === item && styles.filterOptionSelected,
                       ]}
                       onPress={() => setSelectedCategory(item)}
                       accessibilityLabel={`Filter by ${item}`}
@@ -962,8 +1057,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
                     <TouchableOpacity
                       style={[
                         styles.filterOptionButton,
-                        campusMode === item.value &&
-                          styles.filterOptionSelected,
+                        campusMode === item.value && styles.filterOptionSelected,
                       ]}
                       onPress={() => setCampusMode(item.value)}
                       accessibilityLabel={`Filter by ${item.label}`}
@@ -1091,7 +1185,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
 
 export default Dashboard;
 
-// Updated styles to include userInfoContainer and userInfoText
 const styles = StyleSheet.create({
   rootContainer: {
     flex: 1,
@@ -1102,19 +1195,21 @@ const styles = StyleSheet.create({
     paddingBottom: 60,
     backgroundColor: "#000000",
   },
-  toastContainer: {
+  smallToastContainer: {
     position: "absolute",
-    top: 0,
-    left: 0,
-    width: SCREEN_WIDTH,
-    paddingVertical: 15,
+    top: 10,
+    right: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 20,
     justifyContent: "center",
     alignItems: "center",
     zIndex: 9999,
   },
   toastText: {
     color: "#fff",
-    fontWeight: "700",
+    fontWeight: "600",
+    fontSize: 12,
     textAlign: "center",
   },
   topBar: {
@@ -1149,7 +1244,7 @@ const styles = StyleSheet.create({
   filterTagsContainer: {
     flexDirection: "row",
     paddingHorizontal: 15,
-    paddingVertical: 5,
+    paddingVertical: 6,
   },
   filterTag: {
     backgroundColor: "#262626",
@@ -1157,7 +1252,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     marginRight: 5,
+    marginTop: -9, // This will shift the bubbles slightly upward
   },
+  
   filterTagText: {
     color: "#FFFFFF",
     fontSize: 12,
@@ -1166,11 +1263,13 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    marginTop: -24, // Add spacing at the top
   },
+
   stackedProduct: {
     position: "absolute",
     width: SCREEN_WIDTH,
-    height: SCREEN_HEIGHT * 0.67,
+    height: SCREEN_HEIGHT * 0.669,
     justifyContent: "flex-start",
     backgroundColor: "transparent",
     overflow: "hidden",
@@ -1182,22 +1281,16 @@ const styles = StyleSheet.create({
   },
   bottomProduct: {
     zIndex: 1,
-    transform: [{ scale: 0.95 }, { translateY: SCREEN_HEIGHT * 0.05 }],
     opacity: 0,
-  },
-  imageContainer: {
-    width: "100%",
-    height: "100%",
-    justifyContent: "center",
-    overflow: "hidden",
-    position: "relative",
+    transform: [{ scale: 0.95 }, { translateY: SCREEN_HEIGHT * 0.05 }],
   },
   productImage: {
     width: "100%",
     height: "100%",
     resizeMode: "cover",
-    marginTop: -30,
+    transform: [{ translateY: -1 }], // Shift image slightly up
   },
+  
   topGradientOverlay: {
     position: "absolute",
     top: 0,
@@ -1369,7 +1462,7 @@ const styles = StyleSheet.create({
     marginVertical: 5,
   },
   filterOptionSelected: {
-    backgroundColor: "#6A4C93", // subtle purple
+    backgroundColor: "#6A4C93",
   },
   filterOptionText: {
     color: "#FFFFFF",
@@ -1387,7 +1480,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   applyButton: {
-    backgroundColor: "#6A4C93", // subtle purple
+    backgroundColor: "#6A4C93",
     paddingVertical: 10,
     paddingHorizontal: 30,
     borderRadius: 20,
@@ -1449,22 +1542,6 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 14,
     lineHeight: 20,
-    textAlign: "center",
-  },
-  userInfoContainer: {
-    position: "absolute",
-    top: Platform.OS === "ios" ? 70 : 50, // Adjust based on device
-    left: 20,
-    right: 20,
-    zIndex: 1000,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    padding: 10,
-    borderRadius: 10,
-  },
-  userInfoText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "600",
     textAlign: "center",
   },
 });

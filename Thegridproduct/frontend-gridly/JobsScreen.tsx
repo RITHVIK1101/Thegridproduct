@@ -1,5 +1,4 @@
 // JobsScreen.tsx
-
 import React, { useState, useRef, useEffect, useContext } from "react";
 import {
   View,
@@ -16,23 +15,23 @@ import {
   Dimensions,
   ActivityIndicator,
   Alert,
+  Pressable,
 } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
-import BottomNavBar from "./components/BottomNavbar";
+import BottomNavBar from "./components/BottomNavbar"; 
 import { NGROK_URL } from "@env";
-import { UserContext } from "./UserContext"; // Ensure correct path
+import { UserContext } from "./UserContext";
 
 const { width } = Dimensions.get("window");
 
-// Define the Gig interface based on your API response
 interface Gig {
   id: string;
   title: string;
   description: string;
   category: string;
   price: string;
-  userId: string; // ID of the user who posted the gig
+  userId: string;
 }
 
 interface Message {
@@ -55,17 +54,22 @@ const categoryIcons: { [key: string]: string } = {
   Writing: "create-outline",
   Delivery: "bicycle-outline",
   Coding: "code-slash-outline",
-  Other: "ellipse-outline",
+  Other: "grid-outline",
 };
 
+const categoriesFilter = ["All", "Tutoring", "Design", "Writing", "Delivery", "Coding", "Other"];
+
 const JobsScreen: React.FC = () => {
-  const { userId, token } = useContext(UserContext); // Get userId and token from context
+  const { token } = useContext(UserContext);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearchBar, setShowSearchBar] = useState(false);
   const [showAssistant, setShowAssistant] = useState(false);
   const [hasUserMessaged, setHasUserMessaged] = useState(false);
   const assistantAnim = useRef(new Animated.Value(0)).current;
+
+  const [currentFilter, setCurrentFilter] = useState("All");
+  const [filterMenuVisible, setFilterMenuVisible] = useState<boolean>(false);
 
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -76,11 +80,9 @@ const JobsScreen: React.FC = () => {
   ]);
   const [userInput, setUserInput] = useState("");
 
-  // State variables for gigs and loading indicator
   const [gigs, setGigs] = useState<Gig[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
 
-  // Fetch gigs from API on component mount
   useEffect(() => {
     fetchGigs();
   }, []);
@@ -92,7 +94,7 @@ const JobsScreen: React.FC = () => {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`, // Include token if required
+          Authorization: `Bearer ${token}`,
         },
       });
 
@@ -102,31 +104,32 @@ const JobsScreen: React.FC = () => {
 
       const data = await response.json();
 
-      // Ensure that 'gigs' exists and is an array
       if (!data.gigs || !Array.isArray(data.gigs)) {
         throw new Error("Invalid data format received from server.");
       }
 
-      // Since backend already excludes user's gigs, directly set gigs
       setGigs(data.gigs);
     } catch (error) {
       console.error(error);
-      Alert.alert("Error", "Unable to fetch gigs. Please try again later.");
+      Alert.alert("Error", "Unable to fetch services. Please try again later.");
     } finally {
       setLoading(false);
     }
   };
 
   const featuredGigs = gigs.slice(0, 2);
-  const allGigs = gigs;
 
-  // Filter gigs based on search query
-  const filteredGigs = allGigs.filter(
-    (gig) =>
+  const filteredGigs = gigs.filter((gig) => {
+    const matchSearch =
       gig.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       gig.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      gig.description.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+      gig.description.toLowerCase().includes(searchQuery.toLowerCase());
+
+    const matchCategory =
+      currentFilter === "All" || gig.category === currentFilter;
+
+    return matchSearch && matchCategory;
+  });
 
   const toggleAssistant = () => {
     if (showAssistant) {
@@ -159,22 +162,19 @@ const JobsScreen: React.FC = () => {
     setMessages((prev) => [...prev, newUserMessage]);
     setUserInput("");
 
-    // Once user sends a message, suggestions vanish
     if (!hasUserMessaged) {
       setHasUserMessaged(true);
     }
 
-    // Mock assistant reply logic
     setTimeout(() => {
       const assistantReplies = [
         "Awesome! Could you tell me more about the category or field you're interested in?",
-        "Great. Any specific deadline or timeframe you're working with?",
+        "Great. Any specific deadline or timeframe?",
         "Got it. What's your budget range?",
-        "Perfect! I'll find some top-rated freelancers that match your needs.",
+        "Perfect! I'll find some freelancers that match your needs.",
       ];
 
-      const userMessagesCount =
-        messages.filter((m) => m.role === "user").length + 1;
+      const userMessagesCount = messages.filter((m) => m.role === "user").length + 1;
       let responseText = "Let me think...";
       if (userMessagesCount <= assistantReplies.length) {
         responseText = assistantReplies[userMessagesCount - 1];
@@ -191,12 +191,65 @@ const JobsScreen: React.FC = () => {
     }, 1000);
   };
 
-  const toggleSearchBar = () => {
-    setShowSearchBar(!showSearchBar);
+  const sendMessageWithSuggestion = (suggestion: string) => {
+    const newUserMessage: Message = {
+      id: Math.random().toString(),
+      text: suggestion,
+      role: "user",
+    };
+    setMessages((prev) => [...prev, newUserMessage]);
+    setUserInput("");
+
+    if (!hasUserMessaged) {
+      setHasUserMessaged(true);
+    }
+
+    setTimeout(() => {
+      const assistantReplies = [
+        "Awesome! Could you tell me more about the category or field you're interested in?",
+        "Great. Any specific deadline or timeframe?",
+        "Got it. What's your budget range?",
+        "Perfect! I'll find some freelancers that match your needs.",
+      ];
+
+      const userMessagesCount = messages.filter((m) => m.role === "user").length + 1;
+      let responseText = "Let me think...";
+      if (userMessagesCount <= assistantReplies.length) {
+        responseText = assistantReplies[userMessagesCount - 1];
+      } else {
+        responseText = "Alright! Let me find some matches for you. One sec...";
+      }
+
+      const newAssistantMessage: Message = {
+        id: Math.random().toString(),
+        text: responseText,
+        role: "assistant",
+      };
+      setMessages((prev) => [...prev, newAssistantMessage]);
+    }, 1000);
   };
 
   const handleSuggestionPress = (suggestion: string) => {
     setUserInput(suggestion);
+    sendMessageWithSuggestion(suggestion);
+  };
+
+  const toggleSearchBar = () => {
+    setShowSearchBar(!showSearchBar);
+  };
+
+  const handleFilterPillPress = () => {
+    if (currentFilter === "All") {
+      setFilterMenuVisible(true);
+    } else {
+      // If currently filtered by a category, pressing again resets to All
+      setCurrentFilter("All");
+    }
+  };
+
+  const truncateDescription = (desc: string, length: number) => {
+    if (desc.length <= length) return desc;
+    return desc.slice(0, length) + "...";
   };
 
   const opacity = assistantAnim.interpolate({
@@ -209,37 +262,42 @@ const JobsScreen: React.FC = () => {
     outputRange: [50, 0],
   });
 
+  const currentHeaderTitle = "Find a Service";
+  const currentFilterLabel = currentFilter === "All" ? (
+    <>
+      <Ionicons name="filter-outline" size={16} color="#BB86FC" style={{ marginRight: 5 }} />
+      <Text style={styles.filterLabelText}>All</Text>
+    </>
+  ) : (
+    <Text style={styles.filterLabelText}>
+      {currentFilter} ×
+    </Text>
+  );
+
   return (
     <View style={styles.container}>
-      {/* Hero Section (Purple Gradient) */}
+      {/* Thinner hero section */}
       <LinearGradient
-        colors={["#BB86FC", "#3700B3"]}
+        colors={["#8E2DE2", "#4A00E0"]}
         start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
+        end={{ x: 0.9, y: 1 }}
         style={styles.heroContainer}
       >
-        <Text style={styles.heroTitle}>Find Your Perfect Service</Text>
-        <TouchableOpacity
-          style={styles.heroSearchIcon}
-          onPress={toggleSearchBar}
-        >
-          <Ionicons
-            name={showSearchBar ? "close" : "search"}
-            size={24}
-            color="#fff"
-          />
-        </TouchableOpacity>
+        <View style={styles.headerRow}>
+          <Text style={styles.mainHeader}>{currentHeaderTitle}</Text>
+          <Pressable
+            style={styles.filterLabelButton}
+            onPress={handleFilterPillPress}
+            accessibilityLabel="Filter Options"
+          >
+            {currentFilterLabel}
+          </Pressable>
+        </View>
       </LinearGradient>
 
-      {/* Search Bar Below Hero */}
       {showSearchBar && (
         <View style={styles.searchBarContainer}>
-          <Ionicons
-            name="search-outline"
-            size={20}
-            color="#BB86FC"
-            style={styles.searchIcon}
-          />
+          <Ionicons name="search-outline" size={20} color="#BB86FC" style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
             placeholder="Search services..."
@@ -250,25 +308,46 @@ const JobsScreen: React.FC = () => {
         </View>
       )}
 
+      {/* Filter Modal */}
+      <Modal
+        visible={filterMenuVisible}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setFilterMenuVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.filterModalContainer}>
+            {categoriesFilter.map((cat) => (
+              <Pressable
+                key={cat}
+                style={styles.filterModalOption}
+                onPress={() => {
+                  setCurrentFilter(cat);
+                  setFilterMenuVisible(false);
+                }}
+              >
+                <Text style={styles.filterModalOptionText}>{cat}</Text>
+              </Pressable>
+            ))}
+            <Pressable
+              style={[styles.filterModalOption, styles.filterModalClose]}
+              onPress={() => setFilterMenuVisible(false)}
+            >
+              <Text style={styles.filterModalOptionText}>Close</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
       <ScrollView
         contentContainerStyle={styles.scrollContainer}
         showsVerticalScrollIndicator={false}
       >
-        {/* Featured Gigs */}
         <Text style={styles.sectionTitle}>Featured</Text>
-
         {loading ? (
-          <ActivityIndicator
-            size="large"
-            color="#BB86FC"
-            style={{ marginLeft: 20 }}
-          />
+          <ActivityIndicator size="large" color="#BB86FC" style={{ marginLeft: 20 }} />
         ) : (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.featuredScroll}
-          >
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.featuredScroll}>
             {featuredGigs.map((gig) => (
               <LinearGradient
                 key={gig.id}
@@ -281,7 +360,7 @@ const JobsScreen: React.FC = () => {
                   <Text style={styles.featuredTitle}>{gig.title}</Text>
                   <View style={styles.featuredCategoryRow}>
                     <Ionicons
-                      name={categoryIcons[gig.category] || "help-outline"}
+                      name={categoryIcons[gig.category] || "grid-outline"}
                       size={16}
                       color="#BB86FC"
                       style={{ marginRight: 5 }}
@@ -294,56 +373,46 @@ const JobsScreen: React.FC = () => {
           </ScrollView>
         )}
 
-        {/* All Gigs (Simple List with lines, no images) */}
         <Text style={styles.sectionTitle}>All Services</Text>
-
         {loading ? (
-          <ActivityIndicator
-            size="large"
-            color="#BB86FC"
-            style={{ marginLeft: 20 }}
-          />
+          <ActivityIndicator size="large" color="#BB86FC" style={{ marginLeft: 20 }} />
         ) : (
-          filteredGigs.map((gig, index) => (
-            <View key={gig.id}>
-              <View style={styles.serviceRow}>
-                <Ionicons
-                  name={categoryIcons[gig.category] || "help-outline"}
-                  size={24}
-                  color="#BB86FC"
-                  style={{ marginRight: 15 }}
-                />
-                <View style={styles.serviceInfo}>
-                  <Text style={styles.serviceTitle}>{gig.title}</Text>
-                  <Text style={styles.serviceCategory}>{gig.category}</Text>
-                  <Text style={styles.serviceDescription}>
-                    {gig.description}
-                  </Text>
-                  <Text style={styles.servicePrice}>{gig.price}</Text>
+          <>
+            {filteredGigs.map((gig, index) => (
+              <View key={gig.id}>
+                <View style={styles.serviceRow}>
+                  <Ionicons
+                    name={categoryIcons[gig.category] || "grid-outline"}
+                    size={24}
+                    color="#BB86FC"
+                    style={{ marginRight: 15 }}
+                  />
+                  <View style={styles.serviceInfo}>
+                    <Text style={styles.serviceTitle}>{gig.title}</Text>
+                    <Text style={styles.serviceCategory}>{gig.category}</Text>
+                    <Text style={styles.serviceDescription}>
+                      {truncateDescription(gig.description, 80)}
+                    </Text>
+                    <Text style={styles.servicePrice}>{gig.price}</Text>
+                  </View>
                 </View>
+                {index < filteredGigs.length - 1 && <View style={styles.divider} />}
               </View>
-              {index < filteredGigs.length - 1 && (
-                <View style={styles.divider} />
-              )}
-            </View>
-          ))
-        )}
+            ))}
 
-        {!loading && filteredGigs.length === 0 && (
-          <Text style={styles.noResultsText}>
-            No services found for "{searchQuery}"
-          </Text>
+            {!loading && filteredGigs.length === 0 && (
+              <Text style={styles.noResultsText}>
+                No services found for "{currentFilter}"
+              </Text>
+            )}
+          </>
         )}
       </ScrollView>
 
       <BottomNavBar />
 
       {/* Floating "Ask AI" Button */}
-      <TouchableOpacity
-        activeOpacity={0.9}
-        style={styles.fab}
-        onPress={toggleAssistant}
-      >
+      <TouchableOpacity activeOpacity={0.9} style={styles.fab} onPress={toggleAssistant}>
         <LinearGradient
           colors={["rgb(168, 237, 234)", "rgb(254, 214, 227)"]}
           start={{ x: 0, y: 0 }}
@@ -354,7 +423,7 @@ const JobsScreen: React.FC = () => {
         </LinearGradient>
       </TouchableOpacity>
 
-      {/* Full-Screen AI Assistant Modal */}
+      {/* AI Assistant Modal */}
       <Modal visible={showAssistant} transparent animationType="none">
         <KeyboardAvoidingView
           style={styles.modalContainer}
@@ -367,21 +436,20 @@ const JobsScreen: React.FC = () => {
               { transform: [{ translateY }], opacity },
             ]}
           >
-            {/* Updated Gradient Header for Assistant */}
             <LinearGradient
-              colors={["#BB86FC", "#03DAC6"]}
+              colors={["#6D1B7B", "#B012F1"]}
               start={{ x: 0.2, y: 0 }}
               end={{ x: 0.8, y: 1 }}
               style={styles.assistantHeader}
             >
               <View style={styles.assistantHeaderLeft}>
                 <Ionicons
-                  name="robot-outline"
+                  name="grid-outline"
                   size={24}
                   color="#fff"
                   style={{ marginRight: 10 }}
                 />
-                <Text style={styles.assistantHeaderText}>AI Assistant</Text>
+                <Text style={styles.assistantHeaderText}>Find a Freelancer with AI</Text>
               </View>
               <TouchableOpacity onPress={toggleAssistant}>
                 <Ionicons name="close" size={24} color="#fff" />
@@ -396,7 +464,6 @@ const JobsScreen: React.FC = () => {
                 contentContainerStyle={styles.chatContent}
                 showsVerticalScrollIndicator={false}
               >
-                {/* Suggestions in the center if user hasn't messaged yet */}
                 {!hasUserMessaged && (
                   <View style={styles.initialSuggestionsContainer}>
                     <ScrollView
@@ -411,9 +478,7 @@ const JobsScreen: React.FC = () => {
                           onPress={() => handleSuggestionPress(phrase)}
                           activeOpacity={0.7}
                         >
-                          <Text style={styles.initialSuggestionText}>
-                            {phrase}
-                          </Text>
+                          <Text style={styles.initialSuggestionText}>{phrase}</Text>
                         </TouchableOpacity>
                       ))}
                     </ScrollView>
@@ -433,9 +498,7 @@ const JobsScreen: React.FC = () => {
                     <Text
                       style={[
                         styles.messageText,
-                        msg.role === "assistant"
-                          ? styles.assistantText
-                          : styles.userText,
+                        msg.role === "assistant" ? styles.assistantText : styles.userText,
                       ]}
                     >
                       {msg.text}
@@ -444,7 +507,6 @@ const JobsScreen: React.FC = () => {
                 ))}
               </ScrollView>
 
-              {/* Input Area */}
               <View style={styles.inputArea}>
                 <TextInput
                   style={styles.chatInput}
@@ -453,10 +515,7 @@ const JobsScreen: React.FC = () => {
                   value={userInput}
                   onChangeText={setUserInput}
                 />
-                <TouchableOpacity
-                  style={styles.sendButton}
-                  onPress={sendMessage}
-                >
+                <TouchableOpacity style={styles.sendButton} onPress={sendMessage}>
                   <Ionicons name="paper-plane" size={20} color="#fff" />
                 </TouchableOpacity>
               </View>
@@ -478,23 +537,35 @@ const styles = StyleSheet.create({
   },
   heroContainer: {
     width: "100%",
-    paddingTop: 50,
-    paddingBottom: 30,
+    // Make hero section thinner
+    paddingTop: 20,
+    paddingBottom: 10,
     paddingHorizontal: 20,
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
   },
-  heroTitle: {
-    fontSize: 24,
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  mainHeader: {
+    fontSize: 18,
     fontWeight: "700",
     color: "#fff",
   },
-  heroSearchIcon: {
-    position: "absolute",
-    top: 55,
-    right: 20,
+  filterLabelButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: "#1E1E1E",
+    borderRadius: 20,
   },
-
+  filterLabelText: {
+    color: "#BB86FC",
+    fontSize: 14,
+  },
   searchBarContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -503,7 +574,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 15,
     marginTop: 10,
-    marginBottom: 10,
     borderWidth: 1,
     borderColor: "#BB86FC",
   },
@@ -516,7 +586,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     paddingVertical: 8,
   },
-
   scrollContainer: {
     paddingBottom: 100,
   },
@@ -556,8 +625,6 @@ const styles = StyleSheet.create({
     color: "#BB86FC",
     fontSize: 14,
   },
-
-  // All Gigs List (No images, just icons and text)
   serviceRow: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -598,8 +665,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 50,
   },
-
-  // Floating FAB
   fab: {
     position: "absolute",
     bottom: 120,
@@ -618,8 +683,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-
-  // Assistant Modal Styles
   modalContainer: {
     flex: 1,
     justifyContent: "flex-end",
@@ -640,7 +703,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     paddingTop: 50,
-    paddingBottom: 20,
+    paddingBottom: 15,
     paddingHorizontal: 20,
   },
   assistantHeaderLeft: {
@@ -652,7 +715,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#fff",
   },
-
   chatContainer: {
     flex: 1,
     borderTopLeftRadius: 20,
@@ -660,31 +722,30 @@ const styles = StyleSheet.create({
     padding: 15,
   },
   chatContent: {
-    paddingBottom: 140, // space for input
-    alignItems: "center", // Center content including suggestions if present
+    paddingBottom: 100,
+    alignItems: "center",
   },
-
   initialSuggestionsContainer: {
-    marginTop: 50,
-    marginBottom: 30,
+    marginTop: 30,
+    marginBottom: 20,
+    alignItems: "center",
   },
   initialSuggestionsScroll: {
     paddingHorizontal: 10,
   },
   initialSuggestionCard: {
     backgroundColor: "#1E1E1E",
-    borderRadius: 10,
+    borderRadius: 6,
     borderWidth: 1,
     borderColor: "#BB86FC",
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-    marginRight: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    marginRight: 8,
   },
   initialSuggestionText: {
     color: "#BB86FC",
     fontSize: 14,
   },
-
   messageBubble: {
     padding: 12,
     borderRadius: 12,
@@ -696,18 +757,12 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
     borderWidth: 1,
     borderColor: "#BB86FC",
-    shadowColor: "#BB86FC",
-    shadowOpacity: 0.4,
-    shadowRadius: 4,
   },
   userBubble: {
     backgroundColor: "#fff",
     alignSelf: "flex-end",
     borderWidth: 1,
     borderColor: "#03DAC6",
-    shadowColor: "#03DAC6",
-    shadowOpacity: 0.4,
-    shadowRadius: 4,
   },
   messageText: {
     fontSize: 15,
@@ -718,7 +773,6 @@ const styles = StyleSheet.create({
   userText: {
     color: "#000",
   },
-
   inputArea: {
     flexDirection: "row",
     alignItems: "center",
@@ -727,7 +781,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
     position: "absolute",
-    bottom: 20,
+    bottom: 30,
     left: 15,
     right: 15,
     borderWidth: 1,
@@ -744,5 +798,32 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 8,
     marginLeft: 8,
+  },
+  // Filter Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  filterModalContainer: {
+    backgroundColor: "#1E1E1E",
+    borderRadius: 8,
+    padding: 20,
+    width: 200,
+    alignItems: "stretch",
+  },
+  filterModalOption: {
+    paddingVertical: 10,
+    alignItems: "center",
+  },
+  filterModalOptionText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+  },
+  filterModalClose: {
+    marginTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: "#333333",
   },
 });
