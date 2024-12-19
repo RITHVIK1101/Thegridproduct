@@ -217,7 +217,6 @@ func GetSingleGigHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(gig)
 }
 
-// GetAllGigsHandler handles fetching all gigs with optional pagination and filtering
 // GetAllGigsHandler handles fetching all gigs with optional pagination and filtering,
 // excluding gigs posted by the current authenticated user.
 func GetAllGigsHandler(w http.ResponseWriter, r *http.Request) {
@@ -536,6 +535,105 @@ func DeleteGigHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"message": "Gig deleted successfully",
 	})
+}
+
+// GetUserGigsHandler handles fetching all gigs posted by the authenticated user with optional pagination
+func GetUserGigsHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method != http.MethodGet {
+		WriteJSONError(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Retrieve authenticated user details from context
+	userID, ok := r.Context().Value(userIDKey).(string)
+	if !ok || userID == "" {
+		WriteJSONError(w, "User not authenticated", http.StatusUnauthorized)
+		return
+	}
+
+	userObjID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		WriteJSONError(w, "Invalid user ID format", http.StatusBadRequest)
+		return
+	}
+
+	// Implement pagination
+	pageStr := r.URL.Query().Get("page")
+	limitStr := r.URL.Query().Get("limit")
+
+	// Parse 'page' query parameter
+	page, err := strconv.Atoi(pageStr)
+	if err != nil || page < 1 {
+		page = 1 // Default to page 1 if invalid
+	}
+
+	// Parse 'limit' query parameter
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil || limit < 1 || limit > 100 {
+		limit = 10 // Default to 10 items per page if invalid or out of range
+	}
+
+	// Calculate 'skip' based on current page and limit
+	skip := int64((page - 1) * limit) // Convert to int64
+	limit64 := int64(limit)           // Convert to int64
+
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+
+	collection := db.GetCollection("gridlyapp", "gigs")
+
+	// Filter to fetch gigs posted by the authenticated user
+	filter := bson.M{
+		"status": "active",
+		"userId": userObjID,
+	}
+
+	// Create FindOptions with proper *int64 types
+	findOptions := options.Find()
+	findOptions.SetSkip(skip)
+	findOptions.SetLimit(limit64)
+	findOptions.SetSort(bson.D{
+		{Key: "postedDate", Value: -1}, // Sort by newest first
+	})
+
+	cursor, err := collection.Find(ctx, filter, findOptions)
+	if err != nil {
+		log.Printf("Error fetching user gigs: %v", err)
+		WriteJSONError(w, "Error fetching gigs", http.StatusInternalServerError)
+		return
+	}
+	defer cursor.Close(ctx)
+
+	var gigs []models.Gig
+	if err = cursor.All(ctx, &gigs); err != nil {
+		log.Printf("Error decoding user gigs: %v", err)
+		WriteJSONError(w, "Error decoding gigs", http.StatusInternalServerError)
+		return
+	}
+
+	// Get total count for pagination
+	totalCount, err := collection.CountDocuments(ctx, filter)
+	if err != nil {
+		log.Printf("Error counting user gigs: %v", err)
+		WriteJSONError(w, "Error counting gigs", http.StatusInternalServerError)
+		return
+	}
+
+	totalPages := int((totalCount + int64(limit) - 1) / int64(limit)) // Ceiling division
+
+	// Response structure with pagination metadata
+	response := map[string]interface{}{
+		"page":       page,
+		"limit":      limit,
+		"totalPages": totalPages,
+		"totalCount": totalCount,
+		"gigs":       gigs,
+		"count":      len(gigs),
+	}
+
+	json.NewEncoder(w).Encode(response)
 }
 
 // Helper function to validate price format

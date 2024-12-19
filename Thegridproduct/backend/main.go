@@ -122,11 +122,13 @@ func main() {
 
 	// === Gig (Service) Routes ===
 	// Aligning endpoints with frontend's expectation of "/services"
-	protected.HandleFunc("/services", handlers.AddGigHandler).Methods("POST")           // Create a new gig
-	protected.HandleFunc("/services", handlers.GetAllGigsHandler).Methods("GET")        // Retrieve all gigs
-	protected.HandleFunc("/services/{id}", handlers.GetSingleGigHandler).Methods("GET") // Retrieve a single gig by ID
-	protected.HandleFunc("/services/{id}", handlers.UpdateGigHandler).Methods("PUT")    // Update a gig by ID
-	protected.HandleFunc("/services/{id}", handlers.DeleteGigHandler).Methods("DELETE") // Delete a gig by ID
+
+	protected.HandleFunc("/services", handlers.AddGigHandler).Methods("POST")                // Create a new gig
+	protected.HandleFunc("/services", handlers.GetAllGigsHandler).Methods("GET")             // Retrieve all gigs
+	protected.HandleFunc("/services/{id}", handlers.GetSingleGigHandler).Methods("GET")      // Retrieve a single gig by ID
+	protected.HandleFunc("/users/{id}/services", handlers.GetUserGigsHandler).Methods("GET") // Retrieve gigs for a specific user
+	protected.HandleFunc("/services/{id}", handlers.UpdateGigHandler).Methods("PUT")         // Update a gig by ID
+	protected.HandleFunc("/services/{id}", handlers.DeleteGigHandler).Methods("DELETE")      // Delete a gig by ID
 	// Add more gig-specific routes if needed, e.g., liking a gig
 	// protected.HandleFunc("/services/{id}/like", handlers.LikeGigHandler).Methods("POST")
 	// protected.HandleFunc("/services/{id}/unlike", handlers.UnlikeGigHandler).Methods("POST")

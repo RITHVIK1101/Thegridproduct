@@ -61,13 +61,22 @@ const ActivityScreen: React.FC = () => {
   const isFocused = useIsFocused();
   const { userId, token } = useContext(UserContext);
 
-  const [activeSegment, setActiveSegment] = useState<"Products" | "Gigs">("Products");
+  const [activeSegment, setActiveSegment] = useState<"Products" | "Gigs">(
+    "Products"
+  );
+
+  // Products State
   const [products, setProducts] = useState<Product[]>([]);
-  const [gigs, setGigs] = useState<Gig[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState<boolean>(false);
+  const [errorProducts, setErrorProducts] = useState<string | null>(null);
+
+  // Gigs State
+  const [gigs, setGigs] = useState<Gig[]>([]);
   const [filteredGigs, setFilteredGigs] = useState<Gig[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loadingGigs, setLoadingGigs] = useState<boolean>(false);
+  const [errorGigs, setErrorGigs] = useState<string | null>(null);
+
   const [searchQuery, setSearchQuery] = useState<string>("");
 
   const inputRef = useRef<TextInput>(null);
@@ -75,8 +84,8 @@ const ActivityScreen: React.FC = () => {
   // Fetch user products
   const fetchUserProducts = async () => {
     if (!userId || !token) {
-      setError("User not logged in.");
-      setLoading(false);
+      setErrorProducts("User not logged in.");
+      setLoadingProducts(false);
       return;
     }
 
@@ -114,26 +123,28 @@ const ActivityScreen: React.FC = () => {
       }
     } catch (err) {
       console.error("Error fetching products:", err);
-      setError(
+      setErrorProducts(
         err instanceof Error
           ? err.message
           : "An unexpected error occurred while fetching products."
       );
     } finally {
-      setLoading(false);
+      setLoadingProducts(false);
     }
   };
 
-  // Fetch all gigs, then filter by userId
+  // Fetch user gigs
+  // Fetch user gigs
   const fetchUserGigs = async () => {
     if (!userId || !token) {
-      setError("User not logged in.");
-      setLoading(false);
+      setErrorGigs("User not logged in.");
+      setLoadingGigs(false);
       return;
     }
 
     try {
-      const response = await fetch(`${NGROK_URL}/services`, {
+      // Updated URL to include userId in the path
+      const response = await fetch(`${NGROK_URL}/users/${userId}/services`, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
@@ -145,7 +156,7 @@ const ActivityScreen: React.FC = () => {
       if (!response.ok) {
         const errorText = await response.text();
         console.error("Error response text:", errorText);
-        throw new Error("Failed to fetch gigs. Server error.");
+        throw new Error("Failed to fetch your gigs. Server error.");
       } else if (!contentType || !contentType.includes("application/json")) {
         const errorText = await response.text();
         console.error("Unexpected content-type:", contentType, errorText);
@@ -154,72 +165,41 @@ const ActivityScreen: React.FC = () => {
 
       const data = await response.json();
 
-      // The GetAllGigsHandler might return a pagination structure like:
-      // {
-      //   "page": number,
-      //   "limit": number,
-      //   "totalPages": number,
-      //   "totalCount": number,
-      //   "gigs": [...],
-      //   "count": number
-      // }
-      //
-      // Or it might return just an array of gigs.
-      // We'll handle both scenarios.
-      const allGigs = Array.isArray(data) ? data : data.gigs || data;
-
-      const mappedGigs: Gig[] = allGigs.map((gig: any) => ({
-        id: gig._id,
-        userId: gig.userId,
-        university: gig.university,
-        studentType: gig.studentType,
-        title: gig.title,
-        category: gig.category,
-        description: gig.description,
-        coverImage: gig.coverImage,
-        price: gig.price,
-        availability: gig.availability,
-        additionalLinks: gig.additionalLinks || [],
-        additionalDocuments: gig.additionalDocuments || [],
-        postedDate: gig.postedDate,
-        expired: gig.expired,
-        status: gig.status,
-        likeCount: gig.likeCount,
-      }));
-
-      // Filter gigs by the current user's ID
-      const userGigs = mappedGigs.filter((gig) => gig.userId === userId);
-
-      if (userGigs.length === 0) {
+      // Assuming the response structure matches the backend handler
+      // If your backend sends a paginated response, adjust accordingly
+      const gigsData: Gig[] = data.gigs || [];
+      if (!gigsData || gigsData.length === 0) {
         setGigs([]);
         setFilteredGigs([]);
       } else {
-        setGigs(userGigs);
+        setGigs(gigsData);
         setFilteredGigs(
-          userGigs.filter((gig) =>
+          gigsData.filter((gig) =>
             gig.title.toLowerCase().includes(searchQuery.toLowerCase())
           )
         );
       }
     } catch (err) {
       console.error("Error fetching gigs:", err);
-      setError(
+      setErrorGigs(
         err instanceof Error
           ? err.message
           : "An unexpected error occurred while fetching gigs."
       );
     } finally {
-      setLoading(false);
+      setLoadingGigs(false);
     }
   };
 
   // Fetch data based on active segment
   const fetchData = async () => {
-    setLoading(true);
-    setError(null);
     if (activeSegment === "Products") {
+      setLoadingProducts(true);
+      setErrorProducts(null);
       await fetchUserProducts();
     } else {
+      setLoadingGigs(true);
+      setErrorGigs(null);
       await fetchUserGigs();
     }
   };
@@ -231,7 +211,11 @@ const ActivityScreen: React.FC = () => {
       "Are you sure you want to delete this product?",
       [
         { text: "No", style: "cancel" },
-        { text: "Delete", style: "destructive", onPress: () => deleteProduct(productId) },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => deleteProduct(productId),
+        },
       ],
       { cancelable: true }
     );
@@ -244,7 +228,11 @@ const ActivityScreen: React.FC = () => {
       "Are you sure you want to delete this gig?",
       [
         { text: "No", style: "cancel" },
-        { text: "Delete", style: "destructive", onPress: () => deleteGig(gigId) },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => deleteGig(gigId),
+        },
       ],
       { cancelable: true }
     );
@@ -355,6 +343,7 @@ const ActivityScreen: React.FC = () => {
     if (isFocused) {
       fetchData();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isFocused, activeSegment]);
 
   // Filter data based on search query
@@ -380,7 +369,8 @@ const ActivityScreen: React.FC = () => {
   // Render a single product item
   const renderProduct = ({ item }: { item: Product }) => {
     const daysActive = calculateDaysActive(item.postedDate);
-    const status = daysActive > 30 ? "Expired" : `Active for ${daysActive} days`;
+    const status =
+      daysActive > 30 ? "Expired" : `Active for ${daysActive} days`;
 
     return (
       <View style={styles.itemContainer}>
@@ -442,7 +432,8 @@ const ActivityScreen: React.FC = () => {
   // Render a single gig item
   const renderGig = ({ item }: { item: Gig }) => {
     const daysActive = calculateDaysActive(item.postedDate);
-    const status = daysActive > 30 ? "Expired" : `Active for ${daysActive} days`;
+    const status =
+      daysActive > 30 ? "Expired" : `Active for ${daysActive} days`;
 
     return (
       <View style={styles.itemContainer}>
@@ -453,7 +444,9 @@ const ActivityScreen: React.FC = () => {
         >
           <Text style={styles.itemTitle}>{item.title || "No Title"}</Text>
           <Text style={styles.itemPrice}>
-            {item.price === "Open to Communication" ? item.price : `$${item.price}`}
+            {item.price === "Open to Communication"
+              ? item.price
+              : `$${item.price}`}
           </Text>
           <Text style={styles.itemDate}>
             Posted: {new Date(item.postedDate).toDateString()}
@@ -499,31 +492,69 @@ const ActivityScreen: React.FC = () => {
 
   const renderList = () => {
     if (activeSegment === "Products") {
+      if (loadingProducts) {
+        return (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="small" color="#BB86FC" />
+            <Text style={styles.loadingText}>Loading your products...</Text>
+          </View>
+        );
+      }
+
+      if (errorProducts) {
+        return (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{errorProducts}</Text>
+          </View>
+        );
+      }
+
       return (
         <FlatList
           data={filteredProducts}
           keyExtractor={(item) => item.id}
           renderItem={renderProduct}
           contentContainerStyle={styles.listContainer}
-          ListEmptyComponent={<Text style={styles.emptyText}>You have no products.</Text>}
+          ListEmptyComponent={
+            <Text style={styles.emptyText}>You have no products.</Text>
+          }
           showsVerticalScrollIndicator={false}
           onRefresh={handleRefresh}
-          refreshing={loading}
+          refreshing={loadingProducts}
           ItemSeparatorComponent={renderSeparator}
           ListFooterComponent={renderFooter}
         />
       );
     } else {
+      if (loadingGigs) {
+        return (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="small" color="#BB86FC" />
+            <Text style={styles.loadingText}>Loading your gigs...</Text>
+          </View>
+        );
+      }
+
+      if (errorGigs) {
+        return (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{errorGigs}</Text>
+          </View>
+        );
+      }
+
       return (
         <FlatList
           data={filteredGigs}
           keyExtractor={(item) => item.id}
           renderItem={renderGig}
           contentContainerStyle={styles.listContainer}
-          ListEmptyComponent={<Text style={styles.emptyText}>You have no gigs.</Text>}
+          ListEmptyComponent={
+            <Text style={styles.emptyText}>You have no gigs.</Text>
+          }
           showsVerticalScrollIndicator={false}
           onRefresh={handleRefresh}
-          refreshing={loading}
+          refreshing={loadingGigs}
           ItemSeparatorComponent={renderSeparator}
           ListFooterComponent={null}
         />
@@ -572,7 +603,12 @@ const ActivityScreen: React.FC = () => {
         </View>
 
         <View style={styles.searchContainer}>
-          <Ionicons name="search" size={20} color="#fff" style={styles.searchIcon} />
+          <Ionicons
+            name="search"
+            size={20}
+            color="#fff"
+            style={styles.searchIcon}
+          />
           <View style={styles.searchLineContainer}>
             <TextInput
               ref={inputRef}
@@ -589,28 +625,23 @@ const ActivityScreen: React.FC = () => {
               returnKeyType="search"
             />
             {searchQuery.length > 0 && (
-              <TouchableOpacity onPress={() => setSearchQuery("")} activeOpacity={0.7}>
-                <Ionicons name="close-circle" size={20} color="#fff" style={styles.clearIcon} />
+              <TouchableOpacity
+                onPress={() => setSearchQuery("")}
+                activeOpacity={0.7}
+              >
+                <Ionicons
+                  name="close-circle"
+                  size={20}
+                  color="#fff"
+                  style={styles.clearIcon}
+                />
               </TouchableOpacity>
             )}
           </View>
         </View>
       </View>
 
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="small" color="#BB86FC" />
-          <Text style={styles.loadingText}>
-            Loading your {activeSegment.toLowerCase()}...
-          </Text>
-        </View>
-      ) : error ? (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{error}</Text>
-        </View>
-      ) : (
-        renderList()
-      )}
+      {renderList()}
 
       <BottomNavBar />
     </View>

@@ -1,5 +1,3 @@
-// LikedProductScreen.tsx
-
 import React, { useEffect, useState, useContext } from "react";
 import {
   View,
@@ -11,74 +9,53 @@ import {
   TouchableOpacity,
   Alert,
 } from "react-native";
-import { UserContext } from "./UserContext"; // Adjust the path as necessary
-import axios from "axios";
+import { UserContext } from "./UserContext"; // Adjust path as necessary
+import { NGROK_URL } from "@env"; // Load backend URL from environment variables
 import { useNavigation } from "@react-navigation/native";
 import Ionicons from "react-native-vector-icons/Ionicons";
 
-// Define the structure of a product based on the backend response
+// Define the structure of a product
 interface Product {
   _id: string;
-  userId: string;
   title: string;
   price: number;
   description: string;
-  selectedTags: string[];
   images: string[];
-  postedDate: string; // ISO string
-  isAvailableOutOfCampus: boolean;
-  rating: number;
-  listingType: string;
-  availability: string;
-  university: string;
-  studentType: string;
-  condition?: string;
   status: string;
-  likeCount: number;
 }
 
 const LikedProductScreen: React.FC = () => {
-  const { token } = useContext(UserContext);
+  const { token } = useContext(UserContext); // Get token from UserContext
   const [likedProducts, setLikedProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const navigation = useNavigation();
 
-  // Define the API endpoint
-  const API_ENDPOINT = "http://localhost:8080/products/liked"; // Replace with your actual backend URL
-
+  // Fetch liked products from backend
   useEffect(() => {
     const fetchLikedProducts = async () => {
-      if (!token) {
-        setError("User not authenticated.");
-        setLoading(false);
-        return;
-      }
-
-      setLoading(true);
-      setError(null);
-
       try {
-        const response = await axios.get(API_ENDPOINT, {
+        const response = await fetch(`${NGROK_URL}/products/liked`, {
+          method: "GET",
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
         });
 
-        if (response.status === 200) {
-          setLikedProducts(response.data);
-        } else {
-          setError("Failed to fetch liked products.");
-          Alert.alert("Error", "Failed to fetch liked products.");
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(
+            errorData.message || "Failed to fetch liked products"
+          );
         }
+
+        const data: Product[] = await response.json();
+        setLikedProducts(data);
       } catch (err: any) {
         console.error("Error fetching liked products:", err);
-        setError(err.response?.data?.error || "An unexpected error occurred.");
-        Alert.alert(
-          "Error",
-          err.response?.data?.error || "An unexpected error occurred."
-        );
+        setError(err.message || "An unexpected error occurred");
+        Alert.alert("Error", err.message || "An unexpected error occurred");
       } finally {
         setLoading(false);
       }
@@ -87,81 +64,67 @@ const LikedProductScreen: React.FC = () => {
     fetchLikedProducts();
   }, [token]);
 
-  // Render a single product item
-  const renderProductItem = ({ item }: { item: Product }) => {
-    return (
-      <TouchableOpacity
-        style={styles.productItem}
-        onPress={() => {
-          // Navigate to Product Details or another screen if needed
-          // For example: navigation.navigate("ProductDetails", { productId: item._id });
-        }}
-        accessibilityLabel={`View details for ${item.title}`}
-      >
-        {item.images && item.images.length > 0 ? (
-          <Image
-            source={{ uri: item.images[0] }}
-            style={styles.productImage}
-            resizeMode="cover"
-          />
-        ) : (
-          <View style={[styles.productImage, styles.imagePlaceholder]}>
-            <Text style={styles.imagePlaceholderText}>No Image</Text>
-          </View>
-        )}
-        <View style={styles.productInfo}>
-          <Text style={styles.productTitle}>{item.title}</Text>
-          <Text style={styles.productPrice}>${item.price.toFixed(2)}</Text>
-          <Text style={styles.productStatus}>
-            Status:{" "}
-            <Text
-              style={{
-                color: item.status === "sold" ? "green" : "orange",
-                fontWeight: "bold",
-              }}
-            >
-              {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
-            </Text>
-          </Text>
-          <Text numberOfLines={2} style={styles.productDescription}>
-            {item.description}
-          </Text>
+  // Render each liked product item
+  const renderProductItem = ({ item }: { item: Product }) => (
+    <TouchableOpacity
+      style={styles.productItem}
+      onPress={() =>
+        navigation.navigate("ProductDetails", { productId: item._id })
+      }
+    >
+      {item.images?.length > 0 ? (
+        <Image
+          source={{ uri: item.images[0] }}
+          style={styles.productImage}
+          resizeMode="cover"
+        />
+      ) : (
+        <View style={[styles.productImage, styles.imagePlaceholder]}>
+          <Text style={styles.imagePlaceholderText}>No Image</Text>
         </View>
-        <Ionicons name="chevron-forward" size={24} color="#FFFFFF" />
-      </TouchableOpacity>
-    );
-  };
+      )}
+      <View style={styles.productInfo}>
+        <Text style={styles.title}>{item.title}</Text>
+        <Text style={styles.price}>${item.price.toFixed(2)}</Text>
+        <Text style={styles.status}>
+          Status:{" "}
+          <Text
+            style={{
+              color: item.status === "sold" ? "green" : "orange",
+              fontWeight: "bold",
+            }}
+          >
+            {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+          </Text>
+        </Text>
+        <Text numberOfLines={2} style={styles.description}>
+          {item.description}
+        </Text>
+      </View>
+      <Ionicons name="chevron-forward" size={24} color="#000" />
+    </TouchableOpacity>
+  );
 
+  // Loading state
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#FFFFFF" />
-        <Text style={styles.loadingText}>Loading your liked products...</Text>
+        <ActivityIndicator size="large" color="#0000ff" />
+        <Text style={styles.loadingText}>Loading liked products...</Text>
       </View>
     );
   }
 
+  // Error state
   if (error) {
     return (
       <View style={styles.centered}>
         <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity
-          style={styles.retryButton}
-          onPress={() => {
-            // Retry fetching liked products
-            setLoading(true);
-            setError(null);
-            // Re-trigger the useEffect by updating state or implement a separate fetch function
-            // For simplicity, you can call fetchLikedProducts directly if it's defined outside useEffect
-          }}
-          accessibilityLabel="Retry fetching liked products"
-        >
-          <Text style={styles.retryButtonText}>Retry</Text>
-        </TouchableOpacity>
       </View>
     );
   }
 
+  // Empty state
   if (likedProducts.length === 0) {
     return (
       <View style={styles.centered}>
@@ -170,11 +133,14 @@ const LikedProductScreen: React.FC = () => {
     );
   }
 
+  // Main content
   return (
     <View style={styles.container}>
       <FlatList
         data={likedProducts}
-        keyExtractor={(item) => item._id}
+        keyExtractor={(item, index) =>
+          item._id || `item-${index}-${Math.random()}`
+        }
         renderItem={renderProductItem}
         contentContainerStyle={styles.listContent}
       />
@@ -187,7 +153,7 @@ export default LikedProductScreen;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#000000",
+    backgroundColor: "#fff",
     padding: 10,
   },
   centered: {
@@ -202,40 +168,23 @@ const styles = StyleSheet.create({
     color: "#555",
   },
   errorText: {
-    color: "#FF6347",
-    fontSize: 16,
-    marginBottom: 10,
-    textAlign: "center",
-  },
-  retryButton: {
-    backgroundColor: "#6f42c1",
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 5,
-  },
-  retryButtonText: {
-    color: "#FFFFFF",
+    color: "red",
     fontSize: 16,
   },
   emptyText: {
     fontSize: 18,
-    color: "#CCCCCC",
-    textAlign: "center",
+    color: "#555",
   },
   listContent: {
     paddingBottom: 20,
   },
   productItem: {
     flexDirection: "row",
-    backgroundColor: "#1c1c1c",
+    backgroundColor: "#f9f9f9",
     borderRadius: 8,
     marginBottom: 10,
     overflow: "hidden",
-    elevation: 2, // For Android
-    shadowColor: "#000", // For iOS
-    shadowOffset: { width: 0, height: 2 }, // For iOS
-    shadowOpacity: 0.1, // For iOS
-    shadowRadius: 4, // For iOS
+    elevation: 2,
     padding: 10,
     alignItems: "center",
   },
@@ -245,12 +194,12 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   imagePlaceholder: {
-    backgroundColor: "#555555",
+    backgroundColor: "#ccc",
     justifyContent: "center",
     alignItems: "center",
   },
   imagePlaceholderText: {
-    color: "#CCCCCC",
+    color: "#666",
     fontSize: 14,
   },
   productInfo: {
@@ -258,21 +207,21 @@ const styles = StyleSheet.create({
     marginLeft: 10,
     justifyContent: "space-between",
   },
-  productTitle: {
-    color: "#FFFFFF",
+  title: {
     fontSize: 16,
-    fontWeight: "600",
+    fontWeight: "bold",
+    color: "#333",
   },
-  productPrice: {
-    color: "#CCCCCC",
+  price: {
     fontSize: 14,
+    color: "#666",
   },
-  productStatus: {
-    color: "#CCCCCC",
+  status: {
     fontSize: 14,
+    color: "#666",
   },
-  productDescription: {
-    color: "#999999",
+  description: {
     fontSize: 12,
+    color: "#999",
   },
 });
