@@ -1,5 +1,3 @@
-// JobsScreen.tsx
-
 import React, { useState, useRef, useEffect, useContext } from "react";
 import {
   View,
@@ -21,12 +19,12 @@ import {
 } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
-import BottomNavBar from "./components/BottomNavbar"; 
+import BottomNavBar from "./components/BottomNavbar";
 import { NGROK_URL } from "@env";
 import { UserContext } from "./UserContext";
-import { StackNavigationProp } from '@react-navigation/stack';
-import { RootStackParamList } from './navigationtypes'; // Adjust the path if necessary
-import { useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from "@react-navigation/stack";
+import { RootStackParamList } from "./navigationtypes"; // Adjust the path if necessary
+import { useNavigation } from "@react-navigation/native";
 
 const { width } = Dimensions.get("window");
 
@@ -63,7 +61,15 @@ const categoryIcons: { [key: string]: string } = {
   Other: "grid-outline",
 };
 
-const categoriesFilter = ["All", "Tutoring", "Design", "Writing", "Delivery", "Coding", "Other"];
+const categoriesFilter = [
+  "All",
+  "Tutoring",
+  "Design",
+  "Writing",
+  "Delivery",
+  "Coding",
+  "Other",
+];
 
 // Helper function to get the current cycle based on 12-hour intervals
 const getCurrentCycle = (): number => {
@@ -92,10 +98,7 @@ const getFeaturedGigs = (gigs: Gig[]): Gig[] => {
 };
 
 // Define the navigation prop type
-type JobsScreenNavigationProp = StackNavigationProp<
-  RootStackParamList,
-  'Jobs'
->;
+type JobsScreenNavigationProp = StackNavigationProp<RootStackParamList, "Jobs">;
 
 const JobsScreen: React.FC = () => {
   const navigation = useNavigation<JobsScreenNavigationProp>();
@@ -217,7 +220,8 @@ const JobsScreen: React.FC = () => {
         "Perfect! I'll find some freelancers that match your needs.",
       ];
 
-      const userMessagesCount = messages.filter((m) => m.role === "user").length + 1;
+      const userMessagesCount =
+        messages.filter((m) => m.role === "user").length + 1;
       let responseText = "Let me think...";
       if (userMessagesCount <= assistantReplies.length) {
         responseText = assistantReplies[userMessagesCount - 1];
@@ -255,7 +259,8 @@ const JobsScreen: React.FC = () => {
         "Perfect! I'll find some freelancers that match your needs.",
       ];
 
-      const userMessagesCount = messages.filter((m) => m.role === "user").length + 1;
+      const userMessagesCount =
+        messages.filter((m) => m.role === "user").length + 1;
       let responseText = "Let me think...";
       if (userMessagesCount <= assistantReplies.length) {
         responseText = assistantReplies[userMessagesCount - 1];
@@ -306,16 +311,20 @@ const JobsScreen: React.FC = () => {
   });
 
   const currentHeaderTitle = "Find a Service";
-  const currentFilterLabel = currentFilter === "All" ? (
-    <>
-      <Ionicons name="filter-outline" size={16} color="#BB86FC" style={{ marginRight: 5 }} />
-      <Text style={styles.filterLabelText}>All</Text>
-    </>
-  ) : (
-    <Text style={styles.filterLabelText}>
-      {currentFilter} ×
-    </Text>
-  );
+  const currentFilterLabel =
+    currentFilter === "All" ? (
+      <>
+        <Ionicons
+          name="filter-outline"
+          size={16}
+          color="#BB86FC"
+          style={{ marginRight: 5 }}
+        />
+        <Text style={styles.filterLabelText}>All</Text>
+      </>
+    ) : (
+      <Text style={styles.filterLabelText}>{currentFilter} ×</Text>
+    );
 
   return (
     <View style={styles.container}>
@@ -340,7 +349,12 @@ const JobsScreen: React.FC = () => {
 
       {showSearchBar && (
         <View style={styles.searchBarContainer}>
-          <Ionicons name="search-outline" size={20} color="#BB86FC" style={styles.searchIcon} />
+          <Ionicons
+            name="search-outline"
+            size={20}
+            color="#BB86FC"
+            style={styles.searchIcon}
+          />
           <TextInput
             style={styles.searchInput}
             placeholder="Search services..."
@@ -388,9 +402,17 @@ const JobsScreen: React.FC = () => {
       >
         <Text style={styles.sectionTitle}>Featured</Text>
         {loading ? (
-          <ActivityIndicator size="large" color="#BB86FC" style={{ marginLeft: 20 }} />
+          <ActivityIndicator
+            size="large"
+            color="#BB86FC"
+            style={{ marginLeft: 20 }}
+          />
         ) : (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.featuredScroll}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.featuredScroll}
+          >
             {featuredGigs.map((gig) => (
               <LinearGradient
                 key={gig.id}
@@ -418,13 +440,19 @@ const JobsScreen: React.FC = () => {
 
         <Text style={styles.sectionTitle}>All Services</Text>
         {loading ? (
-          <ActivityIndicator size="large" color="#BB86FC" style={{ marginLeft: 20 }} />
+          <ActivityIndicator
+            size="large"
+            color="#BB86FC"
+            style={{ marginLeft: 20 }}
+          />
         ) : (
           <>
             {filteredGigs.map((gig, index) => (
               <TouchableOpacity
                 key={gig.id}
-                onPress={() => navigation.navigate('JobDetail', { jobId: gig.id })}
+                onPress={() =>
+                  navigation.navigate("JobDetail", { jobId: gig.id })
+                }
                 activeOpacity={0.7}
               >
                 <View>
@@ -436,7 +464,10 @@ const JobsScreen: React.FC = () => {
                         style={styles.coverImage}
                         resizeMode="cover"
                         onError={(e) => {
-                          console.log(`Failed to load image for gig ID ${gig.id}:`, e.nativeEvent.error);
+                          console.log(
+                            `Failed to load image for gig ID ${gig.id}:`,
+                            e.nativeEvent.error
+                          );
                         }}
                       />
                     ) : (
@@ -444,7 +475,7 @@ const JobsScreen: React.FC = () => {
                         <Ionicons name="image-outline" size={24} color="#555" />
                       </View>
                     )}
-                    
+
                     <View style={styles.serviceInfo}>
                       <Text style={styles.serviceTitle}>{gig.title}</Text>
                       <View style={styles.categoryRow}>
@@ -454,7 +485,9 @@ const JobsScreen: React.FC = () => {
                           color="#BB86FC"
                           style={{ marginRight: 5 }}
                         />
-                        <Text style={styles.serviceCategory}>{gig.category}</Text>
+                        <Text style={styles.serviceCategory}>
+                          {gig.category}
+                        </Text>
                       </View>
                       <Text style={styles.serviceDescription}>
                         {truncateDescription(gig.description, 80)}
@@ -462,7 +495,9 @@ const JobsScreen: React.FC = () => {
                       <Text style={styles.servicePrice}>{gig.price}</Text>
                     </View>
                   </View>
-                  {index < filteredGigs.length - 1 && <View style={styles.divider} />}
+                  {index < filteredGigs.length - 1 && (
+                    <View style={styles.divider} />
+                  )}
                 </View>
               </TouchableOpacity>
             ))}
@@ -479,7 +514,11 @@ const JobsScreen: React.FC = () => {
       <BottomNavBar />
 
       {/* Floating "Ask AI" Button */}
-      <TouchableOpacity activeOpacity={0.9} style={styles.fab} onPress={toggleAssistant}>
+      <TouchableOpacity
+        activeOpacity={0.9}
+        style={styles.fab}
+        onPress={toggleAssistant}
+      >
         <LinearGradient
           colors={["rgb(168, 237, 234)", "rgb(254, 214, 227)"]}
           start={{ x: 0, y: 0 }}
@@ -516,7 +555,9 @@ const JobsScreen: React.FC = () => {
                   color="#fff"
                   style={{ marginRight: 10 }}
                 />
-                <Text style={styles.assistantHeaderText}>Find a Freelancer with AI</Text>
+                <Text style={styles.assistantHeaderText}>
+                  Find a Freelancer with AI
+                </Text>
               </View>
               <TouchableOpacity onPress={toggleAssistant}>
                 <Ionicons name="close" size={24} color="#fff" />
@@ -545,7 +586,9 @@ const JobsScreen: React.FC = () => {
                           onPress={() => handleSuggestionPress(phrase)}
                           activeOpacity={0.7}
                         >
-                          <Text style={styles.initialSuggestionText}>{phrase}</Text>
+                          <Text style={styles.initialSuggestionText}>
+                            {phrase}
+                          </Text>
                         </TouchableOpacity>
                       ))}
                     </ScrollView>
@@ -565,7 +608,9 @@ const JobsScreen: React.FC = () => {
                     <Text
                       style={[
                         styles.messageText,
-                        msg.role === "assistant" ? styles.assistantText : styles.userText,
+                        msg.role === "assistant"
+                          ? styles.assistantText
+                          : styles.userText,
                       ]}
                     >
                       {msg.text}
@@ -582,7 +627,10 @@ const JobsScreen: React.FC = () => {
                   value={userInput}
                   onChangeText={setUserInput}
                 />
-                <TouchableOpacity style={styles.sendButton} onPress={sendMessage}>
+                <TouchableOpacity
+                  style={styles.sendButton}
+                  onPress={sendMessage}
+                >
                   <Ionicons name="paper-plane" size={20} color="#fff" />
                 </TouchableOpacity>
               </View>

@@ -13,13 +13,18 @@ import {
   Dimensions,
 } from "react-native";
 import { RouteProp, useRoute, useNavigation } from "@react-navigation/native";
-import { RootStackParamList } from "./navigationtypes";
+import { RootStackParamList } from "./navigationTypes";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { UserContext } from "./UserContext";
 import { NGROK_URL } from "@env";
 import { LinearGradient } from "expo-linear-gradient";
+import { StackNavigationProp } from "@react-navigation/stack";
 
-type JobDetailRouteProp = RouteProp<RootStackParamList, 'JobDetail'>;
+type JobDetailRouteProp = RouteProp<RootStackParamList, "JobDetail">;
+type JobDetailNavigationProp = StackNavigationProp<
+  RootStackParamList,
+  "JobDetail"
+>;
 
 interface JobDetail {
   id: string;
@@ -36,7 +41,7 @@ const { width } = Dimensions.get("window");
 
 const JobDetails: React.FC = () => {
   const route = useRoute<JobDetailRouteProp>();
-  const navigation = useNavigation();
+  const navigation = useNavigation<JobDetailNavigationProp>();
   const { jobId } = route.params;
   const { token, userId } = useContext(UserContext);
 
@@ -64,14 +69,19 @@ const JobDetails: React.FC = () => {
 
       const data = await response.json();
 
-      if (!data.job) {
+      // Adjust this based on your backend's response structure
+      // Assuming backend returns { gig: { ... } }
+      if (!data.gig) {
         throw new Error("Job detail not found.");
       }
 
-      setJobDetail(data.job);
+      setJobDetail(data.gig);
     } catch (error) {
       console.error(error);
-      Alert.alert("Error", "Unable to fetch job details. Please try again later.");
+      Alert.alert(
+        "Error",
+        "Unable to fetch job details. Please try again later."
+      );
       navigation.goBack();
     } finally {
       setLoading(false);
@@ -106,7 +116,10 @@ const JobDetails: React.FC = () => {
           style={styles.coverImage}
           resizeMode="cover"
           onError={(e) => {
-            console.log(`Failed to load image for job ID ${jobDetail.id}:`, e.nativeEvent.error);
+            console.log(
+              `Failed to load image for job ID ${jobDetail.id}:`,
+              e.nativeEvent.error
+            );
           }}
         />
       ) : (
@@ -127,19 +140,30 @@ const JobDetails: React.FC = () => {
           />
           <Text style={styles.category}>{jobDetail.category}</Text>
         </View>
-        <Text style={styles.price}>${parseFloat(jobDetail.price).toFixed(2)}</Text>
+        <Text style={styles.price}>
+          {jobDetail.price === "Open to Communication"
+            ? jobDetail.price
+            : `$${parseFloat(jobDetail.price).toFixed(2)}`}
+        </Text>
         <Text style={styles.description}>{jobDetail.description}</Text>
 
         {/* Add more details as needed, e.g., seller info, ratings, etc. */}
 
-        <TouchableOpacity style={styles.messageButton} onPress={handleMessagePress}>
+        <TouchableOpacity
+          style={styles.messageButton}
+          onPress={handleMessagePress}
+        >
           <LinearGradient
             colors={["#8E2DE2", "#4A00E0"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.messageButtonGradient}
           >
-            <Ionicons name="chatbubble-ellipses-outline" size={20} color="#fff" />
+            <Ionicons
+              name="chatbubble-ellipses-outline"
+              size={20}
+              color="#fff"
+            />
             <Text style={styles.messageButtonText}>Message</Text>
           </LinearGradient>
         </TouchableOpacity>
