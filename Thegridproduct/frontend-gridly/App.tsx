@@ -54,9 +54,11 @@ const TermsOfServiceScreen: React.FC = () => (
 
 // Liked Items Screen
 const LikedItemsScreen: React.FC = () => {
-  const { favorites, allProducts } = useContext(UserContext);
+  // Example: if you were storing favorites in context, you'd retrieve them here
+  // This snippet is purely an example. Adjust as needed if you store user’s favorites differently.
+  const { favorites, allProducts } = useContext<any>(UserContext);
 
-  const likedProducts = allProducts.filter((p) => favorites.includes(p.id));
+  const likedProducts = allProducts?.filter((p: any) => favorites?.includes(p.id)) || [];
 
   return (
     <View style={styles.screenContainer}>
@@ -81,7 +83,7 @@ const LikedItemsScreen: React.FC = () => {
         </View>
       ) : (
         <ScrollView contentContainerStyle={{ padding: 20 }}>
-          {likedProducts.map((product) => (
+          {likedProducts.map((product: any) => (
             <View
               key={product.id}
               style={{
@@ -121,7 +123,6 @@ const UserMenuScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       );
     } catch (error) {
       console.error("Logout Error:", error);
-      // Removed Alert.alert to prevent popup on logout failure
     }
   };
 
@@ -141,7 +142,6 @@ const UserMenuScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         <View style={styles.bottomSheetUserInfo}>
           <View style={styles.bottomSheetAvatar}>
             <Text style={styles.bottomSheetAvatarText}>
-              {/* Display both first and last name initials */}
               {firstName && firstName.length > 0
                 ? firstName.charAt(0).toUpperCase()
                 : "?"}
