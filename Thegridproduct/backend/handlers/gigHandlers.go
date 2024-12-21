@@ -24,28 +24,24 @@ import (
 
 // CreateGigRequest defines the expected payload for creating a gig
 type CreateGigRequest struct {
-	Title               string   `json:"title"`
-	Description         string   `json:"description"`
-	Category            string   `json:"category"`
-	Price               string   `json:"price"`
-	Availability        string   `json:"availability"`
-	AdditionalLinks     []string `json:"additionalLinks"`
-	AdditionalDocuments []string `json:"additionalDocuments"`
-	CoverImage          string   `json:"coverImage"`
-	Images              []string `json:"images"` // Assuming additionalDocuments are images/documents
+	Title          string   `json:"title"`
+	Description    string   `json:"description"`
+	Category       string   `json:"category"`
+	Price          string   `json:"price"`
+	DeliveryTime   string   `json:"deliveryTime"`
+	Images         []string `json:"images"`
+	ExpirationDate string   `json:"expirationDate,omitempty"` // Optional
 }
 
 // UpdateGigRequest defines the expected payload for updating a gig
 type UpdateGigRequest struct {
-	Title               *string   `json:"title,omitempty"`
-	Description         *string   `json:"description,omitempty"`
-	Category            *string   `json:"category,omitempty"`
-	Price               *string   `json:"price,omitempty"`
-	Availability        *string   `json:"availability,omitempty"`
-	AdditionalLinks     *[]string `json:"additionalLinks,omitempty"`
-	AdditionalDocuments *[]string `json:"additionalDocuments,omitempty"`
-	CoverImage          *string   `json:"coverImage,omitempty"`
-	Images              *[]string `json:"images,omitempty"`
+	Title          *string   `json:"title,omitempty"`
+	Description    *string   `json:"description,omitempty"`
+	Category       *string   `json:"category,omitempty"`
+	Price          *string   `json:"price,omitempty"`
+	DeliveryTime   *string   `json:"deliveryTime,omitempty"`
+	Images         *[]string `json:"images,omitempty"`
+	ExpirationDate *string   `json:"expirationDate,omitempty"` // Optional
 }
 
 // AddGigHandler handles the creation of a new gig
@@ -98,10 +94,6 @@ func AddGigHandler(w http.ResponseWriter, r *http.Request) {
 		WriteJSONError(w, "Category is required", http.StatusBadRequest)
 		return
 	}
-	if strings.TrimSpace(gigReq.CoverImage) == "" {
-		WriteJSONError(w, "Cover image is required", http.StatusBadRequest)
-		return
-	}
 	if strings.TrimSpace(gigReq.Description) == "" {
 		WriteJSONError(w, "Description is required", http.StatusBadRequest)
 		return
@@ -115,50 +107,47 @@ func AddGigHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Validate availability
-	finalAvailability := "Open to Communication"
-	if gigReq.Availability != "Open to Communication" && gigReq.Availability != "" {
-		validDays := map[string]bool{
-			"Monday":    true,
-			"Tuesday":   true,
-			"Wednesday": true,
-			"Thursday":  true,
-			"Friday":    true,
-			"Saturday":  true,
-			"Sunday":    true,
-		}
-		days := strings.Split(gigReq.Availability, ",")
-		var trimmedDays []string
-		for _, day := range days {
-			day = strings.TrimSpace(day)
-			if day != "" {
-				if !validDays[day] {
-					WriteJSONError(w, "Invalid availability day: "+day, http.StatusBadRequest)
-					return
-				}
-				trimmedDays = append(trimmedDays, day)
+	// Validate deliveryTime
+	finalDeliveryTime := "Not Required"
+	if strings.TrimSpace(gigReq.DeliveryTime) != "" {
+		finalDeliveryTime = gigReq.DeliveryTime
+	}
+
+	// Validate expirationDate
+	var expirationDate time.Time
+	if strings.TrimSpace(gigReq.ExpirationDate) != "" {
+		// Attempt to parse the expirationDate string
+		parsedDate, err := time.Parse(time.RFC3339, gigReq.ExpirationDate)
+		if err != nil {
+			// If RFC3339 fails, try to parse with a different layout (e.g., "2006-01-02 15:04")
+			parsedDate, err = time.Parse("2006-01-02 15:04", gigReq.ExpirationDate)
+			if err != nil {
+				WriteJSONError(w, "Invalid expiration date format. Use RFC3339 or 'YYYY-MM-DD HH:MM' format.", http.StatusBadRequest)
+				return
 			}
 		}
-		finalAvailability = strings.Join(trimmedDays, ", ")
+		expirationDate = parsedDate
+	} else {
+		// Default to 30 days from now
+		expirationDate = time.Now().AddDate(0, 0, 30)
 	}
 
 	// Prepare Gig model
 	gig := models.Gig{
-		UserID:              userObjID,
-		University:          university,
-		StudentType:         studentType,
-		Title:               gigReq.Title,
-		Category:            gigReq.Category,
-		Description:         gigReq.Description,
-		CoverImage:          gigReq.CoverImage,
-		Price:               gigReq.Price,
-		Availability:        finalAvailability,
-		AdditionalLinks:     gigReq.AdditionalLinks,
-		AdditionalDocuments: gigReq.AdditionalDocuments,
-		PostedDate:          time.Now(),
-		Expired:             false,
-		Status:              "active",
-		LikeCount:           0,
+		UserID:         userObjID,
+		University:     university,
+		StudentType:    studentType,
+		Title:          gigReq.Title,
+		Category:       gigReq.Category,
+		Price:          gigReq.Price,
+		DeliveryTime:   finalDeliveryTime,
+		Description:    gigReq.Description,
+		Images:         gigReq.Images,
+		ExpirationDate: expirationDate,
+		PostedDate:     time.Now(),
+		Expired:        false,
+		Status:         "active",
+		LikeCount:      0,
 	}
 
 	// Insert into MongoDB
@@ -387,8 +376,8 @@ func UpdateGigHandler(w http.ResponseWriter, r *http.Request) {
 	if gigReq.Category != nil && strings.TrimSpace(*gigReq.Category) != "" {
 		updateFields["category"] = strings.TrimSpace(*gigReq.Category)
 	}
-	if gigReq.CoverImage != nil && strings.TrimSpace(*gigReq.CoverImage) != "" {
-		updateFields["coverImage"] = strings.TrimSpace(*gigReq.CoverImage)
+	if gigReq.Description != nil && strings.TrimSpace(*gigReq.Description) != "" {
+		updateFields["description"] = strings.TrimSpace(*gigReq.Description)
 	}
 	if gigReq.Price != nil && strings.TrimSpace(*gigReq.Price) != "" {
 		// Validate price format if not "Open to Communication"
@@ -398,46 +387,29 @@ func UpdateGigHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		updateFields["price"] = strings.TrimSpace(*gigReq.Price)
 	}
-	if gigReq.Availability != nil && strings.TrimSpace(*gigReq.Availability) != "" {
-		// Validate and map availability
-		if *gigReq.Availability == "Whenever/Open to Communicate" {
-			updateFields["availability"] = "Open to Communication"
-		} else {
-			validDays := map[string]bool{
-				"Monday":    true,
-				"Tuesday":   true,
-				"Wednesday": true,
-				"Thursday":  true,
-				"Friday":    true,
-				"Saturday":  true,
-				"Sunday":    true,
-			}
-			days := strings.Split(*gigReq.Availability, ",")
-			var trimmedDays []string
-			for _, day := range days {
-				day = strings.TrimSpace(day)
-				if day != "" {
-					if !validDays[day] {
-						WriteJSONError(w, "Invalid availability day: "+day, http.StatusBadRequest)
-						return
-					}
-					trimmedDays = append(trimmedDays, day)
-				}
-			}
-			updateFields["availability"] = strings.Join(trimmedDays, ", ")
-		}
-	}
-	if gigReq.AdditionalLinks != nil {
-		updateFields["additionalLinks"] = *gigReq.AdditionalLinks
-	}
-	if gigReq.AdditionalDocuments != nil {
-		updateFields["additionalDocuments"] = *gigReq.AdditionalDocuments
-	}
-	if gigReq.Description != nil && strings.TrimSpace(*gigReq.Description) != "" {
-		updateFields["description"] = strings.TrimSpace(*gigReq.Description)
+	if gigReq.DeliveryTime != nil && strings.TrimSpace(*gigReq.DeliveryTime) != "" {
+		updateFields["deliveryTime"] = strings.TrimSpace(*gigReq.DeliveryTime)
 	}
 	if gigReq.Images != nil && len(*gigReq.Images) > 0 {
 		updateFields["images"] = *gigReq.Images
+	}
+	if gigReq.ExpirationDate != nil {
+		if strings.TrimSpace(*gigReq.ExpirationDate) != "" {
+			// Parse the expirationDate string
+			parsedDate, err := time.Parse(time.RFC3339, *gigReq.ExpirationDate)
+			if err != nil {
+				// If RFC3339 fails, try to parse with a different layout (e.g., "2006-01-02 15:04")
+				parsedDate, err = time.Parse("2006-01-02 15:04", *gigReq.ExpirationDate)
+				if err != nil {
+					WriteJSONError(w, "Invalid expiration date format. Use RFC3339 or 'YYYY-MM-DD HH:MM' format.", http.StatusBadRequest)
+					return
+				}
+			}
+			updateFields["expirationDate"] = parsedDate
+		} else {
+			// If expirationDate is empty, default to 30 days from now
+			updateFields["expirationDate"] = time.Now().AddDate(0, 0, 30)
+		}
 	}
 
 	if len(updateFields) == 0 {
