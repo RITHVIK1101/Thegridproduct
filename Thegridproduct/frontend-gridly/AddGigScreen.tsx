@@ -1,94 +1,103 @@
 // AddGig.tsx
 
-import React, { useState, useContext, useRef } from "react";
+import React, { useState, useRef } from "react";
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
+  Image,
   TextInput,
   ScrollView,
   Modal,
-  Image,
   Animated,
-  Easing,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   TouchableWithoutFeedback,
   Keyboard,
+  Alert,
+  Easing,
 } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import * as ImagePicker from "expo-image-picker";
 import { useNavigation } from "@react-navigation/native";
-import { UserContext } from "./UserContext";
-import { NGROK_URL } from "@env";
+import { NGROK_URL } from "@env"; // Ensure your .env is set up correctly
+import DateTimePickerModal from "react-native-modal-datetime-picker"; // Make sure you have installed this package
 
-const PREDEFINED_CATEGORIES = [
-  "Tutoring",
-  "Writing",
-  "Design",
-  "Delivery",
-  "Coding",
-  "Other",
-];
+/** Available categories to choose from. */
+const AVAILABLE_CATEGORIES = ["Tutoring", "Design", "Delivering", "Other"] as const;
 
-type Step = 1 | 2 | 3 | 4 | 5;
+/** Define the multi-step flow with a union type for convenience. 
+ *  We have 6 steps total.
+ */
+type Step = 1 | 2 | 3 | 4 | 5 | 6;
 
-type AvailabilityDays = {
-  Monday: boolean;
-  Tuesday: boolean;
-  Wednesday: boolean;
-  Thursday: boolean;
-  Friday: boolean;
-  Saturday: boolean;
-  Sunday: boolean;
-};
+/** Shape of our gig form data. */
+interface FormData {
+  title: string;
+  category: string;
+  price: string; // numeric or empty
+  isPriceOpenToComm: boolean;
+  deliveryTime: string; // optional
+  description: string;
+  images: string[]; // up to 5
+  /** Expiration date field (optional).
+   *  The gig will become inactive by this time if set.
+   *  If unset (empty), the gig defaults to 30 days. 
+   */
+  expirationDate: string;
+}
 
 const AddGig: React.FC = () => {
   const navigation = useNavigation();
-  const { userId, token, institution, studentType } = useContext(UserContext);
 
-  // Form fields
-  const [title, setTitle] = useState("");
-  const [category, setCategory] = useState<string | null>(null);
-  const [coverImage, setCoverImage] = useState<string | null>(null);
-
-  const [price, setPrice] = useState("");
-  const [isPriceOpenComm, setIsPriceOpenComm] = useState(false);
-
-  // Availability states
-  const [availabilityDays, setAvailabilityDays] = useState<AvailabilityDays>({
-    Monday: false,
-    Tuesday: false,
-    Wednesday: false,
-    Thursday: false,
-    Friday: false,
-    Saturday: false,
-    Sunday: false,
-  });
-  const [isWhenever, setIsWhenever] = useState(false);
-
-  // Additional Links and Documents
-  const [additionalLinks, setAdditionalLinks] = useState<string[]>([]);
-  const [newLink, setNewLink] = useState("");
-  const [additionalDocuments, setAdditionalDocuments] = useState<string[]>([]);
-
-  const [description, setDescription] = useState("");
-
-  // States
+  // ---------------------------
+  // Multi-step management
+  // ---------------------------
   const [currentStep, setCurrentStep] = useState<Step>(1);
+  const [slideAnim] = useState(new Animated.Value(0));
+
+  // Categories modal visibility
   const [showCategoriesModal, setShowCategoriesModal] = useState(false);
+
+  // Form state
+  const [formData, setFormData] = useState<FormData>({
+    title: "",
+    category: "",
+    price: "",
+    isPriceOpenToComm: false,
+    deliveryTime: "",
+    description: "",
+    images: [],
+    expirationDate: "",
+  });
+
+  // Delivery time toggle
+  const [noDeliveryRequired, setNoDeliveryRequired] = useState(false);
+
+  // ** New toggle for expiration date **
+  const [noExpiration, setNoExpiration] = useState<boolean>(false);
+
+  // Loading and success states
   const [isLoading, setIsLoading] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [isSuccessModalVisible, setIsSuccessModalVisible] = useState(false);
 
-  // Animation for slide transitions
-  const slideAnim = useRef(new Animated.Value(0)).current;
+  // Info modal states (for additional explanations)
+  const [infoModalVisible, setInfoModalVisible] = useState(false);
+  const [infoModalText, setInfoModalText] = useState("");
 
-  // Error Toast States
+  // Error toast states
   const [errorMessage, setErrorMessage] = useState("");
   const errorOpacity = useRef(new Animated.Value(0)).current;
 
+  // DateTime Picker states
+  const [isDatePickerVisible, setDatePickerVisibility] = useState(false);
+
+  // ------------------------------------------------------------------------------
+  // Helper functions for error handling
+  // ------------------------------------------------------------------------------
   const showError = (msg: string) => {
     setErrorMessage(msg);
     Animated.timing(errorOpacity, {
@@ -110,12 +119,14 @@ const AddGig: React.FC = () => {
     });
   };
 
-  const animateTransition = (forward: boolean) => {
+  // ------------------------------------------------------------------------------
+  // Animation for sliding transitions between steps
+  // ------------------------------------------------------------------------------
+  const animateSlide = (direction: "forward" | "backward") => {
     Animated.sequence([
       Animated.timing(slideAnim, {
-        toValue: forward ? 1 : -1,
+        toValue: direction === "forward" ? 1 : -1,
         duration: 200,
-        easing: Easing.ease,
         useNativeDriver: true,
       }),
       Animated.timing(slideAnim, {
@@ -126,10 +137,13 @@ const AddGig: React.FC = () => {
     ]).start();
   };
 
+  // ------------------------------------------------------------------------------
+  // Step navigation functions
+  // ------------------------------------------------------------------------------
   const handleNext = () => {
     if (!validateCurrentStep()) return;
-    if (currentStep < 5) {
-      animateTransition(true);
+    if (currentStep < 6) {
+      animateSlide("forward");
       setCurrentStep((prev) => (prev + 1) as Step);
     } else {
       handleSubmit();
@@ -138,482 +152,503 @@ const AddGig: React.FC = () => {
 
   const handleBack = () => {
     if (currentStep > 1) {
-      animateTransition(false);
+      animateSlide("backward");
       setCurrentStep((prev) => (prev - 1) as Step);
     }
   };
 
+  // ------------------------------------------------------------------------------
+  // Step validation function
+  // ------------------------------------------------------------------------------
   const validateCurrentStep = (): boolean => {
     switch (currentStep) {
       case 1:
-        if (!title.trim()) {
+        if (!formData.title.trim()) {
           showError("Please enter a Title.");
           return false;
         }
-        if (!category) {
+        if (!formData.category) {
           showError("Please select a Category.");
-          return false;
-        }
-        if (!coverImage) {
-          showError("Please upload a Headshot Image.");
           return false;
         }
         return true;
       case 2:
-        if (!isPriceOpenComm && !price.trim()) {
-          showError(
-            "Please specify a price or choose 'Open to Communication'."
-          );
-          return false;
-        }
-        const anyDaySelected = Object.values(availabilityDays).some(Boolean);
-        if (!isWhenever && !anyDaySelected) {
-          showError("Please select availability days or choose 'Whenever'.");
+        if (!formData.isPriceOpenToComm && !formData.price.trim()) {
+          showError("Please specify a price or choose 'Open to Communication'.");
           return false;
         }
         return true;
       case 3:
-        if (!description.trim()) {
-          showError("Please provide a description.");
+        // Delivery time is optional, so no strict requirement if blank
+        return true;
+      case 4:
+        if (!formData.description.trim()) {
+          showError("Please provide a Description.");
           return false;
         }
         return true;
-      case 4:
-        // Additional resources are optional, no strict validation needed
-        return true;
       case 5:
+        // Expiration date is now optional, so no strict validation
+        return true;
+      case 6:
+        // Image uploading is optional, so no validation required
         return true;
       default:
         return false;
     }
   };
 
+  // ------------------------------------------------------------------------------
+  // Final submission to backend
+  // ------------------------------------------------------------------------------
   const handleSubmit = async () => {
     setIsLoading(true);
 
-    let finalAvailability = "Open to Communication";
-    if (!isWhenever) {
-      const selectedDays = Object.entries(availabilityDays)
-        .filter(([_, selected]) => selected)
-        .map(([day]) => day)
-        .join(", ");
-      if (selectedDays.trim()) {
-        finalAvailability = selectedDays;
-      }
-    }
-
-    const finalPrice = isPriceOpenComm ? "Open to Communication" : price.trim();
-
-    const payload = {
-      title: title.trim(),
-      description: description.trim(),
-      category: category || "Other",
-      price: finalPrice,
-      availability: finalAvailability,
-      additionalLinks: additionalLinks,
-      additionalDocuments: additionalDocuments,
-      coverImage: coverImage,
-      images: additionalDocuments, // Assuming additionalDocuments are images/documents
+    // Construct the payload
+    const payload: any = {
+      title: formData.title.trim(),
+      category: formData.category,
+      price: formData.isPriceOpenToComm
+        ? "Open to Communication"
+        : formData.price.trim(),
+      deliveryTime: noDeliveryRequired
+        ? "Not Required"
+        : formData.deliveryTime.trim(),
+      description: formData.description.trim(),
+      images: formData.images,
     };
 
+    // If user has chosen noExpiration or has no date set, we skip or set it as empty 
+    // (thus defaulting to 30 days on backend or logic).
+    if (!noExpiration && formData.expirationDate) {
+      payload.expirationDate = formData.expirationDate.trim();
+    }
+
     try {
-      const response = await fetch(`${NGROK_URL}/services`, {
+      const response = await fetch(`${NGROK_URL}/gigs`, {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
+          // Include Authorization if needed
+          // Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        console.error("Error:", response.status, errorData);
-        showError(
-          errorData.error || "Failed to post the service. Please try again."
+        throw new Error(
+          errorData.message || `HTTP error! status: ${response.status}`
         );
-        return;
       }
 
       setIsSuccessModalVisible(true);
-      // Reset after success
-      setTitle("");
-      setDescription("");
-      setCategory(null);
-      setPrice("");
-      setIsPriceOpenComm(false);
-      setAdditionalLinks([]);
-      setAdditionalDocuments([]);
-      setCoverImage(null);
-      setAvailabilityDays({
-        Monday: false,
-        Tuesday: false,
-        Wednesday: false,
-        Thursday: false,
-        Friday: false,
-        Saturday: false,
-        Sunday: false,
+
+      // Reset the form after success
+      setFormData({
+        title: "",
+        category: "",
+        price: "",
+        isPriceOpenToComm: false,
+        deliveryTime: "",
+        description: "",
+        images: [],
+        expirationDate: "",
       });
-      setIsWhenever(false);
+      setNoDeliveryRequired(false);
+      setNoExpiration(false);
       setCurrentStep(1);
 
       setTimeout(() => {
         setIsSuccessModalVisible(false);
-        navigation.navigate("Dashboard");
+        navigation.navigate("Dashboard"); // Adjust as needed
       }, 2000);
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Error:", error);
-      showError("Failed to post the service. Please try again.");
+      showError(
+        error instanceof Error
+          ? error.message
+          : "Failed to post the gig. Please try again."
+      );
     } finally {
       setIsLoading(false);
     }
   };
 
-  const pickCoverImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsMultipleSelection: false,
-      quality: 1,
-    });
-
-    if (!result.canceled) {
-      const uri = result.assets[0].uri;
-      setCoverImage(uri);
-    }
-  };
-
-  const pickAdditionalDocument = async () => {
-    if (additionalDocuments.length >= 5) {
-      showError("You can upload up to 5 images/documents.");
+  // ------------------------------------------------------------------------------
+  // Image upload handling
+  // ------------------------------------------------------------------------------
+  const handleImageUpload = async () => {
+    if (formData.images.length >= 5) {
+      Alert.alert("Limit Reached", "You can upload up to 5 images.");
       return;
     }
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.All, // Allow both images and documents
-      allowsMultipleSelection: true,
-      quality: 1,
-    });
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsMultipleSelection: true,
+        quality: 0.7,
+        selectionLimit: 5 - formData.images.length,
+      });
 
-    if (!result.canceled) {
-      const newDocuments = result.assets.map((asset) => asset.uri);
-      if (additionalDocuments.length + newDocuments.length > 5) {
-        showError("You can upload up to 5 images/documents total.");
-      } else {
-        setAdditionalDocuments((prev) => [...prev, ...newDocuments]);
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setIsUploadingImage(true);
+
+        const selectedAssets = result.assets.slice(
+          0,
+          5 - formData.images.length
+        );
+
+        for (const asset of selectedAssets) {
+          const uri = asset.uri;
+          setFormData((prev) => ({
+            ...prev,
+            images: [...prev.images, uri],
+          }));
+        }
+
+        setIsUploadingImage(false);
       }
+    } catch (error) {
+      console.error("Image Picker Error:", error);
+      showError("Error selecting or uploading images. Please try again.");
+      setIsUploadingImage(false);
     }
   };
 
-  const removeAdditionalDocument = (index: number) => {
-    setAdditionalDocuments((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const addNewLink = () => {
-    if (additionalLinks.length >= 5) {
-      showError("You can add up to 5 links.");
-      return;
-    }
-    if (!newLink.trim()) {
-      showError("Please enter a valid link before adding.");
-      return;
-    }
-    // Optional: Add URL validation here
-    setAdditionalLinks((prev) => [...prev, newLink.trim()]);
-    setNewLink("");
-  };
-
-  const removeLink = (index: number) => {
-    setAdditionalLinks((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const toggleDay = (day: keyof AvailabilityDays) => {
-    setAvailabilityDays((prev) => ({
+  const removeImage = (index: number) => {
+    setFormData((prev) => ({
       ...prev,
-      [day]: !prev[day],
+      images: prev.images.filter((_, i) => i !== index),
     }));
   };
 
-  const handleWheneverToggle = () => {
-    if (!isWhenever) {
-      setAvailabilityDays({
-        Monday: false,
-        Tuesday: false,
-        Wednesday: false,
-        Thursday: false,
-        Friday: false,
-        Saturday: false,
-        Sunday: false,
-      });
-    }
-    setIsWhenever(!isWhenever);
+  // ------------------------------------------------------------------------------
+  // Info modal
+  // ------------------------------------------------------------------------------
+  const openInfoModal = (text: string) => {
+    setInfoModalText(text);
+    setInfoModalVisible(true);
   };
 
-  const priceSection = (
-    <View style={styles.sectionContainer}>
-      <Text style={styles.subTitle}>Pricing</Text>
-      <View style={styles.priceOptionContainer}>
-        <TouchableOpacity
-          style={[
-            styles.priceOption,
-            isPriceOpenComm && styles.priceOptionSelected,
-          ]}
-          onPress={() => {
-            setIsPriceOpenComm(true);
-            setPrice("");
-          }}
-        >
-          <Text style={styles.priceOptionText}>Open to Communication</Text>
-        </TouchableOpacity>
+  const closeInfoModal = () => {
+    setInfoModalVisible(false);
+    setInfoModalText("");
+  };
 
-        <TouchableOpacity
-          style={[
-            styles.priceOption,
-            !isPriceOpenComm && styles.priceOptionSelected,
-          ]}
-          onPress={() => {
-            setIsPriceOpenComm(false);
-          }}
-        >
-          <Text style={styles.priceOptionText}>Set a Price</Text>
-        </TouchableOpacity>
-      </View>
-      {!isPriceOpenComm && (
-        <TextInput
-          style={styles.input}
-          placeholder="Price (e.g., $25/hour)"
-          placeholderTextColor="#888"
-          value={price}
-          onChangeText={setPrice}
-        />
-      )}
-    </View>
-  );
+  // ------------------------------------------------------------------------------
+  // DateTime Picker handlers
+  // ------------------------------------------------------------------------------
+  const showDatePicker = () => {
+    setDatePickerVisibility(true);
+  };
 
-  const availabilitySection = (
-    <View style={styles.sectionContainer}>
-      <Text style={styles.subTitle}>Availability</Text>
-      <TouchableOpacity
-        style={[
-          styles.availabilityOption,
-          isWhenever && styles.availabilityOptionSelected,
-        ]}
-        onPress={handleWheneverToggle}
-      >
-        <Text style={styles.availabilityOptionText}>
-          Whenever / Open to Communicate
-        </Text>
-      </TouchableOpacity>
+  const hideDatePicker = () => {
+    setDatePickerVisibility(false);
+  };
 
-      {!isWhenever && (
-        <View style={styles.daysContainer}>
-          {Object.keys(availabilityDays).map((day) => {
-            const dayKey = day as keyof AvailabilityDays;
-            const selected = availabilityDays[dayKey];
-            return (
-              <TouchableOpacity
-                key={day}
-                style={[styles.dayButton, selected && styles.dayButtonSelected]}
-                onPress={() => toggleDay(dayKey)}
-              >
-                <Text style={styles.dayButtonText}>{day}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      )}
-    </View>
-  );
+  const handleConfirm = (date: Date) => {
+    const formattedDate = date.toLocaleString(); // Format as desired
+    setFormData((prev) => ({
+      ...prev,
+      expirationDate: formattedDate,
+    }));
+    hideDatePicker();
+  };
 
-  const additionalResourcesSection = (
-    <View style={styles.sectionContainer}>
-      <Text style={styles.subTitle}>Additional Resources</Text>
+  // ------------------------------------------------------------------------------
+  // Define multi-step slides
+  // ------------------------------------------------------------------------------
+  const slides: Record<number, { title: string; content: JSX.Element }> = {
+    1: {
+      title: "Basic Information",
+      content: (
+        <>
+          <Text style={styles.label}>Gig Title</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Enter gig title (e.g., Math Tutor)"
+            placeholderTextColor="#888"
+            value={formData.title}
+            onChangeText={(text) =>
+              setFormData({ ...formData, title: text })
+            }
+          />
 
-      <Text style={styles.helperText}>Links/Resume/Profiles (Optional):</Text>
-      <View style={styles.addLinksContainer}>
-        {additionalLinks.map((link, index) => (
-          <View key={index} style={styles.linkItem}>
-            <Text style={styles.linkText}>{link}</Text>
-            <TouchableOpacity onPress={() => removeLink(index)}>
-              <Ionicons name="close-circle-outline" size={20} color="#BB86FC" />
-            </TouchableOpacity>
-          </View>
-        ))}
-
-        {additionalLinks.length < 5 && (
-          <View style={styles.addLinkRow}>
+          <Text style={styles.label}>Category</Text>
+          <TouchableOpacity
+            style={styles.dropdown}
+            onPress={() => setShowCategoriesModal(true)}
+          >
+            <Text style={styles.dropdownText}>
+              {formData.category ? formData.category : "Select Category"}
+            </Text>
+            <Ionicons name="chevron-down-outline" size={20} color="#ccc" />
+          </TouchableOpacity>
+        </>
+      ),
+    },
+    2: {
+      title: "Pricing",
+      content: (
+        <>
+          <Text style={styles.label}>Price per Hour</Text>
+          <View style={styles.priceContainer}>
             <TextInput
-              style={[styles.input, { flex: 1 }]}
-              placeholder="Add a link..."
+              style={[
+                styles.input,
+                { flex: 1, opacity: formData.isPriceOpenToComm ? 0.5 : 1 },
+              ]}
+              placeholder="e.g., 25"
               placeholderTextColor="#888"
-              value={newLink}
-              onChangeText={setNewLink}
+              keyboardType="numeric"
+              value={formData.price}
+              onChangeText={(text) =>
+                setFormData({ ...formData, price: text })
+              }
+              editable={!formData.isPriceOpenToComm}
             />
-            <TouchableOpacity style={styles.addLinkButton} onPress={addNewLink}>
-              <Ionicons name="add-circle-outline" size={24} color="#BB86FC" />
+            <Text style={styles.perHourText}>/hour</Text>
+          </View>
+
+          <TouchableOpacity
+            style={styles.toggleButton}
+            onPress={() =>
+              setFormData((prev) => ({
+                ...prev,
+                isPriceOpenToComm: !prev.isPriceOpenToComm,
+                price: prev.isPriceOpenToComm ? "" : prev.price,
+              }))
+            }
+          >
+            <Ionicons
+              name={
+                formData.isPriceOpenToComm
+                  ? "checkmark-circle"
+                  : "ellipse-outline"
+              }
+              size={24}
+              color={formData.isPriceOpenToComm ? "#BB86FC" : "#ccc"}
+            />
+            <Text style={styles.toggleText}>
+              {formData.isPriceOpenToComm
+                ? "Open to Communication"
+                : "I am open to discussing the price"}
+            </Text>
+          </TouchableOpacity>
+        </>
+      ),
+    },
+    3: {
+      title: "Delivery Time",
+      content: (
+        <>
+          <Text style={styles.label}>Delivery Time</Text>
+          <TextInput
+            style={[styles.input, { opacity: noDeliveryRequired ? 0.5 : 1 }]}
+            placeholder="e.g., 2 days"
+            placeholderTextColor="#888"
+            value={formData.deliveryTime}
+            onChangeText={(text) =>
+              setFormData({ ...formData, deliveryTime: text })
+            }
+            editable={!noDeliveryRequired}
+          />
+
+          <TouchableOpacity
+            style={styles.toggleButton}
+            onPress={() => {
+              setNoDeliveryRequired(!noDeliveryRequired);
+              if (!noDeliveryRequired) {
+                // Just toggled it on, so clear the field
+                setFormData((prev) => ({ ...prev, deliveryTime: "" }));
+              }
+            }}
+          >
+            <Ionicons
+              name={
+                noDeliveryRequired ? "checkmark-circle" : "ellipse-outline"
+              }
+              size={24}
+              color={noDeliveryRequired ? "#BB86FC" : "#ccc"}
+            />
+            <Text style={styles.toggleText}>
+              My gig does not require a delivery time
+            </Text>
+          </TouchableOpacity>
+        </>
+      ),
+    },
+    4: {
+      title: "Description",
+      content: (
+        <>
+          <Text style={styles.label}>Description *</Text>
+          <TextInput
+            style={[styles.input, styles.textArea]}
+            placeholder="Provide a detailed description of your gig."
+            placeholderTextColor="#888"
+            multiline
+            numberOfLines={6}
+            value={formData.description}
+            onChangeText={(text) =>
+              setFormData({ ...formData, description: text })
+            }
+          />
+        </>
+      ),
+    },
+    5: {
+      title: "Gig Expiration Date",
+      content: (
+        <>
+          <View style={styles.infoLabelContainer}>
+            <Text style={styles.label}>Expiration Date (Optional)</Text>
+            <TouchableOpacity
+              onPress={() =>
+                openInfoModal(
+                  "If you do NOT set an expiration date, your gig will become inactive after a default 30 days by default."
+                )
+              }
+            >
+              <Ionicons
+                name="information-circle-outline"
+                size={20}
+                color="#BB86FC"
+              />
             </TouchableOpacity>
           </View>
-        )}
-      </View>
 
-      <View style={styles.divider} />
+          {/* Toggle between no expiration and setting an expiration date */}
+          <TouchableOpacity
+            style={styles.toggleButton}
+            onPress={() => {
+              setNoExpiration((prev) => !prev);
+              // If we just toggled noExpiration ON, clear the date
+              if (!noExpiration === true) {
+                setFormData((prev) => ({ ...prev, expirationDate: "" }));
+              }
+            }}
+          >
+            <Ionicons
+              name={noExpiration ? "checkmark-circle" : "ellipse-outline"}
+              size={24}
+              color={noExpiration ? "#BB86FC" : "#ccc"}
+            />
+            <Text style={styles.toggleText}>
+              {noExpiration
+                ? "No Expiration (30-day default)"
+                : "Use No Expiration Date"}
+            </Text>
+          </TouchableOpacity>
 
-      <Text style={styles.helperText}>
-        Additional Images/Documents (Optional):
-      </Text>
-      {additionalDocuments.length > 0 && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={{ marginBottom: 10 }}
-        >
-          {additionalDocuments.map((doc, index) => (
-            <View key={index} style={styles.imageContainer}>
-              <Image source={{ uri: doc }} style={styles.additionalImage} />
+          {/* If noExpiration is false, user can pick a date */}
+          {!noExpiration && (
+            <>
               <TouchableOpacity
-                style={styles.removeButton}
-                onPress={() => removeAdditionalDocument(index)}
+                style={styles.datePickerButton}
+                onPress={showDatePicker}
               >
+                <Text style={styles.datePickerText}>
+                  {formData.expirationDate
+                    ? formData.expirationDate
+                    : "Select an expiration date & time"}
+                </Text>
+                <Ionicons name="calendar-outline" size={20} color="#BB86FC" />
+              </TouchableOpacity>
+
+              {/* If a date is set, allow clearing it */}
+              {formData.expirationDate ? (
+                <TouchableOpacity
+                  style={styles.clearDateButton}
+                  onPress={() =>
+                    setFormData((prev) => ({ ...prev, expirationDate: "" }))
+                  }
+                >
+                  <Ionicons name="trash-outline" size={20} color="#BB86FC" />
+                  <Text style={styles.clearDateButtonText}>Clear Date</Text>
+                </TouchableOpacity>
+              ) : null}
+            </>
+          )}
+
+          <Text style={styles.optionalText}>
+            If no expiration date is set, your gig will be inactive after 30 days.
+          </Text>
+
+          <DateTimePickerModal
+            isVisible={isDatePickerVisible}
+            mode="datetime"
+            onConfirm={handleConfirm}
+            onCancel={hideDatePicker}
+            minimumDate={new Date()}
+          />
+        </>
+      ),
+    },
+    6: {
+      title: "Images (Optional)",
+      content: (
+        <>
+          <TouchableOpacity
+            style={styles.uploadButton}
+            onPress={handleImageUpload}
+            disabled={isUploadingImage || formData.images.length >= 5}
+          >
+            {isUploadingImage ? (
+              <ActivityIndicator size="small" color="#BB86FC" />
+            ) : (
+              <>
                 <Ionicons
-                  name="close-circle-outline"
+                  name="cloud-upload-outline"
                   size={24}
                   color="#BB86FC"
                 />
-              </TouchableOpacity>
-            </View>
-          ))}
-        </ScrollView>
-      )}
-      {additionalDocuments.length < 5 && (
-        <TouchableOpacity
-          style={styles.uploadButton}
-          onPress={pickAdditionalDocument}
-        >
-          <Ionicons name="cloud-upload-outline" size={24} color="#BB86FC" />
-          <Text style={styles.uploadButtonText}>Add Images/Documents</Text>
-        </TouchableOpacity>
-      )}
-    </View>
-  );
+                <Text style={styles.uploadButtonText}>
+                  {formData.images.length > 0
+                    ? "Add More Images"
+                    : "Upload Images"}
+                </Text>
+              </>
+            )}
+          </TouchableOpacity>
 
-  const stepsContent = {
-    1: (
-      <>
-        <Text style={styles.sectionTitle}>Basic Information</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Service Title"
-          placeholderTextColor="#888"
-          value={title}
-          onChangeText={setTitle}
-        />
-
-        <TouchableOpacity
-          style={styles.dropdown}
-          onPress={() => setShowCategoriesModal(true)}
-        >
-          <Text style={styles.dropdownText}>
-            {category ? category : "Select Category"}
-          </Text>
-          <Ionicons name="chevron-down-outline" size={20} color="#ccc" />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.uploadButton} onPress={pickCoverImage}>
-          <Ionicons name="cloud-upload-outline" size={24} color="#BB86FC" />
-          <Text style={styles.uploadButtonText}>
-            {coverImage ? "Change Headshot Image" : "Upload Headshot Image"}
-          </Text>
-        </TouchableOpacity>
-
-        {coverImage && (
-          <View style={styles.coverImageContainer}>
-            <Image source={{ uri: coverImage }} style={styles.coverImage} />
+          <View style={styles.imagesContainer}>
+            {formData.images.map((image, index) => (
+              <View key={index} style={styles.imageContainer}>
+                <Image source={{ uri: image }} style={styles.image} />
+                <TouchableOpacity
+                  style={styles.removeButton}
+                  onPress={() => removeImage(index)}
+                >
+                  <Ionicons
+                    name="close-circle-outline"
+                    size={24}
+                    color="#BB86FC"
+                  />
+                </TouchableOpacity>
+              </View>
+            ))}
           </View>
-        )}
-      </>
-    ),
-    2: (
-      <>
-        <Text style={styles.sectionTitle}>Pricing & Availability</Text>
-        {priceSection}
-        <View style={styles.divider} />
-        {availabilitySection}
-      </>
-    ),
-    3: (
-      <>
-        <Text style={styles.sectionTitle}>Description</Text>
-        <TextInput
-          style={[styles.input, styles.textArea]}
-          placeholder="Describe your service in detail..."
-          placeholderTextColor="#888"
-          multiline
-          numberOfLines={6}
-          value={description}
-          onChangeText={setDescription}
-        />
-      </>
-    ),
-    4: <>{additionalResourcesSection}</>,
-    5: (
-      <>
-        <Text style={styles.sectionTitle}>Review & Submit</Text>
-        <View style={styles.reviewContainer}>
-          <Text style={styles.reviewText}>
-            <Text style={styles.reviewLabel}>Title: </Text>
-            {title}
-          </Text>
-          <Text style={styles.reviewText}>
-            <Text style={styles.reviewLabel}>Category: </Text>
-            {category}
-          </Text>
-          <Text style={styles.reviewText}>
-            <Text style={styles.reviewLabel}>Price: </Text>
-            {isPriceOpenComm ? "Open to Communication" : price || "N/A"}
-          </Text>
-          <Text style={styles.reviewText}>
-            <Text style={styles.reviewLabel}>Availability: </Text>
-            {isWhenever
-              ? "Whenever/Open to Communication"
-              : Object.entries(availabilityDays)
-                  .filter(([_, sel]) => sel)
-                  .map(([day]) => day)
-                  .join(", ") || "N/A"}
-          </Text>
 
-          <Text style={styles.reviewText}>
-            <Text style={styles.reviewLabel}>Links: </Text>
-            {additionalLinks.length > 0 ? additionalLinks.join(", ") : "N/A"}
+          <Text style={styles.optionalText}>
+            You can upload up to 5 images.
           </Text>
-
-          <Text style={styles.reviewText}>
-            <Text style={styles.reviewLabel}>Documents/Images: </Text>
-            {additionalDocuments.length > 0
-              ? `${additionalDocuments.length} Uploaded`
-              : "N/A"}
-          </Text>
-
-          <Text style={styles.reviewText}>
-            <Text style={styles.reviewLabel}>Description: </Text>
-            {description || "N/A"}
-          </Text>
-          <Text style={styles.reviewText}>
-            <Text style={styles.reviewLabel}>Headshot Image: </Text>
-            {coverImage ? "Uploaded" : "None"}
-          </Text>
-        </View>
-        <Text style={styles.note}>
-          Please confirm all details are correct before posting.
-        </Text>
-      </>
-    ),
+        </>
+      ),
+    },
   };
 
+  // ------------------------------------------------------------------------------
+  // Render
+  // ------------------------------------------------------------------------------
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={styles.outerContainer}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      {/* Error Toast outside of innerContainer */}
+      {/* Error Toast */}
       {errorMessage ? (
         <Animated.View
           style={[
@@ -636,20 +671,24 @@ const AddGig: React.FC = () => {
       ) : null}
 
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <View style={styles.innerContainer}>
-          {/* Progress Dots */}
+        <ScrollView
+          style={styles.container}
+          contentContainerStyle={{ paddingBottom: 40 }}
+        >
+          {/* Progress Indicators */}
           <View style={styles.progressContainer}>
-            {[1, 2, 3, 4, 5].map((step) => (
+            {[1, 2, 3, 4, 5, 6].map((stepNumber) => (
               <View
-                key={step}
+                key={stepNumber}
                 style={[
                   styles.progressDot,
-                  step <= currentStep ? styles.progressDotActive : null,
+                  stepNumber <= currentStep ? styles.progressDotActive : null,
                 ]}
               />
             ))}
           </View>
 
+          {/* Slide Content */}
           <Animated.View
             style={[
               styles.slideContainer,
@@ -665,48 +704,48 @@ const AddGig: React.FC = () => {
               },
             ]}
           >
-            <ScrollView
-              contentContainerStyle={{ paddingBottom: 60 }}
-              showsVerticalScrollIndicator={false}
-            >
-              {stepsContent[currentStep]}
-
-              {/* Navigation Buttons */}
-              <View style={styles.buttonContainer}>
-                {currentStep > 1 && (
-                  <TouchableOpacity
-                    style={styles.backButton}
-                    onPress={handleBack}
-                  >
-                    <Ionicons name="arrow-back" size={24} color="#aaa" />
-                    <Text style={styles.backButtonText}>Back</Text>
-                  </TouchableOpacity>
-                )}
-
-                <TouchableOpacity
-                  style={[
-                    styles.nextButton,
-                    isLoading && currentStep === 5 && styles.buttonDisabled,
-                  ]}
-                  onPress={handleNext}
-                  disabled={isLoading && currentStep === 5}
-                >
-                  {isLoading && currentStep === 5 ? (
-                    <ActivityIndicator size="small" color="#fff" />
-                  ) : (
-                    <>
-                      <Text style={styles.nextButtonText}>
-                        {currentStep === 5 ? "Post Service" : "Next"}
-                      </Text>
-                      {currentStep < 5 && (
-                        <Ionicons name="arrow-forward" size={24} color="#fff" />
-                      )}
-                    </>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </ScrollView>
+            <Text style={styles.stepTitle}>
+              {slides[currentStep].title}
+            </Text>
+            {slides[currentStep].content}
           </Animated.View>
+
+          {/* Navigation Buttons */}
+          <View
+            style={[
+              styles.buttonContainer,
+              { justifyContent: currentStep > 1 ? "space-between" : "flex-end" },
+            ]}
+          >
+            {currentStep > 1 && (
+              <TouchableOpacity style={styles.backButton} onPress={handleBack}>
+                <Ionicons name="arrow-back" size={24} color="#aaa" />
+                <Text style={styles.backButtonText}>Back</Text>
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity
+              style={[
+                styles.nextButton,
+                isLoading && currentStep === 6 && styles.buttonDisabled,
+              ]}
+              onPress={handleNext}
+              disabled={isLoading && currentStep === 6}
+            >
+              {isLoading && currentStep === 6 ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <Text style={styles.nextButtonText}>
+                    {currentStep === 6 ? "Post Gig" : "Next"}
+                  </Text>
+                  {currentStep < 6 && (
+                    <Ionicons name="arrow-forward" size={24} color="#fff" />
+                  )}
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
 
           {/* Success Modal */}
           <Modal
@@ -716,16 +755,46 @@ const AddGig: React.FC = () => {
           >
             <View style={styles.modalOverlay}>
               <View style={styles.modalContent}>
-                <Ionicons name="checkmark-circle" size={60} color="#9C27B0" />
-                <Text style={styles.modalText}>
-                  Service Posted Successfully!
-                </Text>
+                <Ionicons
+                  name="checkmark-circle"
+                  size={60}
+                  color="#9C27B0"
+                />
+                <Text style={styles.modalText}>Gig Posted Successfully!</Text>
               </View>
             </View>
           </Modal>
 
+          {/* Info Modal (used for help or additional explanations) */}
+          <Modal
+            transparent
+            visible={infoModalVisible}
+            animationType="fade"
+          >
+            <TouchableOpacity
+              style={styles.modalOverlay}
+              activeOpacity={1}
+              onPressOut={closeInfoModal}
+            >
+              <View style={styles.infoModalContent}>
+                <Text style={styles.infoModalText}>{infoModalText}</Text>
+                <TouchableOpacity
+                  style={styles.closeInfoButton}
+                  onPress={closeInfoModal}
+                >
+                  <Text style={styles.closeInfoButtonText}>Close</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
+          </Modal>
+
           {/* Categories Modal */}
-          <Modal transparent visible={showCategoriesModal} animationType="fade">
+          <Modal
+            transparent
+            visible={showCategoriesModal}
+            animationType="fade"
+            onRequestClose={() => setShowCategoriesModal(false)}
+          >
             <TouchableOpacity
               style={styles.modalOverlay}
               activeOpacity={1}
@@ -733,12 +802,12 @@ const AddGig: React.FC = () => {
             >
               <View style={styles.modalPickerContent}>
                 <Text style={styles.modalTitle}>Select a Category</Text>
-                {PREDEFINED_CATEGORIES.map((cat) => (
+                {AVAILABLE_CATEGORIES.map((cat) => (
                   <TouchableOpacity
                     key={cat}
                     style={styles.modalOption}
                     onPress={() => {
-                      setCategory(cat);
+                      setFormData((prev) => ({ ...prev, category: cat }));
                       setShowCategoriesModal(false);
                     }}
                   >
@@ -748,7 +817,7 @@ const AddGig: React.FC = () => {
               </View>
             </TouchableOpacity>
           </Modal>
-        </View>
+        </ScrollView>
       </TouchableWithoutFeedback>
     </KeyboardAvoidingView>
   );
@@ -757,14 +826,13 @@ const AddGig: React.FC = () => {
 export default AddGig;
 
 const styles = StyleSheet.create({
+  outerContainer: {
+    flex: 1,
+    backgroundColor: "#000000", // Dark background
+  },
   container: {
     flex: 1,
-    backgroundColor: "black",
-  },
-  innerContainer: {
-    flex: 1,
-    paddingTop: 20,
-    paddingHorizontal: 20,
+    padding: 20,
   },
   errorToast: {
     position: "absolute",
@@ -800,28 +868,23 @@ const styles = StyleSheet.create({
     transform: [{ scale: 1.2 }],
   },
   slideContainer: {
-    flex: 1,
+    marginBottom: 30,
   },
-  sectionTitle: {
-    fontSize: 22,
+  stepTitle: {
+    fontSize: 24,
     fontWeight: "700",
     color: "#BB86FC",
-    marginBottom: 25,
+    marginBottom: 20,
     textAlign: "center",
   },
-  sectionContainer: {
-    marginBottom: 25,
-  },
-  subTitle: {
-    fontSize: 18,
-    fontWeight: "600",
+  label: {
+    fontSize: 16,
     color: "#BB86FC",
-    marginBottom: 10,
+    marginBottom: 5,
   },
-  helperText: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: "#aaa",
+  infoLabelContainer: {
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 10,
   },
   input: {
@@ -853,58 +916,98 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#fff",
   },
+  priceContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 15,
+  },
+  perHourText: {
+    color: "#fff",
+    fontSize: 16,
+    marginLeft: 10,
+  },
+  toggleButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 15,
+  },
+  toggleText: {
+    color: "#fff",
+    fontSize: 16,
+    marginLeft: 10,
+  },
   uploadButton: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#1E1E1E",
     padding: 15,
     borderRadius: 10,
-    marginBottom: 20,
+    marginBottom: 15,
   },
   uploadButtonText: {
     color: "#BB86FC",
     fontSize: 16,
     marginLeft: 10,
   },
-  coverImageContainer: {
-    alignItems: "center",
-    marginBottom: 20,
+  imagesContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginTop: 10,
   },
-  coverImage: {
-    width: 150,
-    height: 150,
-    borderRadius: 15,
-    resizeMode: "cover",
+  imageContainer: {
+    position: "relative",
+    margin: 5,
   },
-  reviewContainer: {
+  image: {
+    width: 80,
+    height: 80,
+    borderRadius: 10,
+  },
+  removeButton: {
+    position: "absolute",
+    top: -5,
+    right: -5,
     backgroundColor: "#1E1E1E",
     borderRadius: 12,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: "#424242",
+    padding: 2,
   },
-  reviewText: {
-    color: "#fff",
-    fontSize: 16,
-    marginBottom: 10,
-  },
-  reviewLabel: {
-    color: "#BB86FC",
-    fontWeight: "700",
-  },
-  note: {
+  optionalText: {
     color: "#888",
-    fontSize: 14,
+    fontSize: 12,
+    marginTop: 5,
     textAlign: "center",
-    marginTop: 20,
-    paddingHorizontal: 10,
   },
-  buttonContainer: {
+  datePickerButton: {
+    backgroundColor: "#1E1E1E",
+    padding: 15,
+    borderRadius: 12,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginTop: 30,
-    marginBottom: 40,
+    borderWidth: 1,
+    borderColor: "#424242",
+    marginBottom: 10,
+  },
+  datePickerText: {
+    fontSize: 16,
+    color: "#fff",
+    flex: 1,
+  },
+  clearDateButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 15,
+    marginTop: 5,
+  },
+  clearDateButtonText: {
+    color: "#BB86FC",
+    fontSize: 16,
+    marginLeft: 8,
+  },
+  buttonContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 20,
   },
   backButton: {
     flexDirection: "row",
@@ -938,6 +1041,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.7)",
     justifyContent: "center",
     alignItems: "center",
+    padding: 20,
   },
   modalContent: {
     backgroundColor: "#1E1E1E",
@@ -950,6 +1054,30 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "600",
     color: "#fff",
+  },
+  infoModalContent: {
+    backgroundColor: "#1E1E1E",
+    padding: 20,
+    borderRadius: 15,
+    alignItems: "center",
+    width: "80%",
+  },
+  infoModalText: {
+    fontSize: 16,
+    color: "#fff",
+    marginBottom: 20,
+    textAlign: "center",
+  },
+  closeInfoButton: {
+    backgroundColor: "#BB86FC",
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+  },
+  closeInfoButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
   },
   modalPickerContent: {
     backgroundColor: "#1E1E1E",
@@ -972,113 +1100,5 @@ const styles = StyleSheet.create({
   modalOptionText: {
     fontSize: 16,
     color: "#fff",
-  },
-  availabilityOption: {
-    backgroundColor: "#1E1E1E",
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 15,
-    borderWidth: 1,
-    borderColor: "#424242",
-  },
-  availabilityOptionSelected: {
-    borderColor: "#BB86FC",
-  },
-  availabilityOptionText: {
-    color: "#fff",
-    fontSize: 16,
-  },
-  daysContainer: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    marginTop: 10,
-    gap: 10,
-  },
-  dayButton: {
-    backgroundColor: "#1E1E1E",
-    borderWidth: 1,
-    borderColor: "#424242",
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-  },
-  dayButtonSelected: {
-    borderColor: "#BB86FC",
-  },
-  dayButtonText: {
-    color: "#fff",
-    fontSize: 14,
-  },
-  priceOptionContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 15,
-  },
-  priceOption: {
-    flex: 1,
-    backgroundColor: "#1E1E1E",
-    padding: 15,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#424242",
-    marginRight: 10,
-  },
-  priceOptionSelected: {
-    borderColor: "#BB86FC",
-  },
-  priceOptionText: {
-    color: "#fff",
-    fontSize: 16,
-  },
-  addLinksContainer: {
-    marginBottom: 20,
-  },
-  linkItem: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    backgroundColor: "#1E1E1E",
-    borderColor: "#424242",
-    borderWidth: 1,
-    borderRadius: 10,
-    padding: 10,
-    marginBottom: 10,
-  },
-  linkText: {
-    color: "#fff",
-    flex: 1,
-    marginRight: 10,
-  },
-  addLinkRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  addLinkButton: {
-    backgroundColor: "#1E1E1E",
-    borderRadius: 10,
-    padding: 10,
-  },
-  imageContainer: {
-    position: "relative",
-    marginRight: 10,
-  },
-  additionalImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 10,
-  },
-  removeButton: {
-    position: "absolute",
-    top: -5,
-    right: -5,
-    backgroundColor: "#1E1E1E",
-    borderRadius: 12,
-    padding: 2,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: "#333",
-    marginVertical: 20,
   },
 });
