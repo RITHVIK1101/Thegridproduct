@@ -78,10 +78,13 @@ const DIRECTION_LOCK_THRESHOLD = 10;
 
 const Dashboard: React.FC<DashboardProps> = () => {
   const [campusMode, setCampusMode] = useState<"In Campus" | "Both">("Both");
-  const [selectedCategory, setSelectedCategory] = useState<string>("#Everything");
+  const [selectedCategory, setSelectedCategory] =
+    useState<string>("#Everything");
   const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isDetailsModalVisible, setIsDetailsModalVisible] = useState(false);
+  const [likedProducts, setLikedProducts] = useState<string[]>([]);
+
   const [isDescriptionModalVisible, setIsDescriptionModalVisible] =
     useState(false);
   const [selectedProductDescription, setSelectedProductDescription] =
@@ -111,7 +114,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [cartUpdated, setCartUpdated] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [favorites, setFavorites] = useState<string[]>([]);
 
   // Manage currentImageIndex in Dashboard
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -167,7 +169,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
   };
 
   const toggleFavorite = (productId: string) => {
-    if (favorites.includes(productId)) {
+    if (likedProducts.includes(productId)) {
       unlikeProduct(productId);
     } else {
       likeProduct(productId);
@@ -229,7 +231,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
       if (!response.ok) {
         throw new Error("Failed to like product");
       }
-      setFavorites((prev) => [...prev, productId]);
+      setLikedProducts((prev) => [...prev, productId]);
       showSuccess("Liked the product!");
     } catch (error) {
       console.error("Error liking product:", error);
@@ -249,12 +251,10 @@ const Dashboard: React.FC<DashboardProps> = () => {
           },
         }
       );
-
       if (!response.ok) {
         throw new Error("Failed to unlike product");
       }
-
-      setFavorites((prev) => prev.filter((id) => id !== productId));
+      setLikedProducts((prev) => prev.filter((id) => id !== productId));
       showSuccess("Unliked the product!");
     } catch (error) {
       console.error("Error unliking product:", error);
@@ -305,6 +305,26 @@ const Dashboard: React.FC<DashboardProps> = () => {
       }
     } catch (err) {
       console.error("Fetch Cart Error:", err);
+    }
+  };
+  const fetchLikedProducts = async () => {
+    if (!userId || !token) return;
+    try {
+      const response = await fetch(`${NGROK_URL}/products/liked`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      if (!response.ok) {
+        throw new Error("Failed to fetch liked products");
+      }
+      const data = await response.json();
+      setLikedProducts(data.map((product: Product) => product.id));
+    } catch (error) {
+      console.error("Error fetching liked products:", error);
+      showError("Failed to fetch liked products.");
     }
   };
 
@@ -519,6 +539,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
     setError(null);
     fetchProducts();
     fetchCart();
+    fetchLikedProducts();
     fetchUserInfo();
     setCurrentIndex(0);
     setCurrentImageIndex(0); // Reset image index when campusMode changes
@@ -576,7 +597,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
 
     // Use a ref for direction locking so it resets after each gesture
     const directionLockedRef = useRef<"horizontal" | "vertical" | null>(null);
-
+    const isLiked = likedProducts.includes(product.id);
     const onHandlerStateChange = ({ nativeEvent }: any) => {
       if (nativeEvent.state === State.END) {
         const { translationX, translationY } = nativeEvent;
@@ -645,8 +666,14 @@ const Dashboard: React.FC<DashboardProps> = () => {
             useNativeDriver: true,
           }).start();
         } else {
-          Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
-          Animated.spring(translateY, { toValue: 0, useNativeDriver: true }).start();
+          Animated.spring(translateX, {
+            toValue: 0,
+            useNativeDriver: true,
+          }).start();
+          Animated.spring(translateY, {
+            toValue: 0,
+            useNativeDriver: true,
+          }).start();
         }
 
         // Reset direction lock at the end of gesture
@@ -745,7 +772,10 @@ const Dashboard: React.FC<DashboardProps> = () => {
             style={{
               width: SCREEN_WIDTH,
               height: SCREEN_HEIGHT * 0.67,
-              transform: [{ translateX: translateX }, { translateY: translateY }],
+              transform: [
+                { translateX: translateX },
+                { translateY: translateY },
+              ],
             }}
           >
             {/* Next product below current product (swipe up preview) */}
@@ -1037,7 +1067,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
                       setIsDescriptionModalVisible(true);
                     }}
                     onNextProduct={goToNextProduct}
-                    isFavorite={favorites.includes(product.id)}
+                    isFavorite={likedProducts.includes(product.id)} // Updated here
                     currentImageIndex={currentImageIndex}
                     setCurrentImageIndex={setCurrentImageIndex}
                   />
@@ -1070,7 +1100,8 @@ const Dashboard: React.FC<DashboardProps> = () => {
                     <TouchableOpacity
                       style={[
                         styles.filterOptionButton,
-                        selectedCategory === item && styles.filterOptionSelected,
+                        selectedCategory === item &&
+                          styles.filterOptionSelected,
                       ]}
                       onPress={() => setSelectedCategory(item)}
                       accessibilityLabel={`Filter by ${item}`}
@@ -1098,7 +1129,8 @@ const Dashboard: React.FC<DashboardProps> = () => {
                     <TouchableOpacity
                       style={[
                         styles.filterOptionButton,
-                        campusMode === item.value && styles.filterOptionSelected,
+                        campusMode === item.value &&
+                          styles.filterOptionSelected,
                       ]}
                       onPress={() => setCampusMode(item.value)}
                       accessibilityLabel={`Filter by ${item.label}`}
