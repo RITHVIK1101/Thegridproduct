@@ -1,6 +1,6 @@
 // AddGig.tsx
 
-import React, { useState, useRef } from "react";
+import React, { useState, useContext, useRef } from "react";
 import {
   View,
   Text,
@@ -21,14 +21,22 @@ import {
 } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import * as ImagePicker from "expo-image-picker";
+import * as ImageManipulator from "expo-image-manipulator";
+import DateTimePickerModal from "react-native-modal-datetime-picker";
+import { NGROK_URL } from "@env";
 import { useNavigation } from "@react-navigation/native";
-import { NGROK_URL } from "@env"; // Ensure your .env is set up correctly
-import DateTimePickerModal from "react-native-modal-datetime-picker"; // Make sure you have installed this package
+import { UserContext } from "./UserContext";
+import axios from "axios";
 
 /** Available categories to choose from. */
-const AVAILABLE_CATEGORIES = ["Tutoring", "Design", "Delivering", "Other"] as const;
+const AVAILABLE_CATEGORIES = [
+  "Tutoring",
+  "Design",
+  "Delivering",
+  "Other",
+] as const;
 
-/** Define the multi-step flow with a union type for convenience. 
+/** Define the multi-step flow with a union type for convenience.
  *  We have 6 steps total.
  */
 type Step = 1 | 2 | 3 | 4 | 5 | 6;
@@ -44,17 +52,18 @@ interface FormData {
   images: string[]; // up to 5
   /** Expiration date field (optional).
    *  The gig will become inactive by this time if set.
-   *  If unset (empty), the gig defaults to 30 days. 
+   *  If unset (empty), the gig defaults to 30 days.
    */
   expirationDate: string;
 }
 
+const CLOUDINARY_URL = "https://api.cloudinary.com/v1_1/ds0zpfht9/image/upload";
+const CLOUDINARY_UPLOAD_PRESET = "gridly_preset";
+
 const AddGig: React.FC = () => {
   const navigation = useNavigation();
+  const { userId, token, institution, studentType } = useContext(UserContext);
 
-  // ---------------------------
-  // Multi-step management
-  // ---------------------------
   const [currentStep, setCurrentStep] = useState<Step>(1);
   const [slideAnim] = useState(new Animated.Value(0));
 
@@ -76,7 +85,7 @@ const AddGig: React.FC = () => {
   // Delivery time toggle
   const [noDeliveryRequired, setNoDeliveryRequired] = useState(false);
 
-  // ** New toggle for expiration date **
+  // Toggle for expiration date
   const [noExpiration, setNoExpiration] = useState<boolean>(false);
 
   // Loading and success states
@@ -174,7 +183,9 @@ const AddGig: React.FC = () => {
         return true;
       case 2:
         if (!formData.isPriceOpenToComm && !formData.price.trim()) {
-          showError("Please specify a price or choose 'Open to Communication'.");
+          showError(
+            "Please specify a price or choose 'Open to Communication'."
+          );
           return false;
         }
         return true;
@@ -188,21 +199,21 @@ const AddGig: React.FC = () => {
         }
         return true;
       case 5:
-        // Expiration date is now optional, so no strict validation
         return true;
       case 6:
-        // Image uploading is optional, so no validation required
         return true;
       default:
         return false;
     }
   };
-
-  // ------------------------------------------------------------------------------
-  // Final submission to backend
-  // ------------------------------------------------------------------------------
   const handleSubmit = async () => {
     setIsLoading(true);
+
+    if (!token) {
+      showError("Authentication error. Please log in again.");
+      setIsLoading(false);
+      return;
+    }
 
     // Construct the payload
     const payload: any = {
@@ -218,51 +229,55 @@ const AddGig: React.FC = () => {
       images: formData.images,
     };
 
-    // If user has chosen noExpiration or has no date set, we skip or set it as empty 
+    // If user has chosen noExpiration or has no date set, we skip or set it as empty
     // (thus defaulting to 30 days on backend or logic).
     if (!noExpiration && formData.expirationDate) {
       payload.expirationDate = formData.expirationDate.trim();
     }
 
     try {
-      const response = await fetch(`${NGROK_URL}/gigs`, {
+      const response = await fetch(`${NGROK_URL}/services`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          // Include Authorization if needed
-          // Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${token}`, // Include the token here
         },
         body: JSON.stringify(payload),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(
-          errorData.message || `HTTP error! status: ${response.status}`
-        );
+      const contentType = response.headers.get("content-type");
+
+      if (contentType && contentType.includes("application/json")) {
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(
+            data.message || `HTTP error! status: ${response.status}`
+          );
+        }
+        setFormData({
+          title: "",
+          category: "",
+          price: "",
+          isPriceOpenToComm: false,
+          deliveryTime: "",
+          description: "",
+          images: [],
+          expirationDate: "",
+        });
+        setNoDeliveryRequired(false);
+        setNoExpiration(false);
+        setCurrentStep(1);
+        setIsSuccessModalVisible(true);
+
+        setTimeout(() => {
+          setIsSuccessModalVisible(false);
+          navigation.navigate("Dashboard"); // Adjust as needed
+        }, 2000);
+      } else {
+        const errorText = await response.text();
+        console.error("Unexpected response:", errorText);
+        throw new Error("Unexpected response format. Expected JSON.");
       }
-
-      setIsSuccessModalVisible(true);
-
-      // Reset the form after success
-      setFormData({
-        title: "",
-        category: "",
-        price: "",
-        isPriceOpenToComm: false,
-        deliveryTime: "",
-        description: "",
-        images: [],
-        expirationDate: "",
-      });
-      setNoDeliveryRequired(false);
-      setNoExpiration(false);
-      setCurrentStep(1);
-
-      setTimeout(() => {
-        setIsSuccessModalVisible(false);
-        navigation.navigate("Dashboard"); // Adjust as needed
-      }, 2000);
     } catch (error: unknown) {
       console.error("Error:", error);
       showError(
@@ -299,14 +314,47 @@ const AddGig: React.FC = () => {
           0,
           5 - formData.images.length
         );
+        const uploadedImages: string[] = [];
 
         for (const asset of selectedAssets) {
           const uri = asset.uri;
-          setFormData((prev) => ({
-            ...prev,
-            images: [...prev.images, uri],
-          }));
+          const manipulatedImage = await ImageManipulator.manipulateAsync(
+            uri,
+            [{ resize: { width: 800 } }],
+            {
+              compress: 0.7,
+              format: ImageManipulator.SaveFormat.JPEG,
+              base64: true,
+            }
+          );
+
+          const formDataImage = new FormData();
+          formDataImage.append(
+            "file",
+            `data:image/jpeg;base64,${manipulatedImage.base64}`
+          );
+          formDataImage.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+
+          try {
+            const response = await axios.post(CLOUDINARY_URL, formDataImage, {
+              headers: {
+                "Content-Type": "application/x-www-form-urlencoded",
+              },
+            });
+
+            const imageUrl = response.data.secure_url;
+
+            uploadedImages.push(imageUrl);
+          } catch (error) {
+            console.error("Error uploading image:", error);
+            showError("Image upload failed. Please try again.");
+          }
         }
+
+        setFormData((prev) => ({
+          ...prev,
+          images: [...prev.images, ...uploadedImages],
+        }));
 
         setIsUploadingImage(false);
       }
@@ -349,7 +397,7 @@ const AddGig: React.FC = () => {
   };
 
   const handleConfirm = (date: Date) => {
-    const formattedDate = date.toLocaleString(); // Format as desired
+    const formattedDate = date.toISOString(); // Correct RFC3339 format
     setFormData((prev) => ({
       ...prev,
       expirationDate: formattedDate,
@@ -371,9 +419,7 @@ const AddGig: React.FC = () => {
             placeholder="Enter gig title (e.g., Math Tutor)"
             placeholderTextColor="#888"
             value={formData.title}
-            onChangeText={(text) =>
-              setFormData({ ...formData, title: text })
-            }
+            onChangeText={(text) => setFormData({ ...formData, title: text })}
           />
 
           <Text style={styles.label}>Category</Text>
@@ -404,9 +450,7 @@ const AddGig: React.FC = () => {
               placeholderTextColor="#888"
               keyboardType="numeric"
               value={formData.price}
-              onChangeText={(text) =>
-                setFormData({ ...formData, price: text })
-              }
+              onChangeText={(text) => setFormData({ ...formData, price: text })}
               editable={!formData.isPriceOpenToComm}
             />
             <Text style={styles.perHourText}>/hour</Text>
@@ -467,9 +511,7 @@ const AddGig: React.FC = () => {
             }}
           >
             <Ionicons
-              name={
-                noDeliveryRequired ? "checkmark-circle" : "ellipse-outline"
-              }
+              name={noDeliveryRequired ? "checkmark-circle" : "ellipse-outline"}
               size={24}
               color={noDeliveryRequired ? "#BB86FC" : "#ccc"}
             />
@@ -526,7 +568,7 @@ const AddGig: React.FC = () => {
             onPress={() => {
               setNoExpiration((prev) => !prev);
               // If we just toggled noExpiration ON, clear the date
-              if (!noExpiration === true) {
+              if (!noExpiration) {
                 setFormData((prev) => ({ ...prev, expirationDate: "" }));
               }
             }}
@@ -552,7 +594,7 @@ const AddGig: React.FC = () => {
               >
                 <Text style={styles.datePickerText}>
                   {formData.expirationDate
-                    ? formData.expirationDate
+                    ? new Date(formData.expirationDate).toLocaleString()
                     : "Select an expiration date & time"}
                 </Text>
                 <Ionicons name="calendar-outline" size={20} color="#BB86FC" />
@@ -574,7 +616,8 @@ const AddGig: React.FC = () => {
           )}
 
           <Text style={styles.optionalText}>
-            If no expiration date is set, your gig will be inactive after 30 days.
+            If no expiration date is set, your gig will be inactive after 30
+            days.
           </Text>
 
           <DateTimePickerModal
@@ -597,7 +640,7 @@ const AddGig: React.FC = () => {
             disabled={isUploadingImage || formData.images.length >= 5}
           >
             {isUploadingImage ? (
-              <ActivityIndicator size="small" color="#BB86FC" />
+              <ActivityIndicator size="small" color="#fff" />
             ) : (
               <>
                 <Ionicons
@@ -704,9 +747,7 @@ const AddGig: React.FC = () => {
               },
             ]}
           >
-            <Text style={styles.stepTitle}>
-              {slides[currentStep].title}
-            </Text>
+            <Text style={styles.stepTitle}>{slides[currentStep].title}</Text>
             {slides[currentStep].content}
           </Animated.View>
 
@@ -714,7 +755,9 @@ const AddGig: React.FC = () => {
           <View
             style={[
               styles.buttonContainer,
-              { justifyContent: currentStep > 1 ? "space-between" : "flex-end" },
+              {
+                justifyContent: currentStep > 1 ? "space-between" : "flex-end",
+              },
             ]}
           >
             {currentStep > 1 && (
@@ -755,22 +798,14 @@ const AddGig: React.FC = () => {
           >
             <View style={styles.modalOverlay}>
               <View style={styles.modalContent}>
-                <Ionicons
-                  name="checkmark-circle"
-                  size={60}
-                  color="#9C27B0"
-                />
+                <Ionicons name="checkmark-circle" size={60} color="#9C27B0" />
                 <Text style={styles.modalText}>Gig Posted Successfully!</Text>
               </View>
             </View>
           </Modal>
 
           {/* Info Modal (used for help or additional explanations) */}
-          <Modal
-            transparent
-            visible={infoModalVisible}
-            animationType="fade"
-          >
+          <Modal transparent visible={infoModalVisible} animationType="fade">
             <TouchableOpacity
               style={styles.modalOverlay}
               activeOpacity={1}
@@ -825,6 +860,7 @@ const AddGig: React.FC = () => {
 
 export default AddGig;
 
+// Styles (same as AddProduct.tsx with necessary adjustments)
 const styles = StyleSheet.create({
   outerContainer: {
     flex: 1,

@@ -141,10 +141,9 @@ const ActivityScreen: React.FC = () => {
       setLoadingGigs(false);
       return;
     }
-
     try {
-      // Updated URL to include userId in the path
-      const response = await fetch(`${NGROK_URL}/users/${userId}/services`, {
+      // Updated URL to match the server-side route
+      const response = await fetch(`${NGROK_URL}/services/user`, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",

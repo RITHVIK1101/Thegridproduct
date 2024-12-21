@@ -1,3 +1,5 @@
+// JobsScreen.tsx
+
 import React, { useState, useRef, useEffect, useContext } from "react";
 import {
   View,
@@ -23,7 +25,7 @@ import BottomNavBar from "./components/BottomNavbar";
 import { NGROK_URL } from "@env";
 import { UserContext } from "./UserContext";
 import { StackNavigationProp } from "@react-navigation/stack";
-import { RootStackParamList } from "./navigationtypes"; // Adjust the path if necessary
+import { RootStackParamList } from "./navigationTypes"; // Adjust the path if necessary
 import { useNavigation } from "@react-navigation/native";
 
 const { width } = Dimensions.get("window");
@@ -414,26 +416,35 @@ const JobsScreen: React.FC = () => {
             style={styles.featuredScroll}
           >
             {featuredGigs.map((gig) => (
-              <LinearGradient
+              <TouchableOpacity
                 key={gig.id}
-                colors={["#1E1E1E", "#2A2A2A"]}
-                start={{ x: 0.1, y: 0.1 }}
-                end={{ x: 0.9, y: 0.9 }}
-                style={styles.featuredCard}
+                onPress={() =>
+                  navigation.navigate("JobDetail", { jobId: gig.id })
+                }
+                activeOpacity={0.7}
               >
-                <View style={styles.featuredTextContainer}>
-                  <Text style={styles.featuredTitle}>{gig.title}</Text>
-                  <View style={styles.featuredCategoryRow}>
-                    <Ionicons
-                      name={categoryIcons[gig.category] || "grid-outline"}
-                      size={16}
-                      color="#BB86FC"
-                      style={{ marginRight: 5 }}
-                    />
-                    <Text style={styles.featuredCategory}>{gig.category}</Text>
+                <LinearGradient
+                  colors={["#1E1E1E", "#2A2A2A"]}
+                  start={{ x: 0.1, y: 0.1 }}
+                  end={{ x: 0.9, y: 0.9 }}
+                  style={styles.featuredCard}
+                >
+                  <View style={styles.featuredTextContainer}>
+                    <Text style={styles.featuredTitle}>{gig.title}</Text>
+                    <View style={styles.featuredCategoryRow}>
+                      <Ionicons
+                        name={categoryIcons[gig.category] || "grid-outline"}
+                        size={16}
+                        color="#BB86FC"
+                        style={{ marginRight: 5 }}
+                      />
+                      <Text style={styles.featuredCategory}>
+                        {gig.category}
+                      </Text>
+                    </View>
                   </View>
-                </View>
-              </LinearGradient>
+                </LinearGradient>
+              </TouchableOpacity>
             ))}
           </ScrollView>
         )}

@@ -33,7 +33,11 @@ interface JobDetail {
   category: string;
   price: string;
   userId: string;
-  coverImage: string;
+  images: string[]; // Changed from coverImage
+  deliveryTime: string;
+  studentType: string;
+  university: string;
+  status: string;
   // Add other fields as necessary
 }
 
@@ -69,13 +73,12 @@ const JobDetails: React.FC = () => {
 
       const data = await response.json();
 
-      // Adjust this based on your backend's response structure
-      // Assuming backend returns { gig: { ... } }
-      if (!data.gig) {
+      // Remove the .gig check since the API returns the gig directly
+      if (!data) {
         throw new Error("Job detail not found.");
       }
 
-      setJobDetail(data.gig);
+      setJobDetail(data);
     } catch (error) {
       console.error(error);
       Alert.alert(
@@ -110,9 +113,9 @@ const JobDetails: React.FC = () => {
   return (
     <ScrollView style={styles.container}>
       {/* Cover Image */}
-      {jobDetail.coverImage ? (
+      {jobDetail.images && jobDetail.images.length > 0 ? (
         <Image
-          source={{ uri: jobDetail.coverImage }}
+          source={{ uri: jobDetail.images[0] }} // Use first image as cover
           style={styles.coverImage}
           resizeMode="cover"
           onError={(e) => {
