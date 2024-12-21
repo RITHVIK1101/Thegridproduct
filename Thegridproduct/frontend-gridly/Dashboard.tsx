@@ -528,6 +528,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
     setIsFilterModalVisible(!isFilterModalVisible);
 
   const goToNextProduct = () => {
+    setIsDescriptionModalVisible(false); // Close description modal on swipe-up
     if (currentIndex < filteredProducts.length - 1) {
       setCurrentIndex(currentIndex + 1);
       setCurrentImageIndex(0); // Reset image index when moving to next product
@@ -582,24 +583,31 @@ const Dashboard: React.FC<DashboardProps> = () => {
 
         if (directionLockedRef.current === "horizontal") {
           if (translationX < -SWIPE_THRESHOLD) {
-            // Swipe Left: Show next image or product
+            // Swipe Left: Show next image
             Animated.timing(translateX, {
               toValue: -SCREEN_WIDTH,
               duration: 300,
               useNativeDriver: true,
-            }).start(() => {
-              translateX.setValue(0);
-              const nextIdx =
-                currentImageIndex < product.images.length - 1
-                  ? currentImageIndex + 1
-                  : 0;
-              setCurrentImageIndex(nextIdx);
+            }).start(({ finished }) => {
+              if (finished) {
+                const nextIdx =
+                  currentImageIndex < product.images.length - 1
+                    ? currentImageIndex + 1
+                    : 0;
+                setCurrentImageIndex(nextIdx);
+                // Prevent flicker by waiting for the new index to render
+                requestAnimationFrame(() => {
+                  translateX.setValue(0);
+                });
+              } else {
+                translateX.setValue(0);
+              }
             });
             directionLockedRef.current = null;
             return;
           }
           if (translationX > SWIPE_THRESHOLD) {
-            // Swipe Right: Add to cart without moving the image
+            // Swipe Right: Add to cart
             onAddToCart(product);
             directionLockedRef.current = null;
             return;
@@ -613,12 +621,20 @@ const Dashboard: React.FC<DashboardProps> = () => {
           if (translationY < -SWIPE_THRESHOLD) {
             // Swipe Up: Navigate to next product
             Animated.timing(translateY, {
-              toValue: -SCREEN_HEIGHT * 0.67,
+              toValue: -SCREEN_HEIGHT * 0.67, // Adjust to match product height
               duration: 300,
               useNativeDriver: true,
-            }).start(() => {
-              translateY.setValue(0);
-              onNextProduct();
+            }).start(({ finished }) => {
+              if (finished) {
+                // Call onNextProduct FIRST
+                onNextProduct();
+                // Then wait for a frame to reset translateY
+                requestAnimationFrame(() => {
+                  translateY.setValue(0);
+                });
+              } else {
+                translateY.setValue(0);
+              }
             });
             directionLockedRef.current = null;
             return;
@@ -652,10 +668,10 @@ const Dashboard: React.FC<DashboardProps> = () => {
       }
 
       if (directionLockedRef.current === "horizontal") {
-        if (translationX < 0) { // Allow only left swipe (negative translationX)
+        // Only allow left-swipe movement visually
+        if (translationX < 0) {
           translateX.setValue(translationX);
         } else {
-          // Prevent right swipe movement
           translateX.setValue(0);
         }
         translateY.setValue(0);
@@ -675,27 +691,36 @@ const Dashboard: React.FC<DashboardProps> = () => {
 
     const isTop = index === currentIndex;
 
-    const getNextImageIndex = () =>
-      currentImageIndex < product.images.length - 1 ? currentImageIndex + 1 : 0;
-    const nextImageIndex = getNextImageIndex();
-
-    const currentImageURI =
-      product.images && product.images.length > 0
-        ? product.images[currentImageIndex]
-        : "https://via.placeholder.com/150";
-    const nextImageURI =
-      product.images && product.images.length > 0
-        ? product.images[nextImageIndex]
-        : "https://via.placeholder.com/150";
-
+    // If there's no next product, just reuse the same product image to avoid null references
     const actualNextProduct = nextProduct || product;
     const nextProductImage =
       actualNextProduct.images && actualNextProduct.images.length > 0
         ? actualNextProduct.images[0]
         : "https://via.placeholder.com/150";
 
+    // Current image + next image horizontally
+    const getNextImageIndex = () =>
+      currentImageIndex < product.images.length - 1 ? currentImageIndex + 1 : 0;
+
+    const nextImageIndex = getNextImageIndex();
+
+    const currentImageURI =
+      product.images && product.images.length > 0
+        ? product.images[currentImageIndex]
+        : "https://via.placeholder.com/150";
+
+    const nextImageURI =
+      product.images && product.images.length > 0
+        ? product.images[nextImageIndex]
+        : "https://via.placeholder.com/150";
+
     return (
-      <View style={[styles.stackedProduct, isTop ? styles.topProduct : styles.bottomProduct]}>
+      <View
+        style={[
+          styles.stackedProduct,
+          isTop ? styles.topProduct : styles.bottomProduct,
+        ]}
+      >
         {isTop && (
           <View style={styles.topIconsContainer}>
             <TouchableOpacity
@@ -712,8 +737,10 @@ const Dashboard: React.FC<DashboardProps> = () => {
           </View>
         )}
 
-        <PanGestureHandler onGestureEvent={onGestureEvent} onHandlerStateChange={onHandlerStateChange}>
-          {/* Removed overflow: "hidden" so we can see next images/products immediately */}
+        <PanGestureHandler
+          onGestureEvent={onGestureEvent}
+          onHandlerStateChange={onHandlerStateChange}
+        >
           <Animated.View
             style={{
               width: SCREEN_WIDTH,
@@ -721,8 +748,15 @@ const Dashboard: React.FC<DashboardProps> = () => {
               transform: [{ translateX: translateX }, { translateY: translateY }],
             }}
           >
-            {/* Next product below current product */}
-            <View style={{ position: "absolute", top: SCREEN_HEIGHT * 0.67, width: SCREEN_WIDTH, height: SCREEN_HEIGHT * 0.67 }}>
+            {/* Next product below current product (swipe up preview) */}
+            <View
+              style={{
+                position: "absolute",
+                top: SCREEN_HEIGHT * 0.67,
+                width: SCREEN_WIDTH,
+                height: SCREEN_HEIGHT * 0.67,
+              }}
+            >
               <Image
                 source={{ uri: nextProductImage }}
                 style={styles.productImage}
@@ -738,6 +772,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
               />
             </View>
 
+            {/* TapGestureHandler for the current + next images horizontally */}
             <TapGestureHandler
               ref={doubleTapRef}
               numberOfTaps={2}
@@ -756,7 +791,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
                     flexDirection: "row",
                   }}
                 >
-                  {/* Current image */}
+                  {/* Current image (left half) */}
                   <View style={{ width: SCREEN_WIDTH, height: "100%" }}>
                     <LinearGradient
                       colors={["rgba(0,0,0,0.5)", "transparent"]}
@@ -773,7 +808,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
                     />
                   </View>
 
-                  {/* Next image horizontally */}
+                  {/* Next image horizontally (right half) */}
                   <View style={{ width: SCREEN_WIDTH, height: "100%" }}>
                     <LinearGradient
                       colors={["rgba(0,0,0,0.5)", "transparent"]}
@@ -792,64 +827,70 @@ const Dashboard: React.FC<DashboardProps> = () => {
                 </View>
               </TapGestureHandler>
             </TapGestureHandler>
-
-            {isTop && (
-              <View style={styles.productInfoBubble}>
-                <View style={styles.productInfoTextContainer}>
-                  <Text style={styles.productInfoTitle}>{product.title}</Text>
-                  <Text style={styles.productInfoPrice}>
-                    ${product.price.toFixed(2)}
-                  </Text>
-                </View>
-                <View style={styles.productInfoActions}>
-                  <TouchableOpacity
-                    style={styles.iconButton}
-                    onPress={() => {
-                      const newIdx =
-                        currentImageIndex < product.images.length - 1
-                          ? currentImageIndex + 1
-                          : 0;
-                      setCurrentImageIndex(newIdx);
-                    }}
-                    accessibilityLabel="Next Image"
-                  >
-                    <Ionicons name="close" size={20} color="#FF3B30" />
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.iconButton}
-                    onPress={() => onShowDescription(product.description)}
-                    accessibilityLabel="Info"
-                  >
-                    <Ionicons name="information-circle" size={20} color="#FFFFFF" />
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.iconButton}
-                    onPress={() => onAddToCart(product)}
-                    accessibilityLabel="Add to Cart"
-                  >
-                    <Ionicons name="cart" size={20} color="#34C759" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
-
-            {isTop && (
-              <View style={styles.imageIndicatorsContainer}>
-                {product.images.map((_, idx) => (
-                  <View
-                    key={idx}
-                    style={[
-                      styles.imageIndicatorDot,
-                      idx === currentImageIndex && styles.imageIndicatorDotActive,
-                    ]}
-                  />
-                ))}
-              </View>
-            )}
           </Animated.View>
         </PanGestureHandler>
+
+        {/* Keep the product info outside the Animated View 
+            so it doesn't disappear and reappear on left swipe */}
+        {isTop && (
+          <>
+            <View style={styles.productInfoBubble}>
+              <View style={styles.productInfoTextContainer}>
+                <Text style={styles.productInfoTitle}>{product.title}</Text>
+                <Text style={styles.productInfoPrice}>
+                  ${product.price.toFixed(2)}
+                </Text>
+              </View>
+              <View style={styles.productInfoActions}>
+                <TouchableOpacity
+                  style={styles.iconButton}
+                  onPress={() => {
+                    const newIdx =
+                      currentImageIndex < product.images.length - 1
+                        ? currentImageIndex + 1
+                        : 0;
+                    setCurrentImageIndex(newIdx);
+                  }}
+                  accessibilityLabel="Next Image"
+                >
+                  <Ionicons name="close" size={20} color="#FF3B30" />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.iconButton}
+                  onPress={() => onShowDescription(product.description)}
+                  accessibilityLabel="Info"
+                >
+                  <Ionicons
+                    name="information-circle"
+                    size={20}
+                    color="#FFFFFF"
+                  />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.iconButton}
+                  onPress={() => onAddToCart(product)}
+                  accessibilityLabel="Add to Cart"
+                >
+                  <Ionicons name="cart" size={20} color="#34C759" />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.imageIndicatorsContainer}>
+              {product.images.map((_, idx) => (
+                <View
+                  key={idx}
+                  style={[
+                    styles.imageIndicatorDot,
+                    idx === currentImageIndex && styles.imageIndicatorDotActive,
+                  ]}
+                />
+              ))}
+            </View>
+          </>
+        )}
       </View>
     );
   };
@@ -1252,9 +1293,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     marginRight: 5,
-    marginTop: -9, // This will shift the bubbles slightly upward
+    marginTop: -9,
   },
-  
   filterTagText: {
     color: "#FFFFFF",
     fontSize: 12,
@@ -1263,9 +1303,8 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    marginTop: -24, // Add spacing at the top
+    marginTop: -24,
   },
-
   stackedProduct: {
     position: "absolute",
     width: SCREEN_WIDTH,
@@ -1288,9 +1327,8 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
     resizeMode: "cover",
-    transform: [{ translateY: -1 }], // Shift image slightly up
+    transform: [{ translateY: -1 }],
   },
-  
   topGradientOverlay: {
     position: "absolute",
     top: 0,
