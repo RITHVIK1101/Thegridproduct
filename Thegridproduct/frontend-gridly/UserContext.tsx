@@ -32,6 +32,8 @@ interface UserContextProps {
   lastName: string;
   institution: string;
   studentType: StudentType | null;
+  likedProducts: string[]; // Added likedProducts
+  setLikedProducts: React.Dispatch<React.SetStateAction<string[]>>; // Added setLikedProducts
   isLoading: boolean;
   setUser: (user: User) => Promise<void>;
   clearUser: () => Promise<void>;
@@ -45,6 +47,8 @@ export const UserContext = createContext<UserContextProps>({
   lastName: "",
   institution: "",
   studentType: null,
+  likedProducts: [], // Initialize as empty array
+  setLikedProducts: () => {},
   isLoading: true,
   setUser: async () => {},
   clearUser: async () => {},
@@ -88,6 +92,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   const [lastName, setLastName] = useState<string>("");
   const [institution, setInstitution] = useState<string>("");
   const [studentType, setStudentType] = useState<StudentType | null>(null);
+  const [likedProducts, setLikedProducts] = useState<string[]>([]); // Initialize likedProducts
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   /** Load user data from SecureStore and fetch full profile */
@@ -124,6 +129,11 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
             "studentType",
             userProfile.studentType
           );
+
+          // Optionally, fetch likedProducts here or elsewhere
+          // Example:
+          // const fetchedLikedProducts = await fetchLikedProductsFromBackend(storedUserId, storedToken);
+          // setLikedProducts(fetchedLikedProducts);
         }
       } catch (error) {
         console.error("Error loading user data:", error);
@@ -187,6 +197,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
       setLastName("");
       setInstitution("");
       setStudentType(null);
+      setLikedProducts([]); // Clear likedProducts
     } catch (error) {
       console.error("Error clearing user data:", error);
       throw new Error("Failed to clear user data.");
@@ -201,6 +212,8 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     lastName,
     institution,
     studentType,
+    likedProducts, // Provide likedProducts
+    setLikedProducts, // Provide setLikedProducts
     isLoading,
     setUser,
     clearUser,

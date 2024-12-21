@@ -58,7 +58,8 @@ const LikedItemsScreen: React.FC = () => {
   // This snippet is purely an example. Adjust as needed if you store user’s favorites differently.
   const { favorites, allProducts } = useContext<any>(UserContext);
 
-  const likedProducts = allProducts?.filter((p: any) => favorites?.includes(p.id)) || [];
+  const likedProducts =
+    allProducts?.filter((p: any) => favorites?.includes(p.id)) || [];
 
   return (
     <View style={styles.screenContainer}>

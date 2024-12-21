@@ -24,6 +24,7 @@ import {
   useNavigation,
   CommonActions,
   RouteProp,
+  useFocusEffect,
 } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import Ionicons from "react-native-vector-icons/Ionicons";
@@ -77,13 +78,21 @@ const SWIPE_THRESHOLD = 80;
 const DIRECTION_LOCK_THRESHOLD = 10;
 
 const Dashboard: React.FC<DashboardProps> = () => {
+  const {
+    userId,
+    token,
+    institution,
+    clearUser,
+    likedProducts,
+    setLikedProducts,
+  } = useContext(UserContext); // Access likedProducts from UserContext
+
   const [campusMode, setCampusMode] = useState<"In Campus" | "Both">("Both");
   const [selectedCategory, setSelectedCategory] =
     useState<string>("#Everything");
   const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isDetailsModalVisible, setIsDetailsModalVisible] = useState(false);
-  const [likedProducts, setLikedProducts] = useState<string[]>([]);
 
   const [isDescriptionModalVisible, setIsDescriptionModalVisible] =
     useState(false);
@@ -92,7 +101,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
   const [searchQuery, setSearchQuery] = useState<string>("");
 
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
-  const { userId, token, institution, clearUser } = useContext(UserContext);
 
   const categories = [
     "#Everything",
@@ -307,6 +315,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
       console.error("Fetch Cart Error:", err);
     }
   };
+
   const fetchLikedProducts = async () => {
     if (!userId || !token) return;
     try {
@@ -317,11 +326,45 @@ const Dashboard: React.FC<DashboardProps> = () => {
           Authorization: `Bearer ${token}`,
         },
       });
+      if (response.status === 401) {
+        Alert.alert("Session Expired", "Please log in again.", [
+          {
+            text: "OK",
+            onPress: async () => {
+              await clearUser();
+              navigation.dispatch(
+                CommonActions.reset({
+                  index: 0,
+                  routes: [{ name: "Login" }],
+                })
+              );
+            },
+          },
+        ]);
+        return;
+      }
       if (!response.ok) {
+        const responseText = await response.text();
+        console.error("Error response text:", responseText);
         throw new Error("Failed to fetch liked products");
       }
       const data = await response.json();
-      setLikedProducts(data.map((product: Product) => product.id));
+      // If data is null or empty, just set empty array instead of throwing error
+      if (!data) {
+        setLikedProducts([]);
+        console.log("No liked products found");
+        return;
+      }
+
+      if (Array.isArray(data)) {
+        const likedProductIds = data.map((product: Product) => product.id);
+        setLikedProducts(likedProductIds);
+        console.log("Fetched Liked Products IDs:", likedProductIds);
+      } else {
+        // Only throw error if data exists but isn't in the expected format
+        setLikedProducts([]);
+        console.log("No liked products data available");
+      }
     } catch (error) {
       console.error("Error fetching liked products:", error);
       showError("Failed to fetch liked products.");
@@ -539,11 +582,17 @@ const Dashboard: React.FC<DashboardProps> = () => {
     setError(null);
     fetchProducts();
     fetchCart();
-    fetchLikedProducts();
     fetchUserInfo();
     setCurrentIndex(0);
     setCurrentImageIndex(0); // Reset image index when campusMode changes
   }, [campusMode]);
+
+  // Use useFocusEffect to fetch likedProducts when Dashboard gains focus
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchLikedProducts();
+    }, [token])
+  );
 
   const toggleFilterModal = () =>
     setIsFilterModalVisible(!isFilterModalVisible);
