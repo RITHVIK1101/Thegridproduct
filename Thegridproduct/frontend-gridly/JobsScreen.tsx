@@ -200,8 +200,9 @@ const JobsScreen: React.FC = () => {
     }
   };
 
-  const sendMessage = () => {
+  const sendMessage = async () => {
     if (userInput.trim() === "") return;
+
     const newUserMessage: Message = {
       id: Math.random().toString(),
       text: userInput,
@@ -210,34 +211,63 @@ const JobsScreen: React.FC = () => {
     setMessages((prev) => [...prev, newUserMessage]);
     setUserInput("");
 
-    if (!hasUserMessaged) {
-      setHasUserMessaged(true);
-    }
+    try {
+      // Call AI process endpoint
+      setLoading(true);
+      const aiResponse = await fetch(`${NGROK_URL}/ai/process`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ text: userInput }),
+      });
 
-    setTimeout(() => {
-      const assistantReplies = [
-        "Awesome! Could you tell me more about the category or field you're interested in?",
-        "Great. Any specific deadline or timeframe?",
-        "Got it. What's your budget range?",
-        "Perfect! I'll find some freelancers that match your needs.",
-      ];
-
-      const userMessagesCount =
-        messages.filter((m) => m.role === "user").length + 1;
-      let responseText = "Let me think...";
-      if (userMessagesCount <= assistantReplies.length) {
-        responseText = assistantReplies[userMessagesCount - 1];
-      } else {
-        responseText = "Alright! Let me find some matches for you. One sec...";
+      if (!aiResponse.ok) {
+        throw new Error(`Failed to process AI request: ${aiResponse.status}`);
       }
 
-      const newAssistantMessage: Message = {
+      const aiData = await aiResponse.json();
+      console.log("AI Response:", aiData);
+
+      const assistantMessage: Message = {
         id: Math.random().toString(),
-        text: responseText,
+        text: "Let me find some matches for you. One moment...",
         role: "assistant",
       };
-      setMessages((prev) => [...prev, newAssistantMessage]);
-    }, 1000);
+      setMessages((prev) => [...prev, assistantMessage]);
+
+      // Fetch gigs based on AI response (e.g., using keywords extracted)
+      const gigsResponse = await fetch(`${NGROK_URL}/services`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!gigsResponse.ok) {
+        throw new Error(`Failed to fetch gigs: ${gigsResponse.status}`);
+      }
+
+      const gigsData = await gigsResponse.json();
+      console.log("Filtered Gigs:", gigsData);
+
+      setGigs(gigsData); // Update gigs based on the AI-filtered results
+
+      // Add assistant message with results
+      const resultsMessage: Message = {
+        id: Math.random().toString(),
+        text: `I found ${gigsData.length} gigs that match your query. Take a look below!`,
+        role: "assistant",
+      };
+      setMessages((prev) => [...prev, resultsMessage]);
+    } catch (error) {
+      console.error(error);
+      Alert.alert("Error", "Something went wrong. Please try again later.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const sendMessageWithSuggestion = (suggestion: string) => {

@@ -130,6 +130,8 @@ func main() {
 	protected.HandleFunc("/services/{id}", handlers.UpdateGigHandler).Methods("PUT")    // Update a gig by ID
 	protected.HandleFunc("/services/{id}", handlers.DeleteGigHandler).Methods("DELETE")
 
+	protected.HandleFunc("/ai/process", handlers.ProcessAIInput).Methods("POST")
+
 	router.NotFoundHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		handlers.WriteJSONError(w, "Endpoint not found", http.StatusNotFound)
 	})
