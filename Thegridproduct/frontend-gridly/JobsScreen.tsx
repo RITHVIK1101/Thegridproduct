@@ -99,6 +99,37 @@ const getFeaturedGigs = (gigs: Gig[]): Gig[] => {
   return [gigs[firstIndex], gigs[secondIndex]];
 };
 
+// Helper function to detect greetings
+const isGreeting = (text: string): boolean => {
+  const greetings = [
+    "hello",
+    "hi",
+    "hey",
+    "good morning",
+    "good afternoon",
+    "good evening",
+    "greetings",
+    "salutations",
+  ];
+  const lowerText = text.toLowerCase();
+  return greetings.some((greet) => lowerText.includes(greet));
+};
+
+// Helper function to validate and set gigs
+const setValidatedGigs = (
+  data: any,
+  setGigs: React.Dispatch<React.SetStateAction<Gig[]>>
+) => {
+  if (data && Array.isArray(data.gigs)) {
+    setGigs(data.gigs);
+  } else if (Array.isArray(data)) {
+    setGigs(data);
+  } else {
+    console.error("Invalid gigs data:", data);
+    Alert.alert("Error", "Received invalid gigs data.");
+  }
+};
+
 // Define the navigation prop type
 type JobsScreenNavigationProp = StackNavigationProp<RootStackParamList, "Jobs">;
 
@@ -155,7 +186,7 @@ const JobsScreen: React.FC = () => {
       // Debugging: Log the fetched gigs
       console.log("Fetched Gigs:", data.gigs);
 
-      setGigs(data.gigs);
+      setValidatedGigs(data, setGigs);
     } catch (error) {
       console.error(error);
       Alert.alert("Error", "Unable to fetch services. Please try again later.");
@@ -167,17 +198,19 @@ const JobsScreen: React.FC = () => {
   // Determine featured gigs based on the current cycle
   const featuredGigs = getFeaturedGigs(gigs);
 
-  const filteredGigs = gigs.filter((gig) => {
-    const matchSearch =
-      gig.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      gig.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      gig.description.toLowerCase().includes(searchQuery.toLowerCase());
+  const filteredGigs = Array.isArray(gigs)
+    ? gigs.filter((gig) => {
+        const matchSearch =
+          gig.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          gig.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          gig.description.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const matchCategory =
-      currentFilter === "All" || gig.category === currentFilter;
+        const matchCategory =
+          currentFilter === "All" || gig.category === currentFilter;
 
-    return matchSearch && matchCategory;
-  });
+        return matchSearch && matchCategory;
+      })
+    : [];
 
   const toggleAssistant = () => {
     if (showAssistant) {
@@ -210,6 +243,17 @@ const JobsScreen: React.FC = () => {
     };
     setMessages((prev) => [...prev, newUserMessage]);
     setUserInput("");
+
+    if (isGreeting(userInput)) {
+      // Respond to greetings without fetching gigs
+      const assistantMessage: Message = {
+        id: Math.random().toString(),
+        text: "Hello! 👋 How can I assist you today?",
+        role: "assistant",
+      };
+      setMessages((prev) => [...prev, assistantMessage]);
+      return; // Exit the function to prevent further processing
+    }
 
     try {
       // Call AI process endpoint
@@ -253,12 +297,16 @@ const JobsScreen: React.FC = () => {
       const gigsData = await gigsResponse.json();
       console.log("Filtered Gigs:", gigsData);
 
-      setGigs(gigsData); // Update gigs based on the AI-filtered results
+      // Use the helper function to set gigs
+      setValidatedGigs(gigsData, setGigs);
 
       // Add assistant message with results
+      const gigsCount = Array.isArray(gigsData.gigs) ? gigsData.gigs.length : 0;
       const resultsMessage: Message = {
         id: Math.random().toString(),
-        text: `I found ${gigsData.length} gigs that match your query. Take a look below!`,
+        text: `I found ${gigsCount} gig${
+          gigsCount !== 1 ? "s" : ""
+        } that match your query. Take a look below!`,
         role: "assistant",
       };
       setMessages((prev) => [...prev, resultsMessage]);
@@ -488,60 +536,66 @@ const JobsScreen: React.FC = () => {
           />
         ) : (
           <>
-            {filteredGigs.map((gig, index) => (
-              <TouchableOpacity
-                key={gig.id}
-                onPress={() =>
-                  navigation.navigate("JobDetail", { jobId: gig.id })
-                }
-                activeOpacity={0.7}
-              >
-                <View>
-                  <View style={styles.serviceRow}>
-                    {/* Cover Image */}
-                    {gig.coverImage ? (
-                      <Image
-                        source={{ uri: gig.coverImage }}
-                        style={styles.coverImage}
-                        resizeMode="cover"
-                        onError={(e) => {
-                          console.log(
-                            `Failed to load image for gig ID ${gig.id}:`,
-                            e.nativeEvent.error
-                          );
-                        }}
-                      />
-                    ) : (
-                      <View style={styles.coverPlaceholder}>
-                        <Ionicons name="image-outline" size={24} color="#555" />
-                      </View>
-                    )}
-
-                    <View style={styles.serviceInfo}>
-                      <Text style={styles.serviceTitle}>{gig.title}</Text>
-                      <View style={styles.categoryRow}>
-                        <Ionicons
-                          name={categoryIcons[gig.category] || "grid-outline"}
-                          size={16}
-                          color="#BB86FC"
-                          style={{ marginRight: 5 }}
+            {filteredGigs
+              .filter((gig) => gig !== undefined && gig !== null)
+              .map((gig, index) => (
+                <TouchableOpacity
+                  key={gig.id}
+                  onPress={() =>
+                    navigation.navigate("JobDetail", { jobId: gig.id })
+                  }
+                  activeOpacity={0.7}
+                >
+                  <View>
+                    <View style={styles.serviceRow}>
+                      {/* Cover Image */}
+                      {gig.coverImage ? (
+                        <Image
+                          source={{ uri: gig.coverImage }}
+                          style={styles.coverImage}
+                          resizeMode="cover"
+                          onError={(e) => {
+                            console.log(
+                              `Failed to load image for gig ID ${gig.id}:`,
+                              e.nativeEvent.error
+                            );
+                          }}
                         />
-                        <Text style={styles.serviceCategory}>
-                          {gig.category}
+                      ) : (
+                        <View style={styles.coverPlaceholder}>
+                          <Ionicons
+                            name="image-outline"
+                            size={24}
+                            color="#555"
+                          />
+                        </View>
+                      )}
+
+                      <View style={styles.serviceInfo}>
+                        <Text style={styles.serviceTitle}>{gig.title}</Text>
+                        <View style={styles.categoryRow}>
+                          <Ionicons
+                            name={categoryIcons[gig.category] || "grid-outline"}
+                            size={16}
+                            color="#BB86FC"
+                            style={{ marginRight: 5 }}
+                          />
+                          <Text style={styles.serviceCategory}>
+                            {gig.category}
+                          </Text>
+                        </View>
+                        <Text style={styles.serviceDescription}>
+                          {truncateDescription(gig.description, 80)}
                         </Text>
+                        <Text style={styles.servicePrice}>{gig.price}</Text>
                       </View>
-                      <Text style={styles.serviceDescription}>
-                        {truncateDescription(gig.description, 80)}
-                      </Text>
-                      <Text style={styles.servicePrice}>{gig.price}</Text>
                     </View>
+                    {index < filteredGigs.length - 1 && (
+                      <View style={styles.divider} />
+                    )}
                   </View>
-                  {index < filteredGigs.length - 1 && (
-                    <View style={styles.divider} />
-                  )}
-                </View>
-              </TouchableOpacity>
-            ))}
+                </TouchableOpacity>
+              ))}
 
             {!loading && filteredGigs.length === 0 && (
               <Text style={styles.noResultsText}>
