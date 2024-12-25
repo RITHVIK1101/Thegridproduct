@@ -155,6 +155,7 @@ progressbar==2.5
 prompt-toolkit==3.0.43
 Protego==0.3.0
 proto-plus==1.22.3
+protobuf==3.20.3
 ptyprocess==0.7.0
 pure-eval==0.2.2
 py2app==0.28.8
