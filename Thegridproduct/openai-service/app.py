@@ -21,7 +21,7 @@ app.wsgi_app = ProxyFix(app.wsgi_app)
 
 # Initialize OpenAI with an optional timeout
 client = OpenAI(
-    api_key=os.getenv("OPENAI_API_KEY", "sk-..."),  # Fallback for local dev
+    api_key=os.getenv("OPENAI_API_KEY", "sk-..."),  # Fallback if not set
     timeout=10.0
 )
 
@@ -62,6 +62,23 @@ def parse_price_constraints(query: str) -> Dict[str, Optional[float]]:
 
     return constraints
 
+########################################
+# NEW ROOT ROUTE FOR '/' GET & POST
+########################################
+@app.route("/", methods=["GET", "POST"])
+def root_route():
+    """
+    - GET / : Return a simple greeting
+    - POST / : Return "Welcome to the bot"
+    """
+    if request.method == "GET":
+        return "Hello from the Bot Service!"
+    elif request.method == "POST":
+        return "Welcome to the bot"
+
+########################################
+# ADD GIG ENDPOINT
+########################################
 @app.route('/add-gig', methods=['POST'])
 def add_gig():
     """Add a new gig to the database, generating embeddings on the fly."""
@@ -82,6 +99,9 @@ def add_gig():
         logger.error(f"Error occurred while adding gig: {str(e)}", exc_info=True)
         return jsonify({"error": str(e)}), 500
 
+########################################
+# SEARCH GIGS ENDPOINT
+########################################
 @app.route('/search-gigs', methods=['POST'])
 def search_gigs():
     """Search gigs by user query with GPT-4 refining and vector similarity."""
@@ -192,7 +212,3 @@ def search_gigs():
                 "error_message": str(e)
             }
         }), 500
-
-# ------------------------------
-# No "app.run(...)" block here!
-# ------------------------------
