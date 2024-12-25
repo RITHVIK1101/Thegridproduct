@@ -6,21 +6,28 @@ import numpy as np
 import re
 import os
 import logging
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional
 from datetime import datetime
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize Flask and OpenAI
+# Initialize Flask
 app = Flask(__name__)
-client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))  # Move API key to environment variable
+app.wsgi_app = ProxyFix(app.wsgi_app)
+
+# Initialize OpenAI with timeout
+client = OpenAI(
+    api_key=os.getenv('OPENAI_API_KEY'),
+    timeout=10.0
+)
 
 # MongoDB connection with error handling
 try:
     mongo_client = MongoClient(os.getenv('MONGODB_URI'), serverSelectionTimeoutMS=5000)
-    mongo_client.server_info()  # Will throw an exception if connection fails
+    mongo_client.server_info()
     db = mongo_client["gridlyapp"]
     gigs_collection = db["gigs"]
     logger.info("Successfully connected to MongoDB")
@@ -76,12 +83,17 @@ def search_gigs():
                 "debug_info": {"query_type": "greeting"}
             })
 
-        # Refine query with GPT-4
+        # Refine query with GPT-4 - KEEPING ORIGINAL PROMPT
         try:
             ai_response = client.chat.completions.create(
                 model="gpt-4",
                 messages=[
-                    {"role": "system", "content": "Refine the user's query and extract relevant constraints."},
+                    {"role": "system", "content": """
+                    Refine the user's query and extract relevant constraints:
+                    - If exclusions like 'not tutoring' are mentioned, include that as exclusions.
+                    - Handle vague queries by prompting for more details.
+                    - Extract numeric constraints like 'less than $30/hour' or 'over $30'.
+                    """},
                     {"role": "user", "content": user_input}
                 ]
             )
@@ -148,5 +160,5 @@ def search_gigs():
         }), 500
 
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.environ.get("PORT", 8080))
     app.run(host="0.0.0.0", port=port)
