@@ -4,7 +4,7 @@ from pymongo import MongoClient
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np  # For embedding handling
 import re  # For keyword escaping
-
+import os
 # Initialize Flask and OpenAI
 app = Flask(__name__)
 client = OpenAI(api_key="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")
@@ -160,4 +160,5 @@ def search_gigs():
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))  
+    app.run(host="0.0.0.0", port=port, debug=True)

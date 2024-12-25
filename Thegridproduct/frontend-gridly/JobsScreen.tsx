@@ -22,7 +22,7 @@ import {
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
 import BottomNavBar from "./components/BottomNavbar";
-import { NGROK_URL } from "@env";
+import { NGROK_URL, BOT_API_URL } from "@env";
 import { UserContext } from "./UserContext";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "./navigationTypes"; // Adjust the path if necessary
@@ -258,7 +258,7 @@ const JobsScreen: React.FC = () => {
     try {
       // Call AI process endpoint
       setLoading(true);
-      const aiResponse = await fetch(`http://127.0.0.1:5000/search-gigs`, {
+      const aiResponse = await fetch(`${BOT_API_URL}/search-gigs`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
