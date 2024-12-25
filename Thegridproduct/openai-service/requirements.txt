@@ -5,3 +5,4 @@ numpy==1.26.4
 scikit-learn==1.4.2
 regex==2023.6.3
 gunicorn==21.2.0
+Werkzeug==2.0.3
