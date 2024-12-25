@@ -142,7 +142,7 @@ const JobsScreen: React.FC = () => {
   const [showAssistant, setShowAssistant] = useState(false);
   const [hasUserMessaged, setHasUserMessaged] = useState(false);
   const assistantAnim = useRef(new Animated.Value(0)).current;
-
+  const [searchedGigs, setSearchedGigs] = useState<Gig[]>([]);
   const [currentFilter, setCurrentFilter] = useState("All");
   const [filterMenuVisible, setFilterMenuVisible] = useState<boolean>(false);
 
@@ -258,7 +258,7 @@ const JobsScreen: React.FC = () => {
     try {
       // Call AI process endpoint
       setLoading(true);
-      const aiResponse = await fetch(`${NGROK_URL}/ai/process`, {
+      const aiResponse = await fetch(`http://127.0.0.1:5000/search-gigs`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -747,7 +747,6 @@ const styles = StyleSheet.create({
   },
   heroContainer: {
     width: "100%",
-    // Make hero section thinner
     paddingTop: 20,
     paddingBottom: 10,
     paddingHorizontal: 20,
