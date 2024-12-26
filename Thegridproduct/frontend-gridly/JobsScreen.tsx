@@ -16,8 +16,6 @@ import {
   Dimensions,
   ActivityIndicator,
   Alert,
-  Pressable,
-  Image,
 } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -37,7 +35,6 @@ interface Gig {
   category: string;
   price: string;
   userId: string;
-  coverImage: string; // Ensure this field is included
 }
 
 interface Message {
@@ -47,11 +44,11 @@ interface Message {
 }
 
 const suggestionPhrases = [
-  "I have a budget of $50",
-  "I'm looking for a designer",
-  "Deadline: Next week",
-  "I need help with math homework",
-  "I'm looking for a writer",
+  "I need a logo designer",
+  "Looking for a web developer",
+  "Require tutoring in Physics",
+  "Need content writing services",
+  "Seeking a graphic designer",
 ];
 
 const categoryIcons: { [key: string]: string } = {
@@ -73,7 +70,7 @@ const categoriesFilter = [
   "Other",
 ];
 
-// Helper function to get the current cycle based on 12-hour intervals
+// Helper function to get featured gigs based on the current cycle
 const getCurrentCycle = (): number => {
   const now = new Date();
   // Calculate the number of 12-hour periods since epoch
@@ -81,17 +78,13 @@ const getCurrentCycle = (): number => {
   return cycle;
 };
 
-// Helper function to get featured gigs based on the current cycle
 const getFeaturedGigs = (gigs: Gig[]): Gig[] => {
   if (gigs.length === 0) return [];
 
   const cycle = getCurrentCycle();
-
-  // Use cycle number to determine indices
   const firstIndex = cycle % gigs.length;
   const secondIndex = (cycle + 1) % gigs.length;
 
-  // If there is only one gig, return it
   if (gigs.length === 1) {
     return [gigs[0]];
   }
@@ -142,14 +135,13 @@ const JobsScreen: React.FC = () => {
   const [showAssistant, setShowAssistant] = useState(false);
   const [hasUserMessaged, setHasUserMessaged] = useState(false);
   const assistantAnim = useRef(new Animated.Value(0)).current;
-  const [searchedGigs, setSearchedGigs] = useState<Gig[]>([]);
   const [currentFilter, setCurrentFilter] = useState("All");
   const [filterMenuVisible, setFilterMenuVisible] = useState<boolean>(false);
 
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "init1",
-      text: "Hey there! 👋 What kind of service are you looking for today?",
+      text: "Hey there! 👋 How can I assist you today?",
       role: "assistant",
     },
   ]);
@@ -178,12 +170,6 @@ const JobsScreen: React.FC = () => {
       }
 
       const data = await response.json();
-
-      if (!data.gigs || !Array.isArray(data.gigs)) {
-        throw new Error("Invalid data format received from server.");
-      }
-
-      // Debugging: Log the fetched gigs
       console.log("Fetched Gigs:", data.gigs);
 
       setValidatedGigs(data, setGigs);
@@ -245,18 +231,16 @@ const JobsScreen: React.FC = () => {
     setUserInput("");
 
     if (isGreeting(userInput)) {
-      // Respond to greetings without fetching gigs
       const assistantMessage: Message = {
         id: Math.random().toString(),
         text: "Hello! 👋 How can I assist you today?",
         role: "assistant",
       };
       setMessages((prev) => [...prev, assistantMessage]);
-      return; // Exit the function to prevent further processing
+      return;
     }
 
     try {
-      // Call AI process endpoint
       setLoading(true);
       const aiResponse = await fetch(`${BOT_API_URL}/search-gigs`, {
         method: "POST",
@@ -281,7 +265,7 @@ const JobsScreen: React.FC = () => {
       };
       setMessages((prev) => [...prev, assistantMessage]);
 
-      // Fetch gigs based on AI response (e.g., using keywords extracted)
+      // Fetch gigs again or filter them (depending on your actual flow)
       const gigsResponse = await fetch(`${NGROK_URL}/services`, {
         method: "GET",
         headers: {
@@ -296,11 +280,8 @@ const JobsScreen: React.FC = () => {
 
       const gigsData = await gigsResponse.json();
       console.log("Filtered Gigs:", gigsData);
-
-      // Use the helper function to set gigs
       setValidatedGigs(gigsData, setGigs);
 
-      // Add assistant message with results
       const gigsCount = Array.isArray(gigsData.gigs) ? gigsData.gigs.length : 0;
       const resultsMessage: Message = {
         id: Math.random().toString(),
@@ -375,6 +356,11 @@ const JobsScreen: React.FC = () => {
     }
   };
 
+  // Prevent double '$' in displayed price
+  const getDisplayedPrice = (price: string): string => {
+    return price.replace(/^\$/, ""); // Remove leading $ if present
+  };
+
   const truncateDescription = (desc: string, length: number) => {
     if (desc.length <= length) return desc;
     return desc.slice(0, length) + "...";
@@ -390,43 +376,30 @@ const JobsScreen: React.FC = () => {
     outputRange: [50, 0],
   });
 
-  const currentHeaderTitle = "Find a Service";
-  const currentFilterLabel =
-    currentFilter === "All" ? (
-      <>
-        <Ionicons
-          name="filter-outline"
-          size={16}
-          color="#BB86FC"
-          style={{ marginRight: 5 }}
-        />
-        <Text style={styles.filterLabelText}>All</Text>
-      </>
-    ) : (
-      <Text style={styles.filterLabelText}>{currentFilter} ×</Text>
-    );
-
   return (
     <View style={styles.container}>
-      {/* Thinner hero section */}
-      <LinearGradient
-        colors={["#8E2DE2", "#4A00E0"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0.9, y: 1 }}
-        style={styles.heroContainer}
-      >
-        <View style={styles.headerRow}>
-          <Text style={styles.mainHeader}>{currentHeaderTitle}</Text>
-          <Pressable
-            style={styles.filterLabelButton}
-            onPress={handleFilterPillPress}
-            accessibilityLabel="Filter Options"
-          >
-            {currentFilterLabel}
-          </Pressable>
-        </View>
-      </LinearGradient>
+      {/* Header Section */}
+      <View style={styles.headerContainer}>
+        <Text style={styles.headerTitle}>Explore Services</Text>
+        <TouchableOpacity
+          style={styles.filterButton}
+          onPress={handleFilterPillPress}
+          accessibilityLabel="Filter Options"
+        >
+          <Ionicons
+            name="filter-outline"
+            size={20}
+            color="#BB86FC"
+            style={{ marginRight: 5 }}
+          />
+          <Text style={styles.filterButtonText}>{currentFilter}</Text>
+          {currentFilter !== "All" && (
+            <Ionicons name="close-circle" size={18} color="#BB86FC" />
+          )}
+        </TouchableOpacity>
+      </View>
 
+      {/* Search Bar */}
       {showSearchBar && (
         <View style={styles.searchBarContainer}>
           <Ionicons
@@ -437,25 +410,35 @@ const JobsScreen: React.FC = () => {
           />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search services..."
+            placeholder="Search for services..."
             placeholderTextColor="#888"
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery("")}>
+              <Ionicons name="close-circle" size={20} color="#888" />
+            </TouchableOpacity>
+          )}
         </View>
       )}
 
       {/* Filter Modal */}
       <Modal
         visible={filterMenuVisible}
-        animationType="fade"
+        animationType="slide"
         transparent={true}
         onRequestClose={() => setFilterMenuVisible(false)}
       >
-        <View style={styles.modalOverlay}>
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPressOut={() => setFilterMenuVisible(false)}
+        >
           <View style={styles.filterModalContainer}>
+            <Text style={styles.filterModalTitle}>Select Category</Text>
             {categoriesFilter.map((cat) => (
-              <Pressable
+              <TouchableOpacity
                 key={cat}
                 style={styles.filterModalOption}
                 onPress={() => {
@@ -463,29 +446,40 @@ const JobsScreen: React.FC = () => {
                   setFilterMenuVisible(false);
                 }}
               >
+                <Ionicons
+                  name={categoryIcons[cat] || "grid-outline"}
+                  size={20}
+                  color="#BB86FC"
+                  style={{ marginRight: 10 }}
+                />
                 <Text style={styles.filterModalOptionText}>{cat}</Text>
-              </Pressable>
+              </TouchableOpacity>
             ))}
-            <Pressable
-              style={[styles.filterModalOption, styles.filterModalClose]}
-              onPress={() => setFilterMenuVisible(false)}
-            >
-              <Text style={styles.filterModalOptionText}>Close</Text>
-            </Pressable>
           </View>
-        </View>
+        </TouchableOpacity>
       </Modal>
 
+      {/* Gigs List */}
       <ScrollView
         contentContainerStyle={styles.scrollContainer}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.sectionTitle}>Featured</Text>
+        {/* Featured Gigs */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Featured</Text>
+          {loading && (
+            <ActivityIndicator
+              size="small"
+              color="#BB86FC"
+              style={{ marginRight: 10 }}
+            />
+          )}
+        </View>
         {loading ? (
           <ActivityIndicator
             size="large"
             color="#BB86FC"
-            style={{ marginLeft: 20 }}
+            style={{ marginTop: 20 }}
           />
         ) : (
           <ScrollView
@@ -499,27 +493,23 @@ const JobsScreen: React.FC = () => {
                 onPress={() =>
                   navigation.navigate("JobDetail", { jobId: gig.id })
                 }
-                activeOpacity={0.7}
+                activeOpacity={0.8}
               >
                 <LinearGradient
-                  colors={["#1E1E1E", "#2A2A2A"]}
-                  start={{ x: 0.1, y: 0.1 }}
-                  end={{ x: 0.9, y: 0.9 }}
+                  colors={["#7F00FF", "#E100FF"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
                   style={styles.featuredCard}
                 >
-                  <View style={styles.featuredTextContainer}>
-                    <Text style={styles.featuredTitle}>{gig.title}</Text>
-                    <View style={styles.featuredCategoryRow}>
-                      <Ionicons
-                        name={categoryIcons[gig.category] || "grid-outline"}
-                        size={16}
-                        color="#BB86FC"
-                        style={{ marginRight: 5 }}
-                      />
-                      <Text style={styles.featuredCategory}>
-                        {gig.category}
-                      </Text>
-                    </View>
+                  <Text style={styles.featuredTitle}>{gig.title}</Text>
+                  <View style={styles.featuredCategoryRow}>
+                    <Ionicons
+                      name={categoryIcons[gig.category] || "grid-outline"}
+                      size={16}
+                      color="#FFFFFF"
+                      style={{ marginRight: 5 }}
+                    />
+                    <Text style={styles.featuredCategory}>{gig.category}</Text>
                   </View>
                 </LinearGradient>
               </TouchableOpacity>
@@ -527,77 +517,68 @@ const JobsScreen: React.FC = () => {
           </ScrollView>
         )}
 
-        <Text style={styles.sectionTitle}>All Services</Text>
+        {/* All Gigs */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>All Services</Text>
+          <TouchableOpacity onPress={toggleSearchBar}>
+            <Ionicons
+              name={showSearchBar ? "close" : "search-outline"}
+              size={24}
+              color="#BB86FC"
+            />
+          </TouchableOpacity>
+        </View>
         {loading ? (
           <ActivityIndicator
             size="large"
             color="#BB86FC"
-            style={{ marginLeft: 20 }}
+            style={{ marginTop: 20 }}
           />
         ) : (
           <>
-            {filteredGigs
-              .filter((gig) => gig !== undefined && gig !== null)
-              .map((gig, index) => (
-                <TouchableOpacity
-                  key={gig.id}
-                  onPress={() =>
-                    navigation.navigate("JobDetail", { jobId: gig.id })
-                  }
-                  activeOpacity={0.7}
-                >
-                  <View>
-                    <View style={styles.serviceRow}>
-                      {/* Cover Image */}
-                      {gig.coverImage ? (
-                        <Image
-                          source={{ uri: gig.coverImage }}
-                          style={styles.coverImage}
-                          resizeMode="cover"
-                          onError={(e) => {
-                            console.log(
-                              `Failed to load image for gig ID ${gig.id}:`,
-                              e.nativeEvent.error
-                            );
-                          }}
-                        />
-                      ) : (
-                        <View style={styles.coverPlaceholder}>
-                          <Ionicons
-                            name="image-outline"
-                            size={24}
-                            color="#555"
-                          />
-                        </View>
-                      )}
-
-                      <View style={styles.serviceInfo}>
-                        <Text style={styles.serviceTitle}>{gig.title}</Text>
-                        <View style={styles.categoryRow}>
+            {filteredGigs.length > 0 ? (
+              filteredGigs.map((gig) => {
+                // Safely handle the gig price
+                const displayedPrice = getDisplayedPrice(gig.price);
+                return (
+                  <TouchableOpacity
+                    key={gig.id}
+                    onPress={() =>
+                      navigation.navigate("JobDetail", { jobId: gig.id })
+                    }
+                    activeOpacity={0.8}
+                  >
+                    <View style={styles.gigCard}>
+                      <View style={styles.gigInfo}>
+                        <Text style={styles.gigTitle}>{gig.title}</Text>
+                        <View style={styles.gigCategoryRow}>
                           <Ionicons
                             name={categoryIcons[gig.category] || "grid-outline"}
                             size={16}
                             color="#BB86FC"
-                            style={{ marginRight: 5 }}
+                            style={{ marginRight: 6 }}
                           />
-                          <Text style={styles.serviceCategory}>
+                          <Text style={styles.gigCategory}>
                             {gig.category}
                           </Text>
                         </View>
-                        <Text style={styles.serviceDescription}>
-                          {truncateDescription(gig.description, 80)}
+                        <Text style={styles.gigDescription}>
+                          {truncateDescription(gig.description, 60)}
                         </Text>
-                        <Text style={styles.servicePrice}>{gig.price}</Text>
+                        <Text style={styles.gigPrice}>
+                          ${displayedPrice}
+                        </Text>
                       </View>
+                      <Ionicons
+                        name="chevron-forward"
+                        size={20}
+                        color="#BB86FC"
+                      />
                     </View>
-                    {index < filteredGigs.length - 1 && (
-                      <View style={styles.divider} />
-                    )}
-                  </View>
-                </TouchableOpacity>
-              ))}
-
-            {!loading && filteredGigs.length === 0 && (
+                  </TouchableOpacity>
+                );
+              })
+            ) : (
               <Text style={styles.noResultsText}>
                 No services found for "{currentFilter}"
               </Text>
@@ -608,24 +589,20 @@ const JobsScreen: React.FC = () => {
 
       <BottomNavBar />
 
-      {/* Floating "Ask AI" Button */}
-      <TouchableOpacity
-        activeOpacity={0.9}
-        style={styles.fab}
-        onPress={toggleAssistant}
-      >
+      {/* Floating "Find a Gig" Button */}
+      <TouchableOpacity activeOpacity={0.9} style={styles.fab} onPress={toggleAssistant}>
         <LinearGradient
           colors={["rgb(168, 237, 234)", "rgb(254, 214, 227)"]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.fabGradient}
         >
-          <Ionicons name="chatbubble-ellipses" size={24} color="#000" />
+          <Text style={styles.fabText}>Find a Job</Text>
         </LinearGradient>
       </TouchableOpacity>
 
       {/* AI Assistant Modal */}
-      <Modal visible={showAssistant} transparent animationType="none">
+      <Modal visible={showAssistant} transparent animationType="fade">
         <KeyboardAvoidingView
           style={styles.modalContainer}
           behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -637,32 +614,14 @@ const JobsScreen: React.FC = () => {
               { transform: [{ translateY }], opacity },
             ]}
           >
-            <LinearGradient
-              colors={["#6D1B7B", "#B012F1"]}
-              start={{ x: 0.2, y: 0 }}
-              end={{ x: 0.8, y: 1 }}
-              style={styles.assistantHeader}
-            >
-              <View style={styles.assistantHeaderLeft}>
-                <Ionicons
-                  name="grid-outline"
-                  size={24}
-                  color="#fff"
-                  style={{ marginRight: 10 }}
-                />
-                <Text style={styles.assistantHeaderText}>
-                  Find a Freelancer with AI
-                </Text>
-              </View>
+            <View style={styles.assistantHeader}>
+              <Text style={styles.assistantHeaderText}>AI Assistant</Text>
               <TouchableOpacity onPress={toggleAssistant}>
-                <Ionicons name="close" size={24} color="#fff" />
+                <Ionicons name="close" size={24} color="#BB86FC" />
               </TouchableOpacity>
-            </LinearGradient>
+            </View>
 
-            <LinearGradient
-              colors={["#000000", "#1E1E1E"]}
-              style={styles.chatContainer}
-            >
+            <View style={styles.chatContainer}>
               <ScrollView
                 contentContainerStyle={styles.chatContent}
                 showsVerticalScrollIndicator={false}
@@ -679,7 +638,7 @@ const JobsScreen: React.FC = () => {
                           key={phrase}
                           style={styles.initialSuggestionCard}
                           onPress={() => handleSuggestionPress(phrase)}
-                          activeOpacity={0.7}
+                          activeOpacity={0.8}
                         >
                           <Text style={styles.initialSuggestionText}>
                             {phrase}
@@ -717,19 +676,16 @@ const JobsScreen: React.FC = () => {
               <View style={styles.inputArea}>
                 <TextInput
                   style={styles.chatInput}
-                  placeholder="Tell me what you need..."
-                  placeholderTextColor="#666"
+                  placeholder="How can I help you?"
+                  placeholderTextColor="#888"
                   value={userInput}
                   onChangeText={setUserInput}
                 />
-                <TouchableOpacity
-                  style={styles.sendButton}
-                  onPress={sendMessage}
-                >
-                  <Ionicons name="paper-plane" size={20} color="#fff" />
+                <TouchableOpacity style={styles.sendButton} onPress={sendMessage}>
+                  <Ionicons name="send" size={20} color="#FFFFFF" />
                 </TouchableOpacity>
               </View>
-            </LinearGradient>
+            </View>
           </Animated.View>
         </KeyboardAvoidingView>
       </Modal>
@@ -740,178 +696,187 @@ const JobsScreen: React.FC = () => {
 export default JobsScreen;
 
 const styles = StyleSheet.create({
+  // Overall Screen Container
   container: {
     flex: 1,
-    backgroundColor: "#000",
+    backgroundColor: "#000000", // Deeper black
     position: "relative",
   },
-  heroContainer: {
-    width: "100%",
-    paddingTop: 20,
-    paddingBottom: 10,
-    paddingHorizontal: 20,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-  },
-  headerRow: {
+  // Header
+  headerContainer: {
     flexDirection: "row",
-    alignItems: "center",
     justifyContent: "space-between",
+    alignItems: "center",
+    padding: 16,
+    backgroundColor: "#0B0B0B",
+    elevation: 4,
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
   },
-  mainHeader: {
-    fontSize: 18,
+  headerTitle: {
+    fontSize: 20,
     fontWeight: "700",
-    color: "#fff",
+    color: "#FFFFFF",
   },
-  filterLabelButton: {
+  filterButton: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    backgroundColor: "#1E1E1E",
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    backgroundColor: "#1A1A1A",
     borderRadius: 20,
   },
-  filterLabelText: {
+  filterButtonText: {
     color: "#BB86FC",
     fontSize: 14,
+    marginRight: 5,
   },
+  // Search Bar
   searchBarContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#1E1E1E",
-    marginHorizontal: 20,
-    borderRadius: 10,
+    backgroundColor: "#0B0B0B",
+    marginHorizontal: 16,
+    marginTop: 6,
+    borderRadius: 25,
     paddingHorizontal: 15,
-    marginTop: 10,
-    borderWidth: 1,
-    borderColor: "#BB86FC",
+    paddingVertical: 8,
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
   },
   searchIcon: {
     marginRight: 10,
   },
   searchInput: {
     flex: 1,
-    color: "#fff",
-    fontSize: 16,
-    paddingVertical: 8,
+    color: "#FFFFFF",
+    fontSize: 15,
   },
+  // Scroll View Container
   scrollContainer: {
-    paddingBottom: 100,
+    paddingBottom: 90,
+  },
+  // Section Headers
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    marginTop: 16,
   },
   sectionTitle: {
-    color: "#BB86FC",
-    fontSize: 18,
-    fontWeight: "600",
-    marginLeft: 20,
-    marginBottom: 10,
-    marginTop: 20,
-  },
-  featuredScroll: {
-    marginLeft: 20,
-    marginBottom: 20,
-  },
-  featuredCard: {
-    marginRight: 15,
-    width: width * 0.5,
-    borderRadius: 12,
-    padding: 15,
-    justifyContent: "center",
-  },
-  featuredTextContainer: {
-    justifyContent: "center",
-  },
-  featuredTitle: {
-    color: "#fff",
     fontSize: 16,
     fontWeight: "600",
-    marginBottom: 5,
+    color: "#FFFFFF",
+  },
+  // Featured Gigs
+  featuredScroll: {
+    marginTop: 10,
+    paddingLeft: 16,
+  },
+  featuredCard: {
+    width: width * 0.55,
+    borderRadius: 12,
+    padding: 16,
+    marginRight: 12,
+    justifyContent: "space-between",
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+  },
+  featuredTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#FFFFFF",
+    marginBottom: 8,
   },
   featuredCategoryRow: {
     flexDirection: "row",
     alignItems: "center",
   },
   featuredCategory: {
-    color: "#BB86FC",
-    fontSize: 14,
+    fontSize: 13,
+    color: "#FFFFFF",
   },
-  serviceRow: {
+  // All Gigs
+  gigCard: {
     flexDirection: "row",
-    alignItems: "flex-start",
-    paddingVertical: 15,
-    paddingHorizontal: 20,
-  },
-  coverImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    marginRight: 15,
-    backgroundColor: "#333", // Placeholder background color
-  },
-  coverPlaceholder: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    marginRight: 15,
-    backgroundColor: "#333",
-    justifyContent: "center",
     alignItems: "center",
+    backgroundColor: "#0B0B0B",
+    marginHorizontal: 12,
+    marginVertical: 8,
+    padding: 12,
+    borderRadius: 10,
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
   },
-  serviceInfo: {
+  gigInfo: {
     flex: 1,
+    marginRight: 10,
   },
-  serviceTitle: {
-    fontSize: 16,
+  gigTitle: {
+    fontSize: 14,
     fontWeight: "600",
-    color: "#fff",
-    marginBottom: 2,
+    color: "#FFFFFF",
+    marginBottom: 4,
   },
-  categoryRow: {
+  gigCategoryRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 2,
+    marginBottom: 4,
   },
-  serviceCategory: {
-    fontSize: 14,
+  gigCategory: {
+    fontSize: 12,
     color: "#BB86FC",
   },
-  serviceDescription: {
-    fontSize: 13,
-    color: "#ccc",
-    marginBottom: 2,
+  gigDescription: {
+    fontSize: 12,
+    color: "#B3B3B3",
+    marginBottom: 4,
   },
-  servicePrice: {
-    fontSize: 13,
-    color: "#aaa",
-  },
-  divider: {
-    height: 1,
-    marginHorizontal: 20,
-    backgroundColor: "#333",
+  gigPrice: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: "#BB86FC",
   },
   noResultsText: {
-    fontSize: 16,
-    color: "#888",
+    fontSize: 14,
+    color: "#B3B3B3",
     textAlign: "center",
-    marginTop: 50,
+    marginTop: 40,
   },
+  // Floating Action Button
   fab: {
     position: "absolute",
-    bottom: 120,
+    bottom: 110,
     right: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 120,
+    height: 48,
+    borderRadius: 24,
     overflow: "hidden",
+    elevation: 5,
     shadowColor: "#000",
     shadowOpacity: 0.3,
     shadowRadius: 6,
-    elevation: 5,
   },
   fabGradient: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    paddingHorizontal: 10,
   },
+  fabText: {
+    color: "#000",
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  // AI Assistant Modal
   modalContainer: {
     flex: 1,
     justifyContent: "flex-end",
@@ -921,8 +886,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#000000AA",
   },
   assistantModal: {
-    backgroundColor: "#121212",
-    height: "90%",
+    backgroundColor: "#0B0B0B",
+    height: "85%",
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     overflow: "hidden",
@@ -931,128 +896,112 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingTop: 50,
-    paddingBottom: 15,
-    paddingHorizontal: 20,
-  },
-  assistantHeaderLeft: {
-    flexDirection: "row",
-    alignItems: "center",
+    paddingTop: Platform.OS === "ios" ? 48 : 16,
+    paddingBottom: 12,
+    paddingHorizontal: 16,
+    backgroundColor: "#BB86FC",
   },
   assistantHeaderText: {
-    fontSize: 20,
-    fontWeight: "600",
-    color: "#fff",
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#FFFFFF",
   },
   chatContainer: {
     flex: 1,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 15,
+    padding: 12,
   },
   chatContent: {
-    paddingBottom: 100,
-    alignItems: "center",
+    paddingBottom: 80,
   },
   initialSuggestionsContainer: {
-    marginTop: 30,
-    marginBottom: 20,
+    marginBottom: 16,
     alignItems: "center",
   },
   initialSuggestionsScroll: {
     paddingHorizontal: 10,
   },
   initialSuggestionCard: {
-    backgroundColor: "#1E1E1E",
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: "#BB86FC",
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    marginRight: 8,
+    backgroundColor: "#BB86FC",
+    borderRadius: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginRight: 10,
   },
   initialSuggestionText: {
-    color: "#BB86FC",
-    fontSize: 14,
+    color: "#FFFFFF",
+    fontSize: 13,
   },
   messageBubble: {
-    padding: 12,
-    borderRadius: 12,
+    padding: 10,
+    borderRadius: 16,
     marginBottom: 10,
     maxWidth: "80%",
   },
   assistantBubble: {
-    backgroundColor: "#2A2A2A",
+    backgroundColor: "#1A1A1A",
     alignSelf: "flex-start",
-    borderWidth: 1,
-    borderColor: "#BB86FC",
   },
   userBubble: {
-    backgroundColor: "#fff",
+    backgroundColor: "#BB86FC",
     alignSelf: "flex-end",
-    borderWidth: 1,
-    borderColor: "#03DAC6",
   },
   messageText: {
-    fontSize: 15,
+    fontSize: 14,
   },
   assistantText: {
-    color: "#fff",
+    color: "#FFFFFF",
   },
   userText: {
-    color: "#000",
+    color: "#FFFFFF",
   },
   inputArea: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#1E1E1E",
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    backgroundColor: "#1A1A1A",
+    borderRadius: 25,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     position: "absolute",
-    bottom: 30,
-    left: 15,
-    right: 15,
-    borderWidth: 1,
-    borderColor: "#BB86FC",
+    bottom: 12,
+    left: 12,
+    right: 12,
   },
   chatInput: {
     flex: 1,
-    color: "#fff",
-    fontSize: 15,
-    padding: 10,
+    color: "#FFFFFF",
+    fontSize: 14,
   },
   sendButton: {
-    backgroundColor: "#03DAC6",
+    backgroundColor: "#BB86FC",
     borderRadius: 20,
     padding: 8,
     marginLeft: 8,
   },
-  // Filter Modal Styles
+  // Filter Modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.7)",
-    justifyContent: "center",
-    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.3)",
+    justifyContent: "flex-end",
   },
   filterModalContainer: {
-    backgroundColor: "#1E1E1E",
-    borderRadius: 8,
-    padding: 20,
-    width: 200,
-    alignItems: "stretch",
+    backgroundColor: "#0B0B0B",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 16,
+  },
+  filterModalTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#FFFFFF",
+    marginBottom: 12,
   },
   filterModalOption: {
-    paddingVertical: 10,
+    flexDirection: "row",
     alignItems: "center",
+    paddingVertical: 10,
   },
   filterModalOptionText: {
+    fontSize: 14,
     color: "#FFFFFF",
-    fontSize: 16,
-  },
-  filterModalClose: {
-    marginTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: "#333333",
   },
 });
