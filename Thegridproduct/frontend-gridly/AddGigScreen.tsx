@@ -55,6 +55,8 @@ interface FormData {
    *  If unset (empty), the gig defaults to 30 days.
    */
   expirationDate: string;
+  /** Campus presence field */
+  campusPresence: "inCampus" | "flexible";
 }
 
 const CLOUDINARY_URL = "https://api.cloudinary.com/v1_1/ds0zpfht9/image/upload";
@@ -80,6 +82,7 @@ const AddGig: React.FC = () => {
     description: "",
     images: [],
     expirationDate: "",
+    campusPresence: "inCampus", // Default value
   });
 
   // Delivery time toggle
@@ -191,6 +194,7 @@ const AddGig: React.FC = () => {
         return true;
       case 3:
         // Delivery time is optional, so no strict requirement if blank
+        // Also, campusPresence is always set due to default value
         return true;
       case 4:
         if (!formData.description.trim()) {
@@ -227,6 +231,7 @@ const AddGig: React.FC = () => {
         : formData.deliveryTime.trim(),
       description: formData.description.trim(),
       images: formData.images,
+      campusPresence: formData.campusPresence, // Include campusPresence
     };
 
     // If user has chosen noExpiration or has no date set, we skip or set it as empty
@@ -263,6 +268,7 @@ const AddGig: React.FC = () => {
           description: "",
           images: [],
           expirationDate: "",
+          campusPresence: "inCampus",
         });
         setNoDeliveryRequired(false);
         setNoExpiration(false);
@@ -519,6 +525,63 @@ const AddGig: React.FC = () => {
               My gig does not require a delivery time
             </Text>
           </TouchableOpacity>
+
+          {/* Campus Presence Section with additional spacing */}
+          <View style={styles.campusPresenceSection}>
+            <Text style={styles.label}>Campus Presence</Text>
+            <View style={styles.campusPresenceContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.presenceOption,
+                  formData.campusPresence === "inCampus" &&
+                    styles.presenceOptionSelected,
+                ]}
+                onPress={() =>
+                  setFormData({ ...formData, campusPresence: "inCampus" })
+                }
+              >
+                <Ionicons
+                  name={
+                    formData.campusPresence === "inCampus"
+                      ? "checkmark-circle"
+                      : "ellipse-outline"
+                  }
+                  size={24}
+                  color={
+                    formData.campusPresence === "inCampus" ? "#BB86FC" : "#ccc"
+                  }
+                />
+                <Text style={styles.presenceOptionText}>
+                  In Campus Presence Required
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.presenceOption,
+                  formData.campusPresence === "flexible" &&
+                    styles.presenceOptionSelected,
+                ]}
+                onPress={() =>
+                  setFormData({ ...formData, campusPresence: "flexible" })
+                }
+              >
+                <Ionicons
+                  name={
+                    formData.campusPresence === "flexible"
+                      ? "checkmark-circle"
+                      : "ellipse-outline"
+                  }
+                  size={24}
+                  color={
+                    formData.campusPresence === "flexible" ? "#BB86FC" : "#ccc"
+                  }
+                />
+                <Text style={styles.presenceOptionText}>
+                  In and Out of Campus is Fine
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </>
       ),
     },
@@ -550,7 +613,7 @@ const AddGig: React.FC = () => {
             <TouchableOpacity
               onPress={() =>
                 openInfoModal(
-                  "If you do NOT set an expiration date, your gig will become inactive after a default 30 days by default."
+                  "If you do NOT set an expiration date, your gig will become inactive after a default 30 days."
                 )
               }
             >
@@ -1136,5 +1199,27 @@ const styles = StyleSheet.create({
   modalOptionText: {
     fontSize: 16,
     color: "#fff",
+  },
+  // New Styles for Campus Presence
+  campusPresenceSection: {
+    marginTop: 20, // Added top margin to separate from Delivery Time
+  },
+  campusPresenceContainer: {
+    flexDirection: "column",
+    marginTop: 10,
+    marginBottom: 15,
+  },
+  presenceOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  presenceOptionSelected: {
+    // You can add styles for selected option if needed
+  },
+  presenceOptionText: {
+    color: "#fff",
+    fontSize: 16,
+    marginLeft: 10,
   },
 });
