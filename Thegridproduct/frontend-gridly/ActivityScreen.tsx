@@ -521,9 +521,10 @@ const ActivityScreen: React.FC = () => {
           onRefresh={handleRefresh}
           refreshing={loadingProducts}
           ItemSeparatorComponent={renderSeparator}
-          ListFooterComponent={renderFooter}
+          // ListFooterComponent={renderFooter} // Removed this line
         />
       );
+      
     } else {
       if (loadingGigs) {
         return (
