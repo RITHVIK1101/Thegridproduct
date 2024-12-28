@@ -31,6 +31,7 @@ type CreateGigRequest struct {
 	DeliveryTime   string   `json:"deliveryTime"`
 	Images         []string `json:"images"`
 	ExpirationDate string   `json:"expirationDate,omitempty"` // Optional
+	CampusPresence string   `json:"campusPresence"`           // "inCampus" or "flexible"
 }
 
 // UpdateGigRequest defines the expected payload for updating a gig
@@ -42,6 +43,7 @@ type UpdateGigRequest struct {
 	DeliveryTime   *string   `json:"deliveryTime,omitempty"`
 	Images         *[]string `json:"images,omitempty"`
 	ExpirationDate *string   `json:"expirationDate,omitempty"` // Optional
+	CampusPresence *string   `json:"campusPresence,omitempty"` // "inCampus" or "flexible"
 }
 
 // AddGigHandler handles the creation of a new gig
@@ -99,15 +101,15 @@ func AddGigHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate price format if not "Open to Communication"
+	// Validate price: either "Open to Communication" or a numeric string
 	if gigReq.Price != "Open to Communication" {
-		if !isValidPriceFormat(gigReq.Price) {
-			WriteJSONError(w, "Invalid price format. Use formats like '$25/hour'.", http.StatusBadRequest)
+		if !isValidNumericPrice(gigReq.Price) {
+			WriteJSONError(w, "Invalid price. Must be numeric or 'Open to Communication'.", http.StatusBadRequest)
 			return
 		}
 	}
 
-	// Validate deliveryTime
+	// Validate deliveryTime; if blank, set "Not Required"
 	finalDeliveryTime := "Not Required"
 	if strings.TrimSpace(gigReq.DeliveryTime) != "" {
 		finalDeliveryTime = gigReq.DeliveryTime
@@ -119,17 +121,25 @@ func AddGigHandler(w http.ResponseWriter, r *http.Request) {
 		// Attempt to parse the expirationDate string
 		parsedDate, err := time.Parse(time.RFC3339, gigReq.ExpirationDate)
 		if err != nil {
-			// If RFC3339 fails, try to parse with a different layout (e.g., "2006-01-02 15:04")
+			// If RFC3339 fails, try an alternate layout
 			parsedDate, err = time.Parse("2006-01-02 15:04", gigReq.ExpirationDate)
 			if err != nil {
 				WriteJSONError(w, "Invalid expiration date format. Use RFC3339 or 'YYYY-MM-DD HH:MM' format.", http.StatusBadRequest)
 				return
 			}
+			expirationDate = parsedDate
+		} else {
+			expirationDate = parsedDate
 		}
-		expirationDate = parsedDate
 	} else {
 		// Default to 30 days from now
 		expirationDate = time.Now().AddDate(0, 0, 30)
+	}
+
+	// Validate campusPresence; default to "inCampus" if empty
+	campusPresence := "inCampus"
+	if strings.TrimSpace(gigReq.CampusPresence) != "" {
+		campusPresence = gigReq.CampusPresence
 	}
 
 	// Prepare Gig model
@@ -148,6 +158,8 @@ func AddGigHandler(w http.ResponseWriter, r *http.Request) {
 		Expired:        false,
 		Status:         "active",
 		LikeCount:      0,
+
+		CampusPresence: campusPresence, // NEW FIELD
 	}
 
 	// Insert into MongoDB
@@ -307,7 +319,6 @@ func GetAllGigsHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-// UpdateGigHandler handles updating an existing gig by ID
 func UpdateGigHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -380,10 +391,12 @@ func UpdateGigHandler(w http.ResponseWriter, r *http.Request) {
 		updateFields["description"] = strings.TrimSpace(*gigReq.Description)
 	}
 	if gigReq.Price != nil && strings.TrimSpace(*gigReq.Price) != "" {
-		// Validate price format if not "Open to Communication"
-		if *gigReq.Price != "Open to Communication" && !isValidPriceFormat(*gigReq.Price) {
-			WriteJSONError(w, "Invalid price format. Use formats like '$25/hour'.", http.StatusBadRequest)
-			return
+		// Validate price: either "Open to Communication" or a numeric string
+		if *gigReq.Price != "Open to Communication" {
+			if !isValidNumericPrice(*gigReq.Price) {
+				WriteJSONError(w, "Invalid price. Must be numeric or 'Open to Communication'.", http.StatusBadRequest)
+				return
+			}
 		}
 		updateFields["price"] = strings.TrimSpace(*gigReq.Price)
 	}
@@ -398,7 +411,6 @@ func UpdateGigHandler(w http.ResponseWriter, r *http.Request) {
 			// Parse the expirationDate string
 			parsedDate, err := time.Parse(time.RFC3339, *gigReq.ExpirationDate)
 			if err != nil {
-				// If RFC3339 fails, try to parse with a different layout (e.g., "2006-01-02 15:04")
 				parsedDate, err = time.Parse("2006-01-02 15:04", *gigReq.ExpirationDate)
 				if err != nil {
 					WriteJSONError(w, "Invalid expiration date format. Use RFC3339 or 'YYYY-MM-DD HH:MM' format.", http.StatusBadRequest)
@@ -410,6 +422,11 @@ func UpdateGigHandler(w http.ResponseWriter, r *http.Request) {
 			// If expirationDate is empty, default to 30 days from now
 			updateFields["expirationDate"] = time.Now().AddDate(0, 0, 30)
 		}
+	}
+
+	// NEW: campusPresence
+	if gigReq.CampusPresence != nil && strings.TrimSpace(*gigReq.CampusPresence) != "" {
+		updateFields["campusPresence"] = strings.TrimSpace(*gigReq.CampusPresence)
 	}
 
 	if len(updateFields) == 0 {
@@ -436,6 +453,15 @@ func UpdateGigHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"message": "Gig updated successfully",
 	})
+}
+
+// The rest of your handlers (GetSingleGigHandler, GetAllGigsHandler, etc.) remain the same...
+
+// Helper function to validate a numeric price (no currency symbols, no /hour)
+func isValidNumericPrice(price string) bool {
+	// Matches an integer or decimal (e.g., "25", "25.50")
+	matched, _ := regexp.MatchString(`^\d+(\.\d{1,2})?$`, price)
+	return matched
 }
 
 // DeleteGigHandler handles the deletion of a gig by its ID
@@ -606,11 +632,4 @@ func GetUserGigsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(response)
-}
-
-// Helper function to validate price format
-func isValidPriceFormat(price string) bool {
-	// Simple regex to match formats like '$25/hour'
-	matched, _ := regexp.MatchString(`^\$\d+(\.\d{1,2})?\/hour$`, price)
-	return matched
 }
