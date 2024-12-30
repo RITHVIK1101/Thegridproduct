@@ -24,4 +24,5 @@ type Gig struct {
 	Status         string             `bson:"status" json:"status"` // e.g., "active", "completed"
 	LikeCount      int                `bson:"likeCount" json:"likeCount"`
 	CampusPresence string             `bson:"campusPresence" json:"campusPresence"` // "inCampus" or "flexible"
+	Embeddings     []float32          `bson:"embeddings,omitempty" json:"embeddings,omitempty"`
 }

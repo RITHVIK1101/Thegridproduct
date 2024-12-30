@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"Thegridproduct/backend/db"
+	"Thegridproduct/backend/embeddings"
 	"Thegridproduct/backend/models"
 
 	"github.com/gorilla/mux"
@@ -101,7 +102,7 @@ func AddGigHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate price: either "Open to Communication" or a numeric string
+	// Validate price
 	if gigReq.Price != "Open to Communication" {
 		if !isValidNumericPrice(gigReq.Price) {
 			WriteJSONError(w, "Invalid price. Must be numeric or 'Open to Communication'.", http.StatusBadRequest)
@@ -109,7 +110,7 @@ func AddGigHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Validate deliveryTime; if blank, set "Not Required"
+	// Validate deliveryTime
 	finalDeliveryTime := "Not Required"
 	if strings.TrimSpace(gigReq.DeliveryTime) != "" {
 		finalDeliveryTime = gigReq.DeliveryTime
@@ -118,7 +119,6 @@ func AddGigHandler(w http.ResponseWriter, r *http.Request) {
 	// Validate expirationDate
 	var expirationDate time.Time
 	if strings.TrimSpace(gigReq.ExpirationDate) != "" {
-		// Attempt to parse the expirationDate string
 		parsedDate, err := time.Parse(time.RFC3339, gigReq.ExpirationDate)
 		if err != nil {
 			// If RFC3339 fails, try an alternate layout
@@ -127,16 +127,13 @@ func AddGigHandler(w http.ResponseWriter, r *http.Request) {
 				WriteJSONError(w, "Invalid expiration date format. Use RFC3339 or 'YYYY-MM-DD HH:MM' format.", http.StatusBadRequest)
 				return
 			}
-			expirationDate = parsedDate
-		} else {
-			expirationDate = parsedDate
 		}
+		expirationDate = parsedDate
 	} else {
-		// Default to 30 days from now
 		expirationDate = time.Now().AddDate(0, 0, 30)
 	}
 
-	// Validate campusPresence; default to "inCampus" if empty
+	// Validate campusPresence
 	campusPresence := "inCampus"
 	if strings.TrimSpace(gigReq.CampusPresence) != "" {
 		campusPresence = gigReq.CampusPresence
@@ -158,14 +155,27 @@ func AddGigHandler(w http.ResponseWriter, r *http.Request) {
 		Expired:        false,
 		Status:         "active",
 		LikeCount:      0,
-
-		CampusPresence: campusPresence, // NEW FIELD
+		CampusPresence: campusPresence,
 	}
 
-	// Insert into MongoDB
+	// 1. Generate embeddings for the gig
+	//    Combine fields as needed (e.g., Title + Description + Category)
+	textToEmbed := gigReq.Title + " " + gigReq.Description + " " + gigReq.Category
+
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
+	embeddingVector, err := embeddings.GetEmbeddingForText(ctx, textToEmbed)
+	if err != nil {
+		log.Printf("Error generating embeddings: %v", err)
+		WriteJSONError(w, "Error generating embeddings", http.StatusInternalServerError)
+		return
+	}
+
+	// 2. Assign the embeddings to the gig struct
+	gig.Embeddings = embeddingVector
+
+	// 3. Insert the gig into MongoDB
 	collection := db.GetCollection("gridlyapp", "gigs")
 	result, err := collection.InsertOne(ctx, gig)
 	if err != nil {
@@ -174,6 +184,7 @@ func AddGigHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Return success
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"message": "Gig added successfully",
