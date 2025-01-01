@@ -16,11 +16,12 @@ import {
   Dimensions,
   ActivityIndicator,
   Alert,
+  PanResponder,
 } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
 import BottomNavBar from "./components/BottomNavbar";
-import { NGROK_URL } from "@env"; // Removed BOT_API_URL as it's no longer needed
+import { NGROK_URL } from "@env";
 import { UserContext } from "./UserContext";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "./navigationTypes"; // Adjust the path if necessary
@@ -46,11 +47,22 @@ interface GigMatch {
   similarity: number;
 }
 
-interface Message {
+interface TextMessage {
   id: string;
   text: string;
   role: "user" | "assistant";
+  type: "text";
 }
+
+interface GigMessage {
+  id: string;
+  text: string; // Gig title
+  role: "assistant";
+  type: "gig";
+  gig: GigMatch;
+}
+
+type Message = TextMessage | GigMessage;
 
 const suggestionPhrases = [
   "I need a logo designer",
@@ -152,12 +164,36 @@ const JobsScreen: React.FC = () => {
       id: "init1",
       text: "Hey there! 👋 How can I assist you today?",
       role: "assistant",
+      type: "text",
     },
   ]);
   const [userInput, setUserInput] = useState("");
 
   const [gigs, setGigs] = useState<Gig[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
+
+  // Initialize PanResponder for swipe-down-to-close
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (evt, gestureState) => {
+        // Activate responder for vertical swipes
+        return Math.abs(gestureState.dy) > 10 && Math.abs(gestureState.dx) < 50;
+      },
+      onPanResponderMove: (evt, gestureState) => {
+        if (gestureState.dy > 0) {
+          // Optionally, add visual feedback here
+          // For simplicity, we won't animate the modal during the swipe
+        }
+      },
+      onPanResponderRelease: (evt, gestureState) => {
+        if (gestureState.dy > 100) {
+          // If the swipe down is beyond the threshold, close the modal
+          toggleAssistant();
+        }
+        // If not, do nothing and keep the modal open
+      },
+    })
+  ).current;
 
   useEffect(() => {
     fetchGigs();
@@ -207,7 +243,7 @@ const JobsScreen: React.FC = () => {
       })
     : [];
 
-  const toggleAssistant = () => {
+  const toggleAssistant = (callback?: () => void) => {
     if (showAssistant) {
       Animated.timing(assistantAnim, {
         toValue: 0,
@@ -216,6 +252,7 @@ const JobsScreen: React.FC = () => {
         useNativeDriver: true,
       }).start(() => {
         setShowAssistant(false);
+        if (callback) callback();
       });
     } else {
       setShowAssistant(true);
@@ -231,19 +268,21 @@ const JobsScreen: React.FC = () => {
   const sendMessage = async () => {
     if (userInput.trim() === "") return;
 
-    const newUserMessage: Message = {
+    const newUserMessage: TextMessage = {
       id: Math.random().toString(),
       text: userInput,
       role: "user",
+      type: "text",
     };
     setMessages((prev) => [...prev, newUserMessage]);
     setUserInput("");
 
     if (isGreeting(userInput)) {
-      const assistantMessage: Message = {
+      const assistantMessage: TextMessage = {
         id: Math.random().toString(),
         text: "Hello! 👋 How can I assist you today?",
         role: "assistant",
+        type: "text",
       };
       setMessages((prev) => [...prev, assistantMessage]);
       return;
@@ -270,44 +309,50 @@ const JobsScreen: React.FC = () => {
       if (Array.isArray(aiData)) {
         if (aiData.length > 0 && "message" in aiData[0]) {
           // GPT is asking for clarification
-          const assistantMessage: Message = {
+          const assistantMessage: TextMessage = {
             id: Math.random().toString(),
             text: aiData[0].message,
             role: "assistant",
+            type: "text",
           };
           setMessages((prev) => [...prev, assistantMessage]);
         } else if (aiData.length > 0 && "id" in aiData[0]) {
           // Received gigs
-          const gigMessages: Message[] = aiData.map((gig: GigMatch) => ({
+          const gigMessages: GigMessage[] = aiData.map((gig: GigMatch) => ({
             id: gig.id,
-            text: `• **${gig.title}**\n  - *${gig.description}*\n  - **Category**: ${gig.category}\n  - **Price**: ${gig.price}`,
+            text: gig.title, // Use gig's title for display
             role: "assistant",
+            type: "gig",
+            gig, // Attach the gig data
           }));
           setMessages((prev) => [...prev, ...gigMessages]);
         } else {
           // Unexpected format
-          const assistantMessage: Message = {
+          const assistantMessage: TextMessage = {
             id: Math.random().toString(),
             text: "I encountered an unexpected response. Please try again.",
             role: "assistant",
+            type: "text",
           };
           setMessages((prev) => [...prev, assistantMessage]);
         }
       } else {
         // Unexpected response format
-        const assistantMessage: Message = {
+        const assistantMessage: TextMessage = {
           id: Math.random().toString(),
           text: "I encountered an unexpected response. Please try again.",
           role: "assistant",
+          type: "text",
         };
         setMessages((prev) => [...prev, assistantMessage]);
       }
     } catch (error) {
       console.error(error);
-      const assistantMessage: Message = {
+      const assistantMessage: TextMessage = {
         id: Math.random().toString(),
         text: "Something went wrong. Please try again later.",
         role: "assistant",
+        type: "text",
       };
       setMessages((prev) => [...prev, assistantMessage]);
     } finally {
@@ -316,10 +361,11 @@ const JobsScreen: React.FC = () => {
   };
 
   const sendMessageWithSuggestion = (suggestion: string) => {
-    const newUserMessage: Message = {
+    const newUserMessage: TextMessage = {
       id: Math.random().toString(),
       text: suggestion,
       role: "user",
+      type: "text",
     };
     setMessages((prev) => [...prev, newUserMessage]);
     setUserInput("");
@@ -345,10 +391,11 @@ const JobsScreen: React.FC = () => {
         responseText = "Alright! Let me find some matches for you. One sec...";
       }
 
-      const newAssistantMessage: Message = {
+      const newAssistantMessage: TextMessage = {
         id: Math.random().toString(),
         text: responseText,
         role: "assistant",
+        type: "text",
       };
       setMessages((prev) => [...prev, newAssistantMessage]);
     }, 1000);
@@ -625,14 +672,18 @@ const JobsScreen: React.FC = () => {
         >
           <Animated.View style={[styles.assistantModalOverlay, { opacity }]} />
           <Animated.View
+            {...panResponder.panHandlers}
             style={[
               styles.assistantModal,
-              { transform: [{ translateY }], opacity },
+              {
+                transform: [{ translateY: translateY }],
+                opacity,
+              },
             ]}
           >
             <View style={styles.assistantHeader}>
               <Text style={styles.assistantHeaderText}>AI Assistant</Text>
-              <TouchableOpacity onPress={toggleAssistant}>
+              <TouchableOpacity onPress={() => toggleAssistant()}>
                 <Ionicons name="close" size={24} color="#BB86FC" />
               </TouchableOpacity>
             </View>
@@ -675,16 +726,51 @@ const JobsScreen: React.FC = () => {
                         : styles.userBubble,
                     ]}
                   >
-                    <Text
-                      style={[
-                        styles.messageText,
-                        msg.role === "assistant"
-                          ? styles.assistantText
-                          : styles.userText,
-                      ]}
-                    >
-                      {msg.text}
-                    </Text>
+                    {msg.type === "gig" && msg.gig ? (
+                      <TouchableOpacity
+                        style={styles.gigCard}
+                        onPress={() => {
+                          toggleAssistant(() => {
+                            navigation.navigate("JobDetail", {
+                              jobId: msg.gig.id,
+                            });
+                          });
+                        }}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={styles.gigTitle}>{msg.gig.title}</Text>
+                        <View style={styles.gigCategoryRow}>
+                          <Ionicons
+                            name={
+                              categoryIcons[msg.gig.category] || "grid-outline"
+                            }
+                            size={16}
+                            color="#BB86FC"
+                            style={{ marginRight: 6 }}
+                          />
+                          <Text style={styles.gigCategory}>
+                            {msg.gig.category}
+                          </Text>
+                        </View>
+                        <Text style={styles.gigDescription}>
+                          {truncateDescription(msg.gig.description, 60)}
+                        </Text>
+                        <Text style={styles.gigPrice}>
+                          ${getDisplayedPrice(msg.gig.price)}
+                        </Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <Text
+                        style={[
+                          styles.messageText,
+                          msg.role === "assistant"
+                            ? styles.assistantText
+                            : styles.userText,
+                        ]}
+                      >
+                        {msg.text}
+                      </Text>
+                    )}
                   </View>
                 ))}
               </ScrollView>
@@ -1022,5 +1108,42 @@ const styles = StyleSheet.create({
   filterModalOptionText: {
     fontSize: 14,
     color: "#FFFFFF",
+  },
+  // Gig Card Styles within Chat
+  gigCard: {
+    backgroundColor: "#1A1A1A",
+    borderRadius: 12,
+    padding: 12,
+    marginVertical: 5,
+    width: width * 0.7,
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  },
+  gigTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#FFFFFF",
+    marginBottom: 5,
+  },
+  gigCategoryRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 5,
+  },
+  gigCategory: {
+    fontSize: 14,
+    color: "#BB86FC",
+  },
+  gigDescription: {
+    fontSize: 14,
+    color: "#B3B3B3",
+    marginBottom: 5,
+  },
+  gigPrice: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#BB86FC",
   },
 });
