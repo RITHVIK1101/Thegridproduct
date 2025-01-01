@@ -20,7 +20,7 @@ import {
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
 import BottomNavBar from "./components/BottomNavbar";
-import { NGROK_URL, BOT_API_URL } from "@env";
+import { NGROK_URL } from "@env"; // Removed BOT_API_URL as it's no longer needed
 import { UserContext } from "./UserContext";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "./navigationTypes"; // Adjust the path if necessary
@@ -35,6 +35,15 @@ interface Gig {
   category: string;
   price: string;
   userId: string;
+}
+
+interface GigMatch {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  price: string;
+  similarity: number;
 }
 
 interface Message {
@@ -242,13 +251,13 @@ const JobsScreen: React.FC = () => {
 
     try {
       setLoading(true);
-      const aiResponse = await fetch(`${BOT_API_URL}/search-gigs`, {
+      const aiResponse = await fetch(`${NGROK_URL}/services/search`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ text: userInput }),
+        body: JSON.stringify({ query: userInput }),
       });
 
       if (!aiResponse.ok) {
@@ -258,42 +267,49 @@ const JobsScreen: React.FC = () => {
       const aiData = await aiResponse.json();
       console.log("AI Response:", aiData);
 
+      if (Array.isArray(aiData)) {
+        if (aiData.length > 0 && "message" in aiData[0]) {
+          // GPT is asking for clarification
+          const assistantMessage: Message = {
+            id: Math.random().toString(),
+            text: aiData[0].message,
+            role: "assistant",
+          };
+          setMessages((prev) => [...prev, assistantMessage]);
+        } else if (aiData.length > 0 && "id" in aiData[0]) {
+          // Received gigs
+          const gigMessages: Message[] = aiData.map((gig: GigMatch) => ({
+            id: gig.id,
+            text: `• **${gig.title}**\n  - *${gig.description}*\n  - **Category**: ${gig.category}\n  - **Price**: ${gig.price}`,
+            role: "assistant",
+          }));
+          setMessages((prev) => [...prev, ...gigMessages]);
+        } else {
+          // Unexpected format
+          const assistantMessage: Message = {
+            id: Math.random().toString(),
+            text: "I encountered an unexpected response. Please try again.",
+            role: "assistant",
+          };
+          setMessages((prev) => [...prev, assistantMessage]);
+        }
+      } else {
+        // Unexpected response format
+        const assistantMessage: Message = {
+          id: Math.random().toString(),
+          text: "I encountered an unexpected response. Please try again.",
+          role: "assistant",
+        };
+        setMessages((prev) => [...prev, assistantMessage]);
+      }
+    } catch (error) {
+      console.error(error);
       const assistantMessage: Message = {
         id: Math.random().toString(),
-        text: "Let me find some matches for you. One moment...",
+        text: "Something went wrong. Please try again later.",
         role: "assistant",
       };
       setMessages((prev) => [...prev, assistantMessage]);
-
-      // Fetch gigs again or filter them (depending on your actual flow)
-      const gigsResponse = await fetch(`${NGROK_URL}/services`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!gigsResponse.ok) {
-        throw new Error(`Failed to fetch gigs: ${gigsResponse.status}`);
-      }
-
-      const gigsData = await gigsResponse.json();
-      console.log("Filtered Gigs:", gigsData);
-      setValidatedGigs(gigsData, setGigs);
-
-      const gigsCount = Array.isArray(gigsData.gigs) ? gigsData.gigs.length : 0;
-      const resultsMessage: Message = {
-        id: Math.random().toString(),
-        text: `I found ${gigsCount} gig${
-          gigsCount !== 1 ? "s" : ""
-        } that match your query. Take a look below!`,
-        role: "assistant",
-      };
-      setMessages((prev) => [...prev, resultsMessage]);
-    } catch (error) {
-      console.error(error);
-      Alert.alert("Error", "Something went wrong. Please try again later.");
     } finally {
       setLoading(false);
     }
@@ -317,7 +333,7 @@ const JobsScreen: React.FC = () => {
         "Awesome! Could you tell me more about the category or field you're interested in?",
         "Great. Any specific deadline or timeframe?",
         "Got it. What's your budget range?",
-        "Perfect! I'll find some freelancers that match your needs.",
+        "Perfect! I'll find some gigs that match your needs.",
       ];
 
       const userMessagesCount =
@@ -558,16 +574,12 @@ const JobsScreen: React.FC = () => {
                             color="#BB86FC"
                             style={{ marginRight: 6 }}
                           />
-                          <Text style={styles.gigCategory}>
-                            {gig.category}
-                          </Text>
+                          <Text style={styles.gigCategory}>{gig.category}</Text>
                         </View>
                         <Text style={styles.gigDescription}>
                           {truncateDescription(gig.description, 60)}
                         </Text>
-                        <Text style={styles.gigPrice}>
-                          ${displayedPrice}
-                        </Text>
+                        <Text style={styles.gigPrice}>${displayedPrice}</Text>
                       </View>
                       <Ionicons
                         name="chevron-forward"
@@ -590,7 +602,11 @@ const JobsScreen: React.FC = () => {
       <BottomNavBar />
 
       {/* Floating "Find a Gig" Button */}
-      <TouchableOpacity activeOpacity={0.9} style={styles.fab} onPress={toggleAssistant}>
+      <TouchableOpacity
+        activeOpacity={0.9}
+        style={styles.fab}
+        onPress={toggleAssistant}
+      >
         <LinearGradient
           colors={["rgb(168, 237, 234)", "rgb(254, 214, 227)"]}
           start={{ x: 0, y: 0 }}
@@ -681,7 +697,10 @@ const JobsScreen: React.FC = () => {
                   value={userInput}
                   onChangeText={setUserInput}
                 />
-                <TouchableOpacity style={styles.sendButton} onPress={sendMessage}>
+                <TouchableOpacity
+                  style={styles.sendButton}
+                  onPress={sendMessage}
+                >
                   <Ionicons name="send" size={20} color="#FFFFFF" />
                 </TouchableOpacity>
               </View>

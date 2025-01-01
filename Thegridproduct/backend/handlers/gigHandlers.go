@@ -5,9 +5,13 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
+	"math"
 	"net/http"
+	"os"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -17,6 +21,7 @@ import (
 	"Thegridproduct/backend/models"
 
 	"github.com/gorilla/mux"
+	"github.com/sashabaranov/go-openai"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -190,6 +195,246 @@ func AddGigHandler(w http.ResponseWriter, r *http.Request) {
 		"message": "Gig added successfully",
 		"id":      result.InsertedID,
 	})
+}
+func SearchGigsHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method != http.MethodPost {
+		WriteJSONError(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Parse user query
+	var req struct {
+		Query string `json:"query"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Printf("Error decoding request body: %v", err)
+		WriteJSONError(w, "Invalid input format", http.StatusBadRequest)
+		return
+	}
+
+	cleanedQuery := strings.TrimSpace(req.Query)
+	if cleanedQuery == "" {
+		WriteJSONError(w, "Query is required", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// --------------------------------------------------------------------------
+	// 1) Refine the query using GPT
+	// --------------------------------------------------------------------------
+	refinedQuery, err := RefineQueryWithPrompt(cleanedQuery)
+	if err != nil {
+		log.Printf("Error refining query with GPT: %v", err)
+		WriteJSONError(w, "Error processing query", http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("Refined Query from GPT: %s", refinedQuery)
+
+	// --------------------------------------------------------------------------
+	// 2) Optional: Check for specific keywords to build a partial MongoDB filter
+	//    e.g. if user says "open to communication" or "30 dollars an hour"
+	//    or "non-academic" to exclude academic gigs
+	// --------------------------------------------------------------------------
+	filter := bson.M{"embeddings": bson.M{"$exists": true}}
+
+	lowerRefined := strings.ToLower(refinedQuery)
+
+	if strings.Contains(lowerRefined, "open to communication") ||
+		strings.Contains(lowerRefined, "negotiable") ||
+		strings.Contains(lowerRefined, "discuss price") {
+		// Case-insensitive regex
+		filter["price"] = bson.M{"$regex": "open to communication|negotiable", "$options": "i"}
+	}
+
+	if strings.Contains(lowerRefined, "30 dollars an hour") ||
+		strings.Contains(lowerRefined, "$30/hour") {
+		// If you want to specifically show gigs priced at "30 dollars an hour"
+		// You can also handle numeric conversion if your DB stores numeric prices.
+		// This is just an example of direct equality.
+		filter["price"] = "30 dollars an hour"
+	}
+
+	// EXCLUDE "academic" gigs if user specifically said "non-academic"
+	if strings.Contains(lowerRefined, "non academic") ||
+		strings.Contains(lowerRefined, "non-academic") {
+		// Example approach: exclude gigs whose category is "Academic" or "Tutoring"
+		// Adjust to your actual DB fields
+		filter["category"] = bson.M{"$ne": "Academic"}
+	}
+
+	// --------------------------------------------------------------------------
+	// 3) Generate embedding for the refined query
+	// --------------------------------------------------------------------------
+	queryEmbedding, err := embeddings.GetEmbeddingForText(ctx, refinedQuery)
+	if err != nil {
+		log.Printf("Error generating query embedding: %v", err)
+		WriteJSONError(w, "Error generating query embedding", http.StatusInternalServerError)
+		return
+	}
+
+	// --------------------------------------------------------------------------
+	// 4) Fetch relevant gigs from MongoDB with the partial filter
+	// --------------------------------------------------------------------------
+	collection := db.GetCollection("gridlyapp", "gigs")
+	cursor, err := collection.Find(
+		ctx,
+		filter,
+		options.Find().SetProjection(bson.M{
+			"_id":         1,
+			"title":       1,
+			"description": 1,
+			"embeddings":  1,
+			"price":       1,
+			"category":    1,
+			// add any other fields you want to return
+		}),
+	)
+	if err != nil {
+		log.Printf("Error fetching gigs: %v", err)
+		WriteJSONError(w, "Error fetching gigs", http.StatusInternalServerError)
+		return
+	}
+	defer cursor.Close(ctx)
+
+	type GigMinimal struct {
+		ID          primitive.ObjectID `bson:"_id" json:"id"`
+		Title       string             `bson:"title" json:"title"`
+		Description string             `bson:"description" json:"description"`
+		Embeddings  []float32          `bson:"embeddings"`
+		Price       string             `bson:"price" json:"price"`
+		Category    string             `bson:"category" json:"category"`
+	}
+
+	var gigs []GigMinimal
+	if err := cursor.All(ctx, &gigs); err != nil {
+		log.Printf("Error decoding gigs: %v", err)
+		WriteJSONError(w, "Error decoding gigs", http.StatusInternalServerError)
+		return
+	}
+
+	// --------------------------------------------------------------------------
+	// 5) Calculate cosine similarity and match gigs
+	// --------------------------------------------------------------------------
+	type GigMatch struct {
+		ID          primitive.ObjectID `json:"id"`
+		Title       string             `json:"title"`
+		Description string             `json:"description"`
+		Price       string             `json:"price"`
+		Category    string             `json:"category"`
+		Similarity  float64            `json:"similarity"`
+	}
+
+	var matches []GigMatch
+	for _, gig := range gigs {
+		similarity := computeCosineSimilarity(queryEmbedding, gig.Embeddings)
+
+		// Use a similarity threshold (adjust to your preference)
+		if similarity >= 0.8 {
+			matches = append(matches, GigMatch{
+				ID:          gig.ID,
+				Title:       gig.Title,
+				Description: gig.Description,
+				Price:       gig.Price,
+				Category:    gig.Category,
+				Similarity:  similarity,
+			})
+		}
+	}
+
+	// Sort by similarity descending
+	sort.Slice(matches, func(i, j int) bool {
+		return matches[i].Similarity > matches[j].Similarity
+	})
+
+	// Limit to top 5 results (adjust as needed)
+	if len(matches) > 5 {
+		matches = matches[:5]
+	}
+
+	// --------------------------------------------------------------------------
+	// 6) Handle no matches scenario
+	// --------------------------------------------------------------------------
+	if len(matches) == 0 {
+		// Instead of just returning a “no gigs found” message,
+		// you could optionally use GPT again to ask the user clarifying questions.
+		// For simplicity, we’re returning a prompt here:
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode([]map[string]interface{}{
+			{
+				"message": "No gigs matched your query. Could you clarify your preferred category, price range, or other details?",
+			},
+		})
+		return
+	}
+
+	// --------------------------------------------------------------------------
+	// 7) Return the matched gigs
+	// --------------------------------------------------------------------------
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(matches)
+}
+
+// --------------------------------------------------------------------------
+// RefineQueryWithPrompt refines the user query using GPT
+// Adjust the system prompt and API usage as needed.
+// --------------------------------------------------------------------------
+func RefineQueryWithPrompt(userQuery string) (string, error) {
+	client := openai.NewClient(os.Getenv("OPENAI_API_KEY"))
+
+	// Define the system prompt for refinement
+	systemPrompt := `
+You are an assistant specializing in understanding and refining user queries for a gig search platform.
+- Extract key intent from the query, paying special attention to preferences like "open to communication," numeric rates ("30 dollars an hour"), or "non-academic."
+- Emphasize important qualifiers and explicitly exclude "academic" if the user says "non-academic."
+- If the query is vague, make it more specific by adding synonyms or clarifications, but do not change user intent.
+- The goal is to help find the best matching gigs in a database.
+`
+	resp, err := client.CreateChatCompletion(context.Background(), openai.ChatCompletionRequest{
+		Model: openai.GPT4, // Or whichever model you use
+		Messages: []openai.ChatCompletionMessage{
+			{Role: "system", Content: systemPrompt},
+			{Role: "user", Content: userQuery},
+		},
+		Temperature: 0.8,
+		MaxTokens:   150,
+	})
+	if err != nil {
+		return "", err
+	}
+
+	if len(resp.Choices) == 0 {
+		return "", fmt.Errorf("no GPT response")
+	}
+
+	refinedQuery := strings.TrimSpace(resp.Choices[0].Message.Content)
+	log.Printf("Refined Query: %s", refinedQuery) // Debug
+	return refinedQuery, nil
+}
+
+// --------------------------------------------------------------------------
+// Helper for computing cosine similarity between two float32 vectors
+func computeCosineSimilarity(a, b []float32) float64 {
+	if len(a) != len(b) {
+		return 0.0 // Embeddings must be the same length
+	}
+
+	var dotProduct, normA, normB float64
+	for i := 0; i < len(a); i++ {
+		dotProduct += float64(a[i]) * float64(b[i])
+		normA += float64(a[i]) * float64(a[i])
+		normB += float64(b[i]) * float64(b[i])
+	}
+
+	if normA == 0 || normB == 0 {
+		return 0.0
+	}
+
+	return dotProduct / (math.Sqrt(normA) * math.Sqrt(normB))
 }
 
 // GetSingleGigHandler handles fetching a single gig by its ID

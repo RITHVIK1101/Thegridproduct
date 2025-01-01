@@ -123,7 +123,8 @@ func main() {
 	// === Gig (Service) Routes ===
 	// Aligning endpoints with frontend's expectation of "/services"
 
-	protected.HandleFunc("/services", handlers.AddGigHandler).Methods("POST")           // Create a new gig
+	protected.HandleFunc("/services", handlers.AddGigHandler).Methods("POST") // Create a new gig
+	protected.HandleFunc("/services/search", handlers.SearchGigsHandler).Methods("POST")
 	protected.HandleFunc("/services", handlers.GetAllGigsHandler).Methods("GET")        // Retrieve all gigs
 	protected.HandleFunc("/services/user", handlers.GetUserGigsHandler).Methods("GET")  // Retrieve gigs for the authenticated user
 	protected.HandleFunc("/services/{id}", handlers.GetSingleGigHandler).Methods("GET") // Retrieve a single gig by ID
