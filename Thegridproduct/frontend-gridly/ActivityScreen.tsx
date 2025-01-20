@@ -61,7 +61,7 @@ const ActivityScreen: React.FC = () => {
   const isFocused = useIsFocused();
   const { userId, token } = useContext(UserContext);
 
-  const [activeSegment, setActiveSegment] = useState<"Products" | "Gigs">(
+  const [activeSegment, setActiveSegment] = useState<"Products" | "Gigs" | "Requested">(
     "Products"
   );
 
@@ -134,7 +134,6 @@ const ActivityScreen: React.FC = () => {
   };
 
   // Fetch user gigs
-  // Fetch user gigs
   const fetchUserGigs = async () => {
     if (!userId || !token) {
       setErrorGigs("User not logged in.");
@@ -196,11 +195,12 @@ const ActivityScreen: React.FC = () => {
       setLoadingProducts(true);
       setErrorProducts(null);
       await fetchUserProducts();
-    } else {
+    } else if (activeSegment === "Gigs") {
       setLoadingGigs(true);
       setErrorGigs(null);
       await fetchUserGigs();
     }
+    // No fetching for "Requested" segment as per instruction
   };
 
   // Handle deletion of a product
@@ -337,6 +337,13 @@ const ActivityScreen: React.FC = () => {
     navigation.navigate("EditGig", { gigId });
   };
 
+  // Navigate to view requested product details (Assuming there's a screen)
+  // This is left empty as no data or functionality is needed for Requested Products
+  const navigateToViewRequestedProduct = (requestedProductId: string) => {
+    // Placeholder for navigation
+    Alert.alert("Info", "Requested Products feature coming soon!");
+  };
+
   // Fetch data when screen is focused or active segment changes
   useEffect(() => {
     if (isFocused) {
@@ -352,18 +359,43 @@ const ActivityScreen: React.FC = () => {
         product.title.toLowerCase().includes(searchQuery.toLowerCase())
       );
       setFilteredProducts(filtered);
-    } else {
+    } else if (activeSegment === "Gigs") {
       const filtered = gigs.filter((gig) =>
         gig.title.toLowerCase().includes(searchQuery.toLowerCase())
       );
       setFilteredGigs(filtered);
     }
+    // No filtering needed for "Requested"
   }, [searchQuery, products, gigs, activeSegment]);
 
   // Handle pull-to-refresh
   const handleRefresh = () => {
     fetchData();
   };
+
+  // Reusable EmptyList component
+  const EmptyList = ({
+    message,
+    buttonText,
+    onPress,
+  }: {
+    message: string;
+    buttonText: string;
+    onPress: () => void;
+  }) => (
+    <View style={styles.emptyContainer}>
+      <Ionicons name="information-circle-outline" size={50} color="#BB86FC" />
+      <Text style={styles.emptyText}>{message}</Text>
+      <TouchableOpacity
+        style={styles.emptyButton}
+        onPress={onPress}
+        activeOpacity={0.7}
+      >
+        <Text style={styles.emptyButtonText}>{buttonText}</Text>
+        <Ionicons name="arrow-forward" size={20} color="#fff" />
+      </TouchableOpacity>
+    </View>
+  );
 
   // Render a single product item
   const renderProduct = ({ item }: { item: Product }) => {
@@ -484,10 +516,18 @@ const ActivityScreen: React.FC = () => {
     );
   };
 
-  const renderSeparator = () => <View style={styles.separator} />;
+  // Render requested products using EmptyList for consistency
+  const renderRequested = () => {
+    return (
+      <EmptyList
+        message="You have no requested products."
+        buttonText="Request a Product"
+        onPress={() => navigation.navigate("RequestProduct")}
+      />
+    );
+  };
 
-  const renderFooter = () =>
-    activeSegment === "Products" ? <View style={styles.separator} /> : null;
+  const renderSeparator = () => <View style={styles.separator} />;
 
   const renderList = () => {
     if (activeSegment === "Products") {
@@ -515,17 +555,21 @@ const ActivityScreen: React.FC = () => {
           renderItem={renderProduct}
           contentContainerStyle={styles.listContainer}
           ListEmptyComponent={
-            <Text style={styles.emptyText}>You have no products.</Text>
+            !loadingProducts && !errorProducts ? (
+              <EmptyList
+                message="You have no products."
+                buttonText="Add Product"
+                onPress={() => navigation.navigate("AddProduct")}
+              />
+            ) : null
           }
           showsVerticalScrollIndicator={false}
           onRefresh={handleRefresh}
           refreshing={loadingProducts}
           ItemSeparatorComponent={renderSeparator}
-          // ListFooterComponent={renderFooter} // Removed this line
         />
       );
-      
-    } else {
+    } else if (activeSegment === "Gigs") {
       if (loadingGigs) {
         return (
           <View style={styles.loadingContainer}>
@@ -550,20 +594,35 @@ const ActivityScreen: React.FC = () => {
           renderItem={renderGig}
           contentContainerStyle={styles.listContainer}
           ListEmptyComponent={
-            <Text style={styles.emptyText}>You have no gigs.</Text>
+            !loadingGigs && !errorGigs ? (
+              <EmptyList
+                message="You have no gigs."
+                buttonText="Add Gig"
+                onPress={() => navigation.navigate("AddGig")}
+              />
+            ) : null
           }
           showsVerticalScrollIndicator={false}
           onRefresh={handleRefresh}
           refreshing={loadingGigs}
           ItemSeparatorComponent={renderSeparator}
-          ListFooterComponent={null}
         />
+      );
+    } else if (activeSegment === "Requested") {
+      return (
+        <View style={styles.listContainer}>
+          <EmptyList
+            message="You have no requested products."
+            buttonText="Request a Product"
+            onPress={() => navigation.navigate("RequestProduct")}
+          />
+        </View>
       );
     }
   };
 
   return (
-    <View style={styles.container}>
+    <View style={styles.mainContainer}>
       <View style={styles.topBar}>
         <View style={styles.segmentedControlContainer}>
           <TouchableOpacity
@@ -600,6 +659,23 @@ const ActivityScreen: React.FC = () => {
               Gigs
             </Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.segment,
+              activeSegment === "Requested" && styles.activeSegment,
+            ]}
+            onPress={() => setActiveSegment("Requested")}
+            activeOpacity={0.7}
+          >
+            <Text
+              style={[
+                styles.segmentText,
+                activeSegment === "Requested" && styles.activeSegmentText,
+              ]}
+            >
+              Requested
+            </Text>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.searchContainer}>
@@ -616,7 +692,9 @@ const ActivityScreen: React.FC = () => {
               placeholder={
                 activeSegment === "Products"
                   ? "Search your products..."
-                  : "Search your gigs..."
+                  : activeSegment === "Gigs"
+                  ? "Search your gigs..."
+                  : "Search requested products..."
               }
               placeholderTextColor="#bbb"
               value={searchQuery}
@@ -651,7 +729,7 @@ const ActivityScreen: React.FC = () => {
 export default ActivityScreen;
 
 const styles = StyleSheet.create({
-  container: {
+  mainContainer: {
     flex: 1,
     backgroundColor: "#000",
   },
@@ -675,7 +753,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   activeSegment: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#BB86FC",
   },
   segmentText: {
     color: "#fff",
@@ -733,8 +811,9 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     paddingHorizontal: 20,
-    paddingBottom: 100,
+    paddingBottom: 100, // To prevent content from being hidden behind BottomNavBar
     paddingTop: 10,
+    flexGrow: 1, // Ensure FlatList can center EmptyList
   },
   itemContainer: {
     position: "relative",
@@ -798,13 +877,32 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: "#222",
   },
-  emptyText: {
-    textAlign: "center",
-    color: "#888",
-    fontSize: 14,
-    marginTop: 50,
+  // Adjusted emptyContainer to be centered
+  emptyContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 20,
   },
-  listFooter: {
-    height: 20,
+  emptyText: {
+    color: "#fff",
+    fontSize: 16,
+    textAlign: "center",
+    marginVertical: 20,
+  },
+  emptyButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#BB86FC",
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    justifyContent: "center",
+  },
+  emptyButtonText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "600",
+    marginRight: 5,
   },
 });

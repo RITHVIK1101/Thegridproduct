@@ -1,4 +1,5 @@
 // BottomNavBar.tsx
+
 import React, { useState, useRef, useEffect } from "react";
 import {
   View,
@@ -130,7 +131,7 @@ const BottomNavBar: React.FC = () => {
       <TouchableOpacity
         style={styles.navItem}
         onPress={toggleModal}
-        accessibilityLabel="Add Product or Gig"
+        accessibilityLabel="Add or Request Product"
         hitSlop={hitSlopValue}
       >
         <Animated.View style={[styles.addButton, { transform: [{ rotate: spin }] }]}>
@@ -214,6 +215,17 @@ const BottomNavBar: React.FC = () => {
                 accessibilityLabel="Add Gig"
               >
                 <Text style={styles.modalButtonText}>Add Job</Text>
+              </TouchableOpacity>
+              {/* New Request Product Button */}
+              <TouchableOpacity
+                style={styles.modalButton}
+                onPress={() => {
+                  toggleModal();
+                  navigation.navigate("RequestProduct");
+                }}
+                accessibilityLabel="Request Product"
+              >
+                <Text style={styles.modalButtonText}>Request Product</Text>
               </TouchableOpacity>
             </View>
             <TouchableOpacity

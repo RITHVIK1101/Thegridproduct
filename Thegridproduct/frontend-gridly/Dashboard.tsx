@@ -1127,8 +1127,8 @@ const Dashboard: React.FC<DashboardProps> = () => {
           {/* Filter Modal */}
           <Modal
             visible={isFilterModalVisible}
-            transparent
             animationType="slide"
+            transparent={true}
             onRequestClose={toggleFilterModal}
           >
             <TouchableOpacity
@@ -1136,8 +1136,8 @@ const Dashboard: React.FC<DashboardProps> = () => {
               activeOpacity={1}
               onPressOut={toggleFilterModal}
             >
-              <View style={styles.filterModalContent}>
-                <Text style={styles.modalTitle}>Filters</Text>
+              <View style={styles.filterModalContainer}>
+                <Text style={styles.filterModalTitle}>Filters</Text>
 
                 <View style={styles.divider} />
                 <Text style={styles.sectionTitle}>Category</Text>
@@ -1148,18 +1148,27 @@ const Dashboard: React.FC<DashboardProps> = () => {
                   renderItem={({ item }) => (
                     <TouchableOpacity
                       style={[
-                        styles.filterOptionButton,
-                        selectedCategory === item &&
-                          styles.filterOptionSelected,
+                        styles.filterModalOption,
+                        selectedCategory === item && styles.filterModalOptionSelected,
                       ]}
                       onPress={() => setSelectedCategory(item)}
                       accessibilityLabel={`Filter by ${item}`}
                     >
+                      <Ionicons
+                        name={
+                          selectedCategory === item
+                            ? "checkbox-outline"
+                            : "ellipse-outline"
+                        }
+                        size={20}
+                        color={selectedCategory === item ? "#BB86FC" : "#FFFFFF"}
+                        style={{ marginRight: 10 }}
+                      />
                       <Text
                         style={[
-                          styles.filterOptionText,
+                          styles.filterModalOptionText,
                           selectedCategory === item &&
-                            styles.filterOptionTextSelected,
+                            styles.filterModalOptionTextSelected,
                         ]}
                       >
                         {item === "#Everything" ? "All" : item.replace("#", "")}
@@ -1177,18 +1186,29 @@ const Dashboard: React.FC<DashboardProps> = () => {
                   renderItem={({ item }) => (
                     <TouchableOpacity
                       style={[
-                        styles.filterOptionButton,
-                        campusMode === item.value &&
-                          styles.filterOptionSelected,
+                        styles.filterModalOption,
+                        campusMode === item.value && styles.filterModalOptionSelected,
                       ]}
                       onPress={() => setCampusMode(item.value)}
                       accessibilityLabel={`Filter by ${item.label}`}
                     >
+                      <Ionicons
+                        name={
+                          campusMode === item.value
+                            ? "checkbox-outline"
+                            : "ellipse-outline"
+                        }
+                        size={20}
+                        color={
+                          campusMode === item.value ? "#BB86FC" : "#FFFFFF"
+                        }
+                        style={{ marginRight: 10 }}
+                      />
                       <Text
                         style={[
-                          styles.filterOptionText,
+                          styles.filterModalOptionText,
                           campusMode === item.value &&
-                            styles.filterOptionTextSelected,
+                            styles.filterModalOptionTextSelected,
                         ]}
                       >
                         {item.label}
@@ -1203,17 +1223,17 @@ const Dashboard: React.FC<DashboardProps> = () => {
                     toggleFilterModal();
                     fetchProducts();
                   }}
-                  accessibilityLabel="Apply"
+                  accessibilityLabel="Apply Filters"
                 >
-                  <Text style={styles.applyButtonText}>Apply</Text>
+                  <Text style={styles.applyButtonText}>Apply Filters</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   onPress={toggleFilterModal}
                   style={styles.modalClose}
-                  accessibilityLabel="Close"
+                  accessibilityLabel="Close Filter Modal"
                 >
-                  <Ionicons name="close-outline" size={24} color="#FFFFFF" />
+                  <Ionicons name="close-circle" size={24} color="#FFFFFF" />
                 </TouchableOpacity>
               </View>
             </TouchableOpacity>
@@ -1254,7 +1274,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
                     <TouchableOpacity
                       onPress={() => setIsDetailsModalVisible(false)}
                       style={styles.modalClose}
-                      accessibilityLabel="Close"
+                      accessibilityLabel="Close Details Modal"
                     >
                       <Ionicons
                         name="close-outline"
@@ -1290,7 +1310,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
                 <TouchableOpacity
                   onPress={() => setIsDescriptionModalVisible(false)}
                   style={styles.modalClose}
-                  accessibilityLabel="Close"
+                  accessibilityLabel="Close Description Modal"
                 >
                   <Ionicons name="close-outline" size={24} color="#FFFFFF" />
                 </TouchableOpacity>
@@ -1534,36 +1554,24 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 16,
   },
+  // Updated Filter Modal Styles
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.7)",
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 20,
+    backgroundColor: "rgba(0,0,0,0.3)",
+    justifyContent: "flex-end",
   },
-  filterModalContent: {
-    width: "100%",
-    backgroundColor: "#1F1F1F",
-    padding: 20,
-    borderRadius: 15,
-    alignItems: "center",
+  filterModalContainer: {
+    backgroundColor: "#0B0B0B",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 16,
     maxHeight: "80%",
-    position: "relative",
   },
-  descriptionModalContent: {
-    width: "85%",
-    backgroundColor: "#1E1E1E",
-    padding: 20,
-    borderRadius: 15,
-    alignItems: "center",
-    maxHeight: "70%",
-    position: "relative",
-  },
-  modalTitle: {
-    fontSize: 20,
+  filterModalTitle: {
+    fontSize: 18,
     fontWeight: "700",
     color: "#FFFFFF",
-    marginBottom: 15,
+    marginBottom: 12,
     textAlign: "center",
   },
   divider: {
@@ -1572,25 +1580,6 @@ const styles = StyleSheet.create({
     width: "100%",
     marginVertical: 10,
   },
-  filterOptionButton: {
-    width: "100%",
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-    borderRadius: 8,
-    backgroundColor: "#3A3A3A",
-    marginVertical: 5,
-  },
-  filterOptionSelected: {
-    backgroundColor: "#6A4C93",
-  },
-  filterOptionText: {
-    color: "#FFFFFF",
-    fontSize: 15,
-  },
-  filterOptionTextSelected: {
-    color: "#FFFFFF",
-    fontWeight: "700",
-  },
   sectionTitle: {
     fontSize: 16,
     color: "#FFFFFF",
@@ -1598,31 +1587,49 @@ const styles = StyleSheet.create({
     marginBottom: 5,
     fontWeight: "600",
   },
-  applyButton: {
-    backgroundColor: "#6A4C93",
-    paddingVertical: 10,
-    paddingHorizontal: 30,
-    borderRadius: 20,
-    marginTop: 15,
-    width: "100%",
+  filterModalOption: {
+    flexDirection: "row",
     alignItems: "center",
+    paddingVertical: 10,
+  },
+  filterModalOptionSelected: {
+    backgroundColor: "#BB86FC20", // Slightly transparent highlight
+    borderRadius: 10,
+  },
+  filterModalOptionText: {
+    fontSize: 14,
+    color: "#FFFFFF",
+  },
+  filterModalOptionTextSelected: {
+    color: "#BB86FC",
+    fontWeight: "600",
+  },
+  applyButton: {
+    backgroundColor: "#BB86FC",
+    paddingVertical: 12,
+    borderRadius: 25,
+    marginTop: 15,
+    alignItems: "center",
+    transform: [{ translateY: -9 }], // Shifts the button up by 5 units
   },
   applyButtonText: {
     color: "#FFFFFF",
     fontSize: 16,
-    fontWeight: "500",
+    fontWeight: "600",
   },
   modalClose: {
     position: "absolute",
     top: 10,
     right: 10,
   },
+  // Details Modal Styles
   detailsModalContent: {
     width: "90%",
     backgroundColor: "#1E1E1E",
     borderRadius: 15,
     padding: 20,
     alignItems: "center",
+    maxHeight: "70%",
     position: "relative",
   },
   detailsTitle: {
@@ -1655,6 +1662,23 @@ const styles = StyleSheet.create({
   detailsDescription: {
     color: "#AAAAAA",
     fontSize: 14,
+    textAlign: "center",
+  },
+  // Description Modal Styles
+  descriptionModalContent: {
+    width: "85%",
+    backgroundColor: "#1E1E1E",
+    padding: 20,
+    borderRadius: 15,
+    alignItems: "center",
+    maxHeight: "70%",
+    position: "relative",
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#FFFFFF",
+    marginBottom: 15,
     textAlign: "center",
   },
   descriptionText: {

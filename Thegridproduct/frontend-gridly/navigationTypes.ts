@@ -1,4 +1,4 @@
-// navigationtypes.ts
+// navigationTypes.ts
 
 export type CartProduct = {
   id: string;
@@ -33,4 +33,5 @@ export type RootStackParamList = {
   TermsOfService: undefined;
   LikedItems: undefined;
   ProductDetails: { productId: string }; // Added ProductDetails
+  RequestProduct: undefined; // Added RequestProduct
 };

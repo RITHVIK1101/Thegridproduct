@@ -34,7 +34,8 @@ import CartScreen from "./CartScreen";
 import AccountScreen from "./AccountScreen";
 import AllOrdersScreen from "./AllOrdersScreen";
 import JobDetails from "./JobDetails"; // Import the new JobDetails screen
-import { RootStackParamList } from "./navigationtypes"; // Import RootStackParamList
+import RequestProduct from "./RequestProduct"; // Import the RequestProduct screen
+import { RootStackParamList } from "./navigationTypes"; // Import RootStackParamList
 
 // Terms of Service Screen
 const TermsOfServiceScreen: React.FC = () => (
@@ -155,7 +156,9 @@ const UserMenuScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
             {firstName} {lastName}
           </Text>
           {institution && (
-            <Text style={styles.bottomSheetUserInstitution}>{institution}</Text>
+            <Text style={styles.bottomSheetUserInstitution}>
+              {institution}
+            </Text>
           )}
           {studentType && (
             <Text style={styles.bottomSheetUserInstitution}>
@@ -348,6 +351,7 @@ const AppNavigator: React.FC = () => {
     >
       {token ? (
         <>
+          {/* Existing Screens */}
           <Stack.Screen
             name="Dashboard"
             component={Dashboard}
@@ -451,6 +455,14 @@ const AppNavigator: React.FC = () => {
           <Stack.Screen
             name="JobDetail"
             component={JobDetails}
+            options={({ navigation }) =>
+              getHeaderOptions(navigation, firstName, lastName, true, true)
+            }
+          />
+          {/* Registering the RequestProduct Screen */}
+          <Stack.Screen
+            name="RequestProduct"
+            component={RequestProduct}
             options={({ navigation }) =>
               getHeaderOptions(navigation, firstName, lastName, true, true)
             }
