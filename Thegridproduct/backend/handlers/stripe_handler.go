@@ -29,6 +29,13 @@ type PaymentIntentRequest struct {
 
 // CreatePaymentIntentHandler handles the creation of Stripe PaymentIntents and a chat session
 func CreatePaymentIntentHandler(w http.ResponseWriter, r *http.Request) {
+	http.Error(w, "Payment processing is temporarily disabled", http.StatusForbidden)
+	enablePayments := os.Getenv("ENABLE_PAYMENTS")
+	if enablePayments != "true" {
+		http.Error(w, "Payments are temporarily disabled", http.StatusForbidden)
+		return
+	}
+
 	// Load Stripe secret key
 	stripe.Key = os.Getenv("STRIPE_SECRET_KEY")
 	if stripe.Key == "" {

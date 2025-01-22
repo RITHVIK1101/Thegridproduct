@@ -68,10 +68,11 @@ const CartScreen: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const fadeAnim = useState(new Animated.Value(0))[0];
-  
+
   // State for delete confirmation
   const [itemToDelete, setItemToDelete] = useState<CartProduct | null>(null);
-  const [isDeleteModalVisible, setIsDeleteModalVisible] = useState<boolean>(false);
+  const [isDeleteModalVisible, setIsDeleteModalVisible] =
+    useState<boolean>(false);
 
   const { userId, token, clearUser } = useContext(UserContext);
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
@@ -186,7 +187,8 @@ const CartScreen: React.FC = () => {
         duration: 500,
         useNativeDriver: true,
       }).start();
-    } catch (err) {
+    } catch (err: any) {
+      // Added type annotation
       console.error("Fetch Cart Error:", err);
       setError(err.message || "An unexpected error occurred.");
     } finally {
@@ -241,7 +243,8 @@ const CartScreen: React.FC = () => {
         prevItems.filter((item) => item.id !== itemToDelete.id)
       );
       // Removed the Alert after deletion for a smoother UX
-    } catch (err) {
+    } catch (err: any) {
+      // Added type annotation
       console.error("Remove from Cart Error:", err);
       Alert.alert(
         "Error",
@@ -253,7 +256,8 @@ const CartScreen: React.FC = () => {
     }
   };
 
-  const buyProduct = (product: CartProduct) => {
+  // Function to handle "Buy" button press
+  const buyProduct = async (product: CartProduct) => {
     if (!userId) {
       Alert.alert("Error", "User not authenticated.");
       return;
@@ -263,14 +267,52 @@ const CartScreen: React.FC = () => {
       return;
     }
 
-    // Directly navigate to Payment without confirmation
-    navigation.navigate("Payment", {
-      product,
-      buyerId: userId,
-      sellerId: product.sellerId,
-    });
+    try {
+      const response = await fetch(`${NGROK_URL}/chat/request`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`, // Use your token from context
+        },
+        body: JSON.stringify({
+          productId: product.id,
+          buyerId: userId,
+          sellerId: product.sellerId,
+        }),
+      });
+
+      if (response.status === 401) {
+        Alert.alert("Session Expired", "Please log in again.", [
+          {
+            text: "OK",
+            onPress: async () => {
+              await clearUser();
+              navigation.dispatch(
+                CommonActions.reset({
+                  index: 0,
+                  routes: [{ name: "Login" }],
+                })
+              );
+            },
+          },
+        ]);
+        return;
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to request chat.");
+      }
+
+      Alert.alert("Request Sent", "Your chat request has been sent!");
+    } catch (err: any) {
+      // Added type annotation
+      console.error("Chat Request Error:", err);
+      Alert.alert("Error", err.message || "Failed to send chat request.");
+    }
   };
 
+  // Function to navigate to Checkout (disabled in this flow, but kept for reference)
   const proceedToCheckout = () => {
     if (cartProducts.length === 0) {
       Alert.alert("Empty Cart", "Your cart is empty.");
@@ -305,9 +347,7 @@ const CartScreen: React.FC = () => {
         resizeMode="cover"
       />
       <View style={styles.cartDetails}>
-        <Text style={styles.cartTitle}>
-          {item.title}
-        </Text>
+        <Text style={styles.cartTitle}>{item.title}</Text>
         <Text style={styles.cartPrice}>${item.price.toFixed(2)}</Text>
       </View>
       <View style={styles.actionButtons}>
@@ -379,8 +419,14 @@ const CartScreen: React.FC = () => {
           <View style={styles.footer}>
             <View style={styles.totalContainer}>
               <Text style={styles.totalText}>Total</Text>
-              <Text style={styles.totalAmount}>${calculateTotal().toFixed(2)}</Text>
+              <Text style={styles.totalAmount}>
+                ${calculateTotal().toFixed(2)}
+              </Text>
             </View>
+            {/* 
+              The Checkout button is retained but can be hidden or disabled 
+              since payment flow is currently disabled.
+            */}
             <TouchableOpacity
               style={styles.checkoutButton}
               onPress={proceedToCheckout}

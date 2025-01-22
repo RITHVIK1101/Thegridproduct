@@ -1,5 +1,3 @@
-// main.go
-
 package main
 
 import (
@@ -94,17 +92,22 @@ func main() {
 	protected.HandleFunc("/products/{id}", handlers.DeleteProductHandler).Methods("DELETE")
 	protected.HandleFunc("/products/{id}", handlers.UpdateProductHandler).Methods("PUT")
 
-	// Liked Product Routes
+	// Liked Products
 	protected.HandleFunc("/products/{id}/like", handlers.LikeProductHandler).Methods("POST")
 	protected.HandleFunc("/products/{id}/unlike", handlers.UnlikeProductHandler).Methods("POST")
 
-	// Cart Routes
+	// Cart & Orders
 	protected.HandleFunc("/cart", handlers.GetCartHandler).Methods("GET")
 	protected.HandleFunc("/cart/add", handlers.AddToCartHandler).Methods("POST")
 	protected.HandleFunc("/cart/remove", handlers.RemoveFromCartHandler).Methods("POST")
 	protected.HandleFunc("/orders", handlers.GetAllOrdersHandler).Methods("GET")
 
-	// User Routes
+	// NEW Chat Request Routes
+	protected.HandleFunc("/chat/request", handlers.RequestChatHandler).Methods("POST")
+	protected.HandleFunc("/chat/accept", handlers.AcceptChatRequestHandler).Methods("POST")
+	protected.HandleFunc("/chat/reject", handlers.RejectChatRequestHandler).Methods("POST")
+
+	// User & Chat
 	protected.HandleFunc("/users/{id}", handlers.GetUserHandler).Methods("GET")
 	protected.HandleFunc("/chats/user/{userId}", handlers.GetChatsByUserHandler).Methods("GET")
 	protected.HandleFunc("/chats/{chatId}", handlers.GetChatHandler).Methods("GET")
@@ -114,37 +117,34 @@ func main() {
 	// Real-time Messaging Route using Ably
 	protected.HandleFunc("/messages", handlers.PublishMessageHandler).Methods("POST")
 
-	// Payment Routes
-	protected.HandleFunc("/create-payment-intent", handlers.CreatePaymentIntentHandler).Methods("POST")
-	protected.HandleFunc("/payment/save-method", handlers.SavePaymentMethodHandler).Methods("POST")
-	protected.HandleFunc("/payment/saved-methods", handlers.GetSavedPaymentMethodsHandler).Methods("GET")
-	protected.HandleFunc("/payment/charge-saved-method", handlers.ChargeSavedPaymentMethodHandler).Methods("POST")
+	// Payment Routes (Commented Out to disable payment flow)
+	// protected.HandleFunc("/create-payment-intent", handlers.CreatePaymentIntentHandler).Methods("POST")
+	// protected.HandleFunc("/payment/save-method", handlers.SavePaymentMethodHandler).Methods("POST")
+	// protected.HandleFunc("/payment/saved-methods", handlers.GetSavedPaymentMethodsHandler).Methods("GET")
+	// protected.HandleFunc("/payment/charge-saved-method", handlers.ChargeSavedPaymentMethodHandler).Methods("POST")
 
-	// === Gig (Service) Routes ===
-	// Aligning endpoints with frontend's expectation of "/services"
-
-	protected.HandleFunc("/services", handlers.AddGigHandler).Methods("POST") // Create a new gig
-	protected.HandleFunc("/services/search", handlers.SearchGigsHandler).Methods("POST")
-	protected.HandleFunc("/services", handlers.GetAllGigsHandler).Methods("GET")        // Retrieve all gigs
-	protected.HandleFunc("/services/user", handlers.GetUserGigsHandler).Methods("GET")  // Retrieve gigs for the authenticated user
-	protected.HandleFunc("/services/{id}", handlers.GetSingleGigHandler).Methods("GET") // Retrieve a single gig by ID
-	protected.HandleFunc("/services/{id}", handlers.UpdateGigHandler).Methods("PUT")    // Update a gig by ID
+	// Gigs (Services)
+	protected.HandleFunc("/services", handlers.AddGigHandler).Methods("POST")
+	protected.HandleFunc("/services", handlers.GetAllGigsHandler).Methods("GET")
+	protected.HandleFunc("/services/user", handlers.GetUserGigsHandler).Methods("GET")
+	protected.HandleFunc("/services/{id}", handlers.GetSingleGigHandler).Methods("GET")
+	protected.HandleFunc("/services/{id}", handlers.UpdateGigHandler).Methods("PUT")
 	protected.HandleFunc("/services/{id}", handlers.DeleteGigHandler).Methods("DELETE")
 
+	// AI Processing
 	protected.HandleFunc("/ai/process", handlers.ProcessAIInput).Methods("POST")
 
 	router.NotFoundHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		handlers.WriteJSONError(w, "Endpoint not found", http.StatusNotFound)
 	})
 
-	// Start the server with graceful shutdown handling
+	// Start the server with graceful shutdown
 	port := getEnv("PORT", "8080")
 	server := &http.Server{
 		Addr:    fmt.Sprintf(":%s", port),
 		Handler: router,
 	}
 
-	// Channel to listen for OS signals to gracefully shut down
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt)
 
@@ -155,7 +155,6 @@ func main() {
 		}
 	}()
 
-	// Wait for an interrupt signal to gracefully shut down the server
 	<-stop
 	log.Println("Shutting down server...")
 

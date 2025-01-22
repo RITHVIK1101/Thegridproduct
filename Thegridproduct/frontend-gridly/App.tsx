@@ -156,9 +156,7 @@ const UserMenuScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
             {firstName} {lastName}
           </Text>
           {institution && (
-            <Text style={styles.bottomSheetUserInstitution}>
-              {institution}
-            </Text>
+            <Text style={styles.bottomSheetUserInstitution}>{institution}</Text>
           )}
           {studentType && (
             <Text style={styles.bottomSheetUserInstitution}>
@@ -408,13 +406,7 @@ const AppNavigator: React.FC = () => {
               getHeaderOptions(navigation, firstName, lastName, true, true)
             }
           />
-          <Stack.Screen
-            name="Payment"
-            component={PaymentScreen}
-            options={({ navigation }) =>
-              getHeaderOptions(navigation, firstName, lastName, true, true)
-            }
-          />
+
           <Stack.Screen
             name="Account"
             component={AccountScreen}
