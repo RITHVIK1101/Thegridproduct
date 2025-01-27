@@ -1,4 +1,3 @@
-// db/db.go
 package db
 
 import (
@@ -9,8 +8,6 @@ import (
 	"log"
 	"os"
 	"time"
-
-	"github.com/google/uuid"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -23,16 +20,13 @@ var MongoDBClient *mongo.Client
 
 // ConnectDB initializes the MongoDB connection and sets up indexes
 func ConnectDB() {
-	// Get MongoDB URI from environment variables
 	mongoURI := os.Getenv("MONGODB_URI")
 	if mongoURI == "" {
-		log.Fatal("MONGODB_URI is not set in the environment variables")
+		log.Fatal("MONGODB_URI is not set in environment variables")
 	}
 
-	// Set client options
 	clientOptions := options.Client().ApplyURI(mongoURI)
 
-	// Connect to MongoDB with a timeout context
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -41,16 +35,15 @@ func ConnectDB() {
 		log.Fatalf("MongoDB connection error: %v", err)
 	}
 
-	// Ping the database to verify connection
-	err = client.Ping(ctx, nil)
-	if err != nil {
+	// Verify the connection
+	if err := client.Ping(ctx, nil); err != nil {
 		log.Fatalf("MongoDB ping error: %v", err)
 	}
 
-	fmt.Println("Connected to MongoDB successfully")
+	log.Println("Connected to MongoDB successfully")
 	MongoDBClient = client
 
-	// Set up indexes
+	// Create any needed indexes
 	if err := setupIndexes(ctx); err != nil {
 		log.Fatalf("Failed to set up indexes: %v", err)
 	}
@@ -60,7 +53,6 @@ func ConnectDB() {
 func setupIndexes(ctx context.Context) error {
 	collection := GetCollection("gridlyapp", "chats")
 
-	// Define indexes
 	indexes := []mongo.IndexModel{
 		{
 			Keys:    bson.D{{Key: "buyerId", Value: 1}},
@@ -76,59 +68,47 @@ func setupIndexes(ctx context.Context) error {
 		},
 	}
 
-	// Create indexes
 	_, err := collection.Indexes().CreateMany(ctx, indexes)
 	if err != nil {
 		return fmt.Errorf("error creating indexes: %v", err)
 	}
 
-	fmt.Println("Indexes created successfully")
+	log.Println("Indexes created successfully")
 	return nil
 }
 
-func generateID() string {
-	return uuid.New().String()
-}
-
-// DisconnectDB disconnects from MongoDB
+// DisconnectDB closes the MongoDB connection
 func DisconnectDB() {
 	if MongoDBClient != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		err := MongoDBClient.Disconnect(ctx)
-		if err != nil {
+		if err := MongoDBClient.Disconnect(ctx); err != nil {
 			log.Printf("Error disconnecting from MongoDB: %v", err)
 		} else {
-			fmt.Println("Disconnected from MongoDB successfully")
+			log.Println("Disconnected from MongoDB successfully.")
 		}
 	}
 }
 
-// GetCollection returns a MongoDB collection
-func GetCollection(database string, collection string) *mongo.Collection {
+// GetCollection returns a MongoDB collection handle
+func GetCollection(database, collection string) *mongo.Collection {
 	if MongoDBClient == nil {
-		log.Fatal("MongoDB client is not initialized. Call ConnectDB() before using this function.")
+		log.Fatal("MongoDB client is not initialized. Call ConnectDB() first.")
 	}
 	return MongoDBClient.Database(database).Collection(collection)
 }
 
-// CreateChat creates a new chat entry in the database
+// CreateChat creates a new chat document (using a string ID or letting Mongo handle _id)
 func CreateChat(chat *models.Chat) error {
-	collection := GetCollection("gridlyapp", "chats") // Ensure "gridlyapp" is your correct database name
+	col := GetCollection("gridlyapp", "chats")
 
-	// Set the chat ID if not already set
-	if chat.ID == "" {
-		chat.ID = generateID() // Implement a unique ID generator, e.g., UUID or ObjectID
-	}
-
-	// Set CreatedAt if not already set
+	// If CreatedAt not set, set it now
 	if chat.CreatedAt.IsZero() {
 		chat.CreatedAt = time.Now()
 	}
 
-	// Insert the chat document
-	_, err := collection.InsertOne(context.Background(), chat)
+	_, err := col.InsertOne(context.Background(), chat)
 	if err != nil {
 		log.Printf("Error inserting chat: %v", err)
 		return fmt.Errorf("failed to create chat: %v", err)
@@ -136,32 +116,31 @@ func CreateChat(chat *models.Chat) error {
 	return nil
 }
 
-// GetProductByID retrieves a product by its ID
+// GetProductByID loads a Product by its string-based ID (hex)
 func GetProductByID(productID string) (*models.Product, error) {
-	collection := GetCollection("gridlyapp", "products")
+	col := GetCollection("gridlyapp", "products")
 
 	objectID, err := primitive.ObjectIDFromHex(productID)
 	if err != nil {
-		log.Printf("Invalid product ID format %s: %v", productID, err)
+		log.Printf("Invalid product ID format '%s': %v", productID, err)
 		return nil, fmt.Errorf("invalid product ID format: %v", err)
 	}
 
 	var product models.Product
-	err = collection.FindOne(context.TODO(), bson.M{"_id": objectID}).Decode(&product)
-	if err != nil {
+	if err := col.FindOne(context.TODO(), bson.M{"_id": objectID}).Decode(&product); err != nil {
 		if err == mongo.ErrNoDocuments {
-			log.Printf("Product with ID %s not found", productID)
+			log.Printf("Product with ID '%s' not found", productID)
 			return nil, errors.New("product not found")
 		}
-		log.Printf("Error fetching product with ID %s: %v", productID, err)
+		log.Printf("Error fetching product with ID '%s': %v", productID, err)
 		return nil, fmt.Errorf("error fetching product: %v", err)
 	}
 	return &product, nil
 }
 
-// FindChatsByUser retrieves chats involving a specific user (either buyer or seller)
+// FindChatsByUser finds all chats matching buyerId or sellerId == userID (string)
 func FindChatsByUser(userID string) ([]models.Chat, error) {
-	collection := GetCollection("gridlyapp", "chats")
+	col := GetCollection("gridlyapp", "chats")
 
 	filter := bson.M{
 		"$or": []bson.M{
@@ -170,136 +149,130 @@ func FindChatsByUser(userID string) ([]models.Chat, error) {
 		},
 	}
 
-	cursor, err := collection.Find(context.Background(), filter)
+	cur, err := col.Find(context.Background(), filter)
 	if err != nil {
-		log.Printf("Error finding chats for user %s: %v", userID, err)
+		log.Printf("Error finding chats for user '%s': %v", userID, err)
 		return nil, fmt.Errorf("failed to find chats: %v", err)
 	}
-	defer cursor.Close(context.Background())
+	defer cur.Close(context.Background())
 
 	var chats []models.Chat
-	if err := cursor.All(context.Background(), &chats); err != nil {
-		log.Printf("Error decoding chats for user %s: %v", userID, err)
+	if err := cur.All(context.Background(), &chats); err != nil {
+		log.Printf("Error decoding chats for user '%s': %v", userID, err)
 		return nil, fmt.Errorf("failed to decode chats: %v", err)
 	}
 
 	return chats, nil
 }
 
+// AddMessageToChat pushes a new message into the messages array of the chat, using a string chatID
 func AddMessageToChat(chatID string, message models.Message) error {
-	collection := GetCollection("gridlyapp", "chats")
+	col := GetCollection("gridlyapp", "chats")
 
-	// Check if the chat exists
+	// Make sure chat exists
 	var chat models.Chat
-	err := collection.FindOne(context.Background(), bson.M{"_id": chatID}).Decode(&chat)
-	if err != nil {
+	if err := col.FindOne(context.Background(), bson.M{"_id": chatID}).Decode(&chat); err != nil {
 		if err == mongo.ErrNoDocuments {
-			log.Printf("Chat with ID %s not found", chatID)
-			return fmt.Errorf("chat not found")
+			log.Printf("Chat with ID '%s' not found", chatID)
+			return errors.New("chat not found")
 		}
-		log.Printf("Error finding chat: %v", err)
+		log.Printf("Error finding chat '%s': %v", chatID, err)
 		return fmt.Errorf("failed to find chat: %v", err)
 	}
 
-	// Push the new message into the chat
-	update := bson.M{
-		"$push": bson.M{
-			"messages": message,
-		},
-	}
-	_, err = collection.UpdateOne(context.Background(), bson.M{"_id": chatID}, update)
-	if err != nil {
-		log.Printf("Error adding message to chat %s: %v", chatID, err)
-		return fmt.Errorf("failed to add message to chat: %v", err)
+	// Push the message into the existing chat doc
+	update := bson.M{"$push": bson.M{"messages": message}}
+	if _, err := col.UpdateOne(context.Background(), bson.M{"_id": chatID}, update); err != nil {
+		log.Printf("Error adding message to chat '%s': %v", chatID, err)
+		return fmt.Errorf("failed to add message: %v", err)
 	}
 	return nil
 }
 
-// GetChatByProductID retrieves a chat by its associated product ID
+// GetChatByProductID loads the chat that references a specific product ID (string)
 func GetChatByProductID(productID string) (*models.Chat, error) {
-	collection := GetCollection("gridlyapp", "chats") // Ensure "gridlyapp" is your correct database name
+	col := GetCollection("gridlyapp", "chats")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	filter := bson.M{"productId": productID}
 	var chat models.Chat
-	err := collection.FindOne(ctx, filter).Decode(&chat)
-	if err != nil {
+	if err := col.FindOne(ctx, filter).Decode(&chat); err != nil {
 		if err == mongo.ErrNoDocuments {
-			log.Printf("Chat with productId %s not found", productID)
+			log.Printf("Chat with productId '%s' not found", productID)
 			return nil, errors.New("chat not found")
 		}
-		log.Printf("Error fetching chat by productId %s: %v", productID, err)
+		log.Printf("Error fetching chat by productId '%s': %v", productID, err)
 		return nil, fmt.Errorf("error fetching chat: %v", err)
 	}
-
 	return &chat, nil
 }
 
-// GetChatByID retrieves a chat by its unique ID
+// GetChatByID loads a single Chat doc by its _id (string)
 func GetChatByID(chatID string) (*models.Chat, error) {
-	collection := GetCollection("gridlyapp", "chats") // Ensure "gridlyapp" is your correct database name
+	col := GetCollection("gridlyapp", "chats")
 
 	var chat models.Chat
-	err := collection.FindOne(context.TODO(), bson.M{"_id": chatID}).Decode(&chat)
-	if err != nil {
+	if err := col.FindOne(context.TODO(), bson.M{"_id": chatID}).Decode(&chat); err != nil {
 		if err == mongo.ErrNoDocuments {
-			log.Printf("Chat with ID %s not found", chatID)
+			log.Printf("Chat with ID '%s' not found", chatID)
 			return nil, errors.New("chat not found")
 		}
-		log.Printf("Error fetching chat by ID %s: %v", chatID, err)
+		log.Printf("Error fetching chat by ID '%s': %v", chatID, err)
 		return nil, fmt.Errorf("error fetching chat: %v", err)
 	}
 	return &chat, nil
 }
 
-// GetUserByID retrieves a user by their ID from university_users or highschool_users
+// GetUserByID attempts to find a user in both university_users and highschool_users by string userID
 func GetUserByID(userID string) (*models.User, error) {
-	// Attempt to find the user in university_users collection
+	// Attempt in 'university_users' first
 	user, err := findUserInCollection("gridlyapp", "university_users", userID)
 	if err == nil {
 		return user, nil
 	}
 
-	// If not found, attempt to find the user in highschool_users collection
+	// If not found, attempt in 'highschool_users'
 	user, err = findUserInCollection("gridlyapp", "highschool_users", userID)
 	if err == nil {
 		return user, nil
 	}
 
-	// If not found in both collections, return an error
-	log.Printf("User with ID %s not found in any collection", userID)
-	return nil, errors.New("user not found in any collection")
+	log.Printf("User with ID '%s' not found in any user collection", userID)
+	return nil, errors.New("user not found")
 }
 
-func findUserInCollection(database string, collectionName string, userID string) (*models.User, error) {
-	collection := GetCollection(database, collectionName)
+// findUserInCollection is a helper that queries a single collection by string userID
+func findUserInCollection(dbName, collName, userID string) (*models.User, error) {
+	col := GetCollection(dbName, collName)
 
-	objectID, err := primitive.ObjectIDFromHex(userID)
+	// Convert the hex string to objectID for the user doc
+	objID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
-		log.Printf("Invalid user ID format %s: %v", userID, err)
+		log.Printf("Invalid userID format '%s': %v", userID, err)
 		return nil, fmt.Errorf("invalid user ID format: %v", err)
 	}
 
-	var user models.User
-	err = collection.FindOne(context.TODO(), bson.M{"_id": objectID}).Decode(&user)
-	if err != nil {
+	var usr models.User
+	if err := col.FindOne(context.Background(), bson.M{"_id": objID}).Decode(&usr); err != nil {
 		if err == mongo.ErrNoDocuments {
-			log.Printf("User with ID %s not found in %s collection", userID, collectionName)
+			// Not found in this particular collection
 			return nil, errors.New("user not found")
 		}
-		log.Printf("Error fetching user with ID %s from %s collection: %v", userID, collectionName, err)
 		return nil, fmt.Errorf("error fetching user: %v", err)
 	}
-	return &user, nil
+	return &usr, nil
 }
 
-// UpdateProductStatusAndBuyer sets the product's status and buyerId simultaneously
-func UpdateProductStatusAndBuyer(productID string, buyerID string, newStatus string) error {
+// UpdateProductStatusAndBuyer updates the product's 'status' and 'buyerId' fields, by string ID
+func UpdateProductStatusAndBuyer(productID, buyerID, newStatus string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
+	productCol := GetCollection("gridlyapp", "products")
+
+	// Convert strings to ObjectIDs
 	productObjID, err := primitive.ObjectIDFromHex(productID)
 	if err != nil {
 		return fmt.Errorf("invalid product ID format: %v", err)
@@ -309,45 +282,42 @@ func UpdateProductStatusAndBuyer(productID string, buyerID string, newStatus str
 		return fmt.Errorf("invalid buyer ID format: %v", err)
 	}
 
-	productCollection := GetCollection("gridlyapp", "products")
-
 	filter := bson.M{"_id": productObjID}
-	update := bson.M{
-		"$set": bson.M{
-			"status":  newStatus,
-			"buyerId": buyerObjID,
-		},
-	}
+	update := bson.M{"$set": bson.M{"status": newStatus, "buyerId": buyerObjID}}
 
-	result, err := productCollection.UpdateOne(ctx, filter, update)
+	res, err := productCol.UpdateOne(ctx, filter, update)
 	if err != nil {
 		log.Printf("Error updating product status/buyer: %v", err)
 		return err
 	}
-	if result.MatchedCount == 0 {
+	if res.MatchedCount == 0 {
 		return errors.New("product not found")
 	}
-
 	return nil
 }
 
-func GetProductsByStatus(status string, userID string) ([]models.Product, error) {
-	collection := GetCollection("gridlyapp", "products")
+// GetProductsByStatus returns all products with given status, excluding those owned by userID (string)
+func GetProductsByStatus(status, userID string) ([]models.Product, error) {
+	col := GetCollection("gridlyapp", "products")
 
+	// Convert userID from hex string to objectID
 	objectID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
-		log.Printf("Invalid user ID format %s: %v", userID, err)
+		log.Printf("Invalid user ID format '%s': %v", userID, err)
 		return nil, fmt.Errorf("invalid user ID format: %v", err)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	filter := bson.M{"status": status, "userId": bson.M{"$ne": objectID}}
+	filter := bson.M{
+		"status": status,
+		"userId": bson.M{"$ne": objectID},
+	}
 
-	cursor, err := collection.Find(ctx, filter)
+	cursor, err := col.Find(ctx, filter)
 	if err != nil {
-		log.Printf("Error fetching products with status %s: %v", status, err)
+		log.Printf("Error fetching products with status '%s': %v", status, err)
 		return nil, fmt.Errorf("error fetching products: %v", err)
 	}
 	defer cursor.Close(ctx)

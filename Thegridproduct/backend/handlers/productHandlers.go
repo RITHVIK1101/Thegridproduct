@@ -1,3 +1,5 @@
+// handlers/productshandlers.go
+
 package handlers
 
 import (
@@ -66,6 +68,10 @@ func AddProductHandler(w http.ResponseWriter, r *http.Request) {
 	product.PostedDate = time.Now()
 	product.Expired = false
 	product.LikeCount = 0 // Initialize LikeCount to 0
+
+	// **Initialize Workflow-Related Fields**
+	product.Status = "inshop" // Set default status to "inshop"
+	product.ChatCount = 0     // Initialize chatCount to 0
 
 	//----------------------------------------------------
 	// Map frontend availability to final stored field:
@@ -383,7 +389,6 @@ func UpdateProductHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Define a struct for the fields that can be updated
 	type ProductUpdate struct {
 		Title                  string   `json:"title,omitempty"`
 		Price                  *float64 `json:"price,omitempty"`
@@ -434,10 +439,11 @@ func UpdateProductHandler(w http.ResponseWriter, r *http.Request) {
 			WriteJSONError(w, "Rent Duration is required for Renting listing type", http.StatusBadRequest)
 			return
 		}
-		if updatedData.RentPrice == nil && existingProduct.RentPrice == 0 {
+		if updatedData.RentPrice == nil && (existingProduct.RentPrice == nil || *existingProduct.RentPrice == 0) {
 			WriteJSONError(w, "Rent Price is required for Renting listing type", http.StatusBadRequest)
 			return
 		}
+
 		// Availability must remain "In Campus Only"
 		if mappedAvailability != "" && mappedAvailability != "In Campus Only" {
 			WriteJSONError(w, "Availability must be 'In Campus Only' for Renting listing type", http.StatusBadRequest)
@@ -448,10 +454,11 @@ func UpdateProductHandler(w http.ResponseWriter, r *http.Request) {
 			WriteJSONError(w, "Rent Duration is required for Both listing type", http.StatusBadRequest)
 			return
 		}
-		if updatedData.RentPrice == nil && existingProduct.RentPrice == 0 {
-			WriteJSONError(w, "Rent Price is required for Both listing type", http.StatusBadRequest)
+		if updatedData.RentPrice == nil && (existingProduct.RentPrice == nil || *existingProduct.RentPrice == 0) {
+			WriteJSONError(w, "Rent Price is required for Renting listing type", http.StatusBadRequest)
 			return
 		}
+
 		// Availability must remain "On and Off Campus"
 		if mappedAvailability != "" && mappedAvailability != "On and Off Campus" {
 			WriteJSONError(w, "Availability must be 'On and Off Campus' for Both listing type", http.StatusBadRequest)
@@ -495,6 +502,10 @@ func UpdateProductHandler(w http.ResponseWriter, r *http.Request) {
 	if mappedAvailability != "" {
 		updateFields["availability"] = mappedAvailability
 	}
+
+	// **Ensure Workflow-Related Fields Cannot Be Updated Here**
+	// Prevent updating 'status' and 'chatCount' via this handler
+	// They are managed through the chat request workflow
 
 	// Check if there's any field to update
 	if len(updateFields) == 0 {
@@ -642,8 +653,9 @@ func AddMultipleProductsHandler(w http.ResponseWriter, r *http.Request) {
 		p.StudentType = studentType
 		p.PostedDate = time.Now()
 		p.Expired = false
-		p.Status = "inshop"
-		p.LikeCount = 0 // Initialize LikeCount to 0
+		p.Status = "inshop" // Set default status to "inshop"
+		p.ChatCount = 0     // Initialize chatCount to 0
+		p.LikeCount = 0     // Initialize LikeCount to 0
 
 		// Map availability from "In Campus"/"Out of Campus"/"Both" to final
 		switch p.Availability {
@@ -862,6 +874,7 @@ func ConfirmTransferHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// LikeProductHandler handles liking a product
 func LikeProductHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -912,8 +925,8 @@ func LikeProductHandler(w http.ResponseWriter, r *http.Request) {
 		var userCollection *mongo.Collection
 		var foundUser bool
 
-		for _, collectionName := range collections {
-			tempCollection := db.GetCollection("gridlyapp", collectionName)
+		for _, col := range collections {
+			tempCollection := db.GetCollection("gridlyapp", col)
 			err := tempCollection.FindOne(sc, bson.M{"_id": userObjID}).Decode(&user)
 			if err == nil {
 				foundUser = true
@@ -921,7 +934,7 @@ func LikeProductHandler(w http.ResponseWriter, r *http.Request) {
 				break
 			}
 			if err != mongo.ErrNoDocuments {
-				return nil, fmt.Errorf("error fetching user from %s: %v", collectionName, err)
+				return nil, fmt.Errorf("error fetching user from %s: %v", col, err)
 			}
 		}
 
@@ -951,17 +964,22 @@ func LikeProductHandler(w http.ResponseWriter, r *http.Request) {
 				"likeCount": 1,
 			},
 		}
-		result, err := productCollection.UpdateOne(sc, bson.M{"_id": productObjID}, updateProduct)
+		result, err := productCollection.UpdateOne(
+			sc,
+			bson.M{"_id": productObjID, "status": "inshop"}, // Ensure only 'inshop' products can be liked
+			updateProduct,
+		)
 		if err != nil {
 			return nil, fmt.Errorf("error incrementing likeCount: %v", err)
 		}
 		if result.MatchedCount == 0 {
-			return nil, fmt.Errorf("product not found")
+			return nil, fmt.Errorf("product not found or not in 'inshop' status")
 		}
 
 		return nil, nil
 	}
 
+	// Execute transaction
 	_, err = session.WithTransaction(ctx, callback)
 	if err != nil {
 		log.Printf("Transaction error: %v", err)
@@ -971,7 +989,7 @@ func LikeProductHandler(w http.ResponseWriter, r *http.Request) {
 		case strings.Contains(err.Error(), "user not found"):
 			WriteJSONError(w, "User not found", http.StatusNotFound)
 		case strings.Contains(err.Error(), "product not found"):
-			WriteJSONError(w, "Product not found", http.StatusNotFound)
+			WriteJSONError(w, "Product not found or not in 'inshop' status", http.StatusNotFound)
 		default:
 			WriteJSONError(w, "Failed to like product", http.StatusInternalServerError)
 		}
@@ -1035,8 +1053,8 @@ func UnlikeProductHandler(w http.ResponseWriter, r *http.Request) {
 		var userCollection *mongo.Collection
 		var foundUser bool
 
-		for _, collectionName := range collections {
-			tempCollection := db.GetCollection("gridlyapp", collectionName)
+		for _, col := range collections {
+			tempCollection := db.GetCollection("gridlyapp", col)
 			err := tempCollection.FindOne(sc, bson.M{"_id": userObjID}).Decode(&user)
 			if err == nil {
 				foundUser = true
@@ -1044,7 +1062,7 @@ func UnlikeProductHandler(w http.ResponseWriter, r *http.Request) {
 				break
 			}
 			if err != mongo.ErrNoDocuments {
-				return nil, fmt.Errorf("error fetching user from %s: %v", collectionName, err)
+				return nil, fmt.Errorf("error fetching user from %s: %v", col, err)
 			}
 		}
 
@@ -1101,15 +1119,14 @@ func UnlikeProductHandler(w http.ResponseWriter, r *http.Request) {
 	_, err = session.WithTransaction(ctx, callback)
 	if err != nil {
 		log.Printf("Transaction error: %v", err)
-		if strings.Contains(err.Error(), "not liked yet") {
+		switch {
+		case strings.Contains(err.Error(), "not liked yet"):
 			WriteJSONError(w, "Product not liked yet", http.StatusBadRequest)
-		} else if strings.Contains(err.Error(), "user not found") {
+		case strings.Contains(err.Error(), "user not found"):
 			WriteJSONError(w, "User not found", http.StatusNotFound)
-		} else if strings.Contains(err.Error(), "product not found") {
-			WriteJSONError(w, "Product not found", http.StatusNotFound)
-		} else if strings.Contains(err.Error(), "likeCount already zero") {
-			WriteJSONError(w, "Like count cannot be negative", http.StatusBadRequest)
-		} else {
+		case strings.Contains(err.Error(), "product not found"):
+			WriteJSONError(w, "Product not found or likeCount already zero", http.StatusNotFound)
+		default:
 			WriteJSONError(w, "Failed to unlike product", http.StatusInternalServerError)
 		}
 		return
@@ -1117,6 +1134,8 @@ func UnlikeProductHandler(w http.ResponseWriter, r *http.Request) {
 
 	json.NewEncoder(w).Encode(map[string]string{"message": "Product unliked successfully"})
 }
+
+// GetLikedProductsHandler retrieves all liked products for the authenticated user
 func GetLikedProductsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 

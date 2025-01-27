@@ -1,3 +1,5 @@
+// handlers/chat.go
+
 package handlers
 
 import (
@@ -13,34 +15,45 @@ import (
 	"github.com/gorilla/mux"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-// EnrichedChat represents the enriched chat data sent to the frontend
 type EnrichedChat struct {
-	ChatID          string `json:"chatID"`
-	ProductID       string `json:"productID"`
-	ProductTitle    string `json:"productTitle"`
-	User            User   `json:"user"`
-	LatestMessage   string `json:"latestMessage,omitempty"`
-	LatestTimestamp string `json:"latestTimestamp,omitempty"`
+	ChatID          string `json:"chatID"`                    // Fixed syntax
+	ProductID       string `json:"productID"`                 // Fixed syntax
+	ProductTitle    string `json:"productTitle"`              // Fixed syntax
+	User            User   `json:"user"`                      // Fixed syntax
+	LatestMessage   string `json:"latestMessage,omitempty"`   // Fixed syntax
+	LatestTimestamp string `json:"latestTimestamp,omitempty"` // Fixed syntax
 }
-
-// User represents a user object in the enriched chat
 type User struct {
-	FirstName string `json:"firstName"`
-	LastName  string `json:"lastName"`
+	FirstName string `json:"firstName"` // Fixed syntax
+	LastName  string `json:"lastName"`  // Fixed syntax
 }
 
-// GetChatHandler fetches chat details by product ID
+// AppError defines a custom application error with a message and HTTP status code
+type AppError struct {
+	Message    string
+	StatusCode int
+}
+
+func (e *AppError) Error() string {
+	return e.Message
+}
+
+// GetChatHandler fetches chat details by product ID (string-based)
 func GetChatHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	productID, ok := vars["productId"]
-	if !ok || productID == "" {
+	productIDStr, ok := vars["productId"]
+	if !ok || productIDStr == "" {
 		WriteJSONError(w, "Product ID is required", http.StatusBadRequest)
 		return
 	}
 
-	chat, err := db.GetChatByProductID(productID)
+	// No need to convert productIDStr to ObjectID here
+	// Fetch chat by productID string
+	chat, err := db.GetChatByProductID(productIDStr)
 	if err != nil {
 		WriteJSONError(w, "Chat not found", http.StatusNotFound)
 		return
@@ -49,56 +62,57 @@ func GetChatHandler(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, chat, http.StatusOK)
 }
 
-// GetChatsByUserHandler fetches all chats for a specific user
+// GetChatsByUserHandler fetches all chats for a specific user (string-based)
 func GetChatsByUserHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	userId := vars["userId"]
-	if userId == "" {
+	userIDStr := vars["userId"]
+	if userIDStr == "" {
 		WriteJSONError(w, "User ID is required", http.StatusBadRequest)
 		return
 	}
 
-	chats, err := db.FindChatsByUser(userId)
+	// No need to convert userIDStr to ObjectID here
+	// Fetch chats by userID string
+	chats, err := db.FindChatsByUser(userIDStr)
 	if err != nil {
 		WriteJSONError(w, "Failed to fetch chats", http.StatusInternalServerError)
 		return
 	}
 
-	// Enrich chat details with product name and user details
+	// Enrich chat details with product name and other user details
 	var enrichedChats []EnrichedChat
-	for _, chat := range chats {
+	for _, c := range chats {
 		// Fetch product details
-		product, err := db.GetProductByID(chat.ProductID)
+		product, err := db.GetProductByID(c.ProductID.Hex())
 		if err != nil {
-			log.Printf("Failed to fetch product details for productID %s: %v", chat.ProductID, err)
+			log.Printf("Failed to fetch product details for productID %s: %v", c.ProductID.Hex(), err)
 			continue
 		}
 
 		// Determine the other user ID
-		otherUserID := chat.BuyerID
-		if chat.BuyerID == userId {
-			otherUserID = chat.SellerID
+		var otherUserID primitive.ObjectID
+		if c.BuyerID.Hex() == userIDStr {
+			otherUserID = c.SellerID
+		} else {
+			otherUserID = c.BuyerID
 		}
 
 		// Fetch the other user's details
-		otherUser, err := db.GetUserByID(otherUserID)
+		otherUser, err := db.GetUserByID(otherUserID.Hex())
 		if err != nil {
-			log.Printf("Failed to fetch user details for userID %s: %v", otherUserID, err)
+			log.Printf("Failed to fetch user details for userID %s: %v", otherUserID.Hex(), err)
 			continue
 		}
 
-		// Get the latest message/timestamp
-		latestMessage, latestTimestamp := getLatestMessageAndTimestamp(chat.Messages)
+		// Get the latest message and timestamp
+		latestMessage, latestTimestamp := getLatestMessageAndTimestamp(c.Messages)
 
 		// Build enriched chat data
 		enrichedChat := EnrichedChat{
-			ChatID:       chat.ID,
-			ProductID:    product.ID.Hex(),
-			ProductTitle: product.Title,
-			User: User{
-				FirstName: otherUser.FirstName,
-				LastName:  otherUser.LastName,
-			},
+			ChatID:          c.ID.Hex(),
+			ProductID:       c.ProductID.Hex(),
+			ProductTitle:    product.Title,
+			User:            User{FirstName: otherUser.FirstName, LastName: otherUser.LastName},
 			LatestMessage:   latestMessage,
 			LatestTimestamp: latestTimestamp,
 		}
@@ -114,9 +128,18 @@ func GetChatsByUserHandler(w http.ResponseWriter, r *http.Request) {
 // AddMessageHandler adds a new message to a chat
 func AddMessageHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	chatID, ok := vars["chatId"]
-	if !ok || chatID == "" {
+	chatIDStr, ok := vars["chatId"]
+	if !ok || chatIDStr == "" {
 		WriteJSONError(w, "Chat ID is required", http.StatusBadRequest)
+		return
+	}
+
+	// No need to convert chatIDStr to ObjectID here
+	// Use chatIDStr directly
+	// Fetch chat to ensure it exists
+	_, err := db.GetChatByID(chatIDStr)
+	if err != nil {
+		WriteJSONError(w, "Chat not found", http.StatusNotFound)
 		return
 	}
 
@@ -126,6 +149,7 @@ func AddMessageHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Adjust the comparison since message.SenderID is a string
 	if message.SenderID == "" || message.Content == "" {
 		WriteJSONError(w, "Sender ID and content are required", http.StatusBadRequest)
 		return
@@ -133,7 +157,8 @@ func AddMessageHandler(w http.ResponseWriter, r *http.Request) {
 
 	message.Timestamp = time.Now()
 
-	err := db.AddMessageToChat(chatID, message)
+	// Add message to chat
+	err = db.AddMessageToChat(chatIDStr, message)
 	if err != nil {
 		WriteJSONError(w, "Failed to add message to chat", http.StatusInternalServerError)
 		return
@@ -145,13 +170,14 @@ func AddMessageHandler(w http.ResponseWriter, r *http.Request) {
 // GetMessagesHandler fetches all messages for a specific chat
 func GetMessagesHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	chatID, ok := vars["chatId"]
-	if !ok || chatID == "" {
+	chatIDStr, ok := vars["chatId"]
+	if !ok || chatIDStr == "" {
 		WriteJSONError(w, "Chat ID is required", http.StatusBadRequest)
 		return
 	}
 
-	chat, err := db.GetChatByID(chatID)
+	// Fetch chat by ID using string
+	chat, err := db.GetChatByID(chatIDStr)
 	if err != nil {
 		WriteJSONError(w, "Chat not found", http.StatusNotFound)
 		return
@@ -160,54 +186,126 @@ func GetMessagesHandler(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, chat.Messages, http.StatusOK)
 }
 
-// RequestChatHandler - when user clicks "Buy" (no payment). Creates a pending chat request.
+// RequestChatHandler - Creates a pending chat request when user clicks "Buy"
 func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	var req struct {
-		ProductID string `json:"productId"`
-		BuyerID   string `json:"buyerId"`
-		SellerID  string `json:"sellerId"`
+		ProductID string `json:"productId"` // Fixed syntax
+		BuyerID   string `json:"buyerId"`   // Fixed syntax
+		SellerID  string `json:"sellerId"`  // Fixed syntax
 	}
-
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request payload", http.StatusBadRequest)
+		WriteJSONError(w, "Invalid request payload", http.StatusBadRequest)
 		return
 	}
 
-	// Validate request fields
 	if req.ProductID == "" || req.BuyerID == "" || req.SellerID == "" {
-		http.Error(w, "All fields are required", http.StatusBadRequest)
+		WriteJSONError(w, "All fields are required", http.StatusBadRequest)
 		return
 	}
 
-	collection := db.GetCollection("gridlyapp", "chat_requests")
-
-	// Check if a pending request already exists
-	existingRequest := models.ChatRequest{}
-	err := collection.FindOne(context.TODO(), bson.M{
-		"productId": req.ProductID,
-		"buyerId":   req.BuyerID,
-		"status":    "pending",
-	}).Decode(&existingRequest)
-	if err == nil {
-		http.Error(w, "Chat request already pending", http.StatusConflict)
+	// Convert IDs from string to ObjectID
+	productObjectID, err := primitive.ObjectIDFromHex(req.ProductID)
+	if err != nil {
+		WriteJSONError(w, "Invalid Product ID format", http.StatusBadRequest)
 		return
 	}
 
-	// Create the new chat request with "pending" status
-	chatRequest := models.ChatRequest{
-		ID:        primitive.NewObjectID(),
-		ProductID: req.ProductID,
-		BuyerID:   req.BuyerID,
-		SellerID:  req.SellerID,
-		Status:    "pending",
-		CreatedAt: time.Now(),
+	buyerObjectID, err := primitive.ObjectIDFromHex(req.BuyerID)
+	if err != nil {
+		WriteJSONError(w, "Invalid Buyer ID format", http.StatusBadRequest)
+		return
 	}
 
-	_, insertErr := collection.InsertOne(context.TODO(), chatRequest)
-	if insertErr != nil {
-		http.Error(w, "Failed to create chat request", http.StatusInternalServerError)
+	sellerObjectID, err := primitive.ObjectIDFromHex(req.SellerID)
+	if err != nil {
+		WriteJSONError(w, "Invalid Seller ID format", http.StatusBadRequest)
+		return
+	}
+
+	session, err := db.MongoDBClient.StartSession()
+	if err != nil {
+		log.Printf("Failed to start MongoDB session: %v", err)
+		WriteJSONError(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	defer session.EndSession(context.Background())
+
+	callback := func(sessCtx mongo.SessionContext) (interface{}, error) {
+		chatRequests := db.GetCollection("gridlyapp", "chat_requests")
+		productsCol := db.GetCollection("gridlyapp", "products")
+
+		// 1) Check if product is "inshop"
+		var product models.Product
+		err := productsCol.FindOne(sessCtx, bson.M{"_id": productObjectID}).Decode(&product)
+		if err != nil {
+			if err == mongo.ErrNoDocuments {
+				return nil, &AppError{Message: "Product not found", StatusCode: http.StatusNotFound}
+			}
+			return nil, err
+		}
+		if product.Status != "inshop" {
+			return nil, &AppError{Message: "Product is not available for purchase", StatusCode: http.StatusBadRequest}
+		}
+
+		// 2) Check if a pending request already exists
+		existingRequest := models.ChatRequest{}
+		findErr := chatRequests.FindOne(sessCtx, bson.M{
+			"productId": productObjectID,
+			"buyerId":   buyerObjectID,
+			"status":    models.ChatRequestStatusPending,
+		}).Decode(&existingRequest)
+		if findErr == nil {
+			return nil, &AppError{Message: "Chat request already pending", StatusCode: http.StatusConflict}
+		} else if findErr != mongo.ErrNoDocuments {
+			return nil, findErr
+		}
+
+		// 3) Create new chat request
+		chatRequest := models.NewChatRequest(productObjectID, buyerObjectID, sellerObjectID)
+
+		_, err = chatRequests.InsertOne(sessCtx, chatRequest)
+		if err != nil {
+			return nil, err
+		}
+
+		// 4) Increment product's chatCount
+		update := bson.M{"$inc": bson.M{"chatCount": 1}}
+		var updatedProduct models.Product
+		err = productsCol.FindOneAndUpdate(
+			sessCtx,
+			bson.M{"_id": productObjectID},
+			update,
+			options.FindOneAndUpdate().SetReturnDocument(options.After),
+		).Decode(&updatedProduct)
+		if err != nil {
+			return nil, err
+		}
+
+		// 5) If chatCount >= 3, set product status to "talks"
+		if updatedProduct.ChatCount >= 3 && updatedProduct.Status != "talks" {
+			_, err = productsCol.UpdateOne(
+				sessCtx,
+				bson.M{"_id": productObjectID},
+				bson.M{"$set": bson.M{"status": "talks"}},
+			)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		return nil, nil
+	}
+
+	_, err = session.WithTransaction(context.Background(), callback)
+	if err != nil {
+		if appErr, ok := err.(*AppError); ok {
+			WriteJSONError(w, appErr.Message, appErr.StatusCode)
+			return
+		}
+		log.Printf("Transaction error in RequestChatHandler: %v", err)
+		WriteJSONError(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
@@ -222,32 +320,98 @@ func AcceptChatRequestHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	var req struct {
-		RequestID string `json:"requestId"`
+		RequestID string `json:"requestId"` // Fixed syntax
 	}
-
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request payload", http.StatusBadRequest)
+		WriteJSONError(w, "Invalid request payload", http.StatusBadRequest)
 		return
 	}
 
-	collection := db.GetCollection("gridlyapp", "chat_requests")
+	if req.RequestID == "" {
+		WriteJSONError(w, "Request ID is required", http.StatusBadRequest)
+		return
+	}
 
-	objectID, err := primitive.ObjectIDFromHex(req.RequestID)
+	session, err := db.MongoDBClient.StartSession()
 	if err != nil {
-		http.Error(w, "Invalid request ID format", http.StatusBadRequest)
+		log.Printf("Failed to start MongoDB session: %v", err)
+		WriteJSONError(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
+	defer session.EndSession(context.Background())
 
-	update := bson.M{"$set": bson.M{"status": "accepted"}}
-	_, updateErr := collection.UpdateOne(context.TODO(), bson.M{"_id": objectID}, update)
-	if updateErr != nil {
-		http.Error(w, "Failed to accept chat request", http.StatusInternalServerError)
+	callback := func(sessCtx mongo.SessionContext) (interface{}, error) {
+		chatRequests := db.GetCollection("gridlyapp", "chat_requests")
+		chatsCol := db.GetCollection("gridlyapp", "chats")
+
+		// Convert RequestID to ObjectID
+		requestObjID, err := primitive.ObjectIDFromHex(req.RequestID)
+		if err != nil {
+			return nil, &AppError{Message: "Invalid Request ID format", StatusCode: http.StatusBadRequest}
+		}
+
+		// Find the chat request
+		var chatReq models.ChatRequest
+		err = chatRequests.FindOne(sessCtx, bson.M{"_id": requestObjID}).Decode(&chatReq)
+		if err != nil {
+			if err == mongo.ErrNoDocuments {
+				return nil, &AppError{Message: "Chat request not found", StatusCode: http.StatusNotFound}
+			}
+			return nil, err
+		}
+
+		if chatReq.Status != models.ChatRequestStatusPending {
+			return nil, &AppError{Message: "Chat request is not pending", StatusCode: http.StatusBadRequest}
+		}
+
+		// Update chat request status to "accepted"
+		update := bson.M{"$set": bson.M{"status": models.ChatRequestStatusAccepted}}
+		_, err = chatRequests.UpdateOne(sessCtx, bson.M{"_id": requestObjID}, update)
+		if err != nil {
+			return nil, err
+		}
+
+		// Check if a chat already exists for this request
+		existingChat := models.Chat{}
+		err = chatsCol.FindOne(sessCtx, bson.M{
+			"productId": chatReq.ProductID,
+			"buyerId":   chatReq.BuyerID,
+			"sellerId":  chatReq.SellerID,
+		}).Decode(&existingChat)
+		if err == nil {
+			return nil, &AppError{Message: "Chat already exists for this request", StatusCode: http.StatusConflict}
+		} else if err != mongo.ErrNoDocuments {
+			return nil, err
+		}
+
+		// Create a new chat
+		newChat := models.NewChat(chatReq.ProductID, chatReq.BuyerID, chatReq.SellerID)
+
+		_, err = chatsCol.InsertOne(sessCtx, newChat)
+		if err != nil {
+			return nil, err
+		}
+
+		// Optionally, notify the buyer that their request was accepted
+		// Implement notification logic here (e.g., via Ably, email, push notification)
+
+		return nil, nil
+	}
+
+	_, err = session.WithTransaction(context.Background(), callback)
+	if err != nil {
+		if appErr, ok := err.(*AppError); ok {
+			WriteJSONError(w, appErr.Message, appErr.StatusCode)
+			return
+		}
+		log.Printf("Transaction error in AcceptChatRequestHandler: %v", err)
+		WriteJSONError(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{
-		"message": "Chat request accepted",
+		"message": "Chat request accepted and chat room created successfully",
 	})
 }
 
@@ -256,36 +420,91 @@ func RejectChatRequestHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	var req struct {
-		RequestID string `json:"requestId"`
+		RequestID string `json:"requestId"` // Fixed syntax
 	}
-
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request payload", http.StatusBadRequest)
+		WriteJSONError(w, "Invalid request payload", http.StatusBadRequest)
 		return
 	}
 
-	collection := db.GetCollection("gridlyapp", "chat_requests")
+	if req.RequestID == "" {
+		WriteJSONError(w, "Request ID is required", http.StatusBadRequest)
+		return
+	}
 
-	objectID, err := primitive.ObjectIDFromHex(req.RequestID)
+	session, err := db.MongoDBClient.StartSession()
 	if err != nil {
-		http.Error(w, "Invalid request ID format", http.StatusBadRequest)
+		log.Printf("Failed to start MongoDB session: %v", err)
+		WriteJSONError(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
+	defer session.EndSession(context.Background())
 
-	update := bson.M{"$set": bson.M{"status": "rejected"}}
-	_, updateErr := collection.UpdateOne(context.TODO(), bson.M{"_id": objectID}, update)
-	if updateErr != nil {
-		http.Error(w, "Failed to reject chat request", http.StatusInternalServerError)
+	callback := func(sessCtx mongo.SessionContext) (interface{}, error) {
+		chatRequests := db.GetCollection("gridlyapp", "chat_requests")
+		productsCol := db.GetCollection("gridlyapp", "products")
+
+		// Convert RequestID to ObjectID
+		requestObjID, err := primitive.ObjectIDFromHex(req.RequestID)
+		if err != nil {
+			return nil, &AppError{Message: "Invalid Request ID format", StatusCode: http.StatusBadRequest}
+		}
+
+		// Find the chat request
+		var chatReq models.ChatRequest
+		err = chatRequests.FindOne(sessCtx, bson.M{"_id": requestObjID}).Decode(&chatReq)
+		if err != nil {
+			if err == mongo.ErrNoDocuments {
+				return nil, &AppError{Message: "Chat request not found", StatusCode: http.StatusNotFound}
+			}
+			return nil, err
+		}
+
+		if chatReq.Status != models.ChatRequestStatusPending {
+			return nil, &AppError{Message: "Chat request is not pending", StatusCode: http.StatusBadRequest}
+		}
+
+		// Update chat request status to "rejected"
+		update := bson.M{"$set": bson.M{"status": models.ChatRequestStatusRejected}}
+		_, err = chatRequests.UpdateOne(sessCtx, bson.M{"_id": requestObjID}, update)
+		if err != nil {
+			return nil, err
+		}
+
+		// Decrement product's chatCount
+		_, err = productsCol.UpdateOne(
+			sessCtx,
+			bson.M{"_id": chatReq.ProductID},
+			bson.M{"$inc": bson.M{"chatCount": -1}},
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		// Optionally, notify the buyer that their request was rejected
+		// Implement notification logic here (e.g., via Ably, email, push notification)
+
+		return nil, nil
+	}
+
+	_, err = session.WithTransaction(context.Background(), callback)
+	if err != nil {
+		if appErr, ok := err.(*AppError); ok {
+			WriteJSONError(w, appErr.Message, appErr.StatusCode)
+			return
+		}
+		log.Printf("Transaction error in RejectChatRequestHandler: %v", err)
+		WriteJSONError(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{
-		"message": "Chat request rejected",
+		"message": "Chat request rejected successfully",
 	})
 }
 
-// Helper function to retrieve the latest message in a chat
+// getLatestMessageAndTimestamp returns the last message + timestamp in the chat
 func getLatestMessageAndTimestamp(messages []models.Message) (string, string) {
 	if len(messages) == 0 {
 		return "", ""
@@ -293,4 +512,53 @@ func getLatestMessageAndTimestamp(messages []models.Message) (string, string) {
 	latestMsg := messages[len(messages)-1].Content
 	latestTime := messages[len(messages)-1].Timestamp.Format(time.RFC3339)
 	return latestMsg, latestTime
+}
+func GetChatRequestsHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	vars := mux.Vars(r)
+	userIDStr := vars["userId"]
+	if userIDStr == "" {
+		WriteJSONError(w, "User ID is required", http.StatusBadRequest)
+		return
+	}
+
+	// Convert userID to ObjectID
+	userObjID, err := primitive.ObjectIDFromHex(userIDStr)
+	if err != nil {
+		WriteJSONError(w, "Invalid user ID format", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	chatRequestsCol := db.GetCollection("gridlyapp", "chat_requests")
+
+	// Find chat requests where the user is either the buyer or seller
+	filter := bson.M{
+		"$or": []bson.M{
+			{"buyerId": userObjID},
+			{"sellerId": userObjID},
+		},
+	}
+
+	cursor, err := chatRequestsCol.Find(ctx, filter)
+	if err != nil {
+		log.Printf("Error fetching chat requests for user %s: %v", userIDStr, err)
+		WriteJSONError(w, "Error fetching chat requests", http.StatusInternalServerError)
+		return
+	}
+	defer cursor.Close(ctx)
+
+	var chatRequests []models.ChatRequest
+	if err := cursor.All(ctx, &chatRequests); err != nil {
+		WriteJSONError(w, "Failed to parse chat requests", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"chatRequests": chatRequests,
+	})
 }

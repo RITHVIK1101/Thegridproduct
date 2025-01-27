@@ -9,7 +9,6 @@ require (
 	github.com/gorilla/mux v1.8.1
 	github.com/joho/godotenv v1.5.1
 	github.com/stripe/stripe-go/v72 v72.122.0
-	github.com/stripe/stripe-go/v74 v74.30.0
 	go.mongodb.org/mongo-driver v1.17.1
 	golang.org/x/crypto v0.29.0
 )

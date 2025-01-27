@@ -1,5 +1,8 @@
-// handlers/stripe_handler.go
 package handlers
+
+/*
+// handlers/stripe_handler.go
+
 
 import (
 	"encoding/json"
@@ -277,3 +280,4 @@ func ChargeSavedPaymentMethodHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 
 }
+*/
