@@ -115,6 +115,10 @@ func main() {
 	protected.HandleFunc("/chats/{chatId}/messages", handlers.AddMessageHandler).Methods("POST")
 	protected.HandleFunc("/chats/{chatId}/messages", handlers.GetMessagesHandler).Methods("GET")
 
+	protected.HandleFunc("/requests", handlers.CreateProductRequestHandler).Methods("POST")
+	protected.HandleFunc("/requests/my", handlers.GetMyProductRequestsHandler).Methods("GET")
+	protected.HandleFunc("/requests/all", handlers.GetAllOtherProductRequestsHandler).Methods("GET")
+
 	// Real-time Messaging Route using Ably
 	protected.HandleFunc("/messages", handlers.PublishMessageHandler).Methods("POST")
 
