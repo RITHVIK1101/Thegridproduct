@@ -32,6 +32,7 @@ import DropDownPicker from "react-native-dropdown-picker";
 import { collegeList, College } from "./data/collegeList";
 import { highSchoolList, HighSchool } from "./data/highschoolList";
 import { Ionicons } from "@expo/vector-icons";
+console.log("Backend URL:", NGROK_URL);
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, "Login">;
 

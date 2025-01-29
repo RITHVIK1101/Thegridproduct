@@ -106,7 +106,7 @@ func main() {
 	protected.HandleFunc("/chat/request", handlers.RequestChatHandler).Methods("POST")
 	protected.HandleFunc("/chat/accept", handlers.AcceptChatRequestHandler).Methods("POST")
 	protected.HandleFunc("/chat/reject", handlers.RejectChatRequestHandler).Methods("POST")
-	protected.HandleFunc("/chat/requests/{userId}", handlers.GetChatRequestsHandler).Methods("GET")
+	protected.HandleFunc("/chat/requests", handlers.GetChatRequestsHandler).Methods("GET")
 
 	// User & Chat
 	protected.HandleFunc("/users/{id}", handlers.GetUserHandler).Methods("GET")

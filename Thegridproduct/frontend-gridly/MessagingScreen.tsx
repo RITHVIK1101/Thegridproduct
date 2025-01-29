@@ -19,7 +19,7 @@ import {
 import Ionicons from "react-native-vector-icons/Ionicons";
 import BottomNavBar from "./components/BottomNavbar";
 import { fetchConversations, postMessage, getMessages } from "./api";
-import { ABLY_API_KEY, CLOUDINARY_URL, UPLOAD_PRESET } from "@env";
+import { ABLY_API_KEY, CLOUDINARY_URL, UPLOAD_PRESET, NGROK_URL } from "@env";
 import { Conversation, Message } from "./types";
 import { UserContext } from "./UserContext";
 import Ably from "ably";
@@ -31,9 +31,17 @@ import axios from "axios";
 
 type Chat = Conversation;
 
+// Define the Request type
+type Request = {
+  id: string;
+  productName: string;
+  description: string;
+  createdAt: string;
+  // Add other fields as needed
+};
+
 type MessagingScreenRouteProp = RouteProp<RootStackParamList, "Messaging">;
 type MessagingScreenProps = { route: MessagingScreenRouteProp };
-type NavigationProp = StackNavigationProp<RootStackParamList, "Messaging">;
 
 const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
   const [chats, setChats] = useState<Chat[]>([]);
@@ -59,6 +67,13 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
 
   const navigation = useNavigation<NavigationProp>();
   const { chatId: routeChatId } = route.params || {};
+
+  // Requests Modal State
+  const [isRequestsModalVisible, setRequestsModalVisible] =
+    useState<boolean>(false);
+  const [requests, setRequests] = useState<Request[]>([]);
+  const [loadingRequests, setLoadingRequests] = useState<boolean>(false);
+  const [errorRequests, setErrorRequests] = useState<string | null>(null);
 
   const applyFilter = (
     chatsToFilter: Chat[],
@@ -407,6 +422,41 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }
   };
 
+  // Function to fetch requests
+  const fetchUserRequests = async () => {
+    if (!userId || !token) {
+      setErrorRequests("User not authenticated.");
+      setLoadingRequests(false);
+      return;
+    }
+
+    setLoadingRequests(true);
+    setErrorRequests(null);
+
+    try {
+      const response = await axios.get(`${NGROK_URL}/chat/requests`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (response.status === 200) {
+        setRequests(response.data as Request[]);
+      } else {
+        setErrorRequests("Failed to fetch requests.");
+      }
+    } catch (error: any) {
+      console.error("Error fetching requests:", error);
+      setErrorRequests(
+        error.response?.data?.message ||
+          "An error occurred while fetching requests."
+      );
+    } finally {
+      setLoadingRequests(false);
+    }
+  };
+
   const renderChat = ({ item }: { item: Chat }) => {
     if (!item.user) {
       console.warn(`Chat with chatID ${item.chatID} is missing user data.`);
@@ -562,19 +612,95 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }
   };
 
+  // Render Requests Modal
+  const renderRequestsModal = () => (
+    <Modal
+      visible={isRequestsModalVisible}
+      animationType="slide"
+      transparent={false}
+      onRequestClose={() => setRequestsModalVisible(false)}
+    >
+      <SafeAreaView style={[styles.modalSafeArea, { backgroundColor: "#000" }]}>
+        <View style={styles.requestsHeader}>
+          <Pressable
+            onPress={() => setRequestsModalVisible(false)}
+            style={styles.backButton}
+            accessibilityLabel="Close Requests"
+          >
+            <Ionicons name="arrow-back" size={24} color="#BB86FC" />
+          </Pressable>
+          <Text style={styles.requestsHeaderTitle}>Your Requests</Text>
+        </View>
+        {loadingRequests ? (
+          <ActivityIndicator
+            size="large"
+            color="#BB86FC"
+            style={{ marginTop: 20 }}
+          />
+        ) : errorRequests ? (
+          <View style={styles.requestsErrorContainer}>
+            <Text style={styles.requestsErrorText}>{errorRequests}</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={requests}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <View style={styles.requestItem}>
+                <Text style={styles.requestProductName}>
+                  {item.productName}
+                </Text>
+                <Text style={styles.requestDescription}>
+                  {item.description}
+                </Text>
+                <Text style={styles.requestDate}>
+                  Requested on: {new Date(item.createdAt).toLocaleDateString()}
+                </Text>
+              </View>
+            )}
+            ListEmptyComponent={
+              <View style={styles.requestsEmptyContainer}>
+                <Text style={styles.requestsEmptyText}>
+                  You have no requests.
+                </Text>
+              </View>
+            }
+            contentContainerStyle={
+              requests.length === 0 && styles.flatListContainer
+            }
+            ItemSeparatorComponent={() => <View style={styles.separatorLine} />}
+          />
+        )}
+      </SafeAreaView>
+    </Modal>
+  );
+
   return (
     <View style={styles.container}>
       <SafeAreaView style={{ flex: 1 }}>
         {/* Header Row with Title and Filter */}
         <View style={styles.headerRow}>
           <Text style={styles.mainHeader}>{currentHeaderTitle}</Text>
-          <Pressable
-            style={styles.filterLabelButton}
-            onPress={handleFilterPillPress}
-            accessibilityLabel="Filter Options"
-          >
-            <Text style={styles.filterLabelText}>{currentFilterLabel}</Text>
-          </Pressable>
+          <View style={styles.headerButtons}>
+            <Pressable
+              style={styles.requestsButton}
+              onPress={() => {
+                setRequestsModalVisible(true);
+                fetchUserRequests();
+              }}
+              accessibilityLabel="View Requests"
+            >
+              <Ionicons name="list-circle-outline" size={24} color="#BB86FC" />
+              <Text style={styles.requestsButtonText}>Requests</Text>
+            </Pressable>
+            <Pressable
+              style={styles.filterLabelButton}
+              onPress={handleFilterPillPress}
+              accessibilityLabel="Filter Options"
+            >
+              <Text style={styles.filterLabelText}>{currentFilterLabel}</Text>
+            </Pressable>
+          </View>
         </View>
 
         {/* Filter Modal */}
@@ -613,6 +739,9 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
             </View>
           </View>
         </Modal>
+
+        {/* Requests Modal */}
+        {renderRequestsModal()}
 
         {/* Purchases Section (only in all or products) */}
         {(filter === "all" || filter === "products") &&
@@ -854,11 +983,28 @@ const styles = StyleSheet.create({
     color: "#BB86FC",
     fontFamily: "HelveticaNeue-Bold",
   },
+  headerButtons: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  requestsButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginRight: 15,
+  },
+  requestsButtonText: {
+    color: "#BB86FC",
+    fontSize: 14,
+    fontFamily: "HelveticaNeue-Medium",
+    marginLeft: 5,
+  },
   filterLabelButton: {
     paddingHorizontal: 10,
     paddingVertical: 5,
     backgroundColor: "#1E1E1E",
     borderRadius: 20,
+    flexDirection: "row",
+    alignItems: "center",
   },
   filterLabelText: {
     color: "#BB86FC",
@@ -1196,5 +1342,69 @@ const styles = StyleSheet.create({
   },
   addImageButton: {
     marginLeft: "auto",
+  },
+  // Styles for Requests Modal
+  requestsHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 15,
+    backgroundColor: "#1E1E1E",
+    borderBottomWidth: 1,
+    borderBottomColor: "#333333",
+  },
+  requestsHeaderTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#BB86FC",
+    fontFamily: "HelveticaNeue-Bold",
+    marginLeft: 10,
+  },
+  requestItem: {
+    backgroundColor: "#1E1E1E",
+    padding: 15,
+    borderRadius: 10,
+    marginHorizontal: 20,
+    marginVertical: 5,
+  },
+  requestProductName: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#BB86FC",
+    fontFamily: "HelveticaNeue-Bold",
+    marginBottom: 5,
+  },
+  requestDescription: {
+    fontSize: 14,
+    color: "#FFFFFF",
+    fontFamily: "HelveticaNeue",
+    marginBottom: 5,
+  },
+  requestDate: {
+    fontSize: 12,
+    color: "#AAAAAA",
+    fontFamily: "HelveticaNeue",
+  },
+  requestsEmptyContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 50,
+  },
+  requestsEmptyText: {
+    fontSize: 16,
+    color: "#888888",
+    fontFamily: "HelveticaNeue",
+  },
+  requestsErrorContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 20,
+  },
+  requestsErrorText: {
+    color: "#FF3B30",
+    fontSize: 14,
+    textAlign: "center",
+    fontFamily: "HelveticaNeue",
   },
 });

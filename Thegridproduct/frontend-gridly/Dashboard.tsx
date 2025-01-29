@@ -1149,7 +1149,8 @@ const Dashboard: React.FC<DashboardProps> = () => {
                     <TouchableOpacity
                       style={[
                         styles.filterModalOption,
-                        selectedCategory === item && styles.filterModalOptionSelected,
+                        selectedCategory === item &&
+                          styles.filterModalOptionSelected,
                       ]}
                       onPress={() => setSelectedCategory(item)}
                       accessibilityLabel={`Filter by ${item}`}
@@ -1161,7 +1162,9 @@ const Dashboard: React.FC<DashboardProps> = () => {
                             : "ellipse-outline"
                         }
                         size={20}
-                        color={selectedCategory === item ? "#BB86FC" : "#FFFFFF"}
+                        color={
+                          selectedCategory === item ? "#BB86FC" : "#FFFFFF"
+                        }
                         style={{ marginRight: 10 }}
                       />
                       <Text
@@ -1187,7 +1190,8 @@ const Dashboard: React.FC<DashboardProps> = () => {
                     <TouchableOpacity
                       style={[
                         styles.filterModalOption,
-                        campusMode === item.value && styles.filterModalOptionSelected,
+                        campusMode === item.value &&
+                          styles.filterModalOptionSelected,
                       ]}
                       onPress={() => setCampusMode(item.value)}
                       accessibilityLabel={`Filter by ${item.label}`}

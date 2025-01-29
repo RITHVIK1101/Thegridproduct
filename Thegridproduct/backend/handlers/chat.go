@@ -516,15 +516,15 @@ func getLatestMessageAndTimestamp(messages []models.Message) (string, string) {
 func GetChatRequestsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	vars := mux.Vars(r)
-	userIDStr := vars["userId"]
-	if userIDStr == "" {
-		WriteJSONError(w, "User ID is required", http.StatusBadRequest)
+	// Extract userID from the request context
+	userID, ok := r.Context().Value(userIDKey).(string)
+	if !ok || userID == "" {
+		WriteJSONError(w, "Unauthorized: UserID not found in token", http.StatusUnauthorized)
 		return
 	}
 
 	// Convert userID to ObjectID
-	userObjID, err := primitive.ObjectIDFromHex(userIDStr)
+	userObjID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
 		WriteJSONError(w, "Invalid user ID format", http.StatusBadRequest)
 		return
@@ -545,7 +545,7 @@ func GetChatRequestsHandler(w http.ResponseWriter, r *http.Request) {
 
 	cursor, err := chatRequestsCol.Find(ctx, filter)
 	if err != nil {
-		log.Printf("Error fetching chat requests for user %s: %v", userIDStr, err)
+		log.Printf("Error fetching chat requests for user %s: %v", userID, err)
 		WriteJSONError(w, "Error fetching chat requests", http.StatusInternalServerError)
 		return
 	}
