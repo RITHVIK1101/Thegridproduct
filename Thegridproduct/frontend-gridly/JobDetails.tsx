@@ -11,14 +11,15 @@ import {
   TouchableOpacity,
   Alert,
   Dimensions,
+  FlatList,
 } from "react-native";
 import { RouteProp, useRoute, useNavigation } from "@react-navigation/native";
-import { RootStackParamList } from "./navigationTypes";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { UserContext } from "./UserContext";
 import { NGROK_URL } from "@env";
 import { LinearGradient } from "expo-linear-gradient";
 import { StackNavigationProp } from "@react-navigation/stack";
+import { RootStackParamList } from "./navigationTypes";
 
 type JobDetailRouteProp = RouteProp<RootStackParamList, "JobDetail">;
 type JobDetailNavigationProp = StackNavigationProp<
@@ -33,12 +34,11 @@ interface JobDetail {
   category: string;
   price: string;
   userId: string;
-  images: string[]; // Changed from coverImage
+  images: string[]; // Array of image URLs
   deliveryTime: string;
-  studentType: string;
   university: string;
-  status: string;
-  // Add other fields as necessary
+  postedDate: string; // Date Posted
+  // Removed studentType and status
 }
 
 const { width } = Dimensions.get("window");
@@ -73,18 +73,31 @@ const JobDetails: React.FC = () => {
 
       const data = await response.json();
 
-      // Remove the .gig check since the API returns the gig directly
       if (!data) {
         throw new Error("Job detail not found.");
       }
 
+      // Ensure `images` is always an array
+      if (!Array.isArray(data.images)) {
+        data.images = [];
+      }
+
+      // Ensure `postedDate` is present and formatted
+      if (data.postedDate) {
+        const date = new Date(data.postedDate);
+        data.postedDate = date.toLocaleDateString(undefined, {
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        });
+      } else {
+        data.postedDate = "N/A";
+      }
+
       setJobDetail(data);
     } catch (error) {
-      console.error(error);
-      Alert.alert(
-        "Error",
-        "Unable to fetch job details. Please try again later."
-      );
+      console.error("Error fetching job details:", error);
+      Alert.alert("Error", "Unable to fetch job details. Please try again later.");
       navigation.goBack();
     } finally {
       setLoading(false);
@@ -94,11 +107,7 @@ const JobDetails: React.FC = () => {
   const handleMessagePress = () => {
     if (!jobDetail) return;
 
-    // Here you would implement logic to either create a new chat or get existing chatId
-    // For simplicity, we'll assume chatId is a combination of userId and jobDetail.userId
-
     const chatId = `chat_${userId}_${jobDetail.userId}`;
-
     navigation.navigate("Messaging", { chatId, userId: jobDetail.userId });
   };
 
@@ -110,18 +119,42 @@ const JobDetails: React.FC = () => {
     );
   }
 
+  // Reusable component to display label & value
+  const DetailItem: React.FC<{ label: string; value: string }> = ({
+    label,
+    value,
+  }) => (
+    <View style={styles.detailItem}>
+      <Text style={styles.detailLabel}>{label}:</Text>
+      <Text style={styles.detailValue}>{value}</Text>
+    </View>
+  );
+
   return (
     <ScrollView style={styles.container}>
-      {/* Cover Image */}
-      {jobDetail.images && jobDetail.images.length > 0 ? (
-        <Image
-          source={{ uri: jobDetail.images[0] }} // Use first image as cover
-          style={styles.coverImage}
-          resizeMode="cover"
-          onError={(e) => {
-            console.log(
-              `Failed to load image for job ID ${jobDetail.id}:`,
-              e.nativeEvent.error
+      {/* Image Gallery */}
+      {jobDetail.images.length > 0 ? (
+        <FlatList
+          data={jobDetail.images.slice(0, 5)} // Show up to 5 images
+          horizontal
+          keyExtractor={(item, index) => `${jobDetail.id}_image_${index}`}
+          showsHorizontalScrollIndicator={false}
+          style={styles.imageGallery}
+          renderItem={({ item }) => {
+            // Convert relative URLs to absolute if necessary
+            const imageUrl = item.startsWith("http")
+              ? item
+              : `${NGROK_URL}/${item}`;
+
+            return (
+              <Image
+                source={{ uri: imageUrl }}
+                style={styles.galleryImage}
+                resizeMode="cover"
+                onError={(e) => {
+                  console.log("Error loading image:", e.nativeEvent.error);
+                }}
+              />
             );
           }}
         />
@@ -131,9 +164,12 @@ const JobDetails: React.FC = () => {
         </View>
       )}
 
-      {/* Job Details */}
+      {/* Details Container */}
       <View style={styles.detailsContainer}>
+        {/* Title */}
         <Text style={styles.title}>{jobDetail.title}</Text>
+
+        {/* Category/Type */}
         <View style={styles.categoryRow}>
           <Ionicons
             name={categoryIcons[jobDetail.category] || "grid-outline"}
@@ -143,15 +179,33 @@ const JobDetails: React.FC = () => {
           />
           <Text style={styles.category}>{jobDetail.category}</Text>
         </View>
-        <Text style={styles.price}>
+
+        {/* Date Posted */}
+        <Text style={styles.datePosted}>Posted on {jobDetail.postedDate}</Text>
+
+        {/* Price */}
+        <Text
+          style={[
+            styles.price,
+            jobDetail.price === "Open to Communication" && styles.priceOpen,
+          ]}
+        >
           {jobDetail.price === "Open to Communication"
             ? jobDetail.price
             : `$${parseFloat(jobDetail.price).toFixed(2)}`}
         </Text>
+
+        {/* Description */}
         <Text style={styles.description}>{jobDetail.description}</Text>
 
-        {/* Add more details as needed, e.g., seller info, ratings, etc. */}
+        {/* Additional Details */}
+        <View style={styles.additionalDetails}>
+          <DetailItem label="Delivery Time" value={jobDetail.deliveryTime} />
+          <DetailItem label="University" value={jobDetail.university} />
+          {/* Removed studentType and status */}
+        </View>
 
+        {/* Message Button */}
         <TouchableOpacity
           style={styles.messageButton}
           onPress={handleMessagePress}
@@ -197,9 +251,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#000",
   },
-  coverImage: {
+  imageGallery: {
     width: "100%",
     height: 200,
+  },
+  galleryImage: {
+    width: width * 0.8,
+    height: 200,
+    marginRight: 10,
+    borderRadius: 10,
   },
   coverPlaceholder: {
     width: "100%",
@@ -213,19 +273,24 @@ const styles = StyleSheet.create({
   },
   title: {
     color: "#fff",
-    fontSize: 24,
-    fontWeight: "700",
+    fontSize: 26,
+    fontWeight: "800",
     marginBottom: 10,
   },
   categoryRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 10,
+    marginBottom: 5,
   },
   category: {
     color: "#BB86FC",
-    fontSize: 16,
-    fontWeight: "600",
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  datePosted: {
+    color: "#AAAAAA",
+    fontSize: 14,
+    marginBottom: 10,
   },
   price: {
     color: "#fff",
@@ -233,11 +298,33 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     marginBottom: 15,
   },
+  priceOpen: {
+    fontWeight: "400", // Normal weight for "Open to Communication"
+  },
   description: {
     color: "#ccc",
     fontSize: 16,
     lineHeight: 22,
     marginBottom: 20,
+  },
+  additionalDetails: {
+    marginBottom: 20,
+  },
+  detailItem: {
+    flexDirection: "row",
+    marginBottom: 10,
+  },
+  detailLabel: {
+    color: "#BB86FC",
+    fontSize: 16,
+    fontWeight: "600",
+    width: 120, // Adjust if needed
+  },
+  detailValue: {
+    color: "#fff",
+    fontSize: 16,
+    flex: 1,
+    flexWrap: "wrap",
   },
   messageButton: {
     alignSelf: "center",
