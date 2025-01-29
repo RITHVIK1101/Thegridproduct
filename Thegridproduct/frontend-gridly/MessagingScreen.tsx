@@ -19,7 +19,7 @@ import {
 import Ionicons from "react-native-vector-icons/Ionicons";
 import BottomNavBar from "./components/BottomNavbar";
 import { fetchConversations, postMessage, getMessages } from "./api";
-import { ABLY_API_KEY, CLOUDINARY_URL, UPLOAD_PRESET, NGROK_URL } from "@env";
+import { ABLY_API_KEY, CLOUDINARY_URL, UPLOAD_PRESET } from "@env";
 import { Conversation, Message } from "./types";
 import { UserContext } from "./UserContext";
 import Ably from "ably";
@@ -34,8 +34,10 @@ type Chat = Conversation;
 // Define the Request type
 type Request = {
   id: string;
-  productName: string;
-  description: string;
+  productId: string;
+  buyerId: string;
+  sellerId: string;
+  status: string;
   createdAt: string;
   // Add other fields as needed
 };
@@ -65,7 +67,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
   const channelRef = useRef<Ably.RealtimeChannel | null>(null);
   const flatListRef = useRef<FlatList<Message> | null>(null);
 
-  const navigation = useNavigation<NavigationProp>();
+  const navigation = useNavigation();
   const { chatId: routeChatId } = route.params || {};
 
   // Requests Modal State
@@ -74,6 +76,9 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
   const [requests, setRequests] = useState<Request[]>([]);
   const [loadingRequests, setLoadingRequests] = useState<boolean>(false);
   const [errorRequests, setErrorRequests] = useState<string | null>(null);
+  const [processingRequestId, setProcessingRequestId] = useState<string | null>(
+    null
+  );
 
   const applyFilter = (
     chatsToFilter: Chat[],
@@ -434,15 +439,18 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     setErrorRequests(null);
 
     try {
-      const response = await axios.get(`${NGROK_URL}/chat/requests`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
+      const response = await axios.get(
+        "https://thegridproduct-production.up.railway.app/chat/requests",
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
 
       if (response.status === 200) {
-        setRequests(response.data as Request[]);
+        setRequests(response.data.chatRequests as Request[]);
       } else {
         setErrorRequests("Failed to fetch requests.");
       }
@@ -454,6 +462,74 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       );
     } finally {
       setLoadingRequests(false);
+    }
+  };
+
+  // Function to accept a request
+  const acceptRequest = async (requestId: string) => {
+    setProcessingRequestId(requestId);
+    try {
+      const response = await axios.post(
+        "https://thegridproduct-production.up.railway.app/chat/accept",
+        { requestId },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (response.status === 200) {
+        Alert.alert("Success", "Chat request accepted.");
+        // Remove the accepted request from the list
+        setRequests((prev) => prev.filter((req) => req.id !== requestId));
+        // Optionally, fetch the updated chats
+        fetchUserChats();
+      } else {
+        Alert.alert("Error", "Failed to accept chat request.");
+      }
+    } catch (error: any) {
+      console.error("Error accepting request:", error);
+      Alert.alert(
+        "Error",
+        error.response?.data?.message || "Failed to accept chat request."
+      );
+    } finally {
+      setProcessingRequestId(null);
+    }
+  };
+
+  // Function to reject a request
+  const rejectRequest = async (requestId: string) => {
+    setProcessingRequestId(requestId);
+    try {
+      const response = await axios.post(
+        "https://thegridproduct-production.up.railway.app/chat/reject",
+        { requestId },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (response.status === 200) {
+        Alert.alert("Success", "Chat request rejected.");
+        // Remove the rejected request from the list
+        setRequests((prev) => prev.filter((req) => req.id !== requestId));
+      } else {
+        Alert.alert("Error", "Failed to reject chat request.");
+      }
+    } catch (error: any) {
+      console.error("Error rejecting request:", error);
+      Alert.alert(
+        "Error",
+        error.response?.data?.message || "Failed to reject chat request."
+      );
+    } finally {
+      setProcessingRequestId(null);
     }
   };
 
@@ -648,14 +724,46 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
             renderItem={({ item }) => (
               <View style={styles.requestItem}>
                 <Text style={styles.requestProductName}>
-                  {item.productName}
+                  Product ID: {item.productId}
                 </Text>
                 <Text style={styles.requestDescription}>
-                  {item.description}
+                  Status: {item.status}
                 </Text>
                 <Text style={styles.requestDate}>
                   Requested on: {new Date(item.createdAt).toLocaleDateString()}
                 </Text>
+                <View style={styles.requestButtonsContainer}>
+                  <Pressable
+                    style={[
+                      styles.acceptButton,
+                      processingRequestId === item.id && styles.buttonDisabled,
+                    ]}
+                    onPress={() => acceptRequest(item.id)}
+                    disabled={processingRequestId === item.id}
+                    accessibilityLabel="Accept Request"
+                  >
+                    {processingRequestId === item.id ? (
+                      <ActivityIndicator color="#fff" />
+                    ) : (
+                      <Text style={styles.buttonText}>Accept</Text>
+                    )}
+                  </Pressable>
+                  <Pressable
+                    style={[
+                      styles.rejectButton,
+                      processingRequestId === item.id && styles.buttonDisabled,
+                    ]}
+                    onPress={() => rejectRequest(item.id)}
+                    disabled={processingRequestId === item.id}
+                    accessibilityLabel="Reject Request"
+                  >
+                    {processingRequestId === item.id ? (
+                      <ActivityIndicator color="#fff" />
+                    ) : (
+                      <Text style={styles.buttonText}>Reject</Text>
+                    )}
+                  </Pressable>
+                </View>
               </View>
             )}
             ListEmptyComponent={
@@ -1406,5 +1514,31 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: "center",
     fontFamily: "HelveticaNeue",
+  },
+  requestButtonsContainer: {
+    flexDirection: "row",
+    marginTop: 10,
+    justifyContent: "flex-end",
+  },
+  acceptButton: {
+    backgroundColor: "#4CAF50",
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 5,
+    marginRight: 10,
+  },
+  rejectButton: {
+    backgroundColor: "#F44336",
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 5,
+  },
+  buttonText: {
+    color: "#fff",
+    fontSize: 14,
+    fontFamily: "HelveticaNeue-Medium",
+  },
+  buttonDisabled: {
+    opacity: 0.6,
   },
 });
