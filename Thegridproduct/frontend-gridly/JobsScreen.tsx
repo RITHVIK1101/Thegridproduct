@@ -24,7 +24,7 @@ import BottomNavBar from "./components/BottomNavbar";
 import { NGROK_URL } from "@env";
 import { UserContext } from "./UserContext";
 import { StackNavigationProp } from "@react-navigation/stack";
-import { RootStackParamList } from "./navigationTypes"; // Adjust the path if necessary
+import { RootStackParamList } from "./navigationTypes";
 import { useNavigation } from "@react-navigation/native";
 
 const { width } = Dimensions.get("window");
@@ -180,17 +180,13 @@ const JobsScreen: React.FC = () => {
         return Math.abs(gestureState.dy) > 10 && Math.abs(gestureState.dx) < 50;
       },
       onPanResponderMove: (evt, gestureState) => {
-        if (gestureState.dy > 0) {
-          // Optionally, add visual feedback here
-          // For simplicity, we won't animate the modal during the swipe
-        }
+        // Could add visual feedback if desired while swiping
       },
       onPanResponderRelease: (evt, gestureState) => {
         if (gestureState.dy > 100) {
           // If the swipe down is beyond the threshold, close the modal
           toggleAssistant();
         }
-        // If not, do nothing and keep the modal open
       },
     })
   ).current;
@@ -307,6 +303,8 @@ const JobsScreen: React.FC = () => {
       console.log("AI Response:", aiData);
 
       if (Array.isArray(aiData)) {
+        // GPT / Search response can return array of objects
+        // Either "message" objects or "gig match" objects
         if (aiData.length > 0 && "message" in aiData[0]) {
           // GPT is asking for clarification
           const assistantMessage: TextMessage = {
@@ -317,13 +315,13 @@ const JobsScreen: React.FC = () => {
           };
           setMessages((prev) => [...prev, assistantMessage]);
         } else if (aiData.length > 0 && "id" in aiData[0]) {
-          // Received gigs
+          // Received gigs from search
           const gigMessages: GigMessage[] = aiData.map((gig: GigMatch) => ({
             id: gig.id,
-            text: gig.title, // Use gig's title for display
+            text: gig.title,
             role: "assistant",
             type: "gig",
-            gig, // Attach the gig data
+            gig,
           }));
           setMessages((prev) => [...prev, ...gigMessages]);
         } else {
@@ -374,6 +372,7 @@ const JobsScreen: React.FC = () => {
       setHasUserMessaged(true);
     }
 
+    // Simple delayed response from the assistant for demonstration
     setTimeout(() => {
       const assistantReplies = [
         "Awesome! Could you tell me more about the category or field you're interested in?",
@@ -421,7 +420,7 @@ const JobsScreen: React.FC = () => {
 
   // Prevent double '$' in displayed price
   const getDisplayedPrice = (price: string): string => {
-    return price.replace(/^\$/, ""); // Remove leading $ if present
+    return price.replace(/^\$/, "");
   };
 
   const truncateDescription = (desc: string, length: number) => {
@@ -522,7 +521,7 @@ const JobsScreen: React.FC = () => {
         </TouchableOpacity>
       </Modal>
 
-      {/* Gigs List */}
+      {/* Main Content Scroll */}
       <ScrollView
         contentContainerStyle={styles.scrollContainer}
         showsVerticalScrollIndicator={false}
@@ -549,6 +548,7 @@ const JobsScreen: React.FC = () => {
             horizontal
             showsHorizontalScrollIndicator={false}
             style={styles.featuredScroll}
+            contentContainerStyle={{ paddingLeft: 8 }}
           >
             {featuredGigs.map((gig) => (
               <TouchableOpacity
@@ -591,6 +591,7 @@ const JobsScreen: React.FC = () => {
             />
           </TouchableOpacity>
         </View>
+
         {loading ? (
           <ActivityIndicator
             size="large"
@@ -601,7 +602,6 @@ const JobsScreen: React.FC = () => {
           <>
             {filteredGigs.length > 0 ? (
               filteredGigs.map((gig) => {
-                // Safely handle the gig price
                 const displayedPrice = getDisplayedPrice(gig.price);
                 return (
                   <TouchableOpacity
@@ -621,12 +621,16 @@ const JobsScreen: React.FC = () => {
                             color="#BB86FC"
                             style={{ marginRight: 6 }}
                           />
-                          <Text style={styles.gigCategory}>{gig.category}</Text>
+                          <Text style={styles.gigCategory}>
+                            {gig.category}
+                          </Text>
                         </View>
                         <Text style={styles.gigDescription}>
                           {truncateDescription(gig.description, 60)}
                         </Text>
-                        <Text style={styles.gigPrice}>${displayedPrice}</Text>
+                        <Text style={styles.gigPrice}>
+                          ${displayedPrice}
+                        </Text>
                       </View>
                       <Ionicons
                         name="chevron-forward"
@@ -646,9 +650,10 @@ const JobsScreen: React.FC = () => {
         )}
       </ScrollView>
 
+      {/* Bottom Navbar */}
       <BottomNavBar />
 
-      {/* Floating "Find a Gig" Button */}
+      {/* Floating "Find a Job" Button */}
       <TouchableOpacity
         activeOpacity={0.9}
         style={styles.fab}
@@ -670,7 +675,10 @@ const JobsScreen: React.FC = () => {
           style={styles.modalContainer}
           behavior={Platform.OS === "ios" ? "padding" : undefined}
         >
+          {/* Background Overlay */}
           <Animated.View style={[styles.assistantModalOverlay, { opacity }]} />
+
+          {/* Modal Content */}
           <Animated.View
             {...panResponder.panHandlers}
             style={[
@@ -681,18 +689,28 @@ const JobsScreen: React.FC = () => {
               },
             ]}
           >
+            {/* Assistant Header */}
             <View style={styles.assistantHeader}>
               <Text style={styles.assistantHeaderText}>AI Assistant</Text>
+              {/* Updated close icon to a more obvious X */}
               <TouchableOpacity onPress={() => toggleAssistant()}>
-                <Ionicons name="close" size={24} color="#BB86FC" />
-              </TouchableOpacity>
+              <Ionicons
+                name="close"
+                size={28}
+                color="#FFFFFF"
+                style={{ paddingLeft: 10 }}
+              />
+            </TouchableOpacity>
+
             </View>
 
+            {/* Chat Container */}
             <View style={styles.chatContainer}>
               <ScrollView
                 contentContainerStyle={styles.chatContent}
                 showsVerticalScrollIndicator={false}
               >
+                {/* Initial Suggestions */}
                 {!hasUserMessaged && (
                   <View style={styles.initialSuggestionsContainer}>
                     <ScrollView
@@ -716,6 +734,7 @@ const JobsScreen: React.FC = () => {
                   </View>
                 )}
 
+                {/* Message Bubbles */}
                 {messages.map((msg) => (
                   <View
                     key={msg.id}
@@ -726,10 +745,12 @@ const JobsScreen: React.FC = () => {
                         : styles.userBubble,
                     ]}
                   >
+                    {/* If it's a gig message, display the gig card */}
                     {msg.type === "gig" && msg.gig ? (
                       <TouchableOpacity
-                        style={styles.gigCard}
+                        style={styles.chatGigCard}
                         onPress={() => {
+                          // Close the modal, then navigate
                           toggleAssistant(() => {
                             navigation.navigate("JobDetail", {
                               jobId: msg.gig.id,
@@ -775,6 +796,7 @@ const JobsScreen: React.FC = () => {
                 ))}
               </ScrollView>
 
+              {/* Input Area */}
               <View style={styles.inputArea}>
                 <TextInput
                   style={styles.chatInput}
@@ -804,7 +826,7 @@ const styles = StyleSheet.create({
   // Overall Screen Container
   container: {
     flex: 1,
-    backgroundColor: "#000000", // Deeper black
+    backgroundColor: "#000000",
     position: "relative",
   },
   // Header
@@ -860,16 +882,16 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 15,
   },
-  // Scroll View Container
+  // Scroll Container
   scrollContainer: {
     paddingBottom: 90,
+    paddingHorizontal: 16, // Center the content more
   },
   // Section Headers
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 16,
     marginTop: 16,
   },
   sectionTitle: {
@@ -880,14 +902,14 @@ const styles = StyleSheet.create({
   // Featured Gigs
   featuredScroll: {
     marginTop: 10,
-    paddingLeft: 16,
   },
   featuredCard: {
-    width: width * 0.55,
+    width: 200, // Thinner width
+    height: 100, // Adjusted height
     borderRadius: 12,
     padding: 16,
-    marginRight: 12,
-    justifyContent: "space-between",
+    marginRight: 16,
+    justifyContent: "space-around",
     elevation: 3,
     shadowColor: "#000",
     shadowOpacity: 0.3,
@@ -897,7 +919,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700",
     color: "#FFFFFF",
-    marginBottom: 8,
   },
   featuredCategoryRow: {
     flexDirection: "row",
@@ -912,7 +933,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#0B0B0B",
-    marginHorizontal: 12,
     marginVertical: 8,
     padding: 12,
     borderRadius: 10,
@@ -926,7 +946,7 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   gigTitle: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: "600",
     color: "#FFFFFF",
     marginBottom: 4,
@@ -937,16 +957,16 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   gigCategory: {
-    fontSize: 12,
+    fontSize: 13,
     color: "#BB86FC",
   },
   gigDescription: {
-    fontSize: 12,
+    fontSize: 13,
     color: "#B3B3B3",
     marginBottom: 4,
   },
   gigPrice: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: "500",
     color: "#BB86FC",
   },
@@ -1001,8 +1021,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingTop: Platform.OS === "ios" ? 48 : 16,
-    paddingBottom: 12,
+    paddingTop: Platform.OS === "ios" ? 36  : 10,
+    paddingBottom: 6,
     paddingHorizontal: 16,
     backgroundColor: "#BB86FC",
   },
@@ -1011,10 +1031,11 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#FFFFFF",
   },
-  chatContainer: {
-    flex: 1,
-    padding: 12,
-  },
+chatContainer: {
+  flex: 1,
+  paddingHorizontal: 12,
+  paddingTop: 10, // Reduce top padding to move chat messages higher
+},
   chatContent: {
     paddingBottom: 80,
   },
@@ -1036,6 +1057,7 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 13,
   },
+  // Message Bubbles
   messageBubble: {
     padding: 10,
     borderRadius: 16,
@@ -1059,6 +1081,7 @@ const styles = StyleSheet.create({
   userText: {
     color: "#FFFFFF",
   },
+  // Chat Input
   inputArea: {
     flexDirection: "row",
     alignItems: "center",
@@ -1067,7 +1090,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     position: "absolute",
-    bottom: 12,
+    bottom: 20,
     left: 12,
     right: 12,
   },
@@ -1109,8 +1132,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#FFFFFF",
   },
-  // Gig Card Styles within Chat
-  gigCard: {
+  // Gig Card Styles Within Chat
+  chatGigCard: {
     backgroundColor: "#1A1A1A",
     borderRadius: 12,
     padding: 12,
@@ -1120,30 +1143,5 @@ const styles = StyleSheet.create({
     shadowColor: "#000",
     shadowOpacity: 0.2,
     shadowRadius: 4,
-  },
-  gigTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#FFFFFF",
-    marginBottom: 5,
-  },
-  gigCategoryRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 5,
-  },
-  gigCategory: {
-    fontSize: 14,
-    color: "#BB86FC",
-  },
-  gigDescription: {
-    fontSize: 14,
-    color: "#B3B3B3",
-    marginBottom: 5,
-  },
-  gigPrice: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: "#BB86FC",
   },
 });
