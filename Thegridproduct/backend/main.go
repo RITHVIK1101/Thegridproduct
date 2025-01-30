@@ -123,9 +123,6 @@ func main() {
 	// Real-time Messaging Route using Ably
 	protected.HandleFunc("/messages", handlers.PublishMessageHandler).Methods("POST")
 
-	// NEW: Message from Cart Route
-	protected.HandleFunc("/cart/message", handlers.MessageFromCartHandler).Methods("POST")
-
 	// Payment Routes (Commented Out to disable payment flow)
 	// protected.HandleFunc("/create-payment-intent", handlers.CreatePaymentIntentHandler).Methods("POST")
 	// protected.HandleFunc("/payment/save-method", handlers.SavePaymentMethodHandler).Methods("POST")
