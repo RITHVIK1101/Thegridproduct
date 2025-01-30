@@ -545,7 +545,7 @@ func getLatestMessageAndTimestamp(messages []models.Message) (string, string) {
 	return latestMsg, latestTime
 }
 
-// GetChatRequestsHandler fetches all chat requests for the authenticated user, including product names.
+// GetChatRequestsHandler fetches all chat requests for the authenticated user
 func GetChatRequestsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -591,7 +591,9 @@ func GetChatRequestsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Enrich chat requests with product names and user details
-	var enrichedChatRequests []EnrichedChatRequest
+	var outgoingRequests []EnrichedChatRequest
+	var incomingRequests []EnrichedChatRequest
+
 	for _, req := range chatRequests {
 		// Fetch product details
 		product, err := db.GetProductByID(req.ProductID.Hex())
@@ -629,12 +631,17 @@ func GetChatRequestsHandler(w http.ResponseWriter, r *http.Request) {
 			SellerLastName:  seller.LastName,
 		}
 
-		enrichedChatRequests = append(enrichedChatRequests, enrichedReq)
+		// Separate into incoming and outgoing requests
+		if req.BuyerID.Hex() == userID {
+			outgoingRequests = append(outgoingRequests, enrichedReq)
+		} else if req.SellerID.Hex() == userID {
+			incomingRequests = append(incomingRequests, enrichedReq)
+		}
 	}
 
+	// Send the response with separate arrays
 	WriteJSON(w, map[string]interface{}{
-		"chatRequests": enrichedChatRequests,
+		"incomingRequests": incomingRequests,
+		"outgoingRequests": outgoingRequests,
 	}, http.StatusOK)
 }
-
-// Additional handlers related to chat can be placed here...

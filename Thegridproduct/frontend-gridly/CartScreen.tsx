@@ -12,6 +12,7 @@ import {
   Dimensions,
   Modal,
   TouchableWithoutFeedback,
+  ActivityIndicator,
 } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { UserContext } from "./UserContext";
@@ -64,12 +65,9 @@ type CartProduct = {
 
 const { width } = Dimensions.get("window");
 
+// Initialize cartProducts as an empty array to avoid undefined
 const CartScreen: React.FC = () => {
-  // If `cartProducts` is `undefined`, it means we haven't finished fetching.
-  // Once fetched, it will become either `[]` (empty) or a populated array.
-  const [cartProducts, setCartProducts] = useState<CartProduct[] | undefined>(
-    undefined
-  );
+  const [cartProducts, setCartProducts] = useState<CartProduct[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   // State for delete confirmation
@@ -81,17 +79,21 @@ const CartScreen: React.FC = () => {
   const [messagePopupVisible, setMessagePopupVisible] =
     useState<boolean>(false);
 
+  // State for loading indicators
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isMessaging, setIsMessaging] = useState<boolean>(false);
+
   const { userId, token, clearUser } = useContext(UserContext);
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
 
   const fetchCart = async () => {
     if (!userId || !token) {
       setError("User not logged in.");
-      // We have no cart data, so set cartProducts to []
-      setCartProducts([]);
+      setCartProducts([]); // Ensure cartProducts is an empty array
       return;
     }
 
+    setIsLoading(true);
     try {
       const response = await fetch(`${NGROK_URL}/cart`, {
         method: "GET",
@@ -127,13 +129,12 @@ const CartScreen: React.FC = () => {
 
       const cartData: Cart = await response.json();
 
-      // If no items or cart is null -> empty
       if (
         !cartData ||
         !Array.isArray(cartData.items) ||
         cartData.items.length === 0
       ) {
-        setCartProducts([]);
+        setCartProducts([]); // Set to empty array if no items
         return;
       }
 
@@ -167,7 +168,6 @@ const CartScreen: React.FC = () => {
       try {
         productsData = await productsResponse.json();
         if (!Array.isArray(productsData)) {
-          // If it's not a direct array, maybe it's a nested object
           if (productsData && Array.isArray((productsData as any).products)) {
             productsData = (productsData as any).products;
           } else {
@@ -201,7 +201,6 @@ const CartScreen: React.FC = () => {
 
         const product = productsData.find((p) => p.id === item.productId);
         if (!product) {
-          // If product detail not found
           return {
             id: item.productId,
             title: "Unknown Product",
@@ -231,17 +230,18 @@ const CartScreen: React.FC = () => {
         };
       });
 
-      // Optionally remove items with unknown sellers
+      // Remove items with unknown sellers
       const validCartProducts = combinedCartProducts.filter(
         (cp) => cp.sellerId !== "unknown-seller"
       );
 
-      // Finally set the products
       setCartProducts(validCartProducts);
     } catch (err: any) {
       console.error("Fetch Cart Error:", err);
       setError(err.message || "An unexpected error occurred.");
-      setCartProducts([]);
+      setCartProducts([]); // Set to empty array on error
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -289,9 +289,7 @@ const CartScreen: React.FC = () => {
       }
 
       // Remove locally
-      setCartProducts(
-        (prev) => prev?.filter((p) => p.id !== itemToDelete.id) || []
-      );
+      setCartProducts((prev) => prev.filter((p) => p.id !== itemToDelete.id));
     } catch (err: any) {
       console.error("Remove from Cart Error:", err);
       Alert.alert(
@@ -315,6 +313,7 @@ const CartScreen: React.FC = () => {
       return;
     }
 
+    setIsMessaging(true);
     try {
       const response = await fetch(`${NGROK_URL}/chat/request`, {
         method: "POST",
@@ -324,8 +323,8 @@ const CartScreen: React.FC = () => {
         },
         body: JSON.stringify({
           productId: product.id, // Send only productId
-          // buyerId: userId,      // Removed to simplify payload
-          // sellerId: product.sellerId, // Removed as sellerId is inferred
+          buyerId: userId, // Included buyerId
+          sellerId: product.sellerId, // Included sellerId
         }),
       });
 
@@ -348,8 +347,18 @@ const CartScreen: React.FC = () => {
       }
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to request chat.");
+        let errorMessage = "Failed to request chat.";
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorMessage;
+          console.error("Chat Request Error Data:", errorData);
+        } catch (parseError) {
+          console.error(
+            "Error parsing chat request error response:",
+            parseError
+          );
+        }
+        throw new Error(errorMessage);
       }
 
       // Show quick confirmation popup
@@ -359,10 +368,12 @@ const CartScreen: React.FC = () => {
       }, 2000);
 
       // Remove the product from the local cart state
-      setCartProducts((prev) => prev?.filter((p) => p.id !== product.id) || []);
+      setCartProducts((prev) => prev.filter((p) => p.id !== product.id));
     } catch (err: any) {
       console.error("Chat Request Error:", err);
       Alert.alert("Error", err.message || "Failed to send chat request.");
+    } finally {
+      setIsMessaging(false);
     }
   };
 
@@ -372,17 +383,15 @@ const CartScreen: React.FC = () => {
       Alert.alert("Error", "User not authenticated.");
       return;
     }
-    if (!cartProducts || cartProducts.length === 0) {
+    if (cartProducts.length === 0) {
       Alert.alert("Error", "No products to message.");
       return;
     }
 
+    setIsMessaging(true);
     try {
-      // Prepare unique productIds
-      const productIds = cartProducts.map((p) => p.id);
-
-      // Prepare requests
-      const chatRequests = productIds.map((productId) =>
+      // Prepare chat requests with buyerId and sellerId
+      const chatRequests = cartProducts.map((product) =>
         fetch(`${NGROK_URL}/chat/request`, {
           method: "POST",
           headers: {
@@ -390,21 +399,36 @@ const CartScreen: React.FC = () => {
             Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
-            productId: productId, // Send only productId
+            productId: product.id, // Send only productId
+            buyerId: userId, // Included buyerId
+            sellerId: product.sellerId, // Included sellerId
           }),
         })
       );
 
       const responses = await Promise.all(chatRequests);
 
-      const failedRequests = [];
+      const failedRequests: string[] = []; // Explicitly define as string[]
       const successfullyMessagedProducts: string[] = [];
 
       for (let i = 0; i < responses.length; i++) {
         if (!responses[i].ok) {
-          const errorData = await responses[i].json();
+          let errorMessage = "Failed to send chat request.";
+          try {
+            const errorData = await responses[i].json();
+            errorMessage = errorData.message || errorMessage;
+            console.error(
+              `Chat Request Error Data for "${cartProducts[i].title}":`,
+              errorData
+            );
+          } catch (parseError) {
+            console.error(
+              "Error parsing chat request error response:",
+              parseError
+            );
+          }
           failedRequests.push(
-            errorData.message || "Failed to send chat request."
+            `Failed to message "${cartProducts[i].title}": ${errorMessage}`
           );
         } else {
           const product = cartProducts[i];
@@ -420,7 +444,7 @@ const CartScreen: React.FC = () => {
         // Remove successfully messaged products from the local cart state
         setCartProducts(
           (prev) =>
-            prev?.filter((p) => !successfullyMessagedProducts.includes(p.id)) ||
+            prev.filter((p) => !successfullyMessagedProducts.includes(p.id)) ||
             []
         );
 
@@ -433,6 +457,8 @@ const CartScreen: React.FC = () => {
     } catch (err: any) {
       console.error("Chat Request Error:", err);
       Alert.alert("Error", err.message || "Failed to send chat requests.");
+    } finally {
+      setIsMessaging(false);
     }
   };
 
@@ -441,7 +467,6 @@ const CartScreen: React.FC = () => {
   }, []);
 
   const calculateTotal = () => {
-    if (!cartProducts) return 0;
     return cartProducts.reduce(
       (sum, item) => sum + item.price * item.quantity,
       0
@@ -477,19 +502,27 @@ const CartScreen: React.FC = () => {
             onPress={() => messageProduct(item)}
             style={styles.messageButton}
             accessibilityLabel={`Message about ${item.title}`}
+            disabled={isMessaging} // Disable during messaging
           >
-            <Ionicons
-              name="chatbubble-ellipses-outline"
-              size={16}
-              color="black"
-            />
-            <Text style={styles.messageButtonText}>Message</Text>
+            {isMessaging ? (
+              <ActivityIndicator size="small" color="black" />
+            ) : (
+              <>
+                <Ionicons
+                  name="chatbubble-ellipses-outline"
+                  size={16}
+                  color="black"
+                />
+                <Text style={styles.messageButtonText}>Message</Text>
+              </>
+            )}
           </TouchableOpacity>
         </LinearGradient>
         <TouchableOpacity
           onPress={() => confirmRemoveFromCart(item)}
           style={styles.removeButton}
           accessibilityLabel={`Remove ${item.title} from Cart`}
+          disabled={isMessaging} // Optionally disable during messaging
         >
           <Ionicons name="trash-outline" size={22} color="#FF3B30" />
         </TouchableOpacity>
@@ -499,14 +532,18 @@ const CartScreen: React.FC = () => {
 
   /**
    * RENDER
-   * - If `cartProducts` is still `undefined`, we haven't finished fetching, so show nothing.
+   * - If `isLoading`, show loading indicator.
    * - If `error`, show error UI.
    * - If `cartProducts` is an empty array, show empty cart.
    * - Else, show cart items.
    */
-  if (cartProducts === undefined) {
-    // Show absolutely nothing to minimize flicker
-    return <View style={styles.container} />;
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Ionicons name="refresh-circle-outline" size={50} color="#BB86FC" />
+        <Text style={styles.loadingText}>Loading your cart...</Text>
+      </View>
+    );
   }
 
   if (error) {
@@ -518,7 +555,7 @@ const CartScreen: React.FC = () => {
           style={styles.retryButton}
           onPress={() => {
             setError(null);
-            setCartProducts(undefined); // Force re-fetch
+            setCartProducts([]); // Reset to empty array to trigger re-fetch
             fetchCart();
           }}
           accessibilityLabel="Retry Fetching Cart"
@@ -559,9 +596,20 @@ const CartScreen: React.FC = () => {
           style={styles.messageAllButton}
           onPress={messageAllProducts}
           accessibilityLabel="Message All Sellers"
+          disabled={isMessaging} // Disable during messaging
         >
-          <Text style={styles.messageAllButtonText}>Message All</Text>
-          <Ionicons name="chatbubble-ellipses-outline" size={20} color="#fff" />
+          {isMessaging ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <>
+              <Text style={styles.messageAllButtonText}>Message All</Text>
+              <Ionicons
+                name="chatbubble-ellipses-outline"
+                size={20}
+                color="#fff"
+              />
+            </>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -687,7 +735,7 @@ const styles = StyleSheet.create({
   messageButtonGradient: {
     borderRadius: 8,
     marginRight: 10,
-    marginTop: 4, // Add this to move the button lower
+    marginTop: 4, // Move the button lower
     shadowColor: "#888",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.4,
@@ -885,5 +933,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginLeft: 10,
     fontWeight: "500",
+  },
+  /** Loading Indicators **/
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#000",
+  },
+  loadingText: {
+    color: "#BB86FC",
+    fontSize: 18,
+    marginTop: 10,
+    fontWeight: "600",
   },
 });

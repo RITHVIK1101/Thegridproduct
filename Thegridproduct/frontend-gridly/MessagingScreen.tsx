@@ -1,3 +1,5 @@
+// MessagingScreen.tsx
+
 import React, { useState, useEffect, useContext, useRef } from "react";
 import {
   SafeAreaView,
@@ -36,12 +38,17 @@ import axios from "axios";
 type Chat = Conversation;
 
 type Request = {
-  id: string;
+  requestId: string;
   productId: string;
+  productTitle: string;
   buyerId: string;
   sellerId: string;
+  status: string;
   createdAt: string;
-  // ... other fields if needed
+  buyerFirstName: string;
+  buyerLastName: string;
+  sellerFirstName: string;
+  sellerLastName: string;
 };
 
 type MessagingScreenRouteProp = RouteProp<RootStackParamList, "Messaging">;
@@ -71,7 +78,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
   const [isRequestsModalVisible, setRequestsModalVisible] =
     useState<boolean>(false);
   const [incomingRequests, setIncomingRequests] = useState<Request[]>([]);
-  const [outgoingRequests, setOutgoingRequests] = useState<Request[]>([]); // Placeholder for future logic
+  const [outgoingRequests, setOutgoingRequests] = useState<Request[]>([]);
   const [loadingRequests, setLoadingRequests] = useState<boolean>(false);
   const [errorRequests, setErrorRequests] = useState<string | null>(null);
   const [processingRequestId, setProcessingRequestId] = useState<string | null>(
@@ -459,7 +466,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }
   };
 
-  /** Fetch incoming requests */
+  /** Fetch incoming and outgoing requests */
   const fetchUserRequests = async () => {
     if (!userId || !token) {
       setErrorRequests("User not authenticated.");
@@ -471,6 +478,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     setErrorRequests(null);
 
     try {
+      // Fetch both incoming and outgoing requests
       const response = await axios.get(
         "https://thegridproduct-production.up.railway.app/chat/requests",
         {
@@ -480,16 +488,20 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
           },
         }
       );
+
       if (response.status === 200) {
-        setIncomingRequests(response.data.chatRequests as Request[]);
+        const { incomingRequests, outgoingRequests } = response.data;
+
+        setIncomingRequests(incomingRequests as Request[]);
+        setOutgoingRequests(outgoingRequests as Request[]);
       } else {
-        setErrorRequests("Failed to fetch requests.");
+        setErrorRequests("Failed to fetch chat requests.");
       }
     } catch (error: any) {
       console.error("Error fetching requests:", error);
       setErrorRequests(
         error.response?.data?.message ||
-          "An error occurred while fetching requests."
+          "An error occurred while fetching chat requests."
       );
     } finally {
       setLoadingRequests(false);
@@ -513,7 +525,9 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
 
       if (response.status === 200) {
         Alert.alert("Success", "Chat request accepted.");
-        setIncomingRequests((prev) => prev.filter((req) => req.id !== requestId));
+        setIncomingRequests((prev) =>
+          prev.filter((req) => req.requestId !== requestId)
+        );
         // Optionally refresh user chats:
         fetchUserChats();
       } else {
@@ -547,7 +561,9 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
 
       if (response.status === 200) {
         Alert.alert("Success", "Chat request rejected.");
-        setIncomingRequests((prev) => prev.filter((req) => req.id !== requestId));
+        setIncomingRequests((prev) =>
+          prev.filter((req) => req.requestId !== requestId)
+        );
       } else {
         Alert.alert("Error", "Failed to reject chat request.");
       }
@@ -583,9 +599,9 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         })
       : "";
 
-    const initials = `${item.user.firstName.charAt(0)}${item.user.lastName.charAt(
+    const initials = `${item.user.firstName.charAt(
       0
-    )}`.toUpperCase();
+    )}${item.user.lastName.charAt(0)}`.toUpperCase();
     const unread = item.unreadCount && item.unreadCount > 0;
 
     return (
@@ -747,9 +763,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         return (
           <View style={styles.requestCard}>
             <View style={styles.requestInfo}>
-              <Text style={styles.requestProductName}>
-                Product ID: {item.productId}
-              </Text>
+              <Text style={styles.requestProductName}>{item.productTitle}</Text>
               <Text style={styles.requestDate}>
                 Requested on: {new Date(item.createdAt).toLocaleDateString()}
               </Text>
@@ -758,13 +772,14 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
               <TouchableOpacity
                 style={[
                   styles.acceptButton,
-                  processingRequestId === item.id && styles.buttonDisabled,
+                  processingRequestId === item.requestId &&
+                    styles.buttonDisabled,
                 ]}
-                onPress={() => acceptRequest(item.id)}
-                disabled={processingRequestId === item.id}
+                onPress={() => acceptRequest(item.requestId)}
+                disabled={processingRequestId === item.requestId}
                 accessibilityLabel="Accept Request"
               >
-                {processingRequestId === item.id ? (
+                {processingRequestId === item.requestId ? (
                   <ActivityIndicator color="#fff" size="small" />
                 ) : (
                   <Ionicons name="checkmark" size={20} color="#fff" />
@@ -773,13 +788,14 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
               <TouchableOpacity
                 style={[
                   styles.rejectButton,
-                  processingRequestId === item.id && styles.buttonDisabled,
+                  processingRequestId === item.requestId &&
+                    styles.buttonDisabled,
                 ]}
-                onPress={() => rejectRequest(item.id)}
-                disabled={processingRequestId === item.id}
+                onPress={() => rejectRequest(item.requestId)}
+                disabled={processingRequestId === item.requestId}
                 accessibilityLabel="Reject Request"
               >
-                {processingRequestId === item.id ? (
+                {processingRequestId === item.requestId ? (
                   <ActivityIndicator color="#fff" size="small" />
                 ) : (
                   <Ionicons name="close" size={20} color="#fff" />
@@ -794,9 +810,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       return (
         <View style={styles.requestCard}>
           <View style={styles.requestInfo}>
-            <Text style={styles.requestProductName}>
-              Outgoing Request: {item.productId}
-            </Text>
+            <Text style={styles.requestProductName}>{item.productTitle}</Text>
             <Text style={styles.requestDate}>
               Created on: {new Date(item.createdAt).toLocaleDateString()}
             </Text>
@@ -842,7 +856,8 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                 onPress={() => setSelectedRequestsTab("incoming")}
                 style={[
                   styles.requestsTab,
-                  selectedRequestsTab === "incoming" && styles.activeRequestsTab,
+                  selectedRequestsTab === "incoming" &&
+                    styles.activeRequestsTab,
                 ]}
                 accessibilityLabel="Incoming Requests Tab"
               >
@@ -860,7 +875,8 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                 onPress={() => setSelectedRequestsTab("outgoing")}
                 style={[
                   styles.requestsTab,
-                  selectedRequestsTab === "outgoing" && styles.activeRequestsTab,
+                  selectedRequestsTab === "outgoing" &&
+                    styles.activeRequestsTab,
                 ]}
                 accessibilityLabel="Outgoing Requests Tab"
               >
@@ -890,7 +906,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
               <View style={styles.requestsContent}>
                 <FlatList
                   data={dataToShow}
-                  keyExtractor={(item) => item.id}
+                  keyExtractor={(item) => item.requestId}
                   renderItem={renderRequestItem}
                   ListEmptyComponent={
                     <View style={styles.sectionEmptyContainer}>
@@ -904,6 +920,8 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                   ItemSeparatorComponent={() => (
                     <View style={styles.requestsSeparatorLine} />
                   )}
+                  refreshing={loadingRequests}
+                  onRefresh={fetchUserRequests}
                 />
               </View>
             )}
@@ -984,26 +1002,27 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         {renderRequestsModal()}
 
         {/* Purchases Section (only visible in 'all' or 'products') */}
-        {(filter === "all" || filter === "products") && productsOrGigs.length > 0 && (
-          <View style={styles.horizontalListContainer}>
-            <Text style={styles.sectionTitle}>Your Purchases</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={styles.horizontalScroll}
-            >
-              {productsOrGigs.map((item, index) => (
-                <Pressable
-                  key={item.chatID + index}
-                  style={styles.productGigItem}
-                  onPress={() => handleNavigateFromProductOrGig(item)}
-                >
-                  <Text style={styles.productGigItemText}>{item.title}</Text>
-                </Pressable>
-              ))}
-            </ScrollView>
-          </View>
-        )}
+        {(filter === "all" || filter === "products") &&
+          productsOrGigs.length > 0 && (
+            <View style={styles.horizontalListContainer}>
+              <Text style={styles.sectionTitle}>Your Purchases</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.horizontalScroll}
+              >
+                {productsOrGigs.map((item, index) => (
+                  <Pressable
+                    key={item.chatID + index}
+                    style={styles.productGigItem}
+                    onPress={() => handleNavigateFromProductOrGig(item)}
+                  >
+                    <Text style={styles.productGigItemText}>{item.title}</Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+          )}
 
         <View style={styles.separatorAfterPurchases} />
 
@@ -1060,9 +1079,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                     <View style={styles.chatHeaderInfo}>
                       <View style={styles.headerProfilePicPlaceholder}>
                         <Text style={styles.headerProfilePicInitials}>
-                          {selectedChat.user.firstName
-                            .charAt(0)
-                            .toUpperCase()}
+                          {selectedChat.user.firstName.charAt(0).toUpperCase()}
                           {selectedChat.user.lastName.charAt(0).toUpperCase()}
                         </Text>
                       </View>
@@ -1085,9 +1102,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                 <FlatList
                   ref={flatListRef}
                   data={selectedChat?.messages || []}
-                  keyExtractor={(item, index) =>
-                    item._id || index.toString()
-                  }
+                  keyExtractor={(item, index) => item._id || index.toString()}
                   renderItem={renderMessage}
                   contentContainerStyle={styles.messagesList}
                   onContentSizeChange={() =>
@@ -1595,7 +1610,7 @@ const styles = StyleSheet.create({
     marginLeft: "auto",
   },
 
-  // Requests Modal Styles
+  /** Requests Modal Styles */
   requestsModalContainer: {
     position: "absolute",
     bottom: 0,
