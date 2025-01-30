@@ -19,20 +19,38 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
+// EnrichedChat represents a chat with additional product and user details.
 type EnrichedChat struct {
-	ChatID          string `json:"chatID"`                    // Fixed syntax
-	ProductID       string `json:"productID"`                 // Fixed syntax
-	ProductTitle    string `json:"productTitle"`              // Fixed syntax
-	User            User   `json:"user"`                      // Fixed syntax
-	LatestMessage   string `json:"latestMessage,omitempty"`   // Fixed syntax
-	LatestTimestamp string `json:"latestTimestamp,omitempty"` // Fixed syntax
-}
-type User struct {
-	FirstName string `json:"firstName"` // Fixed syntax
-	LastName  string `json:"lastName"`  // Fixed syntax
+	ChatID          string `json:"chatID"`
+	ProductID       string `json:"productID"`
+	ProductTitle    string `json:"productTitle"`
+	User            User   `json:"user"`
+	LatestMessage   string `json:"latestMessage,omitempty"`
+	LatestTimestamp string `json:"latestTimestamp,omitempty"`
 }
 
-// AppError defines a custom application error with a message and HTTP status code
+// EnrichedChatRequest represents a chat request with product name included.
+type EnrichedChatRequest struct {
+	RequestID       string `json:"requestId"`
+	ProductID       string `json:"productId"`
+	ProductTitle    string `json:"productTitle"`
+	BuyerID         string `json:"buyerId"`
+	SellerID        string `json:"sellerId"`
+	Status          string `json:"status"`
+	CreatedAt       string `json:"createdAt"`
+	BuyerFirstName  string `json:"buyerFirstName"`
+	BuyerLastName   string `json:"buyerLastName"`
+	SellerFirstName string `json:"sellerFirstName"`
+	SellerLastName  string `json:"sellerLastName"`
+}
+
+// User represents basic user information.
+type User struct {
+	FirstName string `json:"firstName"`
+	LastName  string `json:"lastName"`
+}
+
+// AppError defines a custom application error with a message and HTTP status code.
 type AppError struct {
 	Message    string
 	StatusCode int
@@ -42,7 +60,7 @@ func (e *AppError) Error() string {
 	return e.Message
 }
 
-// GetChatHandler fetches chat details by product ID (string-based)
+// GetChatHandler fetches chat details by product ID (string-based).
 func GetChatHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	productIDStr, ok := vars["productId"]
@@ -62,7 +80,7 @@ func GetChatHandler(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, chat, http.StatusOK)
 }
 
-// GetChatsByUserHandler fetches all chats for a specific user (string-based)
+// GetChatsByUserHandler fetches all chats for a specific user (string-based).
 func GetChatsByUserHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	userIDStr := vars["userId"]
@@ -125,7 +143,7 @@ func GetChatsByUserHandler(w http.ResponseWriter, r *http.Request) {
 	}, http.StatusOK)
 }
 
-// AddMessageHandler adds a new message to a chat
+// AddMessageHandler adds a new message to a chat.
 func AddMessageHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	chatIDStr, ok := vars["chatId"]
@@ -167,7 +185,7 @@ func AddMessageHandler(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, map[string]string{"message": "Message added successfully"}, http.StatusOK)
 }
 
-// GetMessagesHandler fetches all messages for a specific chat
+// GetMessagesHandler fetches all messages for a specific chat.
 func GetMessagesHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	chatIDStr, ok := vars["chatId"]
@@ -186,26 +204,29 @@ func GetMessagesHandler(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, chat.Messages, http.StatusOK)
 }
 
-// RequestChatHandler - Creates a pending chat request when user clicks "Buy"
+// RequestChatHandler - Creates a pending chat request when user clicks "Buy".
 func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	var req struct {
-		ProductID string `json:"productId"` // Fixed syntax
-		BuyerID   string `json:"buyerId"`   // Fixed syntax
-		SellerID  string `json:"sellerId"`  // Fixed syntax
+		ProductID string `json:"productId"`
+		BuyerID   string `json:"buyerId"`
+		SellerID  string `json:"sellerId"`
 	}
+
+	// Decode request body
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		WriteJSONError(w, "Invalid request payload", http.StatusBadRequest)
 		return
 	}
 
+	// Validate required fields
 	if req.ProductID == "" || req.BuyerID == "" || req.SellerID == "" {
 		WriteJSONError(w, "All fields are required", http.StatusBadRequest)
 		return
 	}
 
-	// Convert IDs from string to ObjectID
+	// Convert IDs to ObjectID format
 	productObjectID, err := primitive.ObjectIDFromHex(req.ProductID)
 	if err != nil {
 		WriteJSONError(w, "Invalid Product ID format", http.StatusBadRequest)
@@ -232,9 +253,11 @@ func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer session.EndSession(context.Background())
 
+	// Transaction to create chat request and remove product from cart
 	callback := func(sessCtx mongo.SessionContext) (interface{}, error) {
 		chatRequests := db.GetCollection("gridlyapp", "chat_requests")
 		productsCol := db.GetCollection("gridlyapp", "products")
+		cartCol := db.GetCollection("gridlyapp", "carts")
 
 		// 1) Check if product is "inshop"
 		var product models.Product
@@ -264,7 +287,6 @@ func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 
 		// 3) Create new chat request
 		chatRequest := models.NewChatRequest(productObjectID, buyerObjectID, sellerObjectID)
-
 		_, err = chatRequests.InsertOne(sessCtx, chatRequest)
 		if err != nil {
 			return nil, err
@@ -295,6 +317,15 @@ func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
+		// 6) Remove product from buyer's cart
+		filter := bson.M{"userId": buyerObjectID}
+		updateCart := bson.M{"$pull": bson.M{"items": bson.M{"productId": productObjectID}}}
+		_, err = cartCol.UpdateOne(sessCtx, filter, updateCart)
+		if err != nil {
+			log.Printf("Failed to remove product from cart: %v", err)
+			return nil, err
+		}
+
 		return nil, nil
 	}
 
@@ -311,7 +342,7 @@ func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{
-		"message": "Chat request sent successfully",
+		"message": "Chat request sent successfully and product removed from cart",
 	})
 }
 
@@ -504,7 +535,7 @@ func RejectChatRequestHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// getLatestMessageAndTimestamp returns the last message + timestamp in the chat
+// getLatestMessageAndTimestamp returns the last message + timestamp in the chat.
 func getLatestMessageAndTimestamp(messages []models.Message) (string, string) {
 	if len(messages) == 0 {
 		return "", ""
@@ -513,6 +544,8 @@ func getLatestMessageAndTimestamp(messages []models.Message) (string, string) {
 	latestTime := messages[len(messages)-1].Timestamp.Format(time.RFC3339)
 	return latestMsg, latestTime
 }
+
+// GetChatRequestsHandler fetches all chat requests for the authenticated user, including product names.
 func GetChatRequestsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -557,8 +590,51 @@ func GetChatRequestsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"chatRequests": chatRequests,
-	})
+	// Enrich chat requests with product names and user details
+	var enrichedChatRequests []EnrichedChatRequest
+	for _, req := range chatRequests {
+		// Fetch product details
+		product, err := db.GetProductByID(req.ProductID.Hex())
+		if err != nil {
+			log.Printf("Failed to fetch product details for productID %s: %v", req.ProductID.Hex(), err)
+			continue
+		}
+
+		// Fetch buyer details
+		buyer, err := db.GetUserByID(req.BuyerID.Hex())
+		if err != nil {
+			log.Printf("Failed to fetch buyer details for buyerID %s: %v", req.BuyerID.Hex(), err)
+			continue
+		}
+
+		// Fetch seller details
+		seller, err := db.GetUserByID(req.SellerID.Hex())
+		if err != nil {
+			log.Printf("Failed to fetch seller details for sellerID %s: %v", req.SellerID.Hex(), err)
+			continue
+		}
+
+		// Build enriched chat request
+		enrichedReq := EnrichedChatRequest{
+			RequestID:       req.ID.Hex(),
+			ProductID:       req.ProductID.Hex(),
+			ProductTitle:    product.Title,
+			BuyerID:         req.BuyerID.Hex(),
+			SellerID:        req.SellerID.Hex(),
+			Status:          req.Status,
+			CreatedAt:       req.CreatedAt.Format(time.RFC3339),
+			BuyerFirstName:  buyer.FirstName,
+			BuyerLastName:   buyer.LastName,
+			SellerFirstName: seller.FirstName,
+			SellerLastName:  seller.LastName,
+		}
+
+		enrichedChatRequests = append(enrichedChatRequests, enrichedReq)
+	}
+
+	WriteJSON(w, map[string]interface{}{
+		"chatRequests": enrichedChatRequests,
+	}, http.StatusOK)
 }
+
+// Additional handlers related to chat can be placed here...

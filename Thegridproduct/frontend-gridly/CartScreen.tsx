@@ -1,3 +1,5 @@
+// CartScreen.js
+
 import React, { useEffect, useState, useContext } from "react";
 import {
   View,
@@ -65,15 +67,19 @@ const { width } = Dimensions.get("window");
 const CartScreen: React.FC = () => {
   // If `cartProducts` is `undefined`, it means we haven't finished fetching.
   // Once fetched, it will become either `[]` (empty) or a populated array.
-  const [cartProducts, setCartProducts] = useState<CartProduct[] | undefined>(undefined);
+  const [cartProducts, setCartProducts] = useState<CartProduct[] | undefined>(
+    undefined
+  );
   const [error, setError] = useState<string | null>(null);
 
   // State for delete confirmation
   const [itemToDelete, setItemToDelete] = useState<CartProduct | null>(null);
-  const [isDeleteModalVisible, setIsDeleteModalVisible] = useState<boolean>(false);
+  const [isDeleteModalVisible, setIsDeleteModalVisible] =
+    useState<boolean>(false);
 
   // State for message popup
-  const [messagePopupVisible, setMessagePopupVisible] = useState<boolean>(false);
+  const [messagePopupVisible, setMessagePopupVisible] =
+    useState<boolean>(false);
 
   const { userId, token, clearUser } = useContext(UserContext);
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
@@ -122,13 +128,19 @@ const CartScreen: React.FC = () => {
       const cartData: Cart = await response.json();
 
       // If no items or cart is null -> empty
-      if (!cartData || !Array.isArray(cartData.items) || cartData.items.length === 0) {
+      if (
+        !cartData ||
+        !Array.isArray(cartData.items) ||
+        cartData.items.length === 0
+      ) {
         setCartProducts([]);
         return;
       }
 
       // Gather product IDs
-      const productIds = cartData.items.map((item) => item.productId).filter(Boolean);
+      const productIds = cartData.items
+        .map((item) => item.productId)
+        .filter(Boolean);
       if (productIds.length === 0) {
         setCartProducts([]);
         return;
@@ -277,7 +289,9 @@ const CartScreen: React.FC = () => {
       }
 
       // Remove locally
-      setCartProducts((prev) => prev?.filter((p) => p.id !== itemToDelete.id) || []);
+      setCartProducts(
+        (prev) => prev?.filter((p) => p.id !== itemToDelete.id) || []
+      );
     } catch (err: any) {
       console.error("Remove from Cart Error:", err);
       Alert.alert(
@@ -309,9 +323,9 @@ const CartScreen: React.FC = () => {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          productId: product.id,
-          buyerId: userId,
-          sellerId: product.sellerId,
+          productId: product.id, // Send only productId
+          // buyerId: userId,      // Removed to simplify payload
+          // sellerId: product.sellerId, // Removed as sellerId is inferred
         }),
       });
 
@@ -343,6 +357,9 @@ const CartScreen: React.FC = () => {
       setTimeout(() => {
         setMessagePopupVisible(false);
       }, 2000);
+
+      // Remove the product from the local cart state
+      setCartProducts((prev) => prev?.filter((p) => p.id !== product.id) || []);
     } catch (err: any) {
       console.error("Chat Request Error:", err);
       Alert.alert("Error", err.message || "Failed to send chat request.");
@@ -361,11 +378,11 @@ const CartScreen: React.FC = () => {
     }
 
     try {
-      // Assuming the backend can handle messaging multiple sellers at once.
-      // If not, you might need to iterate and send individual messages.
-      const uniqueSellers = Array.from(new Set(cartProducts.map((p) => p.sellerId)));
+      // Prepare unique productIds
+      const productIds = cartProducts.map((p) => p.id);
 
-      const chatRequests = uniqueSellers.map((sellerId) =>
+      // Prepare requests
+      const chatRequests = productIds.map((productId) =>
         fetch(`${NGROK_URL}/chat/request`, {
           method: "POST",
           headers: {
@@ -373,11 +390,7 @@ const CartScreen: React.FC = () => {
             Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
-            productIds: cartProducts
-              .filter((p) => p.sellerId === sellerId)
-              .map((p) => p.id),
-            buyerId: userId,
-            sellerId: sellerId,
+            productId: productId, // Send only productId
           }),
         })
       );
@@ -385,22 +398,38 @@ const CartScreen: React.FC = () => {
       const responses = await Promise.all(chatRequests);
 
       const failedRequests = [];
+      const successfullyMessagedProducts: string[] = [];
+
       for (let i = 0; i < responses.length; i++) {
         if (!responses[i].ok) {
           const errorData = await responses[i].json();
-          failedRequests.push(errorData.message || "Failed to request chat.");
+          failedRequests.push(
+            errorData.message || "Failed to send chat request."
+          );
+        } else {
+          const product = cartProducts[i];
+          successfullyMessagedProducts.push(product.id);
         }
       }
 
       if (failedRequests.length > 0) {
-        throw new Error(failedRequests.join("\n"));
+        Alert.alert("Partial Success", failedRequests.join("\n"));
       }
 
-      // Show quick confirmation popup
-      setMessagePopupVisible(true);
-      setTimeout(() => {
-        setMessagePopupVisible(false);
-      }, 2000);
+      if (successfullyMessagedProducts.length > 0) {
+        // Remove successfully messaged products from the local cart state
+        setCartProducts(
+          (prev) =>
+            prev?.filter((p) => !successfullyMessagedProducts.includes(p.id)) ||
+            []
+        );
+
+        // Show quick confirmation popup
+        setMessagePopupVisible(true);
+        setTimeout(() => {
+          setMessagePopupVisible(false);
+        }, 2000);
+      }
     } catch (err: any) {
       console.error("Chat Request Error:", err);
       Alert.alert("Error", err.message || "Failed to send chat requests.");
@@ -413,7 +442,10 @@ const CartScreen: React.FC = () => {
 
   const calculateTotal = () => {
     if (!cartProducts) return 0;
-    return cartProducts.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    return cartProducts.reduce(
+      (sum, item) => sum + item.price * item.quantity,
+      0
+    );
   };
 
   const renderSeparator = () => <View style={styles.separator} />;
@@ -446,7 +478,11 @@ const CartScreen: React.FC = () => {
             style={styles.messageButton}
             accessibilityLabel={`Message about ${item.title}`}
           >
-            <Ionicons name="chatbubble-ellipses-outline" size={16} color="black" />
+            <Ionicons
+              name="chatbubble-ellipses-outline"
+              size={16}
+              color="black"
+            />
             <Text style={styles.messageButtonText}>Message</Text>
           </TouchableOpacity>
         </LinearGradient>
@@ -588,7 +624,11 @@ const CartScreen: React.FC = () => {
         <TouchableWithoutFeedback onPress={() => setMessagePopupVisible(false)}>
           <View style={styles.buyPopupOverlay}>
             <View style={styles.buyPopupContainer}>
-              <Ionicons name="checkmark-circle-outline" size={30} color="#4CD964" />
+              <Ionicons
+                name="checkmark-circle-outline"
+                size={30}
+                color="#4CD964"
+              />
               <Text style={styles.buyPopupText}>Message sent!</Text>
             </View>
           </View>
@@ -654,7 +694,6 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 5,
   },
-  
   messageButton: {
     flexDirection: "row",
     alignItems: "center",

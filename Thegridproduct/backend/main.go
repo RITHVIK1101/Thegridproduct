@@ -1,3 +1,5 @@
+// main.go
+
 package main
 
 import (
@@ -80,8 +82,7 @@ func main() {
 
 	// Protected Routes
 	protected := router.PathPrefix("/").Subrouter()
-	protected.Use(handlers.AuthMiddleware) // Ensure AuthMiddleware is implemented
-
+	protected.Use(handlers.AuthMiddleware)
 	// Product Routes
 	protected.HandleFunc("/products", handlers.AddProductHandler).Methods("POST")
 	protected.HandleFunc("/products/user", handlers.GetUserProductsHandler).Methods("GET")
@@ -121,6 +122,9 @@ func main() {
 
 	// Real-time Messaging Route using Ably
 	protected.HandleFunc("/messages", handlers.PublishMessageHandler).Methods("POST")
+
+	// NEW: Message from Cart Route
+	protected.HandleFunc("/cart/message", handlers.MessageFromCartHandler).Methods("POST")
 
 	// Payment Routes (Commented Out to disable payment flow)
 	// protected.HandleFunc("/create-payment-intent", handlers.CreatePaymentIntentHandler).Methods("POST")
