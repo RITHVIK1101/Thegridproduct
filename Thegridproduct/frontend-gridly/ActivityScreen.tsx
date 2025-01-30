@@ -18,7 +18,7 @@ import { NGROK_URL } from "@env";
 import { useNavigation, useIsFocused } from "@react-navigation/native";
 import { UserContext } from "./UserContext";
 
-// Define types for Product and Gig (Service)
+// Define types for Product, Gig (Service), and ProductRequest
 type Product = {
   id: string;
   title: string;
@@ -56,14 +56,24 @@ type Gig = {
   likeCount: number;
 };
 
+type ProductRequest = {
+  id: string;
+  productId: string;
+  productName: string; // Changed from 'title' to 'productName'
+  description: string;
+  status: string;
+  createdAt: string;
+  // Add other fields as needed
+};
+
 const ActivityScreen: React.FC = () => {
   const navigation = useNavigation();
   const isFocused = useIsFocused();
   const { userId, token } = useContext(UserContext);
 
-  const [activeSegment, setActiveSegment] = useState<"Products" | "Gigs" | "Requested">(
-    "Products"
-  );
+  const [activeSegment, setActiveSegment] = useState<
+    "Products" | "Gigs" | "Requested"
+  >("Products");
 
   // Products State
   const [products, setProducts] = useState<Product[]>([]);
@@ -76,6 +86,16 @@ const ActivityScreen: React.FC = () => {
   const [filteredGigs, setFilteredGigs] = useState<Gig[]>([]);
   const [loadingGigs, setLoadingGigs] = useState<boolean>(false);
   const [errorGigs, setErrorGigs] = useState<string | null>(null);
+
+  // Requested Products State
+  const [requestedProducts, setRequestedProducts] = useState<ProductRequest[]>(
+    []
+  );
+  const [filteredRequestedProducts, setFilteredRequestedProducts] = useState<
+    ProductRequest[]
+  >([]);
+  const [loadingRequested, setLoadingRequested] = useState<boolean>(false);
+  const [errorRequested, setErrorRequested] = useState<string | null>(null);
 
   const [searchQuery, setSearchQuery] = useState<string>("");
 
@@ -117,7 +137,9 @@ const ActivityScreen: React.FC = () => {
         setProducts(data);
         setFilteredProducts(
           data.filter((product) =>
-            product.title.toLowerCase().includes(searchQuery.toLowerCase())
+            (product.title || "")
+              .toLowerCase()
+              .includes(searchQuery.toLowerCase())
           )
         );
       }
@@ -173,7 +195,7 @@ const ActivityScreen: React.FC = () => {
         setGigs(gigsData);
         setFilteredGigs(
           gigsData.filter((gig) =>
-            gig.title.toLowerCase().includes(searchQuery.toLowerCase())
+            (gig.title || "").toLowerCase().includes(searchQuery.toLowerCase())
           )
         );
       }
@@ -189,6 +211,60 @@ const ActivityScreen: React.FC = () => {
     }
   };
 
+  // Fetch user requested products
+  const fetchUserRequestedProducts = async () => {
+    if (!userId || !token) {
+      setErrorRequested("User not logged in.");
+      setLoadingRequested(false);
+      return;
+    }
+
+    try {
+      const response = await fetch(`${NGROK_URL}/requests/my`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const contentType = response.headers.get("content-type");
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Error response text:", errorText);
+        throw new Error(
+          "Failed to fetch your requested products. Server error."
+        );
+      } else if (!contentType || !contentType.includes("application/json")) {
+        const errorText = await response.text();
+        console.error("Unexpected content-type:", contentType, errorText);
+        throw new Error("Unexpected response format.");
+      }
+
+      const data: ProductRequest[] = await response.json();
+      if (!data || data.length === 0) {
+        setRequestedProducts([]);
+        setFilteredRequestedProducts([]);
+      } else {
+        setRequestedProducts(data);
+        setFilteredRequestedProducts(
+          data.filter((req) =>
+            req.productName ? req.productName.includes(searchQuery) : false
+          )
+        );
+      }
+    } catch (err) {
+      console.error("Error fetching requested products:", err);
+      setErrorRequested(
+        err instanceof Error
+          ? err.message
+          : "An unexpected error occurred while fetching requested products."
+      );
+    } finally {
+      setLoadingRequested(false);
+    }
+  };
+
   // Fetch data based on active segment
   const fetchData = async () => {
     if (activeSegment === "Products") {
@@ -199,8 +275,11 @@ const ActivityScreen: React.FC = () => {
       setLoadingGigs(true);
       setErrorGigs(null);
       await fetchUserGigs();
+    } else if (activeSegment === "Requested") {
+      setLoadingRequested(true);
+      setErrorRequested(null);
+      await fetchUserRequestedProducts();
     }
-    // No fetching for "Requested" segment as per instruction
   };
 
   // Handle deletion of a product
@@ -231,6 +310,23 @@ const ActivityScreen: React.FC = () => {
           text: "Delete",
           style: "destructive",
           onPress: () => deleteGig(gigId),
+        },
+      ],
+      { cancelable: true }
+    );
+  };
+
+  // Handle deletion of a requested product
+  const handleDeleteRequestedProduct = (requestId: string) => {
+    Alert.alert(
+      "Confirm Deletion",
+      "Are you sure you want to remove this requested product?",
+      [
+        { text: "No", style: "cancel" },
+        {
+          text: "Remove",
+          style: "destructive",
+          onPress: () => deleteRequestedProduct(requestId),
         },
       ],
       { cancelable: true }
@@ -319,6 +415,54 @@ const ActivityScreen: React.FC = () => {
     }
   };
 
+  // Delete a requested product
+  const deleteRequestedProduct = async (requestId: string) => {
+    if (!token) {
+      Alert.alert("Error", "You are not authenticated.");
+      return;
+    }
+
+    try {
+      const response = await fetch(`${NGROK_URL}/requests/my/${requestId}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        const text = await response.text();
+        throw new Error(`Unexpected response: ${response.status} ${text}`);
+      }
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setRequestedProducts((prev) =>
+          prev.filter((req) => req.id !== requestId)
+        );
+        setFilteredRequestedProducts((prev) =>
+          prev.filter((req) => req.id !== requestId)
+        );
+        Alert.alert("Success", "Requested product removed successfully.");
+      } else {
+        const errorMessage =
+          data.error || "Failed to remove the requested product.";
+        Alert.alert("Error", errorMessage);
+      }
+    } catch (error) {
+      console.error("Error removing requested product:", error);
+      Alert.alert(
+        "Error",
+        error instanceof Error
+          ? error.message
+          : "An unexpected error occurred while removing the requested product."
+      );
+    }
+  };
+
   // Calculate days active
   const calculateDaysActive = (postedDate: string): number => {
     const posted = new Date(postedDate);
@@ -338,7 +482,6 @@ const ActivityScreen: React.FC = () => {
   };
 
   // Navigate to view requested product details (Assuming there's a screen)
-  // This is left empty as no data or functionality is needed for Requested Products
   const navigateToViewRequestedProduct = (requestedProductId: string) => {
     // Placeholder for navigation
     Alert.alert("Info", "Requested Products feature coming soon!");
@@ -356,17 +499,21 @@ const ActivityScreen: React.FC = () => {
   useEffect(() => {
     if (activeSegment === "Products") {
       const filtered = products.filter((product) =>
-        product.title.toLowerCase().includes(searchQuery.toLowerCase())
+        (product.title || "").toLowerCase().includes(searchQuery.toLowerCase())
       );
       setFilteredProducts(filtered);
     } else if (activeSegment === "Gigs") {
       const filtered = gigs.filter((gig) =>
-        gig.title.toLowerCase().includes(searchQuery.toLowerCase())
+        (gig.title || "").toLowerCase().includes(searchQuery.toLowerCase())
       );
       setFilteredGigs(filtered);
+    } else if (activeSegment === "Requested") {
+      const filtered = requestedProducts.filter((req) =>
+        req.productName ? req.productName.includes(searchQuery) : false
+      );
+      setFilteredRequestedProducts(filtered);
     }
-    // No filtering needed for "Requested"
-  }, [searchQuery, products, gigs, activeSegment]);
+  }, [searchQuery, products, gigs, requestedProducts, activeSegment]);
 
   // Handle pull-to-refresh
   const handleRefresh = () => {
@@ -516,13 +663,81 @@ const ActivityScreen: React.FC = () => {
     );
   };
 
-  // Render requested products using EmptyList for consistency
-  const renderRequested = () => {
+  // Render a single requested product item
+  const renderRequestedProduct = ({ item }: { item: ProductRequest }) => {
     return (
-      <EmptyList
-        message="You have no requested products."
-        buttonText="Request a Product"
-        onPress={() => navigation.navigate("RequestProduct")}
+      <View style={styles.itemContainer}>
+        <TouchableOpacity
+          onPress={() => navigateToViewRequestedProduct(item.id)}
+          style={styles.itemTouchArea}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.itemTitle}>
+            {item.productName || "No Product Name"}
+          </Text>
+          <Text style={styles.itemDescription}>
+            {item.description || "No Description"}
+          </Text>
+          <Text style={styles.itemDate}>
+            Requested on: {new Date(item.createdAt).toDateString()}
+          </Text>
+          <Text>Status: {item.status}</Text>
+        </TouchableOpacity>
+
+        <View style={styles.iconRow}>
+          <TouchableOpacity
+            onPress={() => handleDeleteRequestedProduct(item.id)}
+            style={styles.iconTouchable}
+            hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="trash-outline" size={18} color="#FF3B30" />
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
+
+  // Render requested products using FlatList
+  const renderRequested = () => {
+    if (loadingRequested) {
+      return (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="small" color="#BB86FC" />
+          <Text style={styles.loadingText}>
+            Loading your requested products...
+          </Text>
+        </View>
+      );
+    }
+
+    if (errorRequested) {
+      return (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{errorRequested}</Text>
+        </View>
+      );
+    }
+
+    return (
+      <FlatList
+        data={filteredRequestedProducts}
+        keyExtractor={(item) => item.id}
+        renderItem={renderRequestedProduct}
+        contentContainerStyle={styles.listContainer}
+        ListEmptyComponent={
+          !loadingRequested && !errorRequested ? (
+            <EmptyList
+              message="You have no requested products."
+              buttonText="Request a Product"
+              onPress={() => navigation.navigate("RequestProduct")}
+            />
+          ) : null
+        }
+        showsVerticalScrollIndicator={false}
+        onRefresh={handleRefresh}
+        refreshing={loadingRequested}
+        ItemSeparatorComponent={renderSeparator}
       />
     );
   };
@@ -609,15 +824,7 @@ const ActivityScreen: React.FC = () => {
         />
       );
     } else if (activeSegment === "Requested") {
-      return (
-        <View style={styles.listContainer}>
-          <EmptyList
-            message="You have no requested products."
-            buttonText="Request a Product"
-            onPress={() => navigation.navigate("RequestProduct")}
-          />
-        </View>
-      );
+      return renderRequested();
     }
   };
 
