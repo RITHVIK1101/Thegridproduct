@@ -15,6 +15,9 @@ import {
   Dimensions,
   Image,
   ScrollView,
+  TouchableOpacity,
+  Animated,
+  Easing,
 } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import BottomNavBar from "./components/BottomNavbar";
@@ -29,23 +32,23 @@ import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from "expo-image-manipulator";
 import axios from "axios";
 
+/** Types & Props */
 type Chat = Conversation;
 
-// Define the Request type
 type Request = {
   id: string;
   productId: string;
   buyerId: string;
   sellerId: string;
-  status: string;
   createdAt: string;
-  // Add other fields as needed
+  // ... other fields if needed
 };
 
 type MessagingScreenRouteProp = RouteProp<RootStackParamList, "Messaging">;
 type MessagingScreenProps = { route: MessagingScreenRouteProp };
 
 const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
+  /** Chats & Messages */
   const [chats, setChats] = useState<Chat[]>([]);
   const [filteredChats, setFilteredChats] = useState<Chat[]>([]);
   const [filter, setFilter] = useState<"all" | "products" | "gigs">("all");
@@ -55,31 +58,49 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
   const [loading, setLoading] = useState<boolean>(false);
   const [sending, setSending] = useState<boolean>(false);
 
+  /** Image Upload */
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
   const [isImagePreviewModalVisible, setIsImagePreviewModalVisible] =
     useState<boolean>(false);
   const [isUploadingImage, setIsUploadingImage] = useState<boolean>(false);
 
+  /** Filter Modal */
   const [filterMenuVisible, setFilterMenuVisible] = useState<boolean>(false);
 
-  const { userId, token } = useContext(UserContext);
-  const ablyRef = useRef<Ably.Realtime | null>(null);
-  const channelRef = useRef<Ably.RealtimeChannel | null>(null);
-  const flatListRef = useRef<FlatList<Message> | null>(null);
-
-  const navigation = useNavigation();
-  const { chatId: routeChatId } = route.params || {};
-
-  // Requests Modal State
+  /** Requests Modal State */
   const [isRequestsModalVisible, setRequestsModalVisible] =
     useState<boolean>(false);
-  const [requests, setRequests] = useState<Request[]>([]);
+  const [incomingRequests, setIncomingRequests] = useState<Request[]>([]);
+  const [outgoingRequests, setOutgoingRequests] = useState<Request[]>([]); // Placeholder for future logic
   const [loadingRequests, setLoadingRequests] = useState<boolean>(false);
   const [errorRequests, setErrorRequests] = useState<string | null>(null);
   const [processingRequestId, setProcessingRequestId] = useState<string | null>(
     null
   );
 
+  /** Tabs for Requests Modal */
+  const [selectedRequestsTab, setSelectedRequestsTab] = useState<
+    "incoming" | "outgoing"
+  >("incoming");
+
+  /** User & Token from Context */
+  const { userId, token } = useContext(UserContext);
+
+  /** Ably & Refs */
+  const ablyRef = useRef<Ably.Realtime | null>(null);
+  const channelRef = useRef<Ably.RealtimeChannel | null>(null);
+  const flatListRef = useRef<FlatList<Message> | null>(null);
+
+  /** Navigation & Route */
+  const navigation = useNavigation();
+  const { chatId: routeChatId } = route.params || {};
+
+  /** Animation for Requests Modal Slide-Up */
+  const slideAnim = useRef(
+    new Animated.Value(Dimensions.get("window").height)
+  ).current;
+
+  /** Chat Filtering Logic */
   const applyFilter = (
     chatsToFilter: Chat[],
     f: "all" | "products" | "gigs"
@@ -90,6 +111,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         (c) => c.productTitle && c.productTitle.trim() !== ""
       );
     } else {
+      // filter === "gigs"
       return chatsToFilter.filter(
         (c) => !c.productTitle || c.productTitle.trim() === ""
       );
@@ -100,12 +122,14 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     setFilteredChats(applyFilter(chats, filter));
   }, [chats, filter]);
 
+  /** Fetch Chats if user & token are available */
   useEffect(() => {
     if (userId && token) {
       fetchUserChats();
     }
   }, [userId, token]);
 
+  /** Initialize Ably connection */
   useEffect(() => {
     if (!ablyRef.current) {
       ablyRef.current = new Ably.Realtime({ key: ABLY_API_KEY });
@@ -131,6 +155,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     };
   }, []);
 
+  /** Subscribe/unsubscribe to the selected channel */
   useEffect(() => {
     if (selectedChat) {
       subscribeToChannel(selectedChat.chatID);
@@ -140,6 +165,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     };
   }, [selectedChat]);
 
+  /** If a chatID is provided from route params, open that chat */
   useEffect(() => {
     if (routeChatId && userId && token) {
       const chat = chats.find((c) => c.chatID === routeChatId);
@@ -151,6 +177,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }
   }, [routeChatId, chats]);
 
+  /** Fetch a specific chat if not already in the list */
   const fetchSpecificChat = async (chatId: string) => {
     setLoading(true);
     try {
@@ -169,12 +196,15 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }
   };
 
+  /** Fetch the user's chats */
   const fetchUserChats = async () => {
     if (!userId || !token) return;
     setLoading(true);
     try {
       const fetchedChats = await fetchConversations(userId, token);
       setChats(fetchedChats);
+
+      // If there's a route param for a specific chat, open that
       if (routeChatId) {
         const chat = fetchedChats.find((c) => c.chatID === routeChatId);
         if (chat) {
@@ -189,6 +219,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }
   };
 
+  /** Subscribe to an Ably channel */
   const subscribeToChannel = (chatId: string) => {
     if (!ablyRef.current) {
       console.warn("Ably client is not initialized");
@@ -205,7 +236,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
           content: string;
           timestamp: number;
         };
-        console.log("Received message via Ably:", messageData);
 
         const newMsg: Message = {
           _id: Date.now().toString(),
@@ -224,10 +254,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
               m.timestamp === newMsg.timestamp &&
               m.senderID === newMsg.senderID
           );
-
-          if (isDuplicate) {
-            return prev;
-          }
+          if (isDuplicate) return prev;
 
           return {
             ...prev,
@@ -268,6 +295,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     });
   };
 
+  /** Unsubscribe from Ably channel */
   const unsubscribeFromChannel = () => {
     if (channelRef.current) {
       channelRef.current.unsubscribe("message");
@@ -276,6 +304,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }
   };
 
+  /** Open a chat and fetch messages */
   const openChat = async (chat: Chat) => {
     setLoading(true);
     try {
@@ -304,11 +333,13 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       setChatModalVisible(true);
       setNewMessage("");
 
+      // Scroll to the latest message
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
       }, 100);
     } catch (error) {
       console.error("getMessages error:", error);
+      // Open the modal anyway (with an empty messages array if there's an error)
       setSelectedChat({
         ...chat,
         messages: [],
@@ -319,6 +350,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }
   };
 
+  /** Send a text message */
   const sendMessage = async () => {
     if (!newMessage.trim() || !selectedChat) {
       Alert.alert("Error", "Please enter a message.");
@@ -340,6 +372,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }
   };
 
+  /** Handle picking an image */
   const handleImagePress = async () => {
     try {
       const { status } =
@@ -362,8 +395,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         const asset = result.assets[0];
         setSelectedImageUri(asset.uri);
         setIsImagePreviewModalVisible(true);
-      } else {
-        console.log("User cancelled image picker");
       }
     } catch (error) {
       console.error("Error picking image:", error);
@@ -371,6 +402,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }
   };
 
+  /** Upload image to Cloudinary */
   const uploadImageToCloudinary = async (uri: string): Promise<string> => {
     setIsUploadingImage(true);
     try {
@@ -406,15 +438,15 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }
   };
 
+  /** Confirm and send an image message */
   const confirmAddImage = async () => {
     if (!selectedChat || !selectedImageUri) return;
 
     setSending(true);
     try {
-      // Upload to Cloudinary first
       const uploadedImageUrl = await uploadImageToCloudinary(selectedImageUri);
-
       const imageMessage = `[Image] ${uploadedImageUrl}`;
+
       await postMessage(selectedChat.chatID, imageMessage, token, userId);
       console.log("Image message sent successfully.");
     } catch (error: any) {
@@ -427,7 +459,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }
   };
 
-  // Function to fetch requests
+  /** Fetch incoming requests */
   const fetchUserRequests = async () => {
     if (!userId || !token) {
       setErrorRequests("User not authenticated.");
@@ -448,9 +480,8 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
           },
         }
       );
-
       if (response.status === 200) {
-        setRequests(response.data.chatRequests as Request[]);
+        setIncomingRequests(response.data.chatRequests as Request[]);
       } else {
         setErrorRequests("Failed to fetch requests.");
       }
@@ -465,7 +496,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }
   };
 
-  // Function to accept a request
+  /** Accept an incoming request */
   const acceptRequest = async (requestId: string) => {
     setProcessingRequestId(requestId);
     try {
@@ -482,9 +513,8 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
 
       if (response.status === 200) {
         Alert.alert("Success", "Chat request accepted.");
-        // Remove the accepted request from the list
-        setRequests((prev) => prev.filter((req) => req.id !== requestId));
-        // Optionally, fetch the updated chats
+        setIncomingRequests((prev) => prev.filter((req) => req.id !== requestId));
+        // Optionally refresh user chats:
         fetchUserChats();
       } else {
         Alert.alert("Error", "Failed to accept chat request.");
@@ -500,7 +530,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }
   };
 
-  // Function to reject a request
+  /** Reject an incoming request */
   const rejectRequest = async (requestId: string) => {
     setProcessingRequestId(requestId);
     try {
@@ -517,8 +547,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
 
       if (response.status === 200) {
         Alert.alert("Success", "Chat request rejected.");
-        // Remove the rejected request from the list
-        setRequests((prev) => prev.filter((req) => req.id !== requestId));
+        setIncomingRequests((prev) => prev.filter((req) => req.id !== requestId));
       } else {
         Alert.alert("Error", "Failed to reject chat request.");
       }
@@ -533,6 +562,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }
   };
 
+  /** Render a single Chat item in the main list */
   const renderChat = ({ item }: { item: Chat }) => {
     if (!item.user) {
       console.warn(`Chat with chatID ${item.chatID} is missing user data.`);
@@ -546,7 +576,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
             timestamp: item.latestTimestamp,
           }
         : null;
-
     const formattedTimestamp = latestMessage
       ? new Date(latestMessage.timestamp).toLocaleTimeString([], {
           hour: "2-digit",
@@ -554,9 +583,9 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         })
       : "";
 
-    const initials = `${item.user.firstName.charAt(
+    const initials = `${item.user.firstName.charAt(0)}${item.user.lastName.charAt(
       0
-    )}${item.user.lastName.charAt(0)}`.toUpperCase();
+    )}`.toUpperCase();
     const unread = item.unreadCount && item.unreadCount > 0;
 
     return (
@@ -596,6 +625,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     );
   };
 
+  /** Render a single message bubble */
   const renderMessage = ({ item }: { item: Message }) => {
     const isImageMessage = item.content.startsWith("[Image] ");
     const imageUri = isImageMessage
@@ -650,6 +680,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     );
   };
 
+  /** Data for "My Purchases" horizontal list */
   const productsOrGigs = chats.map((c) => ({
     chatID: c.chatID,
     title: c.productTitle ? c.productTitle : "Job",
@@ -667,6 +698,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }
   };
 
+  /** Header label for the main chat list */
   const currentHeaderTitle =
     filter === "all"
       ? "All Chats"
@@ -688,100 +720,198 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }
   };
 
-  // Render Requests Modal
-  const renderRequestsModal = () => (
-    <Modal
-      visible={isRequestsModalVisible}
-      animationType="slide"
-      transparent={false}
-      onRequestClose={() => setRequestsModalVisible(false)}
-    >
-      <SafeAreaView style={[styles.modalSafeArea, { backgroundColor: "#000" }]}>
-        <View style={styles.requestsHeader}>
-          <Pressable
-            onPress={() => setRequestsModalVisible(false)}
-            style={styles.backButton}
-            accessibilityLabel="Close Requests"
-          >
-            <Ionicons name="arrow-back" size={24} color="#BB86FC" />
-          </Pressable>
-          <Text style={styles.requestsHeaderTitle}>Your Requests</Text>
-        </View>
-        {loadingRequests ? (
-          <ActivityIndicator
-            size="large"
-            color="#BB86FC"
-            style={{ marginTop: 20 }}
-          />
-        ) : errorRequests ? (
-          <View style={styles.requestsErrorContainer}>
-            <Text style={styles.requestsErrorText}>{errorRequests}</Text>
+  /** Render the entire Requests Modal (with smoother animations) */
+  const renderRequestsModal = () => {
+    // Animate in
+    if (isRequestsModalVisible) {
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 250, // shortened for a slightly snappier feel
+        easing: Easing.inOut(Easing.ease),
+        useNativeDriver: true,
+      }).start();
+    } else {
+      // Animate out
+      Animated.timing(slideAnim, {
+        toValue: Dimensions.get("window").height,
+        duration: 250,
+        easing: Easing.inOut(Easing.ease),
+        useNativeDriver: true,
+      }).start();
+    }
+
+    /** Renders each request item */
+    const renderRequestItem = ({ item }: { item: Request }) => {
+      // If showing Incoming requests
+      if (selectedRequestsTab === "incoming") {
+        return (
+          <View style={styles.requestCard}>
+            <View style={styles.requestInfo}>
+              <Text style={styles.requestProductName}>
+                Product ID: {item.productId}
+              </Text>
+              <Text style={styles.requestDate}>
+                Requested on: {new Date(item.createdAt).toLocaleDateString()}
+              </Text>
+            </View>
+            <View style={styles.requestActions}>
+              <TouchableOpacity
+                style={[
+                  styles.acceptButton,
+                  processingRequestId === item.id && styles.buttonDisabled,
+                ]}
+                onPress={() => acceptRequest(item.id)}
+                disabled={processingRequestId === item.id}
+                accessibilityLabel="Accept Request"
+              >
+                {processingRequestId === item.id ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Ionicons name="checkmark" size={20} color="#fff" />
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.rejectButton,
+                  processingRequestId === item.id && styles.buttonDisabled,
+                ]}
+                onPress={() => rejectRequest(item.id)}
+                disabled={processingRequestId === item.id}
+                accessibilityLabel="Reject Request"
+              >
+                {processingRequestId === item.id ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Ionicons name="close" size={20} color="#fff" />
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
-        ) : (
-          <FlatList
-            data={requests}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <View style={styles.requestItem}>
-                <Text style={styles.requestProductName}>
-                  Product ID: {item.productId}
+        );
+      }
+
+      // If showing Outgoing requests
+      return (
+        <View style={styles.requestCard}>
+          <View style={styles.requestInfo}>
+            <Text style={styles.requestProductName}>
+              Outgoing Request: {item.productId}
+            </Text>
+            <Text style={styles.requestDate}>
+              Created on: {new Date(item.createdAt).toLocaleDateString()}
+            </Text>
+          </View>
+          <View style={styles.requestActions}>
+            <Text style={{ color: "#BBBBBB" }}>No actions for outgoing.</Text>
+          </View>
+        </View>
+      );
+    };
+
+    const dataToShow =
+      selectedRequestsTab === "incoming" ? incomingRequests : outgoingRequests;
+
+    return (
+      <Modal
+        visible={isRequestsModalVisible}
+        animationType="none"
+        transparent={true}
+        onRequestClose={() => setRequestsModalVisible(false)}
+      >
+        <Animated.View
+          style={[
+            styles.requestsModalContainer,
+            { transform: [{ translateY: slideAnim }] },
+          ]}
+        >
+          <SafeAreaView style={styles.requestsSafeArea}>
+            <View style={styles.requestsHeader}>
+              <Pressable
+                onPress={() => setRequestsModalVisible(false)}
+                style={styles.closeButton}
+                accessibilityLabel="Close Requests"
+              >
+                <Ionicons name="close" size={24} color="#FFFFFF" />
+              </Pressable>
+              <Text style={styles.requestsHeaderTitle}>Your Requests</Text>
+            </View>
+
+            {/* Tabs: Incoming / Outgoing */}
+            <View style={styles.requestsTabsRow}>
+              <Pressable
+                onPress={() => setSelectedRequestsTab("incoming")}
+                style={[
+                  styles.requestsTab,
+                  selectedRequestsTab === "incoming" && styles.activeRequestsTab,
+                ]}
+                accessibilityLabel="Incoming Requests Tab"
+              >
+                <Text
+                  style={[
+                    styles.requestsTabText,
+                    selectedRequestsTab === "incoming" &&
+                      styles.activeRequestsTabText,
+                  ]}
+                >
+                  Incoming
                 </Text>
-                <Text style={styles.requestDescription}>
-                  Status: {item.status}
+              </Pressable>
+              <Pressable
+                onPress={() => setSelectedRequestsTab("outgoing")}
+                style={[
+                  styles.requestsTab,
+                  selectedRequestsTab === "outgoing" && styles.activeRequestsTab,
+                ]}
+                accessibilityLabel="Outgoing Requests Tab"
+              >
+                <Text
+                  style={[
+                    styles.requestsTabText,
+                    selectedRequestsTab === "outgoing" &&
+                      styles.activeRequestsTabText,
+                  ]}
+                >
+                  Outgoing
                 </Text>
-                <Text style={styles.requestDate}>
-                  Requested on: {new Date(item.createdAt).toLocaleDateString()}
-                </Text>
-                <View style={styles.requestButtonsContainer}>
-                  <Pressable
-                    style={[
-                      styles.acceptButton,
-                      processingRequestId === item.id && styles.buttonDisabled,
-                    ]}
-                    onPress={() => acceptRequest(item.id)}
-                    disabled={processingRequestId === item.id}
-                    accessibilityLabel="Accept Request"
-                  >
-                    {processingRequestId === item.id ? (
-                      <ActivityIndicator color="#fff" />
-                    ) : (
-                      <Text style={styles.buttonText}>Accept</Text>
-                    )}
-                  </Pressable>
-                  <Pressable
-                    style={[
-                      styles.rejectButton,
-                      processingRequestId === item.id && styles.buttonDisabled,
-                    ]}
-                    onPress={() => rejectRequest(item.id)}
-                    disabled={processingRequestId === item.id}
-                    accessibilityLabel="Reject Request"
-                  >
-                    {processingRequestId === item.id ? (
-                      <ActivityIndicator color="#fff" />
-                    ) : (
-                      <Text style={styles.buttonText}>Reject</Text>
-                    )}
-                  </Pressable>
-                </View>
+              </Pressable>
+            </View>
+
+            {loadingRequests ? (
+              <ActivityIndicator
+                size="large"
+                color="#BB86FC"
+                style={{ marginTop: 20 }}
+              />
+            ) : errorRequests ? (
+              <View style={styles.requestsErrorContainer}>
+                <Text style={styles.requestsErrorText}>{errorRequests}</Text>
+              </View>
+            ) : (
+              <View style={styles.requestsContent}>
+                <FlatList
+                  data={dataToShow}
+                  keyExtractor={(item) => item.id}
+                  renderItem={renderRequestItem}
+                  ListEmptyComponent={
+                    <View style={styles.sectionEmptyContainer}>
+                      <Text style={styles.sectionEmptyText}>
+                        {selectedRequestsTab === "incoming"
+                          ? "No incoming requests."
+                          : "No outgoing requests."}
+                      </Text>
+                    </View>
+                  }
+                  ItemSeparatorComponent={() => (
+                    <View style={styles.requestsSeparatorLine} />
+                  )}
+                />
               </View>
             )}
-            ListEmptyComponent={
-              <View style={styles.requestsEmptyContainer}>
-                <Text style={styles.requestsEmptyText}>
-                  You have no requests.
-                </Text>
-              </View>
-            }
-            contentContainerStyle={
-              requests.length === 0 && styles.flatListContainer
-            }
-            ItemSeparatorComponent={() => <View style={styles.separatorLine} />}
-          />
-        )}
-      </SafeAreaView>
-    </Modal>
-  );
+          </SafeAreaView>
+        </Animated.View>
+      </Modal>
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -794,6 +924,8 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
               style={styles.requestsButton}
               onPress={() => {
                 setRequestsModalVisible(true);
+                // Default tab to 'incoming' each time we open
+                setSelectedRequestsTab("incoming");
                 fetchUserRequests();
               }}
               accessibilityLabel="View Requests"
@@ -851,31 +983,31 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         {/* Requests Modal */}
         {renderRequestsModal()}
 
-        {/* Purchases Section (only in all or products) */}
-        {(filter === "all" || filter === "products") &&
-          productsOrGigs.length > 0 && (
-            <View style={styles.horizontalListContainer}>
-              <Text style={styles.sectionTitle}>Your Purchases</Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                style={styles.horizontalScroll}
-              >
-                {productsOrGigs.map((item, index) => (
-                  <Pressable
-                    key={item.chatID + index}
-                    style={styles.productGigItem}
-                    onPress={() => handleNavigateFromProductOrGig(item)}
-                  >
-                    <Text style={styles.productGigItemText}>{item.title}</Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
-            </View>
-          )}
+        {/* Purchases Section (only visible in 'all' or 'products') */}
+        {(filter === "all" || filter === "products") && productsOrGigs.length > 0 && (
+          <View style={styles.horizontalListContainer}>
+            <Text style={styles.sectionTitle}>Your Purchases</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.horizontalScroll}
+            >
+              {productsOrGigs.map((item, index) => (
+                <Pressable
+                  key={item.chatID + index}
+                  style={styles.productGigItem}
+                  onPress={() => handleNavigateFromProductOrGig(item)}
+                >
+                  <Text style={styles.productGigItemText}>{item.title}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        )}
 
         <View style={styles.separatorAfterPurchases} />
 
+        {/* Main Chats List */}
         {loading ? (
           <ActivityIndicator size="large" color="#BB86FC" />
         ) : (
@@ -928,7 +1060,9 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                     <View style={styles.chatHeaderInfo}>
                       <View style={styles.headerProfilePicPlaceholder}>
                         <Text style={styles.headerProfilePicInitials}>
-                          {selectedChat.user.firstName.charAt(0).toUpperCase()}
+                          {selectedChat.user.firstName
+                            .charAt(0)
+                            .toUpperCase()}
                           {selectedChat.user.lastName.charAt(0).toUpperCase()}
                         </Text>
                       </View>
@@ -951,7 +1085,9 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                 <FlatList
                   ref={flatListRef}
                   data={selectedChat?.messages || []}
-                  keyExtractor={(item, index) => item._id || index.toString()}
+                  keyExtractor={(item, index) =>
+                    item._id || index.toString()
+                  }
                   renderItem={renderMessage}
                   contentContainerStyle={styles.messagesList}
                   onContentSizeChange={() =>
@@ -1042,9 +1178,9 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                   disabled={sending || isUploadingImage}
                 >
                   {sending || isUploadingImage ? (
-                    <ActivityIndicator color="#fff" />
+                    <ActivityIndicator color="#fff" size="small" />
                   ) : (
-                    <Ionicons name="checkmark" size={24} color="#BB86FC" />
+                    <Ionicons name="checkmark" size={20} color="#BB86FC" />
                   )}
                 </Pressable>
               </View>
@@ -1062,6 +1198,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
           </View>
         </Modal>
 
+        {/* Bottom Nav */}
         <BottomNavBar />
       </SafeAreaView>
     </View>
@@ -1070,6 +1207,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
 
 export default MessagingScreen;
 
+/** Styles */
 const { width } = Dimensions.get("window");
 
 const styles = StyleSheet.create({
@@ -1162,9 +1300,14 @@ const styles = StyleSheet.create({
   productGigItem: {
     backgroundColor: "#1E1E1E",
     paddingHorizontal: 15,
-    paddingVertical: 8,
+    paddingVertical: 6,
     borderRadius: 20,
     marginRight: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 5,
   },
   productGigItemText: {
     color: "#FFFFFF",
@@ -1444,64 +1587,78 @@ const styles = StyleSheet.create({
     backgroundColor: "#000",
   },
   previewImage: {
-    width: width,
+    width,
     height: undefined,
     aspectRatio: 1,
   },
   addImageButton: {
     marginLeft: "auto",
   },
-  // Styles for Requests Modal
+
+  // Requests Modal Styles
+  requestsModalContainer: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: "80%",
+    backgroundColor: "#1E1E1E",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 10,
+  },
+  requestsSafeArea: {
+    flex: 1,
+  },
   requestsHeader: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 15,
-    backgroundColor: "#1E1E1E",
-    borderBottomWidth: 1,
-    borderBottomColor: "#333333",
+    paddingHorizontal: 20,
+    marginBottom: 10,
+  },
+  closeButton: {
+    padding: 5,
   },
   requestsHeaderTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: "700",
     color: "#BB86FC",
     fontFamily: "HelveticaNeue-Bold",
     marginLeft: 10,
   },
-  requestItem: {
-    backgroundColor: "#1E1E1E",
-    padding: 15,
-    borderRadius: 10,
-    marginHorizontal: 20,
-    marginVertical: 5,
-  },
-  requestProductName: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#BB86FC",
-    fontFamily: "HelveticaNeue-Bold",
-    marginBottom: 5,
-  },
-  requestDescription: {
-    fontSize: 14,
-    color: "#FFFFFF",
-    fontFamily: "HelveticaNeue",
-    marginBottom: 5,
-  },
-  requestDate: {
-    fontSize: 12,
-    color: "#AAAAAA",
-    fontFamily: "HelveticaNeue",
-  },
-  requestsEmptyContainer: {
-    flex: 1,
+  requestsTabsRow: {
+    flexDirection: "row",
     justifyContent: "center",
-    alignItems: "center",
-    marginTop: 50,
+    marginBottom: 10,
   },
-  requestsEmptyText: {
-    fontSize: 16,
-    color: "#888888",
-    fontFamily: "HelveticaNeue",
+  requestsTab: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 10,
+    marginHorizontal: 10,
+    borderRadius: 20,
+    backgroundColor: "#2C2C2C",
+  },
+  activeRequestsTab: {
+    backgroundColor: "#BB86FC",
+  },
+  requestsTabText: {
+    color: "#BBBBBB",
+    fontSize: 14,
+    fontFamily: "HelveticaNeue-Medium",
+  },
+  activeRequestsTabText: {
+    color: "#000",
+  },
+  requestsContent: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
   },
   requestsErrorContainer: {
     flex: 1,
@@ -1515,30 +1672,69 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontFamily: "HelveticaNeue",
   },
-  requestButtonsContainer: {
+  requestCard: {
+    backgroundColor: "#2C2C2C",
+    paddingVertical: 12,
+    paddingHorizontal: 15,
+    borderRadius: 12,
+    marginVertical: 6,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  requestInfo: {
+    marginBottom: 8,
+  },
+  requestProductName: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#BB86FC",
+    fontFamily: "HelveticaNeue-Bold",
+    marginBottom: 3,
+  },
+  requestDate: {
+    fontSize: 12,
+    color: "#AAAAAA",
+    fontFamily: "HelveticaNeue",
+  },
+  requestActions: {
     flexDirection: "row",
-    marginTop: 10,
     justifyContent: "flex-end",
+    marginTop: 5,
   },
   acceptButton: {
     backgroundColor: "#4CAF50",
     paddingVertical: 6,
     paddingHorizontal: 12,
-    borderRadius: 5,
-    marginRight: 10,
+    borderRadius: 20,
+    marginRight: 8,
+    justifyContent: "center",
+    alignItems: "center",
   },
   rejectButton: {
     backgroundColor: "#F44336",
     paddingVertical: 6,
     paddingHorizontal: 12,
-    borderRadius: 5,
-  },
-  buttonText: {
-    color: "#fff",
-    fontSize: 14,
-    fontFamily: "HelveticaNeue-Medium",
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
   },
   buttonDisabled: {
     opacity: 0.6,
+  },
+  requestsSeparatorLine: {
+    height: 8,
+    backgroundColor: "#1E1E1E",
+  },
+  sectionEmptyContainer: {
+    alignItems: "center",
+    paddingVertical: 10,
+  },
+  sectionEmptyText: {
+    fontSize: 14,
+    color: "#888888",
+    fontFamily: "HelveticaNeue",
   },
 });
