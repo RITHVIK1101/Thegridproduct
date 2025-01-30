@@ -163,7 +163,6 @@ const ActivityScreen: React.FC = () => {
       return;
     }
     try {
-      // Updated URL to match the server-side route
       const response = await fetch(`${NGROK_URL}/services/user`, {
         method: "GET",
         headers: {
@@ -185,8 +184,6 @@ const ActivityScreen: React.FC = () => {
 
       const data = await response.json();
 
-      // Assuming the response structure matches the backend handler
-      // If your backend sends a paginated response, adjust accordingly
       const gigsData: Gig[] = data.gigs || [];
       if (!gigsData || gigsData.length === 0) {
         setGigs([]);
@@ -663,8 +660,12 @@ const ActivityScreen: React.FC = () => {
     );
   };
 
-  // Render a single requested product item
+  // Render a single requested product item (no price/date, but shows name, description, days active)
   const renderRequestedProduct = ({ item }: { item: ProductRequest }) => {
+    const daysActive = calculateDaysActive(item.createdAt);
+    const status =
+      daysActive > 30 ? "Expired" : `Active for ${daysActive} days`;
+
     return (
       <View style={styles.itemContainer}>
         <TouchableOpacity
@@ -678,10 +679,14 @@ const ActivityScreen: React.FC = () => {
           <Text style={styles.itemDescription}>
             {item.description || "No Description"}
           </Text>
-          <Text style={styles.itemDate}>
-            Requested on: {new Date(item.createdAt).toDateString()}
+          <Text
+            style={[
+              styles.itemStatus,
+              status.includes("Expired") && { color: "#FF3B30" },
+            ]}
+          >
+            {status}
           </Text>
-          <Text>Status: {item.status}</Text>
         </TouchableOpacity>
 
         <View style={styles.iconRow}>
@@ -1084,7 +1089,6 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: "#222",
   },
-  // Adjusted emptyContainer to be centered
   emptyContainer: {
     flex: 1,
     justifyContent: "center",
