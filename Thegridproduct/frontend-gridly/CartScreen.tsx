@@ -6,11 +6,10 @@ import {
   FlatList,
   Image,
   TouchableOpacity,
-  ActivityIndicator,
   Alert,
   Dimensions,
-  Animated,
   Modal,
+  TouchableWithoutFeedback,
 } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { UserContext } from "./UserContext";
@@ -27,7 +26,7 @@ type CartItem = {
 
 type Cart = {
   userId: string;
-  items: CartItem[];
+  items: CartItem[] | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -40,7 +39,7 @@ type Product = {
   category: string;
   images: string[];
   university: string;
-  userId: string; // Represents the seller's user ID
+  userId: string;
   postedDate: string;
   rating?: number;
   quality?: string;
@@ -55,7 +54,7 @@ type CartProduct = {
   description?: string;
   category?: string;
   university?: string;
-  sellerId: string; // Renamed from ownerId to sellerId
+  sellerId: string;
   postedDate?: string;
   rating?: number;
   quality?: string;
@@ -64,15 +63,17 @@ type CartProduct = {
 const { width } = Dimensions.get("window");
 
 const CartScreen: React.FC = () => {
-  const [cartProducts, setCartProducts] = useState<CartProduct[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  // If `cartProducts` is `undefined`, it means we haven't finished fetching.
+  // Once fetched, it will become either `[]` (empty) or a populated array.
+  const [cartProducts, setCartProducts] = useState<CartProduct[] | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
-  const fadeAnim = useState(new Animated.Value(0))[0];
 
   // State for delete confirmation
   const [itemToDelete, setItemToDelete] = useState<CartProduct | null>(null);
-  const [isDeleteModalVisible, setIsDeleteModalVisible] =
-    useState<boolean>(false);
+  const [isDeleteModalVisible, setIsDeleteModalVisible] = useState<boolean>(false);
+
+  // State for message popup
+  const [messagePopupVisible, setMessagePopupVisible] = useState<boolean>(false);
 
   const { userId, token, clearUser } = useContext(UserContext);
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
@@ -80,7 +81,8 @@ const CartScreen: React.FC = () => {
   const fetchCart = async () => {
     if (!userId || !token) {
       setError("User not logged in.");
-      setLoading(false);
+      // We have no cart data, so set cartProducts to []
+      setCartProducts([]);
       return;
     }
 
@@ -108,6 +110,7 @@ const CartScreen: React.FC = () => {
             },
           },
         ]);
+        setCartProducts([]);
         return;
       }
 
@@ -118,14 +121,20 @@ const CartScreen: React.FC = () => {
 
       const cartData: Cart = await response.json();
 
-      if (cartData.items.length === 0) {
+      // If no items or cart is null -> empty
+      if (!cartData || !Array.isArray(cartData.items) || cartData.items.length === 0) {
         setCartProducts([]);
-        setLoading(false);
         return;
       }
 
-      const productIds = cartData.items.map((item) => item.productId);
+      // Gather product IDs
+      const productIds = cartData.items.map((item) => item.productId).filter(Boolean);
+      if (productIds.length === 0) {
+        setCartProducts([]);
+        return;
+      }
 
+      // Fetch product details
       const productsResponse = await fetch(
         `${NGROK_URL}/products/by-ids?ids=${productIds.join(",")}`,
         {
@@ -142,67 +151,95 @@ const CartScreen: React.FC = () => {
         throw new Error(errorData.message || "Failed to fetch products.");
       }
 
-      const productsData: Product[] = await productsResponse.json();
+      let productsData: Product[] = [];
+      try {
+        productsData = await productsResponse.json();
+        if (!Array.isArray(productsData)) {
+          // If it's not a direct array, maybe it's a nested object
+          if (productsData && Array.isArray((productsData as any).products)) {
+            productsData = (productsData as any).products;
+          } else {
+            console.warn("Unexpected products format:", productsData);
+            setCartProducts([]);
+            return;
+          }
+        }
+      } catch (parseErr) {
+        console.error("Error parsing products data:", parseErr);
+        setError("Could not parse products data.");
+        setCartProducts([]);
+        return;
+      }
 
+      // Merge cart items with product details
       const combinedCartProducts: CartProduct[] = cartData.items.map((item) => {
-        const product = productsData.find((prod) => prod.id === item.productId);
-        if (product) {
+        if (!item || !item.productId) {
           return {
-            id: product.id,
-            title: product.title,
-            price: product.price,
-            images: product.images,
-            quantity: item.quantity,
-            description: product.description,
-            category: product.category,
-            university: product.university,
-            sellerId: product.userId, // Mapped from product.userId
-            postedDate: product.postedDate,
-            rating: product.rating,
-            quality: product.quality,
+            id: "unknown-product",
+            title: "Unknown Product",
+            price: 0,
+            images: [],
+            quantity: item?.quantity || 1,
+            sellerId: "unknown-seller",
+            postedDate: "",
+            rating: 0,
+            quality: "",
           };
-        } else {
+        }
+
+        const product = productsData.find((p) => p.id === item.productId);
+        if (!product) {
+          // If product detail not found
           return {
             id: item.productId,
             title: "Unknown Product",
             price: 0,
             images: [],
             quantity: item.quantity,
-            sellerId: "unknown-seller", // Handle missing sellerId
+            sellerId: "unknown-seller",
             postedDate: "",
             rating: 0,
             quality: "",
           };
         }
+
+        return {
+          id: product.id,
+          title: product.title,
+          price: product.price,
+          images: product.images,
+          quantity: item.quantity,
+          description: product.description,
+          category: product.category,
+          university: product.university,
+          sellerId: product.userId,
+          postedDate: product.postedDate,
+          rating: product.rating,
+          quality: product.quality,
+        };
       });
 
-      // Filter out products with unknown sellerId if necessary
+      // Optionally remove items with unknown sellers
       const validCartProducts = combinedCartProducts.filter(
-        (product) => product.sellerId !== "unknown-seller"
+        (cp) => cp.sellerId !== "unknown-seller"
       );
 
+      // Finally set the products
       setCartProducts(validCartProducts);
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 500,
-        useNativeDriver: true,
-      }).start();
     } catch (err: any) {
-      // Added type annotation
       console.error("Fetch Cart Error:", err);
       setError(err.message || "An unexpected error occurred.");
-    } finally {
-      setLoading(false);
+      setCartProducts([]);
     }
   };
 
-  // Function to initiate delete confirmation
+  // Confirm removal (trigger modal)
   const confirmRemoveFromCart = (product: CartProduct) => {
     setItemToDelete(product);
     setIsDeleteModalVisible(true);
   };
 
-  // Function to handle actual deletion after confirmation
+  // Actually remove item
   const handleDelete = async () => {
     if (!itemToDelete) return;
 
@@ -239,12 +276,9 @@ const CartScreen: React.FC = () => {
         throw new Error(errorData.message || "Failed to remove item.");
       }
 
-      setCartProducts((prevItems) =>
-        prevItems.filter((item) => item.id !== itemToDelete.id)
-      );
-      // Removed the Alert after deletion for a smoother UX
+      // Remove locally
+      setCartProducts((prev) => prev?.filter((p) => p.id !== itemToDelete.id) || []);
     } catch (err: any) {
-      // Added type annotation
       console.error("Remove from Cart Error:", err);
       Alert.alert(
         "Error",
@@ -256,8 +290,8 @@ const CartScreen: React.FC = () => {
     }
   };
 
-  // Function to handle "Buy" button press
-  const buyProduct = async (product: CartProduct) => {
+  // Handle Message for single product
+  const messageProduct = async (product: CartProduct) => {
     if (!userId) {
       Alert.alert("Error", "User not authenticated.");
       return;
@@ -272,7 +306,7 @@ const CartScreen: React.FC = () => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`, // Use your token from context
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           productId: product.id,
@@ -304,21 +338,73 @@ const CartScreen: React.FC = () => {
         throw new Error(errorData.message || "Failed to request chat.");
       }
 
-      Alert.alert("Request Sent", "Your chat request has been sent!");
+      // Show quick confirmation popup
+      setMessagePopupVisible(true);
+      setTimeout(() => {
+        setMessagePopupVisible(false);
+      }, 2000);
     } catch (err: any) {
-      // Added type annotation
       console.error("Chat Request Error:", err);
       Alert.alert("Error", err.message || "Failed to send chat request.");
     }
   };
 
-  // Function to navigate to Checkout (disabled in this flow, but kept for reference)
-  const proceedToCheckout = () => {
-    if (cartProducts.length === 0) {
-      Alert.alert("Empty Cart", "Your cart is empty.");
+  // Handle Message All
+  const messageAllProducts = async () => {
+    if (!userId) {
+      Alert.alert("Error", "User not authenticated.");
       return;
     }
-    navigation.navigate("Checkout", { cartProducts });
+    if (!cartProducts || cartProducts.length === 0) {
+      Alert.alert("Error", "No products to message.");
+      return;
+    }
+
+    try {
+      // Assuming the backend can handle messaging multiple sellers at once.
+      // If not, you might need to iterate and send individual messages.
+      const uniqueSellers = Array.from(new Set(cartProducts.map((p) => p.sellerId)));
+
+      const chatRequests = uniqueSellers.map((sellerId) =>
+        fetch(`${NGROK_URL}/chat/request`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            productIds: cartProducts
+              .filter((p) => p.sellerId === sellerId)
+              .map((p) => p.id),
+            buyerId: userId,
+            sellerId: sellerId,
+          }),
+        })
+      );
+
+      const responses = await Promise.all(chatRequests);
+
+      const failedRequests = [];
+      for (let i = 0; i < responses.length; i++) {
+        if (!responses[i].ok) {
+          const errorData = await responses[i].json();
+          failedRequests.push(errorData.message || "Failed to request chat.");
+        }
+      }
+
+      if (failedRequests.length > 0) {
+        throw new Error(failedRequests.join("\n"));
+      }
+
+      // Show quick confirmation popup
+      setMessagePopupVisible(true);
+      setTimeout(() => {
+        setMessagePopupVisible(false);
+      }, 2000);
+    } catch (err: any) {
+      console.error("Chat Request Error:", err);
+      Alert.alert("Error", err.message || "Failed to send chat requests.");
+    }
   };
 
   useEffect(() => {
@@ -326,16 +412,14 @@ const CartScreen: React.FC = () => {
   }, []);
 
   const calculateTotal = () => {
-    return cartProducts.reduce(
-      (sum, item) => sum + item.price * item.quantity,
-      0
-    );
+    if (!cartProducts) return 0;
+    return cartProducts.reduce((sum, item) => sum + item.price * item.quantity, 0);
   };
 
   const renderSeparator = () => <View style={styles.separator} />;
 
   const renderCartItem = ({ item }: { item: CartProduct }) => (
-    <Animated.View style={[styles.cartItem, { opacity: fadeAnim }]}>
+    <View style={styles.cartItem}>
       <Image
         source={{
           uri:
@@ -355,15 +439,15 @@ const CartScreen: React.FC = () => {
           colors={["rgb(168, 237, 234)", "rgb(254, 214, 227)"]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={styles.buyButtonGradient}
+          style={styles.messageButtonGradient}
         >
           <TouchableOpacity
-            onPress={() => buyProduct(item)}
-            style={styles.buyButton}
-            accessibilityLabel={`Buy ${item.title}`}
+            onPress={() => messageProduct(item)}
+            style={styles.messageButton}
+            accessibilityLabel={`Message about ${item.title}`}
           >
-            <Ionicons name="cart-outline" size={16} color="black" />
-            <Text style={styles.buyButtonText}>Buy</Text>
+            <Ionicons name="chatbubble-ellipses-outline" size={16} color="black" />
+            <Text style={styles.messageButtonText}>Message</Text>
           </TouchableOpacity>
         </LinearGradient>
         <TouchableOpacity
@@ -374,70 +458,76 @@ const CartScreen: React.FC = () => {
           <Ionicons name="trash-outline" size={22} color="#FF3B30" />
         </TouchableOpacity>
       </View>
-    </Animated.View>
+    </View>
   );
 
+  /**
+   * RENDER
+   * - If `cartProducts` is still `undefined`, we haven't finished fetching, so show nothing.
+   * - If `error`, show error UI.
+   * - If `cartProducts` is an empty array, show empty cart.
+   * - Else, show cart items.
+   */
+  if (cartProducts === undefined) {
+    // Show absolutely nothing to minimize flicker
+    return <View style={styles.container} />;
+  }
+
+  if (error) {
+    return (
+      <View style={styles.errorContainer}>
+        <Ionicons name="alert-circle-outline" size={60} color="#FF3B30" />
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity
+          style={styles.retryButton}
+          onPress={() => {
+            setError(null);
+            setCartProducts(undefined); // Force re-fetch
+            fetchCart();
+          }}
+          accessibilityLabel="Retry Fetching Cart"
+        >
+          <Ionicons name="refresh-outline" size={20} color="#fff" />
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  if (cartProducts.length === 0) {
+    return (
+      <View style={styles.emptyContainer}>
+        <Ionicons name="bag-outline" size={100} color="#bbb" />
+        <Text style={styles.emptyText}>Your shopping bag is empty.</Text>
+      </View>
+    );
+  }
+
+  // Otherwise, we have cart items
   return (
     <View style={styles.container}>
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#BB86FC" />
-          <Text style={styles.loadingText}>Loading your cart...</Text>
+      <FlatList
+        data={cartProducts}
+        keyExtractor={(item) => item.id}
+        renderItem={renderCartItem}
+        ItemSeparatorComponent={renderSeparator}
+        contentContainerStyle={styles.listContainer}
+        showsVerticalScrollIndicator={false}
+      />
+      <View style={styles.footer}>
+        <View style={styles.totalContainer}>
+          <Text style={styles.totalText}>Total</Text>
+          <Text style={styles.totalAmount}>${calculateTotal().toFixed(2)}</Text>
         </View>
-      ) : error ? (
-        <View style={styles.errorContainer}>
-          <Ionicons name="alert-circle-outline" size={60} color="#FF3B30" />
-          <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity
-            style={styles.retryButton}
-            onPress={() => {
-              setLoading(true);
-              setError(null);
-              fetchCart();
-            }}
-            accessibilityLabel="Retry Fetching Cart"
-          >
-            <Ionicons name="refresh-outline" size={20} color="#fff" />
-            <Text style={styles.retryButtonText}>Retry</Text>
-          </TouchableOpacity>
-        </View>
-      ) : cartProducts.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Ionicons name="cart-outline" size={100} color="#bbb" />
-          <Text style={styles.emptyText}>Your cart is empty.</Text>
-        </View>
-      ) : (
-        <>
-          <FlatList
-            data={cartProducts}
-            keyExtractor={(item) => item.id}
-            renderItem={renderCartItem}
-            ItemSeparatorComponent={renderSeparator}
-            contentContainerStyle={styles.listContainer}
-            showsVerticalScrollIndicator={false}
-          />
-          <View style={styles.footer}>
-            <View style={styles.totalContainer}>
-              <Text style={styles.totalText}>Total</Text>
-              <Text style={styles.totalAmount}>
-                ${calculateTotal().toFixed(2)}
-              </Text>
-            </View>
-            {/* 
-              The Checkout button is retained but can be hidden or disabled 
-              since payment flow is currently disabled.
-            */}
-            <TouchableOpacity
-              style={styles.checkoutButton}
-              onPress={proceedToCheckout}
-              accessibilityLabel="Proceed to Checkout"
-            >
-              <Text style={styles.checkoutButtonText}>Checkout</Text>
-              <Ionicons name="arrow-forward" size={20} color="#fff" />
-            </TouchableOpacity>
-          </View>
-        </>
-      )}
+        <TouchableOpacity
+          style={styles.messageAllButton}
+          onPress={messageAllProducts}
+          accessibilityLabel="Message All Sellers"
+        >
+          <Text style={styles.messageAllButtonText}>Message All</Text>
+          <Ionicons name="chatbubble-ellipses-outline" size={20} color="#fff" />
+        </TouchableOpacity>
+      </View>
 
       {/* Delete Confirmation Modal */}
       <Modal
@@ -449,34 +539,60 @@ const CartScreen: React.FC = () => {
           setItemToDelete(null);
         }}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <Ionicons name="trash-outline" size={40} color="#FF3B30" />
-            <Text style={styles.modalTitle}>Remove Item</Text>
-            <Text style={styles.modalMessage}>
-              Remove "{itemToDelete?.title}" from your cart?
-            </Text>
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={styles.modalButtonYes}
-                onPress={handleDelete}
-                accessibilityLabel="Confirm Delete"
-              >
-                <Text style={styles.modalButtonText}>Yes</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.modalButtonNo}
-                onPress={() => {
-                  setIsDeleteModalVisible(false);
-                  setItemToDelete(null);
-                }}
-                accessibilityLabel="Cancel Delete"
-              >
-                <Text style={styles.modalButtonText}>No</Text>
-              </TouchableOpacity>
+        <TouchableWithoutFeedback
+          onPress={() => {
+            setIsDeleteModalVisible(false);
+            setItemToDelete(null);
+          }}
+        >
+          <View style={styles.modalOverlay}>
+            <TouchableWithoutFeedback>
+              <View style={styles.modalContainer}>
+                <Ionicons name="trash-outline" size={40} color="#FF3B30" />
+                <Text style={styles.modalTitle}>Remove Item</Text>
+                <Text style={styles.modalMessage}>
+                  Remove "{itemToDelete?.title}" from your cart?
+                </Text>
+                <View style={styles.modalButtons}>
+                  <TouchableOpacity
+                    style={styles.modalButtonYes}
+                    onPress={handleDelete}
+                    accessibilityLabel="Confirm Delete"
+                  >
+                    <Text style={styles.modalButtonText}>Yes</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.modalButtonNo}
+                    onPress={() => {
+                      setIsDeleteModalVisible(false);
+                      setItemToDelete(null);
+                    }}
+                    accessibilityLabel="Cancel Delete"
+                  >
+                    <Text style={styles.modalButtonText}>No</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
+      {/* Message Confirmation Popup (no animation, just appear/disappear) */}
+      <Modal
+        transparent={true}
+        animationType="none"
+        visible={messagePopupVisible}
+        onRequestClose={() => setMessagePopupVisible(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setMessagePopupVisible(false)}>
+          <View style={styles.buyPopupOverlay}>
+            <View style={styles.buyPopupContainer}>
+              <Ionicons name="checkmark-circle-outline" size={30} color="#4CD964" />
+              <Text style={styles.buyPopupText}>Message sent!</Text>
             </View>
           </View>
-        </View>
+        </TouchableWithoutFeedback>
       </Modal>
     </View>
   );
@@ -484,6 +600,7 @@ const CartScreen: React.FC = () => {
 
 export default CartScreen;
 
+/** STYLES **/
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -494,13 +611,13 @@ const styles = StyleSheet.create({
   },
   cartItem: {
     flexDirection: "row",
-    alignItems: "flex-start", // Changed from 'center' to 'flex-start'
+    alignItems: "flex-start",
     paddingVertical: 12,
     paddingHorizontal: 15,
     borderRadius: 16,
   },
   cartImage: {
-    width: width * 0.18, // Reduced from 0.2 to 0.18
+    width: width * 0.18,
     height: width * 0.18,
     borderRadius: 12,
     marginRight: 15,
@@ -509,11 +626,11 @@ const styles = StyleSheet.create({
   cartDetails: {
     flex: 1,
     justifyContent: "flex-start",
-    paddingRight: 10, // Added padding to prevent text from overlapping buttons
+    paddingRight: 10,
   },
   cartTitle: {
     color: "#fff",
-    fontSize: 14, // Reduced font size
+    fontSize: 14,
     fontWeight: "700",
     marginBottom: 4,
     flexWrap: "wrap",
@@ -525,26 +642,28 @@ const styles = StyleSheet.create({
   },
   actionButtons: {
     flexDirection: "row",
-    alignItems: "flex-start", // Changed from 'center' to 'flex-start'
+    alignItems: "flex-start",
   },
-  buyButtonGradient: {
+  messageButtonGradient: {
     borderRadius: 8,
     marginRight: 10,
+    marginTop: 4, // Add this to move the button lower
     shadowColor: "#888",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.4,
     shadowRadius: 3,
     elevation: 5,
   },
-  buyButton: {
+  
+  messageButton: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 6, // Reduced padding
-    paddingHorizontal: 10, // Reduced padding
+    paddingVertical: 6,
+    paddingHorizontal: 10,
   },
-  buyButtonText: {
+  messageButtonText: {
     color: "black",
-    fontSize: 12, // Reduced font size
+    fontSize: 12,
     fontWeight: "700",
     marginLeft: 4,
   },
@@ -556,23 +675,13 @@ const styles = StyleSheet.create({
     backgroundColor: "#2C2C2C",
     marginVertical: 5,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#121212",
-  },
-  loadingText: {
-    marginTop: 10,
-    color: "#bbb",
-    fontSize: 16,
-  },
+  /** Error State **/
   errorContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: 20,
-    backgroundColor: "#121212",
+    backgroundColor: "#000",
   },
   errorText: {
     color: "#FF3B30",
@@ -595,11 +704,12 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     marginLeft: 8,
   },
+  /** Empty Cart **/
   emptyContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#121212",
+    backgroundColor: "#000",
   },
   emptyText: {
     color: "#bbb",
@@ -610,6 +720,7 @@ const styles = StyleSheet.create({
   listContainer: {
     paddingBottom: 150,
   },
+  /** Footer/Message All **/
   footer: {
     position: "absolute",
     bottom: 20,
@@ -642,7 +753,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginTop: 4,
   },
-  checkoutButton: {
+  messageAllButton: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#BB86FC",
@@ -655,13 +766,13 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 15,
   },
-  checkoutButtonText: {
+  messageAllButtonText: {
     color: "#fff",
     fontSize: 16,
     fontWeight: "700",
     marginRight: 6,
   },
-  // Styles for Delete Confirmation Modal
+  /** Modal Styles **/
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
@@ -713,5 +824,27 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 14,
     fontWeight: "600",
+  },
+  /** Message Popup **/
+  buyPopupOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  buyPopupContainer: {
+    backgroundColor: "#1E1E1E",
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    elevation: 10,
+  },
+  buyPopupText: {
+    color: "#fff",
+    fontSize: 14,
+    marginLeft: 10,
+    fontWeight: "500",
   },
 });
