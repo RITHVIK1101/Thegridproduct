@@ -1,6 +1,6 @@
 // JobDetails.tsx
 
-import React, { useEffect, useState, useContext } from "react";
+import React, { useEffect, useState, useContext, useRef } from "react";
 import {
   View,
   Text,
@@ -11,7 +11,7 @@ import {
   TouchableOpacity,
   Alert,
   Dimensions,
-  FlatList,
+  Modal,
 } from "react-native";
 import { RouteProp, useRoute, useNavigation } from "@react-navigation/native";
 import Ionicons from "react-native-vector-icons/Ionicons";
@@ -20,6 +20,7 @@ import { NGROK_URL } from "@env";
 import { LinearGradient } from "expo-linear-gradient";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "./navigationTypes";
+import SwiperFlatList from "react-native-swiper-flatlist";
 
 type JobDetailRouteProp = RouteProp<RootStackParamList, "JobDetail">;
 type JobDetailNavigationProp = StackNavigationProp<
@@ -37,8 +38,9 @@ interface JobDetail {
   images: string[]; // Array of image URLs
   deliveryTime: string;
   university: string;
+  campusPresence: string; // New field for Campus Presence
+  expirationDate: string; // New field for Expiration Date
   postedDate: string; // Date Posted
-  // Removed studentType and status
 }
 
 const { width } = Dimensions.get("window");
@@ -51,6 +53,17 @@ const JobDetails: React.FC = () => {
 
   const [jobDetail, setJobDetail] = useState<JobDetail | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
+  const [isModalVisible, setIsModalVisible] = useState<boolean>(false);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [autoplay, setAutoplay] = useState<boolean>(true);
+
+  // Reference to the Swiper
+  const swiperRef = useRef<SwiperFlatList>(null);
+
+  // Adjust these for the timing you desire
+  const autoplayDelaySeconds = 2;  // Delay before first image slides
+  const autoplayIntervalSeconds = 3; // Time each image is displayed
+  const transitionPauseMs = autoplayIntervalSeconds * 1000; // Pause at last image
 
   useEffect(() => {
     fetchJobDetails();
@@ -72,7 +85,6 @@ const JobDetails: React.FC = () => {
       }
 
       const data = await response.json();
-
       if (!data) {
         throw new Error("Job detail not found.");
       }
@@ -82,7 +94,7 @@ const JobDetails: React.FC = () => {
         data.images = [];
       }
 
-      // Ensure `postedDate` is present and formatted
+      // Format postedDate
       if (data.postedDate) {
         const date = new Date(data.postedDate);
         data.postedDate = date.toLocaleDateString(undefined, {
@@ -92,6 +104,18 @@ const JobDetails: React.FC = () => {
         });
       } else {
         data.postedDate = "N/A";
+      }
+
+      // Format expirationDate
+      if (data.expirationDate) {
+        const date = new Date(data.expirationDate);
+        data.expirationDate = date.toLocaleDateString(undefined, {
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        });
+      } else {
+        data.expirationDate = "N/A";
       }
 
       setJobDetail(data);
@@ -111,13 +135,17 @@ const JobDetails: React.FC = () => {
     navigation.navigate("Messaging", { chatId, userId: jobDetail.userId });
   };
 
-  if (loading || !jobDetail) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#BB86FC" />
-      </View>
-    );
-  }
+  const openImageModal = (imageUrl: string) => {
+    setSelectedImage(imageUrl);
+    setIsModalVisible(true);
+    setAutoplay(false); // Pause autoplay while modal is open
+  };
+
+  const closeImageModal = () => {
+    setIsModalVisible(false);
+    setSelectedImage(null);
+    setAutoplay(true); // Resume autoplay
+  };
 
   // Reusable component to display label & value
   const DetailItem: React.FC<{ label: string; value: string }> = ({
@@ -130,44 +158,104 @@ const JobDetails: React.FC = () => {
     </View>
   );
 
-  return (
-    <ScrollView style={styles.container}>
-      {/* Image Gallery */}
-      {jobDetail.images.length > 0 ? (
-        <FlatList
-          data={jobDetail.images.slice(0, 5)} // Show up to 5 images
-          horizontal
-          keyExtractor={(item, index) => `${jobDetail.id}_image_${index}`}
-          showsHorizontalScrollIndicator={false}
-          style={styles.imageGallery}
-          renderItem={({ item }) => {
-            // Convert relative URLs to absolute if necessary
-            const imageUrl = item.startsWith("http")
-              ? item
-              : `${NGROK_URL}/${item}`;
-
-            return (
-              <Image
-                source={{ uri: imageUrl }}
-                style={styles.galleryImage}
-                resizeMode="cover"
-                onError={(e) => {
-                  console.log("Error loading image:", e.nativeEvent.error);
-                }}
-              />
-            );
+  // Render each image in the swiper
+  const renderSwiperItem = ({ item }: { item: string }) => {
+    const imageUrl = item.startsWith("http") ? item : `${NGROK_URL}/${item}`;
+    return (
+      <TouchableOpacity onPress={() => openImageModal(imageUrl)} activeOpacity={0.8}>
+        <Image
+          source={{ uri: imageUrl }}
+          style={styles.swiperImage}
+          resizeMode="cover"
+          onError={(e) => {
+            console.log("Error loading image:", e.nativeEvent.error);
           }}
         />
+        {/* Overlay Icon to indicate clickability */}
+        <View style={styles.imageOverlay}>
+          <Ionicons name="expand-outline" size={30} color="#FFFFFF80" />
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  if (loading || !jobDetail) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#BB86FC" />
+      </View>
+    );
+  }
+
+  // Basic array of up to 5 images
+  const displayedImages = jobDetail.images.slice(0, 5);
+  const lastImageIndex = displayedImages.length - 1;
+
+  return (
+    <ScrollView style={styles.container}>
+      {/* Image Swiper */}
+      {displayedImages.length > 0 ? (
+        <View style={styles.swiperContainer}>
+          <SwiperFlatList
+            ref={swiperRef}
+            autoplay={autoplay}
+            autoplayDelay={autoplayDelaySeconds}
+            autoplayInterval={autoplayIntervalSeconds}
+            autoplayLoop={false} // We'll manually loop back
+            index={0}
+            showPagination
+            paginationStyle={styles.paginationStyle}
+            paginationDefaultColor="#555555"
+            paginationActiveColor="#BB86FC"
+            data={displayedImages}
+            renderItem={renderSwiperItem}
+            keyExtractor={(item, index) => `${jobDetail.id}_image_${index}`}
+            onChangeIndex={({ index }) => {
+              // If we're at the last image, wait, then smoothly slide back
+              if (index === lastImageIndex) {
+                setTimeout(() => {
+                  if (swiperRef.current) {
+                    swiperRef.current.scrollToIndex({
+                      index: 0,
+                      animated: true,
+                    });
+                  }
+                }, transitionPauseMs);
+              }
+            }}
+          />
+        </View>
       ) : (
         <View style={styles.coverPlaceholder}>
           <Ionicons name="image-outline" size={60} color="#555" />
         </View>
       )}
 
+      {/* Fullscreen Image Modal */}
+      <Modal
+        visible={isModalVisible}
+        transparent={true}
+        onRequestClose={closeImageModal}
+        animationType="fade"
+      >
+        <TouchableOpacity style={styles.modalBackground} onPress={closeImageModal}>
+          {selectedImage && (
+            <Image
+              source={{ uri: selectedImage }}
+              style={styles.fullscreenImage}
+              resizeMode="contain"
+            />
+          )}
+        </TouchableOpacity>
+      </Modal>
+
       {/* Details Container */}
       <View style={styles.detailsContainer}>
         {/* Title */}
         <Text style={styles.title}>{jobDetail.title}</Text>
+
+        {/* Description */}
+        <Text style={styles.description}>{jobDetail.description}</Text>
 
         {/* Category/Type */}
         <View style={styles.categoryRow}>
@@ -180,47 +268,34 @@ const JobDetails: React.FC = () => {
           <Text style={styles.category}>{jobDetail.category}</Text>
         </View>
 
-        {/* Date Posted */}
-        <Text style={styles.datePosted}>Posted on {jobDetail.postedDate}</Text>
-
         {/* Price */}
-        <Text
-          style={[
-            styles.price,
-            jobDetail.price === "Open to Communication" && styles.priceOpen,
-          ]}
-        >
-          {jobDetail.price === "Open to Communication"
-            ? jobDetail.price
+        <Text style={styles.price}>
+          Price:{" "}
+          {jobDetail.price.toLowerCase() === "open to communication"
+            ? "Open to Communication"
             : `$${parseFloat(jobDetail.price).toFixed(2)}`}
         </Text>
 
-        {/* Description */}
-        <Text style={styles.description}>{jobDetail.description}</Text>
+        {/* Date Posted */}
+        <Text style={styles.datePosted}>Posted on {jobDetail.postedDate}</Text>
 
         {/* Additional Details */}
         <View style={styles.additionalDetails}>
           <DetailItem label="Delivery Time" value={jobDetail.deliveryTime} />
+          <DetailItem label="Campus Presence" value={jobDetail.campusPresence} />
           <DetailItem label="University" value={jobDetail.university} />
-          {/* Removed studentType and status */}
+          <DetailItem label="Expiration Date" value={jobDetail.expirationDate} />
         </View>
 
         {/* Message Button */}
-        <TouchableOpacity
-          style={styles.messageButton}
-          onPress={handleMessagePress}
-        >
+        <TouchableOpacity style={styles.messageButton} onPress={handleMessagePress}>
           <LinearGradient
             colors={["#8E2DE2", "#4A00E0"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.messageButtonGradient}
           >
-            <Ionicons
-              name="chatbubble-ellipses-outline"
-              size={20}
-              color="#fff"
-            />
+            <Ionicons name="chatbubble-ellipses-outline" size={20} color="#fff" />
             <Text style={styles.messageButtonText}>Message</Text>
           </LinearGradient>
         </TouchableOpacity>
@@ -240,109 +315,139 @@ const categoryIcons: { [key: string]: string } = {
 
 export default JobDetails;
 
+/* -------------------- STYLES -------------------- */
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#000",
+    backgroundColor: "#000000", // Pure black background
   },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#000",
+    backgroundColor: "#000000",
   },
-  imageGallery: {
-    width: "100%",
-    height: 200,
+  swiperContainer: {
+    height: 250,
+    marginTop: 10,
   },
-  galleryImage: {
-    width: width * 0.8,
-    height: 200,
-    marginRight: 10,
-    borderRadius: 10,
+  swiperImage: {
+    width: width,
+    height: 250,
+    borderRadius: 15,
   },
   coverPlaceholder: {
     width: "100%",
-    height: 200,
-    backgroundColor: "#333",
+    height: 250,
+    backgroundColor: "#1E1E1E",
     justifyContent: "center",
     alignItems: "center",
+    borderRadius: 15,
+    marginVertical: 10,
+  },
+  modalBackground: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.95)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  fullscreenImage: {
+    width: "90%",
+    height: "70%",
+    borderRadius: 10,
   },
   detailsContainer: {
     padding: 20,
   },
   title: {
-    color: "#fff",
-    fontSize: 26,
+    color: "#FFFFFF",
+    fontSize: 28,
     fontWeight: "800",
     marginBottom: 10,
+  },
+  description: {
+    color: "#E0E0E0",
+    fontSize: 20, // Increased font size
+    lineHeight: 28, // Increased line height
+    marginBottom: 20, // Increased margin
   },
   categoryRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 5,
+    marginBottom: 10,
   },
   category: {
     color: "#BB86FC",
     fontSize: 18,
     fontWeight: "700",
   },
+  price: {
+    color: "#BB86FC",
+    fontSize: 18,
+    fontWeight: "700",
+    marginBottom: 10,
+  },
   datePosted: {
     color: "#AAAAAA",
     fontSize: 14,
-    marginBottom: 10,
-  },
-  price: {
-    color: "#fff",
-    fontSize: 20,
-    fontWeight: "600",
     marginBottom: 15,
   },
-  priceOpen: {
-    fontWeight: "400", // Normal weight for "Open to Communication"
-  },
-  description: {
-    color: "#ccc",
-    fontSize: 16,
-    lineHeight: 22,
-    marginBottom: 20,
-  },
   additionalDetails: {
-    marginBottom: 20,
+    marginBottom: 25,
   },
   detailItem: {
     flexDirection: "row",
-    marginBottom: 10,
+    marginBottom: 12,
   },
   detailLabel: {
     color: "#BB86FC",
     fontSize: 16,
     fontWeight: "600",
-    width: 120, // Adjust if needed
+    width: 160, // Adjusted width for better alignment
   },
   detailValue: {
-    color: "#fff",
+    color: "#FFFFFF",
     fontSize: 16,
     flex: 1,
     flexWrap: "wrap",
   },
   messageButton: {
     alignSelf: "center",
-    width: "80%",
-    borderRadius: 25,
+    width: "90%",
+    borderRadius: 30,
     overflow: "hidden",
-    marginTop: 20,
+    marginTop: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 8, // For Android shadow
   },
   messageButtonGradient: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 12,
+    paddingVertical: 14,
   },
   messageButtonText: {
-    color: "#fff",
+    color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "600",
     marginLeft: 10,
+  },
+  paginationStyle: {
+    marginTop: 10,
+  },
+  imageOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    width: width,
+    height: 250,
+    backgroundColor: "rgba(0,0,0,0.3)",
+    justifyContent: "center",
+    alignItems: "center",
+    borderRadius: 15,
   },
 });
