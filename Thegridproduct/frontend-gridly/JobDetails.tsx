@@ -41,9 +41,13 @@ interface JobDetail {
   campusPresence: string; // New field for Campus Presence
   expirationDate: string; // New field for Expiration Date
   postedDate: string; // Date Posted
+  // Removed studentType and status
 }
 
 const { width } = Dimensions.get("window");
+
+// Configure how many characters to display before "Read More"
+const DESCRIPTION_CHAR_LIMIT = 200;
 
 const JobDetails: React.FC = () => {
   const route = useRoute<JobDetailRouteProp>();
@@ -56,11 +60,12 @@ const JobDetails: React.FC = () => {
   const [isModalVisible, setIsModalVisible] = useState<boolean>(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [autoplay, setAutoplay] = useState<boolean>(true);
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState<boolean>(false);
 
   // Reference to the Swiper
   const swiperRef = useRef<SwiperFlatList>(null);
 
-  // Adjust these for the timing you desire
+  // Autoplay timing configuration
   const autoplayDelaySeconds = 2;  // Delay before first image slides
   const autoplayIntervalSeconds = 3; // Time each image is displayed
   const transitionPauseMs = autoplayIntervalSeconds * 1000; // Pause at last image
@@ -130,7 +135,6 @@ const JobDetails: React.FC = () => {
 
   const handleMessagePress = () => {
     if (!jobDetail) return;
-
     const chatId = `chat_${userId}_${jobDetail.userId}`;
     navigation.navigate("Messaging", { chatId, userId: jobDetail.userId });
   };
@@ -158,7 +162,7 @@ const JobDetails: React.FC = () => {
     </View>
   );
 
-  // Render each image in the swiper
+  // Swiper item for each image
   const renderSwiperItem = ({ item }: { item: string }) => {
     const imageUrl = item.startsWith("http") ? item : `${NGROK_URL}/${item}`;
     return (
@@ -187,13 +191,23 @@ const JobDetails: React.FC = () => {
     );
   }
 
-  // Basic array of up to 5 images
   const displayedImages = jobDetail.images.slice(0, 5);
   const lastImageIndex = displayedImages.length - 1;
 
+  // Description logic: truncated vs. full
+  const { description = "" } = jobDetail;
+  const isLongDescription = description.length > DESCRIPTION_CHAR_LIMIT;
+  const truncatedDescription = isLongDescription
+    ? description.slice(0, DESCRIPTION_CHAR_LIMIT) + "..."
+    : description;
+
+  const displayedDescription = isDescriptionExpanded
+    ? description
+    : truncatedDescription;
+
   return (
     <ScrollView style={styles.container}>
-      {/* Image Swiper */}
+      {/* Image Swiper or "No Material" */}
       {displayedImages.length > 0 ? (
         <View style={styles.swiperContainer}>
           <SwiperFlatList
@@ -201,7 +215,7 @@ const JobDetails: React.FC = () => {
             autoplay={autoplay}
             autoplayDelay={autoplayDelaySeconds}
             autoplayInterval={autoplayIntervalSeconds}
-            autoplayLoop={false} // We'll manually loop back
+            autoplayLoop={false} // We'll manually handle returning to the first image
             index={0}
             showPagination
             paginationStyle={styles.paginationStyle}
@@ -211,7 +225,7 @@ const JobDetails: React.FC = () => {
             renderItem={renderSwiperItem}
             keyExtractor={(item, index) => `${jobDetail.id}_image_${index}`}
             onChangeIndex={({ index }) => {
-              // If we're at the last image, wait, then smoothly slide back
+              // If we're at the last image, wait, then smoothly slide back to index 0
               if (index === lastImageIndex) {
                 setTimeout(() => {
                   if (swiperRef.current) {
@@ -226,8 +240,8 @@ const JobDetails: React.FC = () => {
           />
         </View>
       ) : (
-        <View style={styles.coverPlaceholder}>
-          <Ionicons name="image-outline" size={60} color="#555" />
+        <View style={styles.noMaterialContainer}>
+          <Text style={styles.noMaterialText}>No images provided.</Text>
         </View>
       )}
 
@@ -254,8 +268,17 @@ const JobDetails: React.FC = () => {
         {/* Title */}
         <Text style={styles.title}>{jobDetail.title}</Text>
 
-        {/* Description */}
-        <Text style={styles.description}>{jobDetail.description}</Text>
+        {/* Description (with Read More / Read Less) */}
+        <Text style={styles.description}>{displayedDescription}</Text>
+        {isLongDescription && (
+          <TouchableOpacity
+            onPress={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
+          >
+            <Text style={styles.readMoreText}>
+              {isDescriptionExpanded ? "Read Less" : "Read More"}
+            </Text>
+          </TouchableOpacity>
+        )}
 
         {/* Category/Type */}
         <View style={styles.categoryRow}>
@@ -304,6 +327,7 @@ const JobDetails: React.FC = () => {
   );
 };
 
+/** Icon mapping for categories */
 const categoryIcons: { [key: string]: string } = {
   Tutoring: "school-outline",
   Design: "color-palette-outline",
@@ -333,18 +357,21 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   swiperImage: {
-    width: width,
+    width,
     height: 250,
     borderRadius: 15,
   },
-  coverPlaceholder: {
-    width: "100%",
-    height: 250,
-    backgroundColor: "#1E1E1E",
-    justifyContent: "center",
+  // If no images, display a simple "No material provided." text
+  noMaterialContainer: {
+    marginTop: 10,
+    marginBottom: 10,
     alignItems: "center",
-    borderRadius: 15,
-    marginVertical: 10,
+    justifyContent: "center",
+  },
+  noMaterialText: {
+    color: "#AAAAAA",
+    fontSize: 16,
+    fontStyle: "italic",
   },
   modalBackground: {
     flex: 1,
@@ -368,9 +395,15 @@ const styles = StyleSheet.create({
   },
   description: {
     color: "#E0E0E0",
-    fontSize: 20, // Increased font size
-    lineHeight: 28, // Increased line height
-    marginBottom: 20, // Increased margin
+    fontSize: 20, // Larger font for readability
+    lineHeight: 28,
+    marginBottom: 5, // Slightly less margin to place "Read More" closer
+  },
+  readMoreText: {
+    color: "#BB86FC",
+    fontSize: 16,
+    fontWeight: "600",
+    marginBottom: 15,
   },
   categoryRow: {
     flexDirection: "row",
@@ -404,7 +437,7 @@ const styles = StyleSheet.create({
     color: "#BB86FC",
     fontSize: 16,
     fontWeight: "600",
-    width: 160, // Adjusted width for better alignment
+    width: 160,
   },
   detailValue: {
     color: "#FFFFFF",
@@ -443,7 +476,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 0,
     left: 0,
-    width: width,
+    width,
     height: 250,
     backgroundColor: "rgba(0,0,0,0.3)",
     justifyContent: "center",
