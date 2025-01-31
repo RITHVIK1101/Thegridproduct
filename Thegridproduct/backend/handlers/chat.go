@@ -351,7 +351,7 @@ func AcceptChatRequestHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	var req struct {
-		RequestID string `json:"requestId"` // Fixed syntax
+		RequestID string `json:"requestId"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		WriteJSONError(w, "Invalid request payload", http.StatusBadRequest)
@@ -423,13 +423,29 @@ func AcceptChatRequestHandler(w http.ResponseWriter, r *http.Request) {
 			return nil, err
 		}
 
-		// Optionally, notify the buyer that their request was accepted
-		// Implement notification logic here (e.g., via Ably, email, push notification)
+		// Publish event to Ably
+		ablyClient := GetAblyClient()
+		channelName := "chat:" + newChat.ID.Hex()
+		channel := ablyClient.Channels.Get(channelName)
 
-		return nil, nil
+		// Notify both buyer and seller
+		message := map[string]interface{}{
+			"type":      "chat_created",
+			"chatID":    newChat.ID.Hex(),
+			"buyerID":   chatReq.BuyerID.Hex(),
+			"sellerID":  chatReq.SellerID.Hex(),
+			"productID": chatReq.ProductID.Hex(),
+		}
+
+		err = channel.Publish(context.Background(), "chat_created", message)
+		if err != nil {
+			log.Printf("Failed to publish chat_created event to Ably for chat %s: %v", newChat.ID.Hex(), err)
+		}
+
+		return newChat, nil
 	}
 
-	_, err = session.WithTransaction(context.Background(), callback)
+	result, err := session.WithTransaction(context.Background(), callback)
 	if err != nil {
 		if appErr, ok := err.(*AppError); ok {
 			WriteJSONError(w, appErr.Message, appErr.StatusCode)
@@ -440,9 +456,12 @@ func AcceptChatRequestHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	newChat := result.(*models.Chat)
+
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{
 		"message": "Chat request accepted and chat room created successfully",
+		"chatID":  newChat.ID.Hex(),
 	})
 }
 
@@ -451,7 +470,7 @@ func RejectChatRequestHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	var req struct {
-		RequestID string `json:"requestId"` // Fixed syntax
+		RequestID string `json:"requestId"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		WriteJSONError(w, "Invalid request payload", http.StatusBadRequest)

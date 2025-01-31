@@ -2,14 +2,15 @@
 package handlers
 
 import (
-	"Thegridproduct/backend/db"
-	"Thegridproduct/backend/models"
 	"context"
 	"encoding/json"
 	"log"
 	"net/http"
 	"os"
 	"time"
+
+	"Thegridproduct/backend/db"
+	"Thegridproduct/backend/models"
 
 	"github.com/ably/ably-go/ably"
 	"github.com/google/uuid"
@@ -42,6 +43,7 @@ func SetAblyClient(client *ably.Realtime) {
 	ablyClient = client
 	log.Println("Ably client set successfully")
 }
+
 func generateMessageID() string {
 	return uuid.New().String()
 }
@@ -66,7 +68,8 @@ func PublishMessageHandler(w http.ResponseWriter, r *http.Request) {
 	timestamp := time.Now().UTC()
 
 	// Publish the message to Ably
-	channel := ablyClient.Channels.Get(msgReq.ChatID)
+	channelName := "chat:" + msgReq.ChatID
+	channel := ablyClient.Channels.Get(channelName)
 	err := channel.Publish(context.Background(), "message", map[string]interface{}{
 		"messageId": messageID,
 		"chatId":    msgReq.ChatID,

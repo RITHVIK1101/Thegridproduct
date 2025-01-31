@@ -233,7 +233,8 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       return;
     }
 
-    const channel = ablyRef.current.channels.get(chatId);
+    const channelName = "chat:" + chatId;
+    const channel = ablyRef.current.channels.get(channelName);
     channelRef.current = channel;
 
     channel.subscribe("message", (msg) => {
@@ -274,7 +275,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     });
 
     channel.on("attached", () => {
-      console.log(`Subscribed to Ably channel: ${chatId}`);
+      console.log(`Subscribed to Ably channel: ${channelName}`);
     });
 
     channel.on("update", (stateChange) => {
@@ -373,7 +374,10 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       console.log("Message sent successfully.");
     } catch (error: any) {
       console.error("sendMessage error:", error);
-      Alert.alert("Error", error.message || "Failed to send message.");
+      Alert.alert(
+        "Error",
+        error.response?.data?.message || "Failed to send message."
+      );
     } finally {
       setSending(false);
     }
@@ -528,8 +532,21 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         setIncomingRequests((prev) =>
           prev.filter((req) => req.requestId !== requestId)
         );
-        // Optionally refresh user chats:
-        fetchUserChats();
+        // Refresh chats to include the new one
+        await fetchUserChats();
+        // Open the newly created chat
+        if (response.data.chatID) {
+          const newChat = chats.find((c) => c.chatID === response.data.chatID);
+          if (newChat) {
+            openChat(newChat);
+          } else {
+            // Optionally, re-fetch chats and open the latest one
+            await fetchUserChats();
+            if (chats.length > 0) {
+              openChat(chats[chats.length - 1]);
+            }
+          }
+        }
       } else {
         Alert.alert("Error", "Failed to accept chat request.");
       }
