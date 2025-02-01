@@ -7,7 +7,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   FlatList,
-  ActivityIndicator,
   Alert,
   TextInput,
   ScrollView,
@@ -59,11 +58,10 @@ type Gig = {
 type ProductRequest = {
   id: string;
   productId: string;
-  productName: string; // Changed from 'title' to 'productName'
+  productName: string;
   description: string;
   status: string;
   createdAt: string;
-  // Add other fields as needed
 };
 
 const ActivityScreen: React.FC = () => {
@@ -76,19 +74,16 @@ const ActivityScreen: React.FC = () => {
   // Products State
   const [products, setProducts] = useState<Product[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
-  const [loadingProducts, setLoadingProducts] = useState<boolean>(false);
   const [errorProducts, setErrorProducts] = useState<string | null>(null);
 
   // Gigs State
   const [gigs, setGigs] = useState<Gig[]>([]);
   const [filteredGigs, setFilteredGigs] = useState<Gig[]>([]);
-  const [loadingGigs, setLoadingGigs] = useState<boolean>(false);
   const [errorGigs, setErrorGigs] = useState<string | null>(null);
 
   // Requested Products State
   const [requestedProducts, setRequestedProducts] = useState<ProductRequest[]>([]);
   const [filteredRequestedProducts, setFilteredRequestedProducts] = useState<ProductRequest[]>([]);
-  const [loadingRequested, setLoadingRequested] = useState<boolean>(false);
   const [errorRequested, setErrorRequested] = useState<string | null>(null);
 
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -98,7 +93,6 @@ const ActivityScreen: React.FC = () => {
   const fetchUserProducts = async () => {
     if (!userId || !token) {
       setErrorProducts("User not logged in.");
-      setLoadingProducts(false);
       return;
     }
     try {
@@ -138,8 +132,6 @@ const ActivityScreen: React.FC = () => {
           ? err.message
           : "An unexpected error occurred while fetching products."
       );
-    } finally {
-      setLoadingProducts(false);
     }
   };
 
@@ -147,7 +139,6 @@ const ActivityScreen: React.FC = () => {
   const fetchUserGigs = async () => {
     if (!userId || !token) {
       setErrorGigs("User not logged in.");
-      setLoadingGigs(false);
       return;
     }
     try {
@@ -188,8 +179,6 @@ const ActivityScreen: React.FC = () => {
           ? err.message
           : "An unexpected error occurred while fetching gigs."
       );
-    } finally {
-      setLoadingGigs(false);
     }
   };
 
@@ -197,7 +186,6 @@ const ActivityScreen: React.FC = () => {
   const fetchUserRequestedProducts = async () => {
     if (!userId || !token) {
       setErrorRequested("User not logged in.");
-      setLoadingRequested(false);
       return;
     }
     try {
@@ -226,7 +214,9 @@ const ActivityScreen: React.FC = () => {
         setRequestedProducts(data);
         setFilteredRequestedProducts(
           data.filter((req) =>
-            req.productName ? req.productName.includes(searchQuery) : false
+            req.productName
+              ? req.productName.toLowerCase().includes(searchQuery.toLowerCase())
+              : false
           )
         );
       }
@@ -237,23 +227,18 @@ const ActivityScreen: React.FC = () => {
           ? err.message
           : "An unexpected error occurred while fetching requested products."
       );
-    } finally {
-      setLoadingRequested(false);
     }
   };
 
   // Fetch data based on active segment
   const fetchData = async () => {
     if (activeSegment === "Products") {
-      setLoadingProducts(true);
       setErrorProducts(null);
       await fetchUserProducts();
     } else if (activeSegment === "Gigs") {
-      setLoadingGigs(true);
       setErrorGigs(null);
       await fetchUserGigs();
     } else if (activeSegment === "Requested") {
-      setLoadingRequested(true);
       setErrorRequested(null);
       await fetchUserRequestedProducts();
     }
@@ -443,12 +428,10 @@ const ActivityScreen: React.FC = () => {
 
   // Navigate to edit gig screen
   const navigateToEditGig = (gigId: string) => {
-    // For gigs, the edit icon is removed.
-    // Optionally, you can navigate to a detailed view of the gig.
     navigation.navigate("JobDetail", { jobId: gigId });
   };
 
-  // Navigate to view requested product details (Assuming there's a screen)
+  // Navigate to view requested product details (placeholder)
   const navigateToViewRequestedProduct = (requestedProductId: string) => {
     Alert.alert("Info", "Requested Products feature coming soon!");
   };
@@ -503,7 +486,6 @@ const ActivityScreen: React.FC = () => {
         </TouchableOpacity>
 
         <View style={styles.iconRow}>
-          {/* Removed the edit (pencil) icon for gigs */}
           <TouchableOpacity
             onPress={() => handleDeleteGig(item.id)}
             style={styles.iconTouchable}
@@ -533,9 +515,7 @@ const ActivityScreen: React.FC = () => {
           <Text style={styles.itemDate}>
             Posted: {new Date(item.postedDate).toDateString()}
           </Text>
-          <Text style={styles.itemStatus}>
-            {status}
-          </Text>
+          <Text style={styles.itemStatus}>{status}</Text>
           {item.selectedTags?.length > 0 && (
             <ScrollView
               horizontal
@@ -614,122 +594,47 @@ const ActivityScreen: React.FC = () => {
     );
   };
 
-  // Render requested products using FlatList
-  const renderRequested = () => {
-    if (loadingRequested) {
-      return (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="small" color="#BB86FC" />
-          <Text style={styles.loadingText}>
-            Loading your requested products...
-          </Text>
-        </View>
-      );
-    }
-    if (errorRequested) {
-      return (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{errorRequested}</Text>
-        </View>
-      );
-    }
-    return (
-      <FlatList
-        data={filteredRequestedProducts}
-        keyExtractor={(item) => item.id}
-        renderItem={renderRequestedProduct}
-        contentContainerStyle={styles.listContainer}
-        ListEmptyComponent={
-          !loadingRequested && !errorRequested ? (
-            <EmptyList
-              message="You have no requested products."
-              buttonText="Request a Product"
-              onPress={() => navigation.navigate("RequestProduct")}
-            />
-          ) : null
-        }
-        showsVerticalScrollIndicator={false}
-        onRefresh={handleRefresh}
-        refreshing={loadingRequested}
-        ItemSeparatorComponent={renderSeparator}
-      />
-    );
-  };
+  // Render requested products using FlatList without a default empty message
+  const renderRequested = () => (
+    <FlatList
+      data={filteredRequestedProducts}
+      keyExtractor={(item) => item.id}
+      renderItem={renderRequestedProduct}
+      contentContainerStyle={styles.listContainer}
+      showsVerticalScrollIndicator={false}
+      onRefresh={handleRefresh}
+      refreshing={false}
+      ItemSeparatorComponent={renderSeparator}
+    />
+  );
 
   const renderSeparator = () => <View style={styles.separator} />;
 
+  // Render list based on the active segment
   const renderList = () => {
     if (activeSegment === "Products") {
-      if (loadingProducts) {
-        return (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="small" color="#BB86FC" />
-            <Text style={styles.loadingText}>Loading your products...</Text>
-          </View>
-        );
-      }
-      if (errorProducts) {
-        return (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>{errorProducts}</Text>
-          </View>
-        );
-      }
       return (
         <FlatList
           data={filteredProducts}
           keyExtractor={(item) => item.id}
           renderItem={renderProduct}
           contentContainerStyle={styles.listContainer}
-          ListEmptyComponent={
-            !loadingProducts && !errorProducts ? (
-              <EmptyList
-                message="You have no products."
-                buttonText="Add Product"
-                onPress={() => navigation.navigate("AddProduct")}
-              />
-            ) : null
-          }
           showsVerticalScrollIndicator={false}
           onRefresh={handleRefresh}
-          refreshing={loadingProducts}
+          refreshing={false}
           ItemSeparatorComponent={renderSeparator}
         />
       );
     } else if (activeSegment === "Gigs") {
-      if (loadingGigs) {
-        return (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="small" color="#BB86FC" />
-            <Text style={styles.loadingText}>Loading your gigs...</Text>
-          </View>
-        );
-      }
-      if (errorGigs) {
-        return (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>{errorGigs}</Text>
-          </View>
-        );
-      }
       return (
         <FlatList
           data={filteredGigs}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => <GigItem item={item} />}
           contentContainerStyle={styles.listContainer}
-          ListEmptyComponent={
-            !loadingGigs && !errorGigs ? (
-              <EmptyList
-                message="You have no gigs."
-                buttonText="Add Gig"
-                onPress={() => navigation.navigate("AddGig")}
-              />
-            ) : null
-          }
           showsVerticalScrollIndicator={false}
           onRefresh={handleRefresh}
-          refreshing={loadingGigs}
+          refreshing={false}
           ItemSeparatorComponent={renderSeparator}
         />
       );
@@ -743,37 +648,7 @@ const ActivityScreen: React.FC = () => {
     fetchData();
   };
 
-  // Reusable EmptyList component
-  const EmptyList = ({
-    message,
-    buttonText,
-    onPress,
-  }: {
-    message: string;
-    buttonText: string;
-    onPress: () => void;
-  }) => (
-    <View style={styles.emptyContainer}>
-      <Ionicons name="information-circle-outline" size={50} color="#BB86FC" />
-      <Text style={styles.emptyText}>{message}</Text>
-      <TouchableOpacity
-        style={styles.emptyButton}
-        onPress={onPress}
-        activeOpacity={0.7}
-      >
-        <Text style={styles.emptyButtonText}>{buttonText}</Text>
-        <Ionicons name="arrow-forward" size={20} color="#fff" />
-      </TouchableOpacity>
-    </View>
-  );
-
-  useEffect(() => {
-    if (isFocused) {
-      fetchData();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isFocused, activeSegment]);
-
+  // Update filtered data when searchQuery or underlying data changes
   useEffect(() => {
     if (activeSegment === "Products") {
       const filtered = products.filter((product) =>
@@ -787,11 +662,21 @@ const ActivityScreen: React.FC = () => {
       setFilteredGigs(filtered);
     } else if (activeSegment === "Requested") {
       const filtered = requestedProducts.filter((req) =>
-        req.productName ? req.productName.includes(searchQuery) : false
+        req.productName
+          ? req.productName.toLowerCase().includes(searchQuery.toLowerCase())
+          : false
       );
       setFilteredRequestedProducts(filtered);
     }
   }, [searchQuery, products, gigs, requestedProducts, activeSegment]);
+
+  // Fetch data when the screen is focused or the active segment changes
+  useEffect(() => {
+    if (isFocused) {
+      fetchData();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFocused, activeSegment]);
 
   return (
     <View style={styles.mainContainer}>
@@ -957,16 +842,6 @@ const styles = StyleSheet.create({
   clearIcon: {
     marginLeft: 5,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  loadingText: {
-    marginTop: 5,
-    color: "#BB86FC",
-    fontSize: 14,
-  },
   errorContainer: {
     flex: 1,
     justifyContent: "center",
@@ -980,7 +855,7 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     paddingHorizontal: 20,
-    paddingBottom: 100, // To prevent content from being hidden behind BottomNavBar
+    paddingBottom: 100, // prevent content from being hidden behind BottomNavBar
     paddingTop: 10,
     flexGrow: 1,
   },
@@ -1051,32 +926,5 @@ const styles = StyleSheet.create({
   separator: {
     height: 1,
     backgroundColor: "#222",
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 20,
-  },
-  emptyText: {
-    color: "#fff",
-    fontSize: 16,
-    textAlign: "center",
-    marginVertical: 20,
-  },
-  emptyButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#BB86FC",
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    justifyContent: "center",
-  },
-  emptyButtonText: {
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "600",
-    marginRight: 5,
   },
 });

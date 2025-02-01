@@ -8,7 +8,6 @@ import {
   TouchableOpacity,
   Image,
   Modal,
-  ActivityIndicator,
   Alert,
   Dimensions,
   FlatList,
@@ -74,13 +73,7 @@ type CartItem = {
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
 
 // -------------------------------------------------------------------
-// To adjust the image size on Dashboard:
-//   PRODUCT_HEIGHT controls how tall the product image container is.
-//   Here we set it to fill from the top until above the bottom nav bar.
-//   (You can tweak this value if needed.)
-//
-//   For example, if you want a little gap at the top, subtract an extra value:
-//     PRODUCT_HEIGHT = SCREEN_HEIGHT - NAV_BAR_HEIGHT - 20;
+// PRODUCT_HEIGHT controls how tall the product image container is.
 // -------------------------------------------------------------------
 const PRODUCT_HEIGHT = SCREEN_HEIGHT - 100; // 60 is the nav bar height
 const NAV_BAR_HEIGHT = 70;
@@ -100,11 +93,9 @@ const Dashboard: React.FC<DashboardProps> = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>("#Everything");
   const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
 
-  // Modals for product details and description
+  // For product details displayed in the description modal
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [isDetailsModalVisible, setIsDetailsModalVisible] = useState(false);
   const [isDescriptionModalVisible, setIsDescriptionModalVisible] = useState(false);
-  const [selectedProductDescription, setSelectedProductDescription] = useState<string>("");
 
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
 
@@ -122,7 +113,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
 
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
@@ -130,7 +120,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
-  // Toast Animations
+  // Toast Animations for errors and success (added-to-cart)
   const [errorMessage, setErrorMessage] = useState("");
   const errorOpacity = useState(new Animated.Value(0))[0];
   const [successMessage, setSuccessMessage] = useState("");
@@ -372,8 +362,9 @@ const Dashboard: React.FC<DashboardProps> = () => {
       return;
     }
     await fetchCart();
+    // If already in cart, still show success message but don't add again.
     if (cartItems.some((item) => item.productId === product.id)) {
-      showError("Already in cart.");
+      showSuccess("Added to cart!");
       return;
     }
     try {
@@ -403,7 +394,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
         return;
       }
       if (response.status === 409) {
-        showError("Already in cart.");
+        showSuccess("Added to cart!");
         return;
       }
       if (!response.ok) {
@@ -431,7 +422,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
 
   const fetchProducts = async () => {
     if (!userId || !token || !institution) {
-      setLoading(false);
       showError("Complete your profile.");
       return;
     }
@@ -480,7 +470,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
         setAllProducts([]);
         setFilteredProducts([]);
         setError(null);
-        setLoading(false);
         return;
       }
       const mappedData: Product[] = data.map((product) => ({
@@ -519,8 +508,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
     } catch (err) {
       console.error("Fetch Products Error:", err);
       setError(err instanceof Error ? err.message : "Error fetching.");
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -541,7 +528,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
   }, [allProducts, selectedCategory]);
 
   useEffect(() => {
-    setLoading(true);
     setError(null);
     fetchProducts();
     fetchCart();
@@ -575,10 +561,10 @@ const Dashboard: React.FC<DashboardProps> = () => {
   // ProductItem component using react-native-gesture-handler.
   // Gestures:
   // • Pan (swipe):
-  //    - Left: next image
-  //    - Right: add to cart
-  //    - Up: next product
-  //    - Down: show description
+  //    - Left: next image (more sensitive)
+  //    - Right: add to cart (more sensitive)
+  //    - Up: next product (more sensitive)
+  //    - Down: show description (full details)
   // • Single tap: show description
   // • Double tap: toggle favorite
   // ----------------------------------------------------------------
@@ -589,7 +575,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
     currentIndex: number;
     onAddToCart: (product: Product) => void;
     onToggleFavorite: (id: string) => void;
-    onShowDescription: (desc: string) => void;
+    onShowDescription: (product: Product) => void;
     onNextProduct: () => void;
     isFavorite: boolean;
     currentImageIndex: number;
@@ -609,35 +595,33 @@ const Dashboard: React.FC<DashboardProps> = () => {
     currentImageIndex,
     setCurrentImageIndex,
   }) => {
+    // Local state to control inline expansion of the title.
+    const [titleExpanded, setTitleExpanded] = useState(false);
+
     // Reference for double-tap handler.
     const doubleTapRef = useRef<any>(null);
-    const SWIPE_THRESHOLD = 50;
+    // Reduced swipe threshold for more sensitive swipe actions.
+    const SWIPE_THRESHOLD = 20;
 
-    // Pan gesture handler: determines swipe direction on release.
+    // Pan gesture handler.
     const onPanHandlerStateChange = (event: any) => {
       if (event.nativeEvent.state === GestureState.END) {
         const { translationX, translationY } = event.nativeEvent;
         if (Math.abs(translationX) > Math.abs(translationY)) {
-          // Horizontal swipe.
           if (translationX < -SWIPE_THRESHOLD) {
-            // Swipe left: next image.
             const nextIdx =
               currentImageIndex < product.images.length - 1
                 ? currentImageIndex + 1
                 : 0;
             setCurrentImageIndex(nextIdx);
           } else if (translationX > SWIPE_THRESHOLD) {
-            // Swipe right: add to cart.
             onAddToCart(product);
           }
         } else {
-          // Vertical swipe.
           if (translationY < -SWIPE_THRESHOLD) {
-            // Swipe up: next product.
             onNextProduct();
           } else if (translationY > SWIPE_THRESHOLD) {
-            // Swipe down: show description.
-            onShowDescription(product.description);
+            onShowDescription(product);
           }
         }
       }
@@ -645,13 +629,12 @@ const Dashboard: React.FC<DashboardProps> = () => {
 
     // Tap handlers.
     const onSingleTap = () => {
-      onShowDescription(product.description);
+      onShowDescription(product);
     };
     const onDoubleTap = () => {
       onToggleFavorite(product.id);
     };
 
-    // Determine current and next image URIs.
     const currentImageURI =
       product.images && product.images.length > 0
         ? product.images[currentImageIndex]
@@ -663,7 +646,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
         ? product.images[nextImageIndex]
         : "https://via.placeholder.com/150";
 
-    // Next product preview image.
     const actualNextProduct = nextProduct || product;
     const nextProductImage =
       actualNextProduct.images && actualNextProduct.images.length > 0
@@ -697,7 +679,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
               }}
             >
               <View style={{ width: SCREEN_WIDTH, height: PRODUCT_HEIGHT, backgroundColor: "#000" }}>
-                {/* Removed Next product preview view */}
                 {/* Swipeable image container */}
                 <View
                   style={{
@@ -707,7 +688,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
                     backgroundColor: "#000",
                   }}
                 >
-                  {/* Current image */}
                   <View style={{ width: SCREEN_WIDTH, height: "100%" }}>
                     <LinearGradient
                       colors={["rgba(0,0,0,0.5)", "transparent"]}
@@ -724,7 +704,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
                       style={styles.bottomGradientOverlay}
                     />
                   </View>
-                  {/* Next image */}
                   <View style={{ width: SCREEN_WIDTH, height: "100%" }}>
                     <LinearGradient
                       colors={["rgba(0,0,0,0.5)", "transparent"]}
@@ -742,6 +721,18 @@ const Dashboard: React.FC<DashboardProps> = () => {
                     />
                   </View>
                 </View>
+                {/* Mid-screen image indicators */}
+                <View style={styles.midImageIndicatorsContainer}>
+                  {product.images.map((_, idx) => (
+                    <View
+                      key={idx}
+                      style={[
+                        styles.imageIndicatorDot,
+                        idx === currentImageIndex && styles.imageIndicatorDotActive,
+                      ]}
+                    />
+                  ))}
+                </View>
               </View>
             </TapGestureHandler>
           </TapGestureHandler>
@@ -750,6 +741,15 @@ const Dashboard: React.FC<DashboardProps> = () => {
           <>
             <View style={styles.productInfoBubble}>
               <View style={styles.productInfoTextContainer}>
+                <TouchableOpacity onPress={() => setTitleExpanded(!titleExpanded)}>
+                  <Text
+                    style={styles.productInfoTitle}
+                    numberOfLines={titleExpanded ? undefined : 1}
+                    ellipsizeMode="tail"
+                  >
+                    {product.title}
+                  </Text>
+                </TouchableOpacity>
                 <Text style={styles.productInfoPrice}>
                   ${product.price.toFixed(2)}
                 </Text>
@@ -781,8 +781,8 @@ const Dashboard: React.FC<DashboardProps> = () => {
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.iconButton}
-                  onPress={() => onShowDescription(product.description)}
-                  accessibilityLabel="Info"
+                  onPress={() => onShowDescription(product)}
+                  accessibilityLabel="Show Details"
                 >
                   <Ionicons name="information-circle" size={20} color="#FFFFFF" />
                 </TouchableOpacity>
@@ -822,74 +822,13 @@ const Dashboard: React.FC<DashboardProps> = () => {
   return (
     <View style={styles.rootContainer}>
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <LinearGradient
-          colors={["#000000", "#000000"]}
-          style={styles.gradientBackground}
-        >
-          {errorMessage ? (
-            <Animated.View
-              style={[
-                styles.smallToastContainer,
-                { backgroundColor: "#FF6B6B", opacity: errorOpacity },
-                {
-                  transform: [
-                    {
-                      translateY: errorOpacity.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [-20, 0],
-                      }),
-                    },
-                  ],
-                },
-              ]}
-            >
-              <Text style={styles.toastText}>{errorMessage}</Text>
-            </Animated.View>
-          ) : null}
-          {successMessage ? (
-            <Animated.View
-              style={[
-                styles.smallToastContainer,
-                { backgroundColor: "#81C784", opacity: successOpacity },
-                {
-                  transform: [
-                    {
-                      translateY: successOpacity.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [-20, 0],
-                      }),
-                    },
-                  ],
-                },
-              ]}
-            >
-              <Text style={styles.toastText}>{successMessage}</Text>
-            </Animated.View>
-          ) : null}
-          {/* Top Bar with only the filter icon.
-              (The header items such as logo, gridly text, cart, and profile are handled
-               by App.tsx and appear over this content on Dashboard via headerTransparent.) */}
-          <View style={styles.topBar}>
-            <TouchableOpacity
-              style={styles.topBarIconContainer}
-              onPress={toggleFilterModal}
-              accessibilityLabel="Filter"
-            >
-              <Ionicons name="options-outline" size={22} color="#FFFFFF" />
-            </TouchableOpacity>
-          </View>
-          {loading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#007AFF" />
-              <Text style={styles.loadingText}>Loading...</Text>
-            </View>
-          ) : error ? (
+        <LinearGradient colors={["#000000", "#000000"]} style={styles.gradientBackground}>
+          {error ? (
             <View style={styles.errorContainer}>
               <Text style={styles.errorText}>{error}</Text>
               <TouchableOpacity
                 style={styles.retryButton}
                 onPress={() => {
-                  setLoading(true);
                   setError(null);
                   fetchProducts();
                   fetchCart();
@@ -902,9 +841,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
               </TouchableOpacity>
             </View>
           ) : filteredProducts.length === 0 ? (
-            <View style={styles.noProductsContainer}>
-              <Text style={styles.noProductsText}>No products.</Text>
-            </View>
+            <View style={{ flex: 1, backgroundColor: "#000000" }} />
           ) : (
             <View style={styles.productStack}>
               {filteredProducts
@@ -918,8 +855,8 @@ const Dashboard: React.FC<DashboardProps> = () => {
                     currentIndex={currentIndex}
                     onAddToCart={addToCart}
                     onToggleFavorite={toggleFavorite}
-                    onShowDescription={(desc) => {
-                      setSelectedProductDescription(desc);
+                    onShowDescription={(prod) => {
+                      setSelectedProduct(prod);
                       setIsDescriptionModalVisible(true);
                     }}
                     onNextProduct={goToNextProduct}
@@ -930,6 +867,48 @@ const Dashboard: React.FC<DashboardProps> = () => {
                 ))}
             </View>
           )}
+          {/* Description Modal with full product details */}
+          <Modal
+            visible={isDescriptionModalVisible}
+            animationType="slide"
+            transparent={true}
+            onRequestClose={() => setIsDescriptionModalVisible(false)}
+          >
+            <TouchableOpacity
+              style={styles.centerModalOverlay}
+              activeOpacity={1}
+              onPressOut={() => setIsDescriptionModalVisible(false)}
+            >
+              <View style={styles.descriptionModalContent}>
+                {selectedProduct && (
+                  <ScrollView>
+                    <Text style={styles.modalTitle}>{selectedProduct.title}</Text>
+                    <Text style={styles.detailText}>
+                      Price: ${selectedProduct.price.toFixed(2)}
+                    </Text>
+                    <Text style={styles.detailText}>
+                      Condition: {selectedProduct.quality || "New"}
+                    </Text>
+                    <Text style={styles.detailText}>
+                      Rating: {selectedProduct.rating ? selectedProduct.rating : "N/A"}
+                    </Text>
+                    <Text style={styles.detailText}>Description:</Text>
+                    <Text style={styles.descriptionText}>
+                      {selectedProduct.description}
+                    </Text>
+                  </ScrollView>
+                )}
+                <TouchableOpacity
+                  onPress={() => setIsDescriptionModalVisible(false)}
+                  style={styles.modalClose}
+                  accessibilityLabel="Close Details Modal"
+                >
+                  <Ionicons name="close-outline" size={24} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
+          </Modal>
+          {/* Filter Modal */}
           <Modal
             visible={isFilterModalVisible}
             animationType="slide"
@@ -953,18 +932,13 @@ const Dashboard: React.FC<DashboardProps> = () => {
                     <TouchableOpacity
                       style={[
                         styles.filterModalOption,
-                        selectedCategory === item &&
-                          styles.filterModalOptionSelected,
+                        selectedCategory === item && styles.filterModalOptionSelected,
                       ]}
                       onPress={() => setSelectedCategory(item)}
                       accessibilityLabel={`Filter by ${item}`}
                     >
                       <Ionicons
-                        name={
-                          selectedCategory === item
-                            ? "checkbox-outline"
-                            : "ellipse-outline"
-                        }
+                        name={selectedCategory === item ? "checkbox-outline" : "ellipse-outline"}
                         size={20}
                         color={selectedCategory === item ? "#BB86FC" : "#FFFFFF"}
                         style={{ marginRight: 10 }}
@@ -972,8 +946,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
                       <Text
                         style={[
                           styles.filterModalOptionText,
-                          selectedCategory === item &&
-                            styles.filterModalOptionTextSelected,
+                          selectedCategory === item && styles.filterModalOptionTextSelected,
                         ]}
                       >
                         {item === "#Everything" ? "All" : item.replace("#", "")}
@@ -991,18 +964,13 @@ const Dashboard: React.FC<DashboardProps> = () => {
                     <TouchableOpacity
                       style={[
                         styles.filterModalOption,
-                        campusMode === item.value &&
-                          styles.filterModalOptionSelected,
+                        campusMode === item.value && styles.filterModalOptionSelected,
                       ]}
                       onPress={() => setCampusMode(item.value)}
                       accessibilityLabel={`Filter by ${item.label}`}
                     >
                       <Ionicons
-                        name={
-                          campusMode === item.value
-                            ? "checkbox-outline"
-                            : "ellipse-outline"
-                        }
+                        name={campusMode === item.value ? "checkbox-outline" : "ellipse-outline"}
                         size={20}
                         color={campusMode === item.value ? "#BB86FC" : "#FFFFFF"}
                         style={{ marginRight: 10 }}
@@ -1010,8 +978,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
                       <Text
                         style={[
                           styles.filterModalOptionText,
-                          campusMode === item.value &&
-                            styles.filterModalOptionTextSelected,
+                          campusMode === item.value && styles.filterModalOptionTextSelected,
                         ]}
                       >
                         {item.label}
@@ -1039,77 +1006,12 @@ const Dashboard: React.FC<DashboardProps> = () => {
               </View>
             </TouchableOpacity>
           </Modal>
-          <Modal
-            visible={isDescriptionModalVisible}
-            animationType="slide"
-            transparent={true}
-            onRequestClose={() => setIsDescriptionModalVisible(false)}
-          >
-            <TouchableOpacity
-              style={styles.centerModalOverlay}
-              activeOpacity={1}
-              onPressOut={() => setIsDescriptionModalVisible(false)}
-            >
-              <View style={styles.descriptionModalContent}>
-                <Text style={styles.modalTitle}>Description</Text>
-                <ScrollView>
-                  <Text style={styles.descriptionText}>
-                    {selectedProductDescription}
-                  </Text>
-                </ScrollView>
-                <TouchableOpacity
-                  onPress={() => setIsDescriptionModalVisible(false)}
-                  style={styles.modalClose}
-                  accessibilityLabel="Close Description Modal"
-                >
-                  <Ionicons name="close-outline" size={24} color="#FFFFFF" />
-                </TouchableOpacity>
-              </View>
-            </TouchableOpacity>
-          </Modal>
-          <Modal
-            visible={isDetailsModalVisible}
-            animationType="slide"
-            transparent={true}
-            onRequestClose={() => setIsDetailsModalVisible(false)}
-          >
-            <TouchableOpacity
-              style={styles.modalOverlay}
-              activeOpacity={1}
-              onPressOut={() => setIsDetailsModalVisible(false)}
-            >
-              <View style={styles.detailsModalContent}>
-                {selectedProduct && (
-                  <>
-                    <Text style={styles.detailsTitle}>
-                      {selectedProduct.title}
-                    </Text>
-                    <Text style={styles.detailsPrice}>
-                      ${selectedProduct.price.toFixed(2)}
-                    </Text>
-                    <Text style={styles.detailsRating}>
-                      Rating: {selectedProduct.rating || "N/A"}
-                    </Text>
-                    <Text style={styles.detailsQuality}>
-                      Quality: {selectedProduct.quality || "N/A"}
-                    </Text>
-                    <ScrollView style={styles.detailsDescriptionContainer}>
-                      <Text style={styles.detailsDescription}>
-                        {selectedProduct.description}
-                      </Text>
-                    </ScrollView>
-                    <TouchableOpacity
-                      onPress={() => setIsDetailsModalVisible(false)}
-                      style={styles.modalClose}
-                      accessibilityLabel="Close Details Modal"
-                    >
-                      <Ionicons name="close-outline" size={24} color="#FFFFFF" />
-                    </TouchableOpacity>
-                  </>
-                )}
-              </View>
-            </TouchableOpacity>
-          </Modal>
+          {/* Success Toast repositioned underneath the image indicators */}
+          {successMessage !== "" && (
+            <Animated.View style={[styles.successToastContainer, { opacity: successOpacity }]}>
+              <Text style={styles.toastText}>{successMessage}</Text>
+            </Animated.View>
+          )}
           <BottomNavBar />
         </LinearGradient>
       </TouchableWithoutFeedback>
@@ -1124,7 +1026,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#000000",
   },
-  // Gradient background with bottom padding for the nav bar.
   gradientBackground: {
     flex: 1,
     backgroundColor: "#000000",
@@ -1158,14 +1059,23 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: "center",
   },
-  // Top Bar: Only the filter icon remains.
+  // Success Toast is now repositioned underneath the image indicators.
+  successToastContainer: {
+    position: "absolute",
+    top: PRODUCT_HEIGHT / 2 - 230, // Adjusted to appear just underneath the mid-image indicators
+    alignSelf: "center",
+    backgroundColor: "#34C759",
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    zIndex: 10000,
+  },
   topBar: {
     position: "absolute",
-    top: Platform.OS === "ios" ? 66 : 40, // Increased from 40/20 to 60/40
+    top: Platform.OS === "ios" ? 66 : 40,
     left: 20,
     zIndex: 10,
   },
-
   topBarIconContainer: {
     padding: 6,
     backgroundColor: "rgba(0,0,0,0.5)",
@@ -1232,13 +1142,13 @@ const styles = StyleSheet.create({
   },
   productInfoTitle: {
     color: "#FFFFFF",
-    fontSize: 22,
+    fontSize: 16,
     fontWeight: "700",
     marginBottom: 2,
   },
   productInfoPrice: {
     color: "#A1A1A1",
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: "600",
   },
   productInfoActions: {
@@ -1259,25 +1169,22 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     zIndex: 3,
   },
+  midImageIndicatorsContainer: {
+    position: "absolute",
+    top: PRODUCT_HEIGHT / 2 - 270, // Adjust this value to shift the indicators higher or lower
+    flexDirection: "row",
+    alignSelf: "center",
+    zIndex: 4,
+  },
   imageIndicatorDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 3,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
     backgroundColor: "#AAAAAA",
-    marginHorizontal: 2,
+    marginHorizontal: 3,
   },
   imageIndicatorDotActive: {
     backgroundColor: "#FFFFFF",
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  loadingText: {
-    marginTop: 8,
-    color: "#FFFFFF",
-    fontSize: 16,
   },
   errorContainer: {
     flex: 1,
@@ -1380,36 +1287,11 @@ const styles = StyleSheet.create({
     maxHeight: "70%",
     position: "relative",
   },
-  detailsTitle: {
-    fontSize: 24,
+  modalTitle: {
+    fontSize: 20,
     fontWeight: "700",
     color: "#FFFFFF",
     marginBottom: 15,
-    textAlign: "center",
-  },
-  detailsPrice: {
-    fontSize: 20,
-    color: "#FFFFFF",
-    marginBottom: 10,
-    fontWeight: "600",
-  },
-  detailsRating: {
-    fontSize: 16,
-    color: "#FFFFFF",
-    marginBottom: 5,
-  },
-  detailsQuality: {
-    fontSize: 16,
-    color: "#FFFFFF",
-    marginBottom: 15,
-  },
-  detailsDescriptionContainer: {
-    maxHeight: 150,
-    marginBottom: 15,
-  },
-  detailsDescription: {
-    color: "#AAAAAA",
-    fontSize: 14,
     textAlign: "center",
   },
   descriptionModalContent: {
@@ -1420,17 +1302,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     maxHeight: "70%",
   },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#FFFFFF",
-    marginBottom: 15,
-    textAlign: "center",
-  },
   descriptionText: {
     color: "#FFFFFF",
     fontSize: 14,
     lineHeight: 20,
     textAlign: "center",
+  },
+  detailText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    marginBottom: 4,
   },
 });

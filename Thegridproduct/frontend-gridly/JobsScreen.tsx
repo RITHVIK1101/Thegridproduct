@@ -24,7 +24,7 @@ import { NGROK_URL } from "@env";
 import { UserContext } from "./UserContext";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "./navigationTypes";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 
 const { width } = Dimensions.get("window");
 
@@ -63,6 +63,9 @@ interface GigMessage {
 
 type Message = TextMessage | GigMessage;
 
+// Extend Jobs route params to include preFetchedGigs (optional)
+type JobsScreenRouteProp = RouteProp<RootStackParamList, "Jobs">;
+
 const suggestionPhrases = [
   "I need a logo designer",
   "Looking for a web developer",
@@ -93,26 +96,18 @@ const categoriesFilter = [
 // Helper function to get featured gigs based on the current cycle
 const getCurrentCycle = (): number => {
   const now = new Date();
-  // Calculate the number of 12-hour periods since epoch
   const cycle = Math.floor(now.getTime() / (12 * 60 * 60 * 1000));
   return cycle;
 };
 
 const getFeaturedGigs = (gigs: Gig[]): Gig[] => {
   if (gigs.length === 0) return [];
-
   const cycle = getCurrentCycle();
   const firstIndex = cycle % gigs.length;
   const secondIndex = (cycle + 1) % gigs.length;
-
-  if (gigs.length === 1) {
-    return [gigs[0]];
-  }
-
-  return [gigs[firstIndex], gigs[secondIndex]];
+  return gigs.length === 1 ? [gigs[0]] : [gigs[firstIndex], gigs[secondIndex]];
 };
 
-// Helper function to detect greetings
 const isGreeting = (text: string): boolean => {
   const greetings = [
     "hello",
@@ -124,11 +119,9 @@ const isGreeting = (text: string): boolean => {
     "greetings",
     "salutations",
   ];
-  const lowerText = text.toLowerCase();
-  return greetings.some((greet) => lowerText.includes(greet));
+  return greetings.some((greet) => text.toLowerCase().includes(greet));
 };
 
-// Helper function to validate and set gigs
 const setValidatedGigs = (
   data: any,
   setGigs: React.Dispatch<React.SetStateAction<Gig[] | null>>
@@ -143,12 +136,17 @@ const setValidatedGigs = (
   }
 };
 
-// Define the navigation prop type
 type JobsScreenNavigationProp = StackNavigationProp<RootStackParamList, "Jobs">;
 
 const JobsScreen: React.FC = () => {
   const navigation = useNavigation<JobsScreenNavigationProp>();
+  const route = useRoute<JobsScreenRouteProp>();
   const { token } = useContext(UserContext);
+
+  // If gigs were pre-fetched and passed via route params, use them;
+  // otherwise, start with null.
+  const preFetchedGigs: Gig[] | undefined = route.params?.preFetchedGigs;
+  const [gigs, setGigs] = useState<Gig[] | null>(preFetchedGigs || null);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearchBar, setShowSearchBar] = useState(false);
@@ -157,7 +155,6 @@ const JobsScreen: React.FC = () => {
   const assistantAnim = useRef(new Animated.Value(0)).current;
   const [currentFilter, setCurrentFilter] = useState("All");
   const [filterMenuVisible, setFilterMenuVisible] = useState<boolean>(false);
-
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "init1",
@@ -168,30 +165,11 @@ const JobsScreen: React.FC = () => {
   ]);
   const [userInput, setUserInput] = useState("");
 
-  // Initialize gigs as null so we know if they have been fetched yet.
-  const [gigs, setGigs] = useState<Gig[] | null>(null);
-
-  // Initialize PanResponder for swipe-down-to-close
-  const panResponder = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (evt, gestureState) => {
-        // Activate responder for vertical swipes
-        return Math.abs(gestureState.dy) > 10 && Math.abs(gestureState.dx) < 50;
-      },
-      onPanResponderMove: (evt, gestureState) => {
-        // Could add visual feedback if desired while swiping
-      },
-      onPanResponderRelease: (evt, gestureState) => {
-        if (gestureState.dy > 100) {
-          // If the swipe down is beyond the threshold, close the modal
-          toggleAssistant();
-        }
-      },
-    })
-  ).current;
-
+  // Only fetch gigs if they were not pre-fetched
   useEffect(() => {
-    fetchGigs();
+    if (gigs === null) {
+      fetchGigs();
+    }
   }, []);
 
   const fetchGigs = async () => {
@@ -203,23 +181,19 @@ const JobsScreen: React.FC = () => {
           Authorization: `Bearer ${token}`,
         },
       });
-
       if (!response.ok) {
         throw new Error(`Failed to fetch gigs: ${response.status}`);
       }
-
       const data = await response.json();
       console.log("Fetched Gigs:", data);
       setValidatedGigs(data, setGigs);
     } catch (error) {
       console.error(error);
       Alert.alert("Error", "Unable to fetch services. Please try again later.");
-      // Even on error, we set gigs to an empty array so that we can show a proper “no results” message.
       setGigs([]);
     }
   };
 
-  // If gigs are still null (not fetched yet), do not render the gigs section.
   const featuredGigs = gigs ? getFeaturedGigs(gigs) : [];
   const filteredGigs = gigs
     ? gigs.filter((gig) => {
@@ -231,6 +205,20 @@ const JobsScreen: React.FC = () => {
         return matchSearch && matchCategory;
       })
     : [];
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (evt, gestureState) => {
+        return Math.abs(gestureState.dy) > 10 && Math.abs(gestureState.dx) < 50;
+      },
+      onPanResponderMove: (evt, gestureState) => {},
+      onPanResponderRelease: (evt, gestureState) => {
+        if (gestureState.dy > 100) {
+          toggleAssistant();
+        }
+      },
+    })
+  ).current;
 
   const toggleAssistant = (callback?: () => void) => {
     if (showAssistant) {
@@ -256,7 +244,6 @@ const JobsScreen: React.FC = () => {
 
   const sendMessage = async () => {
     if (userInput.trim() === "") return;
-
     const newUserMessage: TextMessage = {
       id: Math.random().toString(),
       text: userInput,
@@ -265,7 +252,6 @@ const JobsScreen: React.FC = () => {
     };
     setMessages((prev) => [...prev, newUserMessage]);
     setUserInput("");
-
     if (isGreeting(userInput)) {
       const assistantMessage: TextMessage = {
         id: Math.random().toString(),
@@ -276,7 +262,6 @@ const JobsScreen: React.FC = () => {
       setMessages((prev) => [...prev, assistantMessage]);
       return;
     }
-
     try {
       const aiResponse = await fetch(`${NGROK_URL}/services/search`, {
         method: "POST",
@@ -286,17 +271,12 @@ const JobsScreen: React.FC = () => {
         },
         body: JSON.stringify({ query: userInput }),
       });
-
       if (!aiResponse.ok) {
         throw new Error(`Failed to process AI request: ${aiResponse.status}`);
       }
-
       const aiData = await aiResponse.json();
       console.log("AI Response:", aiData);
-
       if (Array.isArray(aiData)) {
-        // GPT / Search response can return array of objects:
-        // Either "message" objects or "gig match" objects
         if (aiData.length > 0 && "message" in aiData[0]) {
           const assistantMessage: TextMessage = {
             id: Math.random().toString(),
@@ -353,11 +333,9 @@ const JobsScreen: React.FC = () => {
     };
     setMessages((prev) => [...prev, newUserMessage]);
     setUserInput("");
-
     if (!hasUserMessaged) {
       setHasUserMessaged(true);
     }
-
     setTimeout(() => {
       const assistantReplies = [
         "Awesome! Could you tell me more about the category or field you're interested in?",
@@ -365,7 +343,6 @@ const JobsScreen: React.FC = () => {
         "Got it. What's your budget range?",
         "Perfect! I'll find some gigs that match your needs.",
       ];
-
       const userMessagesCount =
         messages.filter((m) => m.role === "user").length + 1;
       let responseText = "Let me think...";
@@ -374,7 +351,6 @@ const JobsScreen: React.FC = () => {
       } else {
         responseText = "Alright! Let me find some matches for you. One sec...";
       }
-
       const newAssistantMessage: TextMessage = {
         id: Math.random().toString(),
         text: responseText,
@@ -394,15 +370,6 @@ const JobsScreen: React.FC = () => {
     setShowSearchBar(!showSearchBar);
   };
 
-  const handleFilterPillPress = () => {
-    if (currentFilter === "All") {
-      setFilterMenuVisible(true);
-    } else {
-      // If currently filtered by a category, pressing again resets to All
-      setCurrentFilter("All");
-    }
-  };
-
   const getDisplayedPrice = (price: string): string => {
     return price.replace(/^\$/, "");
   };
@@ -416,7 +383,6 @@ const JobsScreen: React.FC = () => {
     inputRange: [0, 1],
     outputRange: [0, 1],
   });
-
   const translateY = assistantAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [50, 0],
@@ -429,7 +395,7 @@ const JobsScreen: React.FC = () => {
         <Text style={styles.headerTitle}>Explore Services</Text>
         <TouchableOpacity
           style={styles.filterButton}
-          onPress={handleFilterPillPress}
+          onPress={() => setFilterMenuVisible(true)}
           accessibilityLabel="Filter Options"
         >
           <Ionicons
@@ -561,7 +527,6 @@ const JobsScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
 
-        {/* Only display gigs if they've been fetched */}
         {gigs !== null ? (
           filteredGigs.length > 0 ? (
             filteredGigs.map((gig) => {
@@ -635,21 +600,14 @@ const JobsScreen: React.FC = () => {
           style={styles.modalContainer}
           behavior={Platform.OS === "ios" ? "padding" : undefined}
         >
-          {/* Background Overlay */}
           <Animated.View style={[styles.assistantModalOverlay, { opacity }]} />
-
-          {/* Modal Content */}
           <Animated.View
             {...panResponder.panHandlers}
             style={[
               styles.assistantModal,
-              {
-                transform: [{ translateY: translateY }],
-                opacity,
-              },
+              { transform: [{ translateY }], opacity },
             ]}
           >
-            {/* Assistant Header */}
             <View style={styles.assistantHeader}>
               <Text style={styles.assistantHeaderText}>AI Assistant</Text>
               <TouchableOpacity onPress={() => toggleAssistant()}>
@@ -661,14 +619,11 @@ const JobsScreen: React.FC = () => {
                 />
               </TouchableOpacity>
             </View>
-
-            {/* Chat Container */}
             <View style={styles.chatContainer}>
               <ScrollView
                 contentContainerStyle={styles.chatContent}
                 showsVerticalScrollIndicator={false}
               >
-                {/* Initial Suggestions */}
                 {!hasUserMessaged && (
                   <View style={styles.initialSuggestionsContainer}>
                     <ScrollView
@@ -691,8 +646,6 @@ const JobsScreen: React.FC = () => {
                     </ScrollView>
                   </View>
                 )}
-
-                {/* Message Bubbles */}
                 {messages.map((msg) => (
                   <View
                     key={msg.id}
@@ -703,37 +656,40 @@ const JobsScreen: React.FC = () => {
                         : styles.userBubble,
                     ]}
                   >
-                    {msg.type === "gig" && msg.gig ? (
+                    {msg.type === "gig" && (msg as GigMessage).gig ? (
                       <TouchableOpacity
                         style={styles.chatGigCard}
                         onPress={() => {
                           toggleAssistant(() => {
                             navigation.navigate("JobDetail", {
-                              jobId: msg.gig.id,
+                              jobId: (msg as GigMessage).gig.id,
                             });
                           });
                         }}
                         activeOpacity={0.8}
                       >
-                        <Text style={styles.gigTitle}>{msg.gig.title}</Text>
+                        <Text style={styles.gigTitle}>
+                          {(msg as GigMessage).gig.title}
+                        </Text>
                         <View style={styles.gigCategoryRow}>
                           <Ionicons
                             name={
-                              categoryIcons[msg.gig.category] || "grid-outline"
+                              categoryIcons[(msg as GigMessage).gig.category] ||
+                              "grid-outline"
                             }
                             size={16}
                             color="#BB86FC"
                             style={{ marginRight: 6 }}
                           />
                           <Text style={styles.gigCategory}>
-                            {msg.gig.category}
+                            {(msg as GigMessage).gig.category}
                           </Text>
                         </View>
                         <Text style={styles.gigDescription}>
-                          {truncateDescription(msg.gig.description, 60)}
+                          {truncateDescription((msg as GigMessage).gig.description, 60)}
                         </Text>
                         <Text style={styles.gigPrice}>
-                          ${getDisplayedPrice(msg.gig.price)}
+                          ${getDisplayedPrice((msg as GigMessage).gig.price)}
                         </Text>
                       </TouchableOpacity>
                     ) : (
@@ -751,8 +707,6 @@ const JobsScreen: React.FC = () => {
                   </View>
                 ))}
               </ScrollView>
-
-              {/* Input Area */}
               <View style={styles.inputArea}>
                 <TextInput
                   style={styles.chatInput}

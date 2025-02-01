@@ -32,7 +32,7 @@ import EditProduct from "./EditProductScreen";
 import MessagingScreen from "./MessagingScreen";
 import CartScreen from "./CartScreen";
 import AccountScreen from "./AccountScreen";
-import AllOrdersScreen from "./AllOrdersScreen";
+
 import JobDetails from "./JobDetails"; // Import the new JobDetails screen
 import RequestProduct from "./RequestProduct"; // Import the RequestProduct screen
 import { RootStackParamList } from "./navigationTypes";
@@ -106,8 +106,12 @@ const UserMenuScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         <View style={styles.bottomSheetUserInfo}>
           <View style={styles.bottomSheetAvatar}>
             <Text style={styles.bottomSheetAvatarText}>
-              {firstName && firstName.length > 0 ? firstName.charAt(0).toUpperCase() : "?"}
-              {lastName && lastName.length > 0 ? lastName.charAt(0).toUpperCase() : "?"}
+              {firstName && firstName.length > 0
+                ? firstName.charAt(0).toUpperCase()
+                : "?"}
+              {lastName && lastName.length > 0
+                ? lastName.charAt(0).toUpperCase()
+                : "?"}
             </Text>
           </View>
           <Text style={styles.bottomSheetUserName}>
@@ -156,18 +160,6 @@ const UserMenuScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
               style={{ marginRight: 10 }}
             />
             <Text style={styles.bottomSheetOptionText}>My Account</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.bottomSheetOption}
-            onPress={() => navigation.navigate("AllOrders")}
-          >
-            <Ionicons
-              name="reader-outline"
-              size={20}
-              color="#FFFFFF"
-              style={{ marginRight: 10 }}
-            />
-            <Text style={styles.bottomSheetOptionText}>All Orders</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.bottomSheetOption}
@@ -315,13 +307,16 @@ const AppNavigator: React.FC = () => {
                   <Text style={styles.headerTitleText}>Gridly</Text>
                 </View>
               ),
-              headerRight: () => HeaderRightComponent(navigation, firstName, lastName),
+              headerRight: () =>
+                HeaderRightComponent(navigation, firstName, lastName),
             })}
           />
           <Stack.Screen
             name="Jobs"
             component={JobsScreen}
-            options={({ navigation }) => getHeaderOptions(navigation, firstName, lastName)}
+            options={({ navigation }) =>
+              getHeaderOptions(navigation, firstName, lastName)
+            }
           />
           <Stack.Screen
             name="AddProduct"
@@ -340,7 +335,9 @@ const AppNavigator: React.FC = () => {
           <Stack.Screen
             name="Activity"
             component={ActivityScreen}
-            options={({ navigation }) => getHeaderOptions(navigation, firstName, lastName)}
+            options={({ navigation }) =>
+              getHeaderOptions(navigation, firstName, lastName)
+            }
           />
           <Stack.Screen
             name="EditProduct"
@@ -352,7 +349,9 @@ const AppNavigator: React.FC = () => {
           <Stack.Screen
             name="Messaging"
             component={MessagingScreen}
-            options={({ navigation }) => getHeaderOptions(navigation, firstName, lastName)}
+            options={({ navigation }) =>
+              getHeaderOptions(navigation, firstName, lastName)
+            }
           />
           <Stack.Screen
             name="Cart"
@@ -380,13 +379,6 @@ const AppNavigator: React.FC = () => {
           <Stack.Screen
             name="TermsOfService"
             component={TermsOfServiceScreen}
-            options={({ navigation }) =>
-              getHeaderOptions(navigation, firstName, lastName, true, true)
-            }
-          />
-          <Stack.Screen
-            name="AllOrders"
-            component={AllOrdersScreen}
             options={({ navigation }) =>
               getHeaderOptions(navigation, firstName, lastName, true, true)
             }

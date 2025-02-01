@@ -1,6 +1,6 @@
 // BottomNavBar.tsx
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useContext } from "react";
 import {
   View,
   Text,
@@ -18,10 +18,23 @@ import {
   CommonActions,
 } from "@react-navigation/native";
 import { RootStackParamList } from "../navigationTypes";
+import { UserContext } from "../UserContext";
+import { NGROK_URL } from "@env";
+
+// Define a type for a gig (as used in your Jobs screen)
+interface Gig {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  price: string;
+  userId: string;
+}
 
 const BottomNavBar: React.FC = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const route = useRoute();
+  const { token } = useContext(UserContext);
   const [isModalVisible, setIsModalVisible] = useState(false);
 
   // Animation value for spinning the add button
@@ -46,8 +59,6 @@ const BottomNavBar: React.FC = () => {
       spinAnimation.stop();
       spinValue.setValue(0); // Reset rotation
     }
-
-    // Cleanup on unmount
     return () => {
       spinAnimation.stop();
     };
@@ -72,11 +83,14 @@ const BottomNavBar: React.FC = () => {
   };
 
   // Use reset to instantly switch without stacking or transitions
-  const switchScreen = (targetRoute: keyof RootStackParamList) => {
+  const switchScreen = (
+    targetRoute: keyof RootStackParamList,
+    params?: object
+  ) => {
     navigation.dispatch(
       CommonActions.reset({
         index: 0,
-        routes: [{ name: targetRoute }],
+        routes: [{ name: targetRoute, params }],
       })
     );
   };
@@ -84,12 +98,47 @@ const BottomNavBar: React.FC = () => {
   // Reduced hitSlop values for smaller touchable areas
   const hitSlopValue = { top: 10, bottom: 10, left: 10, right: 10 };
 
+  // --- Prefetch function for Jobs ---
+  const prefetchJobs = async (): Promise<Gig[]> => {
+    try {
+      const response = await fetch(`${NGROK_URL}/services`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to fetch gigs: ${response.status}`);
+      }
+      const data = await response.json();
+      // Check if data is in { gigs: [...] } format or an array directly.
+      if (data && Array.isArray(data.gigs)) {
+        return data.gigs;
+      } else if (Array.isArray(data)) {
+        return data;
+      } else {
+        console.error("Invalid gigs data format:", data);
+        return [];
+      }
+    } catch (error) {
+      console.error(error);
+      return [];
+    }
+  };
+
   return (
     <View style={styles.container}>
-      {/* Home Tab */}
+      {/* Home Tab with a 50ms delay; if already on Home, do nothing */}
       <TouchableOpacity
         style={styles.navItem}
-        onPress={() => switchScreen("Dashboard")}
+        onPress={() => {
+          if (!isActive("Dashboard")) {
+            setTimeout(() => {
+              switchScreen("Dashboard");
+            }, 50);
+          }
+        }}
         accessibilityLabel="Navigate to Home"
         hitSlop={hitSlopValue}
       >
@@ -98,20 +147,22 @@ const BottomNavBar: React.FC = () => {
           size={24}
           color="#FFFFFF"
         />
-        <Text
-          style={[
-            styles.navText,
-            isActive("Dashboard") && styles.navTextActive,
-          ]}
-        >
+        <Text style={[styles.navText, isActive("Dashboard") && styles.navTextActive]}>
           Home
         </Text>
       </TouchableOpacity>
 
-      {/* Jobs Tab */}
+      {/* Jobs Tab with a 50ms delay and pre-fetch; if already on Jobs, do nothing */}
       <TouchableOpacity
         style={styles.navItem}
-        onPress={() => switchScreen("Jobs")}
+        onPress={async () => {
+          if (!isActive("Jobs")) {
+            const gigs = await prefetchJobs();
+            setTimeout(() => {
+              switchScreen("Jobs", { preFetchedGigs: gigs });
+            }, 50);
+          }
+        }}
         accessibilityLabel="Navigate to Jobs"
         hitSlop={hitSlopValue}
       >
@@ -120,14 +171,12 @@ const BottomNavBar: React.FC = () => {
           size={24}
           color="#FFFFFF"
         />
-        <Text
-          style={[styles.navText, isActive("Jobs") && styles.navTextActive]}
-        >
+        <Text style={[styles.navText, isActive("Jobs") && styles.navTextActive]}>
           Jobs
         </Text>
       </TouchableOpacity>
 
-      {/* Add Button */}
+      {/* Add Button – no delay needed */}
       <TouchableOpacity
         style={styles.navItem}
         onPress={toggleModal}
@@ -139,10 +188,16 @@ const BottomNavBar: React.FC = () => {
         </Animated.View>
       </TouchableOpacity>
 
-      {/* Messaging Tab */}
+      {/* Messaging Tab with a 50ms delay; if already on Messaging, do nothing */}
       <TouchableOpacity
         style={styles.navItem}
-        onPress={() => switchScreen("Messaging")}
+        onPress={() => {
+          if (!isActive("Messaging")) {
+            setTimeout(() => {
+              switchScreen("Messaging");
+            }, 50);
+          }
+        }}
         accessibilityLabel="Navigate to Messaging"
         hitSlop={hitSlopValue}
       >
@@ -151,20 +206,21 @@ const BottomNavBar: React.FC = () => {
           size={24}
           color="#FFFFFF"
         />
-        <Text
-          style={[
-            styles.navText,
-            isActive("Messaging") && styles.navTextActive,
-          ]}
-        >
+        <Text style={[styles.navText, isActive("Messaging") && styles.navTextActive]}>
           Messages
         </Text>
       </TouchableOpacity>
 
-      {/* Activity Tab */}
+      {/* Activity Tab with a 50ms delay; if already on Activity, do nothing */}
       <TouchableOpacity
         style={styles.navItem}
-        onPress={() => switchScreen("Activity")}
+        onPress={() => {
+          if (!isActive("Activity")) {
+            setTimeout(() => {
+              switchScreen("Activity");
+            }, 50);
+          }
+        }}
         accessibilityLabel="Navigate to Activity"
         hitSlop={hitSlopValue}
       >
@@ -173,9 +229,7 @@ const BottomNavBar: React.FC = () => {
           size={24}
           color="#FFFFFF"
         />
-        <Text
-          style={[styles.navText, isActive("Activity") && styles.navTextActive]}
-        >
+        <Text style={[styles.navText, isActive("Activity") && styles.navTextActive]}>
           Activity
         </Text>
       </TouchableOpacity>
@@ -195,7 +249,6 @@ const BottomNavBar: React.FC = () => {
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Add Options</Text>
             <View style={styles.modalButtonsContainer}>
-              {/* Instead of resetting the stack, we navigate so that the back button works */}
               <TouchableOpacity
                 style={styles.modalButton}
                 onPress={() => {
@@ -212,11 +265,10 @@ const BottomNavBar: React.FC = () => {
                   toggleModal();
                   navigation.navigate("AddGig");
                 }}
-                accessibilityLabel="Add Gig"
+                accessibilityLabel="Add Job"
               >
                 <Text style={styles.modalButtonText}>Add Job</Text>
               </TouchableOpacity>
-              {/* New Request Product Button */}
               <TouchableOpacity
                 style={styles.modalButton}
                 onPress={() => {
