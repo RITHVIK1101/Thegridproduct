@@ -27,16 +27,14 @@ const (
 	ChatStatusClosed  = "closed"
 )
 
-// NewChat initializes a new chat with default values
-func NewChat(productID, buyerID, sellerID primitive.ObjectID) Chat {
-	return Chat{
-		ID:          primitive.NewObjectID(),
-		ProductID:   productID,
-		BuyerID:     buyerID,
-		SellerID:    sellerID,
-		Messages:    []Message{},
-		Status:      ChatStatusPending,
-		CreatedAt:   time.Now(),
-		LastUpdated: time.Now(),
+// Change this function signature
+func NewChat(productID, buyerID, sellerID primitive.ObjectID) *Chat {
+	return &Chat{ // Return a pointer instead of a value
+		ID:        primitive.NewObjectID(),
+		ProductID: productID,
+		BuyerID:   buyerID,
+		SellerID:  sellerID,
+		Messages:  []Message{}, // Assuming you have a messages field
+		CreatedAt: time.Now(),
 	}
 }

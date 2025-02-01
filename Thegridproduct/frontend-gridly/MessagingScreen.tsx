@@ -1,4 +1,4 @@
-// MessagingScreen.tsx
+// frontend/MessagingScreen.tsx
 
 import React, { useState, useEffect, useContext, useRef } from "react";
 import {
@@ -23,20 +23,28 @@ import {
 } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import BottomNavBar from "./components/BottomNavbar";
-import { fetchConversations } from "./api"; // API to fetch chat list from MongoDB
+import { fetchConversations, postMessage, getMessages } from "./api";
+
 // For sending messages we’ll use Firestore directly
-import { doc, onSnapshot, updateDoc, arrayUnion } from "firebase/firestore";
+import {
+  getFirestore,
+  doc,
+  onSnapshot,
+  updateDoc,
+  setDoc,
+  getDoc,
+  arrayUnion,
+} from "firebase/firestore";
 import { CLOUDINARY_URL, UPLOAD_PRESET } from "@env";
 import { Conversation, Message } from "./types";
 import { UserContext } from "./UserContext";
-import Ably from "ably";
-import { RouteProp, useNavigation } from "@react-navigation/native";
-import { RootStackParamList } from "./navigationTypes";
 import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from "expo-image-manipulator";
 import axios from "axios";
+import { RouteProp, useNavigation } from "@react-navigation/native";
+import { RootStackParamList } from "./navigationTypes";
 
-/** Types & Props */
+// Types & Props
 type Chat = Conversation;
 
 type Request = {
@@ -57,7 +65,7 @@ type MessagingScreenRouteProp = RouteProp<RootStackParamList, "Messaging">;
 type MessagingScreenProps = { route: MessagingScreenRouteProp };
 
 const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
-  /** Chats & Messages */
+  // Chats & Messages
   const [chats, setChats] = useState<Chat[]>([]);
   const [filteredChats, setFilteredChats] = useState<Chat[]>([]);
   const [filter, setFilter] = useState<"all" | "products" | "gigs">("all");
@@ -67,16 +75,16 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
   const [loading, setLoading] = useState<boolean>(false);
   const [sending, setSending] = useState<boolean>(false);
 
-  /** Image Upload */
+  // Image Upload
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
   const [isImagePreviewModalVisible, setIsImagePreviewModalVisible] =
     useState<boolean>(false);
   const [isUploadingImage, setIsUploadingImage] = useState<boolean>(false);
 
-  /** Filter Modal */
+  // Filter Modal
   const [filterMenuVisible, setFilterMenuVisible] = useState<boolean>(false);
 
-  /** Requests Modal State */
+  // Requests Modal State
   const [isRequestsModalVisible, setRequestsModalVisible] =
     useState<boolean>(false);
   const [incomingRequests, setIncomingRequests] = useState<Request[]>([]);
@@ -87,29 +95,29 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     null
   );
 
-  /** Tabs for Requests Modal */
+  // Tabs for Requests Modal
   const [selectedRequestsTab, setSelectedRequestsTab] = useState<
     "incoming" | "outgoing"
   >("incoming");
 
-  /** User & Token from Context */
+  // User & Token from Context
   const { userId, token } = useContext(UserContext);
 
-  /** Ably & Refs */
-  const ablyRef = useRef<Ably.Realtime | null>(null);
-  const channelRef = useRef<Ably.RealtimeChannel | null>(null);
+  // Firestore instance
+  const firestoreDB = getFirestore();
+
   const flatListRef = useRef<FlatList<Message> | null>(null);
 
-  /** Navigation & Route */
+  // Navigation & Route
   const navigation = useNavigation();
   const { chatId: routeChatId } = route.params || {};
 
-  /** Animation for Requests Modal Slide-Up */
+  // Animation for Requests Modal Slide-Up
   const slideAnim = useRef(
     new Animated.Value(Dimensions.get("window").height)
   ).current;
 
-  /** Chat Filtering Logic */
+  // Chat Filtering Logic
   const applyFilter = (
     chatsToFilter: Chat[],
     f: "all" | "products" | "gigs"
@@ -120,7 +128,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         (c) => c.productTitle && c.productTitle.trim() !== ""
       );
     } else {
-      // filter === "gigs"
       return chatsToFilter.filter(
         (c) => !c.productTitle || c.productTitle.trim() === ""
       );
@@ -131,62 +138,56 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     setFilteredChats(applyFilter(chats, filter));
   }, [chats, filter]);
 
-  /** Fetch Chats if user & token are available */
+  // Fetch Chats from your REST API (MongoDB)
+  const fetchUserChats = async () => {
+    if (!userId || !token) return;
+    setLoading(true);
+    try {
+      const fetchedChats = await fetchConversations(userId, token);
+      setChats(fetchedChats);
+      if (routeChatId) {
+        const chat = fetchedChats.find((c) => c.chatID === routeChatId);
+        if (chat) {
+          openChat(chat);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching chats:", error);
+      Alert.alert("Error", "Failed to load chats.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (userId && token) {
       fetchUserChats();
     }
   }, [userId, token]);
 
-  /** Initialize Ably connection */
   useEffect(() => {
-    if (!ablyRef.current) {
-      ablyRef.current = new Ably.Realtime({ key: ABLY_API_KEY });
-
-      ablyRef.current.connection.on("connected", () => {
-        console.log("Ably connected");
-      });
-
-      ablyRef.current.connection.on("failed", (stateChange) => {
-        console.error("Ably connection failed:", stateChange.reason);
-        Alert.alert(
-          "Connection Error",
-          "Failed to connect to the real-time messaging service."
-        );
-      });
-    }
-
-    return () => {
-      if (ablyRef.current) {
-        ablyRef.current.close();
-        ablyRef.current = null;
-      }
-    };
-  }, []);
-
-  /** Subscribe/unsubscribe to the selected channel */
-  useEffect(() => {
+    let unsubscribe: (() => void) | undefined;
     if (selectedChat) {
-      subscribeToChannel(selectedChat.chatID);
+      const chatDocRef = doc(firestoreDB, "chatRooms", selectedChat.chatID);
+      onSnapshot(chatDocRef, (docSnap) => {
+        if (!docSnap.exists()) {
+          console.warn(
+            "🚨 Chat room does not exist in Firestore! Check chatID."
+          );
+        } else {
+          console.log("✅ Chat room found:", docSnap.data());
+        }
+      });
     }
+
     return () => {
-      unsubscribeFromChannel();
-    };
-  }, [selectedChat]);
-
-  /** If a chatID is provided from route params, open that chat */
-  useEffect(() => {
-    if (routeChatId && userId && token) {
-      const chat = chats.find((c) => c.chatID === routeChatId);
-      if (chat) {
-        openChat(chat);
-      } else {
-        fetchSpecificChat(routeChatId);
+      if (unsubscribe) {
+        unsubscribe();
       }
-    }
-  }, [routeChatId, chats]);
+    };
+  }, [selectedChat, firestoreDB]);
 
-  /** Fetch a specific chat if not already in the list */
+  // Fetch a specific chat if not already in the list
   const fetchSpecificChat = async (chatId: string) => {
     setLoading(true);
     try {
@@ -205,187 +206,86 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }
   };
 
-  /** Fetch the user's chats */
-  const fetchUserChats = async () => {
-    if (!userId || !token) return;
-    setLoading(true);
-    try {
-      const fetchedChats = await fetchConversations(userId, token);
-      setChats(fetchedChats);
-
-      // If there's a route param for a specific chat, open that
-      if (routeChatId) {
-        const chat = fetchedChats.find((c) => c.chatID === routeChatId);
-        if (chat) {
-          openChat(chat);
-        }
-      }
-    } catch (error) {
-      console.error("Error fetching chats:", error);
-      Alert.alert("Error", "Failed to load chats.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  /** Subscribe to an Ably channel */
-  const subscribeToChannel = (chatId: string) => {
-    if (!ablyRef.current) {
-      console.warn("Ably client is not initialized");
-      return;
-    }
-
-    const channelName = "chat:" + chatId;
-    const channel = ablyRef.current.channels.get(channelName);
-    channelRef.current = channel;
-
-    channel.subscribe("message", (msg) => {
-      try {
-        const messageData = msg.data as {
-          senderId: string;
-          content: string;
-          timestamp: number;
-        };
-
-        const newMsg: Message = {
-          _id: Date.now().toString(),
-          sender: messageData.senderId === userId ? "user" : "other",
-          senderID: messageData.senderId,
-          content: messageData.content,
-          timestamp: new Date(messageData.timestamp * 1000).toISOString(),
-        };
-
-        setSelectedChat((prev) => {
-          if (!prev) return prev;
-
-          const isDuplicate = prev.messages?.some(
-            (m) =>
-              m.content === newMsg.content &&
-              m.timestamp === newMsg.timestamp &&
-              m.senderID === newMsg.senderID
-          );
-          if (isDuplicate) return prev;
-
-          return {
-            ...prev,
-            messages: [...prev.messages, newMsg],
-          };
-        });
-      } catch (err) {
-        console.error("Error parsing Ably message data:", err);
-      }
-    });
-
-    channel.on("attached", () => {
-      console.log(`Subscribed to Ably channel: ${channelName}`);
-    });
-
-    channel.on("update", (stateChange) => {
-      if (stateChange.current === "failed") {
-        console.error(
-          "Channel failed:",
-          stateChange.reason?.message || "Unknown reason"
-        );
-        Alert.alert(
-          "Channel Error",
-          `An error occurred with the channel: ${
-            stateChange.reason?.message || "Unknown reason"
-          }`
-        );
-      } else {
-        console.log(`Channel state changed to: ${stateChange.current}`);
-      }
-    });
-
-    channel.on("failed", () => {
-      Alert.alert(
-        "Messaging Service Error",
-        "An error occurred with the real-time messaging service."
-      );
-    });
-  };
-
-  /** Unsubscribe from Ably channel */
-  const unsubscribeFromChannel = () => {
-    if (channelRef.current) {
-      channelRef.current.unsubscribe("message");
-      channelRef.current = null;
-      console.log("Unsubscribed from Ably channel");
-    }
-  };
-
-  /** Open a chat and fetch messages */
+  // Open a chat (set it as selected so we can subscribe to Firestore for realtime messages)
   const openChat = async (chat: Chat) => {
     setLoading(true);
     try {
-      const messages = await getMessages(chat.chatID, token || "");
-      const sortedMessages: Message[] = Array.isArray(messages)
-        ? messages
-            .map((msg, index) => ({
-              _id: msg._id ? msg._id.toString() : Date.now().toString() + index,
-              sender: msg.senderID === userId ? "user" : "other",
-              senderID: msg.senderID,
-              content: msg.content,
-              timestamp: new Date(msg.timestamp).toISOString(),
-            }))
-            .sort(
-              (a, b) =>
-                new Date(a.timestamp).getTime() -
-                new Date(b.timestamp).getTime()
-            )
-        : [];
+      setSelectedChat({ ...chat, messages: [] });
 
-      setSelectedChat({
-        ...chat,
-        messages: sortedMessages,
-      });
+      // Fetch latest messages from backend
+      const messages = await getMessages(chat.chatID, token);
+      setSelectedChat({ ...chat, messages });
 
       setChatModalVisible(true);
       setNewMessage("");
 
-      // Scroll to the latest message
+      // Scroll to latest message
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
       }, 100);
     } catch (error) {
-      console.error("getMessages error:", error);
-      // Open the modal anyway (with an empty messages array if there's an error)
-      setSelectedChat({
-        ...chat,
-        messages: [],
-      });
-      setChatModalVisible(true);
+      console.error("🔥 Error opening chat:", error);
+      Alert.alert("Error", "Failed to load messages.");
     } finally {
       setLoading(false);
     }
   };
 
-  /** Send a text message */
+  // Send a text message by updating the Firestore chat room document
   const sendMessage = async () => {
     if (!newMessage.trim() || !selectedChat) {
       Alert.alert("Error", "Please enter a message.");
       return;
     }
-
     setSending(true);
     const messageContent = newMessage.trim();
     setNewMessage("");
 
     try {
-      await postMessage(selectedChat.chatID, messageContent, token, userId);
-      console.log("Message sent successfully.");
-    } catch (error: any) {
-      console.error("sendMessage error:", error);
-      Alert.alert(
-        "Error",
-        error.response?.data?.message || "Failed to send message."
+      console.log("📤 Sending message via API...");
+
+      // Send message to backend using `postMessage`
+      const status = await postMessage(
+        selectedChat.chatID,
+        messageContent,
+        token,
+        userId
       );
+
+      if (status !== "success") {
+        throw new Error("Failed to send message");
+      }
+
+      console.log("✅ Message sent successfully via API!");
+
+      // Optimistically update UI before fetching latest messages
+      const newMessageObj: Message = {
+        _id: Date.now().toString(), // Temporary ID
+        sender: "user",
+        senderID: userId,
+        content: messageContent,
+        timestamp: new Date().toISOString(),
+      };
+
+      setSelectedChat((prev) =>
+        prev
+          ? { ...prev, messages: [...(prev.messages || []), newMessageObj] }
+          : prev
+      );
+
+      // Auto-scroll to the bottom after sending
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 200);
+    } catch (error) {
+      console.error("🔥 sendMessage error:", error);
+      Alert.alert("Error", "Failed to send message.");
     } finally {
       setSending(false);
     }
   };
 
-  /** Handle picking an image */
+  // Handle image selection and preview (unchanged)
   const handleImagePress = async () => {
     try {
       const { status } =
@@ -397,13 +297,11 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         );
         return;
       }
-
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsMultipleSelection: false,
         quality: 0.7,
       });
-
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const asset = result.assets[0];
         setSelectedImageUri(asset.uri);
@@ -415,17 +313,15 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }
   };
 
-  /** Upload image to Cloudinary */
+  // Upload image to Cloudinary (unchanged)
   const uploadImageToCloudinary = async (uri: string): Promise<string> => {
     setIsUploadingImage(true);
     try {
-      // Compress image before upload
       const manipulatedImage = await ImageManipulator.manipulateAsync(
         uri,
         [{ resize: { width: 800 } }],
         { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
       );
-
       const formDataImage = new FormData();
       formDataImage.append("file", {
         uri: manipulatedImage.uri,
@@ -433,15 +329,10 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         name: `upload_${Date.now()}.jpg`,
       } as any);
       formDataImage.append("upload_preset", UPLOAD_PRESET);
-
       const response = await axios.post(CLOUDINARY_URL, formDataImage, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
+        headers: { "Content-Type": "multipart/form-data" },
       });
-
-      const imageUrl = response.data.secure_url;
-      return imageUrl;
+      return response.data.secure_url;
     } catch (error) {
       console.error("Error uploading image to Cloudinary:", error);
       Alert.alert("Error", "Image upload failed. Please try again.");
@@ -451,18 +342,25 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }
   };
 
-  /** Confirm and send an image message */
+  // Confirm and send an image message via Firestore update
   const confirmAddImage = async () => {
     if (!selectedChat || !selectedImageUri) return;
-
     setSending(true);
     try {
       const uploadedImageUrl = await uploadImageToCloudinary(selectedImageUri);
       const imageMessage = `[Image] ${uploadedImageUrl}`;
-
-      await postMessage(selectedChat.chatID, imageMessage, token, userId);
-      console.log("Image message sent successfully.");
-    } catch (error: any) {
+      const chatDocRef = doc(firestoreDB, "chatRooms", selectedChat.chatID);
+      const messageData = {
+        _id: Date.now().toString(),
+        senderId: userId,
+        content: imageMessage,
+        timestamp: new Date().toISOString(),
+      };
+      await updateDoc(chatDocRef, {
+        messages: arrayUnion(messageData),
+      });
+      console.log("Image message sent successfully to Firestore.");
+    } catch (error) {
       console.error("sendImageMessage error:", error);
       Alert.alert("Error", error.message || "Failed to send image.");
     } finally {
@@ -472,19 +370,16 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }
   };
 
-  /** Fetch incoming and outgoing requests */
+  // (Requests modal functions remain unchanged; they use your REST API for chat requests)
   const fetchUserRequests = async () => {
     if (!userId || !token) {
       setErrorRequests("User not authenticated.");
       setLoadingRequests(false);
       return;
     }
-
     setLoadingRequests(true);
     setErrorRequests(null);
-
     try {
-      // Fetch both incoming and outgoing requests
       const response = await axios.get(
         "https://thegridproduct-production.up.railway.app/chat/requests",
         {
@@ -494,10 +389,8 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
           },
         }
       );
-
       if (response.status === 200) {
         const { incomingRequests, outgoingRequests } = response.data;
-
         setIncomingRequests(incomingRequests as Request[]);
         setOutgoingRequests(outgoingRequests as Request[]);
       } else {
@@ -514,7 +407,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }
   };
 
-  /** Accept an incoming request */
   const acceptRequest = async (requestId: string) => {
     setProcessingRequestId(requestId);
     try {
@@ -528,21 +420,17 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
           },
         }
       );
-
       if (response.status === 200) {
         Alert.alert("Success", "Chat request accepted.");
         setIncomingRequests((prev) =>
           prev.filter((req) => req.requestId !== requestId)
         );
-        // Refresh chats to include the new one
         await fetchUserChats();
-        // Open the newly created chat
         if (response.data.chatID) {
           const newChat = chats.find((c) => c.chatID === response.data.chatID);
           if (newChat) {
             openChat(newChat);
           } else {
-            // Optionally, re-fetch chats and open the latest one
             await fetchUserChats();
             if (chats.length > 0) {
               openChat(chats[chats.length - 1]);
@@ -563,7 +451,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }
   };
 
-  /** Reject an incoming request */
   const rejectRequest = async (requestId: string) => {
     setProcessingRequestId(requestId);
     try {
@@ -577,7 +464,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
           },
         }
       );
-
       if (response.status === 200) {
         Alert.alert("Success", "Chat request rejected.");
         setIncomingRequests((prev) =>
@@ -597,19 +483,14 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }
   };
 
-  /** Render a single Chat item in the main list */
   const renderChat = ({ item }: { item: Chat }) => {
     if (!item.user) {
       console.warn(`Chat with chatID ${item.chatID} is missing user data.`);
       return null;
     }
-
     const latestMessage =
       item.latestMessage && item.latestTimestamp
-        ? {
-            content: item.latestMessage,
-            timestamp: item.latestTimestamp,
-          }
+        ? { content: item.latestMessage, timestamp: item.latestTimestamp }
         : null;
     const formattedTimestamp = latestMessage
       ? new Date(latestMessage.timestamp).toLocaleTimeString([], {
@@ -617,12 +498,9 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
           minute: "2-digit",
         })
       : "";
-
     const initials = `${item.user.firstName.charAt(
       0
     )}${item.user.lastName.charAt(0)}`.toUpperCase();
-    const unread = item.unreadCount && item.unreadCount > 0;
-
     return (
       <Pressable
         style={styles.chatItemContainer}
@@ -635,7 +513,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
               <Text style={styles.profilePicInitials}>{initials}</Text>
             </View>
           </View>
-
           <View style={styles.chatDetails}>
             <View style={styles.chatHeaderRow}>
               <Text style={styles.chatName} numberOfLines={1}>
@@ -648,7 +525,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
             </Text>
             {latestMessage && (
               <View style={styles.lastMessageRow}>
-                {unread && <View style={styles.unreadDot} />}
+                {<View style={styles.unreadDot} />}
                 <Text style={styles.lastMessage} numberOfLines={1}>
                   {latestMessage.content}
                 </Text>
@@ -660,14 +537,12 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     );
   };
 
-  /** Render a single message bubble */
   const renderMessage = ({ item }: { item: Message }) => {
     const isImageMessage = item.content.startsWith("[Image] ");
     const imageUri = isImageMessage
       ? item.content.replace("[Image] ", "")
       : null;
     const isUser = item.sender === "user";
-
     return (
       <View
         style={[
@@ -715,7 +590,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     );
   };
 
-  /** Data for "My Purchases" horizontal list */
   const productsOrGigs = chats.map((c) => ({
     chatID: c.chatID,
     title: c.productTitle ? c.productTitle : "Job",
@@ -733,7 +607,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }
   };
 
-  /** Header label for the main chat list */
   const currentHeaderTitle =
     filter === "all"
       ? "All Chats"
@@ -755,18 +628,15 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }
   };
 
-  /** Render the entire Requests Modal (with smoother animations) */
   const renderRequestsModal = () => {
-    // Animate in
     if (isRequestsModalVisible) {
       Animated.timing(slideAnim, {
         toValue: 0,
-        duration: 250, // shortened for a slightly snappier feel
+        duration: 250,
         easing: Easing.inOut(Easing.ease),
         useNativeDriver: true,
       }).start();
     } else {
-      // Animate out
       Animated.timing(slideAnim, {
         toValue: Dimensions.get("window").height,
         duration: 250,
@@ -774,10 +644,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         useNativeDriver: true,
       }).start();
     }
-
-    /** Renders each request item */
     const renderRequestItem = ({ item }: { item: Request }) => {
-      // If showing Incoming requests
       if (selectedRequestsTab === "incoming") {
         return (
           <View style={styles.requestCard}>
@@ -824,8 +691,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
           </View>
         );
       }
-
-      // If showing Outgoing requests
       return (
         <View style={styles.requestCard}>
           <View style={styles.requestInfo}>
@@ -840,10 +705,8 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         </View>
       );
     };
-
     const dataToShow =
       selectedRequestsTab === "incoming" ? incomingRequests : outgoingRequests;
-
     return (
       <Modal
         visible={isRequestsModalVisible}
@@ -868,8 +731,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
               </Pressable>
               <Text style={styles.requestsHeaderTitle}>Your Requests</Text>
             </View>
-
-            {/* Tabs: Incoming / Outgoing */}
             <View style={styles.requestsTabsRow}>
               <Pressable
                 onPress={() => setSelectedRequestsTab("incoming")}
@@ -910,7 +771,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                 </Text>
               </Pressable>
             </View>
-
             {loadingRequests ? (
               <ActivityIndicator
                 size="large"
@@ -961,7 +821,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
               style={styles.requestsButton}
               onPress={() => {
                 setRequestsModalVisible(true);
-                // Default tab to 'incoming' each time we open
                 setSelectedRequestsTab("incoming");
                 fetchUserRequests();
               }}
@@ -1020,7 +879,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         {/* Requests Modal */}
         {renderRequestsModal()}
 
-        {/* Purchases Section (only visible in 'all' or 'products') */}
+        {/* Purchases Section */}
         {(filter === "all" || filter === "products") &&
           productsOrGigs.length > 0 && (
             <View style={styles.horizontalListContainer}>
@@ -1035,6 +894,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                     key={item.chatID + index}
                     style={styles.productGigItem}
                     onPress={() => handleNavigateFromProductOrGig(item)}
+                    accessibilityLabel={`Navigate to ${item.type} titled ${item.title}`}
                   >
                     <Text style={styles.productGigItemText}>{item.title}</Text>
                   </Pressable>
@@ -1073,7 +933,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
           onRequestClose={() => {
             setChatModalVisible(false);
             setSelectedChat(null);
-            unsubscribeFromChannel();
           }}
         >
           <View style={[styles.modalSafeArea, { backgroundColor: "#000" }]}>
@@ -1088,7 +947,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                       onPress={() => {
                         setChatModalVisible(false);
                         setSelectedChat(null);
-                        unsubscribeFromChannel();
                       }}
                       style={styles.backButton}
                       accessibilityLabel="Go Back"
@@ -1150,7 +1008,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                     >
                       <Ionicons name="image" size={20} color="#fff" />
                     </Pressable>
-
                     <TextInput
                       style={styles.messageInput}
                       placeholder="Type a message..."
@@ -1160,7 +1017,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                       multiline
                       accessibilityLabel="Message Input"
                     />
-
                     <Pressable
                       style={styles.sendButton}
                       onPress={sendMessage}
@@ -1218,7 +1074,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                   )}
                 </Pressable>
               </View>
-
               {selectedImageUri && (
                 <View style={styles.imagePreviewContainer}>
                   <Image
@@ -1378,11 +1233,35 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  sectionEmptyContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 20,
+  },
+
+  sectionEmptyText: {
+    fontSize: 16,
+    color: "#888888",
+    textAlign: "center",
+    fontFamily: "HelveticaNeue",
+  },
+
+  requestActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    alignItems: "center",
+    marginTop: 8,
+  },
   profilePicInitials: {
     color: "#000",
     fontSize: 18,
     fontWeight: "700",
     fontFamily: "HelveticaNeue-Bold",
+  },
+  requestsSeparatorLine: {
+    height: 1,
+    backgroundColor: "#333333",
+    marginVertical: 8,
   },
   chatDetails: {
     flex: 1,
@@ -1444,6 +1323,28 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: "#888888",
     fontFamily: "HelveticaNeue",
+  },
+  acceptButton: {
+    backgroundColor: "#4CAF50", // Green color for accept
+    padding: 10,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    marginHorizontal: 5,
+  },
+
+  rejectButton: {
+    backgroundColor: "#F44336", // Red color for reject
+    padding: 10,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    marginHorizontal: 5,
+  },
+
+  buttonDisabled: {
+    backgroundColor: "#888888", // Gray for disabled state
+    opacity: 0.5,
   },
   modalSafeArea: {
     flex: 1,
@@ -1628,8 +1529,6 @@ const styles = StyleSheet.create({
   addImageButton: {
     marginLeft: "auto",
   },
-
-  /** Requests Modal Styles */
   requestsModalContainer: {
     position: "absolute",
     bottom: 0,
@@ -1731,44 +1630,6 @@ const styles = StyleSheet.create({
   requestDate: {
     fontSize: 12,
     color: "#AAAAAA",
-    fontFamily: "HelveticaNeue",
-  },
-  requestActions: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    marginTop: 5,
-  },
-  acceptButton: {
-    backgroundColor: "#4CAF50",
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 20,
-    marginRight: 8,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  rejectButton: {
-    backgroundColor: "#F44336",
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 20,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  requestsSeparatorLine: {
-    height: 8,
-    backgroundColor: "#1E1E1E",
-  },
-  sectionEmptyContainer: {
-    alignItems: "center",
-    paddingVertical: 10,
-  },
-  sectionEmptyText: {
-    fontSize: 14,
-    color: "#888888",
     fontFamily: "HelveticaNeue",
   },
 });

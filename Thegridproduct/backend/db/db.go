@@ -139,27 +139,39 @@ func GetProductByID(productID string) (*models.Product, error) {
 }
 
 // FindChatsByUser finds all chats matching buyerId or sellerId == userID (string)
+// FindChatsByUser returns all chats where the user is either the buyer or the seller.
 func FindChatsByUser(userID string) ([]models.Chat, error) {
-	col := GetCollection("gridlyapp", "chats")
+	// Convert userID from string to ObjectID
+	userObjID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		log.Printf("Invalid userID [%s]: %v", userID, err)
+		return nil, err
+	}
 
+	// Get the "chats" collection
+	collection := GetCollection("gridlyapp", "chats")
+
+	// Build a filter that checks if the user is the buyer or the seller
 	filter := bson.M{
 		"$or": []bson.M{
-			{"buyerId": userID},
-			{"sellerId": userID},
+			{"buyerId": userObjID},
+			{"sellerId": userObjID},
 		},
 	}
 
-	cur, err := col.Find(context.Background(), filter)
+	// Query the collection
+	cursor, err := collection.Find(context.TODO(), filter)
 	if err != nil {
-		log.Printf("Error finding chats for user '%s': %v", userID, err)
-		return nil, fmt.Errorf("failed to find chats: %v", err)
+		log.Printf("Error fetching chats for user [%s]: %v", userID, err)
+		return nil, err
 	}
-	defer cur.Close(context.Background())
+	defer cursor.Close(context.TODO())
 
+	// Decode results into a slice of Chat
 	var chats []models.Chat
-	if err := cur.All(context.Background(), &chats); err != nil {
-		log.Printf("Error decoding chats for user '%s': %v", userID, err)
-		return nil, fmt.Errorf("failed to decode chats: %v", err)
+	if err := cursor.All(context.TODO(), &chats); err != nil {
+		log.Printf("Error decoding chat results for user [%s]: %v", userID, err)
+		return nil, err
 	}
 
 	return chats, nil

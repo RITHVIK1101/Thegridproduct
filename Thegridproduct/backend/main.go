@@ -1,5 +1,3 @@
-// main.go
-
 package main
 
 import (
@@ -14,10 +12,8 @@ import (
 	"Thegridproduct/backend/db"
 	"Thegridproduct/backend/handlers"
 
-	"github.com/ably/ably-go/ably"
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
-	"github.com/stripe/stripe-go/v72"
 )
 
 func main() {
@@ -34,29 +30,6 @@ func main() {
 	} else {
 		log.Println("JWT_SECRET_KEY loaded successfully")
 	}
-
-	// Retrieve and set Stripe secret key
-	stripeKey := os.Getenv("STRIPE_SECRET_KEY")
-	if stripeKey == "" {
-		log.Fatal("STRIPE_SECRET_KEY is not set in environment variables")
-	}
-	stripe.Key = stripeKey
-
-	// Retrieve and validate Ably API key
-	ablyAPIKey := os.Getenv("ABLY_API_KEY")
-	if ablyAPIKey == "" {
-		log.Fatal("ABLY_API_KEY is not set in environment variables")
-	}
-
-	// Initialize the Ably client
-	ablyClient, err := ably.NewRealtime(ably.WithKey(ablyAPIKey))
-	if err != nil {
-		log.Fatalf("Failed to initialize Ably client: %v", err)
-	}
-	log.Println("Ably client initialized successfully")
-
-	// Pass the Ably client to handlers
-	handlers.SetAblyClient(ablyClient)
 
 	// Connect to MongoDB
 	db.ConnectDB()
@@ -83,6 +56,7 @@ func main() {
 	// Protected Routes
 	protected := router.PathPrefix("/").Subrouter()
 	protected.Use(handlers.AuthMiddleware)
+
 	// Product Routes
 	protected.HandleFunc("/products", handlers.AddProductHandler).Methods("POST")
 	protected.HandleFunc("/products/user", handlers.GetUserProductsHandler).Methods("GET")
@@ -93,53 +67,23 @@ func main() {
 	protected.HandleFunc("/products/{id}", handlers.DeleteProductHandler).Methods("DELETE")
 	protected.HandleFunc("/products/{id}", handlers.UpdateProductHandler).Methods("PUT")
 
-	// Liked Products
-	protected.HandleFunc("/products/{id}/like", handlers.LikeProductHandler).Methods("POST")
-	protected.HandleFunc("/products/{id}/unlike", handlers.UnlikeProductHandler).Methods("POST")
-
-	// Cart & Orders
-	protected.HandleFunc("/cart", handlers.GetCartHandler).Methods("GET")
-	protected.HandleFunc("/cart/add", handlers.AddToCartHandler).Methods("POST")
-	protected.HandleFunc("/cart/remove", handlers.RemoveFromCartHandler).Methods("POST")
-	protected.HandleFunc("/orders", handlers.GetAllOrdersHandler).Methods("GET")
-
-	// NEW Chat Request Routes
+	// Chat Routes
 	protected.HandleFunc("/chat/request", handlers.RequestChatHandler).Methods("POST")
 	protected.HandleFunc("/chat/accept", handlers.AcceptChatRequestHandler).Methods("POST")
 	protected.HandleFunc("/chat/reject", handlers.RejectChatRequestHandler).Methods("POST")
 	protected.HandleFunc("/chat/requests", handlers.GetChatRequestsHandler).Methods("GET")
-
-	// User & Chat
-	protected.HandleFunc("/users/{id}", handlers.GetUserHandler).Methods("GET")
 	protected.HandleFunc("/chats/user/{userId}", handlers.GetChatsByUserHandler).Methods("GET")
 	protected.HandleFunc("/chats/{chatId}", handlers.GetChatHandler).Methods("GET")
 	protected.HandleFunc("/chats/{chatId}/messages", handlers.AddMessageHandler).Methods("POST")
 	protected.HandleFunc("/chats/{chatId}/messages", handlers.GetMessagesHandler).Methods("GET")
-
-	protected.HandleFunc("/requests", handlers.CreateProductRequestHandler).Methods("POST")
-	protected.HandleFunc("/requests/my", handlers.GetMyProductRequestsHandler).Methods("GET")
-	protected.HandleFunc("/requests/all", handlers.GetAllOtherProductRequestsHandler).Methods("GET")
-
-	// Real-time Messaging Route using Ably
-	protected.HandleFunc("/messages", handlers.PublishMessageHandler).Methods("POST")
-
-	// Payment Routes (Commented Out to disable payment flow)
-	// protected.HandleFunc("/create-payment-intent", handlers.CreatePaymentIntentHandler).Methods("POST")
-	// protected.HandleFunc("/payment/save-method", handlers.SavePaymentMethodHandler).Methods("POST")
-	// protected.HandleFunc("/payment/saved-methods", handlers.GetSavedPaymentMethodsHandler).Methods("GET")
-	// protected.HandleFunc("/payment/charge-saved-method", handlers.ChargeSavedPaymentMethodHandler).Methods("POST")
-
-	// Gigs (Services)
-	protected.HandleFunc("/services", handlers.AddGigHandler).Methods("POST")
-	protected.HandleFunc("/services", handlers.GetAllGigsHandler).Methods("GET")
-	protected.HandleFunc("/services/user", handlers.GetUserGigsHandler).Methods("GET")
-	protected.HandleFunc("/services/{id}", handlers.GetSingleGigHandler).Methods("GET")
-	protected.HandleFunc("/services/{id}", handlers.UpdateGigHandler).Methods("PUT")
-	protected.HandleFunc("/services/{id}", handlers.DeleteGigHandler).Methods("DELETE")
+	protected.HandleFunc("/chat/test-send-message", handlers.TestSendMessageHandler).Methods("POST")
+	// User Routes
+	protected.HandleFunc("/users/{id}", handlers.GetUserHandler).Methods("GET")
 
 	// AI Processing
 	protected.HandleFunc("/ai/process", handlers.ProcessAIInput).Methods("POST")
 
+	// Not Found Handler
 	router.NotFoundHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		handlers.WriteJSONError(w, "Endpoint not found", http.StatusNotFound)
 	})
