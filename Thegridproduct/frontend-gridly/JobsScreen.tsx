@@ -14,7 +14,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   Dimensions,
-  ActivityIndicator,
   Alert,
   PanResponder,
 } from "react-native";
@@ -132,7 +131,7 @@ const isGreeting = (text: string): boolean => {
 // Helper function to validate and set gigs
 const setValidatedGigs = (
   data: any,
-  setGigs: React.Dispatch<React.SetStateAction<Gig[]>>
+  setGigs: React.Dispatch<React.SetStateAction<Gig[] | null>>
 ) => {
   if (data && Array.isArray(data.gigs)) {
     setGigs(data.gigs);
@@ -169,8 +168,8 @@ const JobsScreen: React.FC = () => {
   ]);
   const [userInput, setUserInput] = useState("");
 
-  const [gigs, setGigs] = useState<Gig[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
+  // Initialize gigs as null so we know if they have been fetched yet.
+  const [gigs, setGigs] = useState<Gig[] | null>(null);
 
   // Initialize PanResponder for swipe-down-to-close
   const panResponder = useRef(
@@ -196,7 +195,6 @@ const JobsScreen: React.FC = () => {
   }, []);
 
   const fetchGigs = async () => {
-    setLoading(true);
     try {
       const response = await fetch(`${NGROK_URL}/services`, {
         method: "GET",
@@ -211,30 +209,25 @@ const JobsScreen: React.FC = () => {
       }
 
       const data = await response.json();
-      console.log("Fetched Gigs:", data.gigs);
-
+      console.log("Fetched Gigs:", data);
       setValidatedGigs(data, setGigs);
     } catch (error) {
       console.error(error);
       Alert.alert("Error", "Unable to fetch services. Please try again later.");
-    } finally {
-      setLoading(false);
+      // Even on error, we set gigs to an empty array so that we can show a proper “no results” message.
+      setGigs([]);
     }
   };
 
-  // Determine featured gigs based on the current cycle
-  const featuredGigs = getFeaturedGigs(gigs);
-
-  const filteredGigs = Array.isArray(gigs)
+  // If gigs are still null (not fetched yet), do not render the gigs section.
+  const featuredGigs = gigs ? getFeaturedGigs(gigs) : [];
+  const filteredGigs = gigs
     ? gigs.filter((gig) => {
         const matchSearch =
           gig.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
           gig.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
           gig.description.toLowerCase().includes(searchQuery.toLowerCase());
-
-        const matchCategory =
-          currentFilter === "All" || gig.category === currentFilter;
-
+        const matchCategory = currentFilter === "All" || gig.category === currentFilter;
         return matchSearch && matchCategory;
       })
     : [];
@@ -285,7 +278,6 @@ const JobsScreen: React.FC = () => {
     }
 
     try {
-      setLoading(true);
       const aiResponse = await fetch(`${NGROK_URL}/services/search`, {
         method: "POST",
         headers: {
@@ -303,10 +295,9 @@ const JobsScreen: React.FC = () => {
       console.log("AI Response:", aiData);
 
       if (Array.isArray(aiData)) {
-        // GPT / Search response can return array of objects
+        // GPT / Search response can return array of objects:
         // Either "message" objects or "gig match" objects
         if (aiData.length > 0 && "message" in aiData[0]) {
-          // GPT is asking for clarification
           const assistantMessage: TextMessage = {
             id: Math.random().toString(),
             text: aiData[0].message,
@@ -315,7 +306,6 @@ const JobsScreen: React.FC = () => {
           };
           setMessages((prev) => [...prev, assistantMessage]);
         } else if (aiData.length > 0 && "id" in aiData[0]) {
-          // Received gigs from search
           const gigMessages: GigMessage[] = aiData.map((gig: GigMatch) => ({
             id: gig.id,
             text: gig.title,
@@ -325,7 +315,6 @@ const JobsScreen: React.FC = () => {
           }));
           setMessages((prev) => [...prev, ...gigMessages]);
         } else {
-          // Unexpected format
           const assistantMessage: TextMessage = {
             id: Math.random().toString(),
             text: "I encountered an unexpected response. Please try again.",
@@ -335,7 +324,6 @@ const JobsScreen: React.FC = () => {
           setMessages((prev) => [...prev, assistantMessage]);
         }
       } else {
-        // Unexpected response format
         const assistantMessage: TextMessage = {
           id: Math.random().toString(),
           text: "I encountered an unexpected response. Please try again.",
@@ -353,8 +341,6 @@ const JobsScreen: React.FC = () => {
         type: "text",
       };
       setMessages((prev) => [...prev, assistantMessage]);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -372,7 +358,6 @@ const JobsScreen: React.FC = () => {
       setHasUserMessaged(true);
     }
 
-    // Simple delayed response from the assistant for demonstration
     setTimeout(() => {
       const assistantReplies = [
         "Awesome! Could you tell me more about the category or field you're interested in?",
@@ -418,7 +403,6 @@ const JobsScreen: React.FC = () => {
     }
   };
 
-  // Prevent double '$' in displayed price
   const getDisplayedPrice = (price: string): string => {
     return price.replace(/^\$/, "");
   };
@@ -529,56 +513,41 @@ const JobsScreen: React.FC = () => {
         {/* Featured Gigs */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Featured</Text>
-          {loading && (
-            <ActivityIndicator
-              size="small"
-              color="#BB86FC"
-              style={{ marginRight: 10 }}
-            />
-          )}
         </View>
-        {loading ? (
-          <ActivityIndicator
-            size="large"
-            color="#BB86FC"
-            style={{ marginTop: 20 }}
-          />
-        ) : (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.featuredScroll}
-            contentContainerStyle={{ paddingLeft: 8 }}
-          >
-            {featuredGigs.map((gig) => (
-              <TouchableOpacity
-                key={gig.id}
-                onPress={() =>
-                  navigation.navigate("JobDetail", { jobId: gig.id })
-                }
-                activeOpacity={0.8}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.featuredScroll}
+          contentContainerStyle={{ paddingLeft: 8 }}
+        >
+          {featuredGigs.map((gig) => (
+            <TouchableOpacity
+              key={gig.id}
+              onPress={() =>
+                navigation.navigate("JobDetail", { jobId: gig.id })
+              }
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={["#7F00FF", "#E100FF"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.featuredCard}
               >
-                <LinearGradient
-                  colors={["#7F00FF", "#E100FF"]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.featuredCard}
-                >
-                  <Text style={styles.featuredTitle}>{gig.title}</Text>
-                  <View style={styles.featuredCategoryRow}>
-                    <Ionicons
-                      name={categoryIcons[gig.category] || "grid-outline"}
-                      size={16}
-                      color="#FFFFFF"
-                      style={{ marginRight: 5 }}
-                    />
-                    <Text style={styles.featuredCategory}>{gig.category}</Text>
-                  </View>
-                </LinearGradient>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        )}
+                <Text style={styles.featuredTitle}>{gig.title}</Text>
+                <View style={styles.featuredCategoryRow}>
+                  <Ionicons
+                    name={categoryIcons[gig.category] || "grid-outline"}
+                    size={16}
+                    color="#FFFFFF"
+                    style={{ marginRight: 5 }}
+                  />
+                  <Text style={styles.featuredCategory}>{gig.category}</Text>
+                </View>
+              </LinearGradient>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
 
         {/* All Gigs */}
         <View style={styles.sectionHeader}>
@@ -592,62 +561,53 @@ const JobsScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
 
-        {loading ? (
-          <ActivityIndicator
-            size="large"
-            color="#BB86FC"
-            style={{ marginTop: 20 }}
-          />
-        ) : (
-          <>
-            {filteredGigs.length > 0 ? (
-              filteredGigs.map((gig) => {
-                const displayedPrice = getDisplayedPrice(gig.price);
-                return (
-                  <TouchableOpacity
-                    key={gig.id}
-                    onPress={() =>
-                      navigation.navigate("JobDetail", { jobId: gig.id })
-                    }
-                    activeOpacity={0.8}
-                  >
-                    <View style={styles.gigCard}>
-                      <View style={styles.gigInfo}>
-                        <Text style={styles.gigTitle}>{gig.title}</Text>
-                        <View style={styles.gigCategoryRow}>
-                          <Ionicons
-                            name={categoryIcons[gig.category] || "grid-outline"}
-                            size={16}
-                            color="#BB86FC"
-                            style={{ marginRight: 6 }}
-                          />
-                          <Text style={styles.gigCategory}>
-                            {gig.category}
-                          </Text>
-                        </View>
-                        <Text style={styles.gigDescription}>
-                          {truncateDescription(gig.description, 60)}
-                        </Text>
-                        <Text style={styles.gigPrice}>
-                          ${displayedPrice}
-                        </Text>
+        {/* Only display gigs if they've been fetched */}
+        {gigs !== null ? (
+          filteredGigs.length > 0 ? (
+            filteredGigs.map((gig) => {
+              const displayedPrice = getDisplayedPrice(gig.price);
+              return (
+                <TouchableOpacity
+                  key={gig.id}
+                  onPress={() =>
+                    navigation.navigate("JobDetail", { jobId: gig.id })
+                  }
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.gigCard}>
+                    <View style={styles.gigInfo}>
+                      <Text style={styles.gigTitle}>{gig.title}</Text>
+                      <View style={styles.gigCategoryRow}>
+                        <Ionicons
+                          name={categoryIcons[gig.category] || "grid-outline"}
+                          size={16}
+                          color="#BB86FC"
+                          style={{ marginRight: 6 }}
+                        />
+                        <Text style={styles.gigCategory}>{gig.category}</Text>
                       </View>
-                      <Ionicons
-                        name="chevron-forward"
-                        size={20}
-                        color="#BB86FC"
-                      />
+                      <Text style={styles.gigDescription}>
+                        {truncateDescription(gig.description, 60)}
+                      </Text>
+                      <Text style={styles.gigPrice}>
+                        ${displayedPrice}
+                      </Text>
                     </View>
-                  </TouchableOpacity>
-                );
-              })
-            ) : (
-              <Text style={styles.noResultsText}>
-                No services found for "{currentFilter}"
-              </Text>
-            )}
-          </>
-        )}
+                    <Ionicons
+                      name="chevron-forward"
+                      size={20}
+                      color="#BB86FC"
+                    />
+                  </View>
+                </TouchableOpacity>
+              );
+            })
+          ) : (
+            <Text style={styles.noResultsText}>
+              No services found for "{currentFilter}"
+            </Text>
+          )
+        ) : null}
       </ScrollView>
 
       {/* Bottom Navbar */}
@@ -692,16 +652,14 @@ const JobsScreen: React.FC = () => {
             {/* Assistant Header */}
             <View style={styles.assistantHeader}>
               <Text style={styles.assistantHeaderText}>AI Assistant</Text>
-              {/* Updated close icon to a more obvious X */}
               <TouchableOpacity onPress={() => toggleAssistant()}>
-              <Ionicons
-                name="close"
-                size={28}
-                color="#FFFFFF"
-                style={{ paddingLeft: 10 }}
-              />
-            </TouchableOpacity>
-
+                <Ionicons
+                  name="close"
+                  size={28}
+                  color="#FFFFFF"
+                  style={{ paddingLeft: 10 }}
+                />
+              </TouchableOpacity>
             </View>
 
             {/* Chat Container */}
@@ -745,12 +703,10 @@ const JobsScreen: React.FC = () => {
                         : styles.userBubble,
                     ]}
                   >
-                    {/* If it's a gig message, display the gig card */}
                     {msg.type === "gig" && msg.gig ? (
                       <TouchableOpacity
                         style={styles.chatGigCard}
                         onPress={() => {
-                          // Close the modal, then navigate
                           toggleAssistant(() => {
                             navigation.navigate("JobDetail", {
                               jobId: msg.gig.id,
@@ -823,13 +779,11 @@ const JobsScreen: React.FC = () => {
 export default JobsScreen;
 
 const styles = StyleSheet.create({
-  // Overall Screen Container
   container: {
     flex: 1,
     backgroundColor: "#000000",
     position: "relative",
   },
-  // Header
   headerContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -859,7 +813,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginRight: 5,
   },
-  // Search Bar
   searchBarContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -882,12 +835,10 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 15,
   },
-  // Scroll Container
   scrollContainer: {
     paddingBottom: 90,
-    paddingHorizontal: 16, // Center the content more
+    paddingHorizontal: 16,
   },
-  // Section Headers
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -899,13 +850,12 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#FFFFFF",
   },
-  // Featured Gigs
   featuredScroll: {
     marginTop: 10,
   },
   featuredCard: {
-    width: 200, // Thinner width
-    height: 100, // Adjusted height
+    width: 200,
+    height: 100,
     borderRadius: 12,
     padding: 16,
     marginRight: 16,
@@ -928,7 +878,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#FFFFFF",
   },
-  // All Gigs
   gigCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -976,7 +925,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 40,
   },
-  // Floating Action Button
   fab: {
     position: "absolute",
     bottom: 110,
@@ -1001,7 +949,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "600",
   },
-  // AI Assistant Modal
   modalContainer: {
     flex: 1,
     justifyContent: "flex-end",
@@ -1021,7 +968,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingTop: Platform.OS === "ios" ? 36  : 10,
+    paddingTop: Platform.OS === "ios" ? 36 : 10,
     paddingBottom: 6,
     paddingHorizontal: 16,
     backgroundColor: "#BB86FC",
@@ -1031,11 +978,11 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#FFFFFF",
   },
-chatContainer: {
-  flex: 1,
-  paddingHorizontal: 12,
-  paddingTop: 10, // Reduce top padding to move chat messages higher
-},
+  chatContainer: {
+    flex: 1,
+    paddingHorizontal: 12,
+    paddingTop: 10,
+  },
   chatContent: {
     paddingBottom: 80,
   },
@@ -1057,7 +1004,6 @@ chatContainer: {
     color: "#FFFFFF",
     fontSize: 13,
   },
-  // Message Bubbles
   messageBubble: {
     padding: 10,
     borderRadius: 16,
@@ -1081,7 +1027,6 @@ chatContainer: {
   userText: {
     color: "#FFFFFF",
   },
-  // Chat Input
   inputArea: {
     flexDirection: "row",
     alignItems: "center",
@@ -1105,7 +1050,6 @@ chatContainer: {
     padding: 8,
     marginLeft: 8,
   },
-  // Filter Modal
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.3)",
@@ -1132,7 +1076,6 @@ chatContainer: {
     fontSize: 14,
     color: "#FFFFFF",
   },
-  // Gig Card Styles Within Chat
   chatGigCard: {
     backgroundColor: "#1A1A1A",
     borderRadius: 12,

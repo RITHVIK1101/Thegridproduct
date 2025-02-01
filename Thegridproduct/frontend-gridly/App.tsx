@@ -35,7 +35,7 @@ import AccountScreen from "./AccountScreen";
 import AllOrdersScreen from "./AllOrdersScreen";
 import JobDetails from "./JobDetails"; // Import the new JobDetails screen
 import RequestProduct from "./RequestProduct"; // Import the RequestProduct screen
-import { RootStackParamList } from "./navigationTypes"; // Import RootStackParamList
+import { RootStackParamList } from "./navigationTypes";
 
 // Terms of Service Screen
 const TermsOfServiceScreen: React.FC = () => (
@@ -43,8 +43,7 @@ const TermsOfServiceScreen: React.FC = () => (
     <Text style={styles.termsHeading}>Terms of Service</Text>
     <ScrollView style={styles.termsScroll}>
       <Text style={styles.termsText}>
-        Welcome to Gridly. By using our platform, you agree to the following
-        terms...
+        Welcome to Gridly. By using our platform, you agree to the following terms...
         {"\n\n"}
         Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla facilisi.
         Phasellus non urna nec sapien dictum luctus.
@@ -55,50 +54,23 @@ const TermsOfServiceScreen: React.FC = () => (
 
 // Liked Items Screen
 const LikedItemsScreen: React.FC = () => {
-  // Example: if you were storing favorites in context, you'd retrieve them here
-  // This snippet is purely an example. Adjust as needed if you store user’s favorites differently.
   const { favorites, allProducts } = useContext<any>(UserContext);
-
   const likedProducts =
     allProducts?.filter((p: any) => favorites?.includes(p.id)) || [];
 
   return (
     <View style={styles.screenContainer}>
-      <Text
-        style={{
-          color: "#fff",
-          fontSize: 22,
-          fontWeight: "700",
-          marginBottom: 20,
-          textAlign: "center",
-        }}
-      >
-        Liked Items
-      </Text>
+      <Text style={styles.likedTitle}>Liked Items</Text>
       {likedProducts.length === 0 ? (
-        <View
-          style={{ alignItems: "center", justifyContent: "center", flex: 1 }}
-        >
-          <Text style={{ color: "#ccc", fontSize: 16 }}>
-            No liked items yet.
-          </Text>
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>No liked items yet.</Text>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={{ padding: 20 }}>
+        <ScrollView contentContainerStyle={styles.likedScroll}>
           {likedProducts.map((product: any) => (
-            <View
-              key={product.id}
-              style={{
-                marginBottom: 20,
-                borderBottomWidth: 1,
-                borderBottomColor: "#333",
-                paddingBottom: 10,
-              }}
-            >
-              <Text style={{ color: "#fff", fontSize: 18, fontWeight: "600" }}>
-                {product.title}
-              </Text>
-              <Text style={{ color: "#fff", fontSize: 16 }}>
+            <View key={product.id} style={styles.likedItem}>
+              <Text style={styles.likedItemTitle}>{product.title}</Text>
+              <Text style={styles.likedItemPrice}>
                 ${product.price.toFixed(2)}
               </Text>
             </View>
@@ -140,16 +112,11 @@ const UserMenuScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       </View>
 
       <View style={styles.fullScreenMenuContent}>
-        {/* User Info Section */}
         <View style={styles.bottomSheetUserInfo}>
           <View style={styles.bottomSheetAvatar}>
             <Text style={styles.bottomSheetAvatarText}>
-              {firstName && firstName.length > 0
-                ? firstName.charAt(0).toUpperCase()
-                : "?"}
-              {lastName && lastName.length > 0
-                ? lastName.charAt(0).toUpperCase()
-                : "?"}
+              {firstName && firstName.length > 0 ? firstName.charAt(0).toUpperCase() : "?"}
+              {lastName && lastName.length > 0 ? lastName.charAt(0).toUpperCase() : "?"}
             </Text>
           </View>
           <Text style={styles.bottomSheetUserName}>
@@ -166,10 +133,7 @@ const UserMenuScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         </View>
 
         <View style={styles.bottomSheetOptions}>
-          <TouchableOpacity
-            style={styles.bottomSheetOption}
-            onPress={handleLogout}
-          >
+          <TouchableOpacity style={styles.bottomSheetOption} onPress={handleLogout}>
             <Ionicons
               name="log-out-outline"
               size={20}
@@ -188,9 +152,7 @@ const UserMenuScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
               color="#FFFFFF"
               style={{ marginRight: 10 }}
             />
-            <Text style={styles.bottomSheetOptionText}>
-              View Terms of Service
-            </Text>
+            <Text style={styles.bottomSheetOptionText}>View Terms of Service</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.bottomSheetOption}
@@ -249,7 +211,7 @@ const HeaderTitleWithLogo: React.FC<{ title: string }> = ({ title }) => (
 );
 
 /**
- * Custom Avatar Component showing the initials of user's first and last name
+ * Custom Avatar Component showing the user's initials.
  */
 const UserAvatar: React.FC<{
   firstName?: string;
@@ -271,7 +233,7 @@ const UserAvatar: React.FC<{
 };
 
 /**
- * Common header right component
+ * Common header right component.
  */
 const HeaderRightComponent = (
   navigation: any,
@@ -295,7 +257,7 @@ const HeaderRightComponent = (
 );
 
 /**
- * Helper function to generate common header options
+ * Helper function to generate common header options.
  */
 const getHeaderOptions = (
   navigation: any,
@@ -349,20 +311,26 @@ const AppNavigator: React.FC = () => {
     >
       {token ? (
         <>
-          {/* Existing Screens */}
+          {/* Dashboard screen with a transparent header so the background image shows underneath.
+              Other screens use the common header options. */}
           <Stack.Screen
             name="Dashboard"
             component={Dashboard}
-            options={({ navigation }) =>
-              getHeaderOptions(navigation, firstName, lastName)
-            }
+            options={({ navigation }) => ({
+              headerTransparent: true,
+              headerTitle: () => (
+                <View style={styles.headerTitleContainer}>
+                  <Ionicons name="grid-outline" size={20} color="#FFFFFF" />
+                  <Text style={styles.headerTitleText}>Gridly</Text>
+                </View>
+              ),
+              headerRight: () => HeaderRightComponent(navigation, firstName, lastName),
+            })}
           />
           <Stack.Screen
             name="Jobs"
             component={JobsScreen}
-            options={({ navigation }) =>
-              getHeaderOptions(navigation, firstName, lastName)
-            }
+            options={({ navigation }) => getHeaderOptions(navigation, firstName, lastName)}
           />
           <Stack.Screen
             name="AddProduct"
@@ -381,9 +349,7 @@ const AppNavigator: React.FC = () => {
           <Stack.Screen
             name="Activity"
             component={ActivityScreen}
-            options={({ navigation }) =>
-              getHeaderOptions(navigation, firstName, lastName)
-            }
+            options={({ navigation }) => getHeaderOptions(navigation, firstName, lastName)}
           />
           <Stack.Screen
             name="EditProduct"
@@ -395,9 +361,7 @@ const AppNavigator: React.FC = () => {
           <Stack.Screen
             name="Messaging"
             component={MessagingScreen}
-            options={({ navigation }) =>
-              getHeaderOptions(navigation, firstName, lastName)
-            }
+            options={({ navigation }) => getHeaderOptions(navigation, firstName, lastName)}
           />
           <Stack.Screen
             name="Cart"
@@ -406,7 +370,6 @@ const AppNavigator: React.FC = () => {
               getHeaderOptions(navigation, firstName, lastName, true, true)
             }
           />
-
           <Stack.Screen
             name="Account"
             component={AccountScreen}
@@ -451,7 +414,6 @@ const AppNavigator: React.FC = () => {
               getHeaderOptions(navigation, firstName, lastName, true, true)
             }
           />
-          {/* Registering the RequestProduct Screen */}
           <Stack.Screen
             name="RequestProduct"
             component={RequestProduct}
@@ -498,7 +460,6 @@ const App: React.FC = () => {
 
 export default App;
 
-// Styles
 const { width } = Dimensions.get("window");
 
 const styles = StyleSheet.create({
@@ -622,6 +583,40 @@ const styles = StyleSheet.create({
   },
   bottomSheetOptionText: {
     color: "#FFFFFF",
+    fontSize: 16,
+  },
+  likedTitle: {
+    color: "#fff",
+    fontSize: 22,
+    fontWeight: "700",
+    marginBottom: 20,
+    textAlign: "center",
+  },
+  emptyContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    flex: 1,
+  },
+  emptyText: {
+    color: "#ccc",
+    fontSize: 16,
+  },
+  likedScroll: {
+    padding: 20,
+  },
+  likedItem: {
+    marginBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: "#333",
+    paddingBottom: 10,
+  },
+  likedItemTitle: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "600",
+  },
+  likedItemPrice: {
+    color: "#fff",
     fontSize: 16,
   },
 });

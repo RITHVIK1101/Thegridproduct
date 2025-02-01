@@ -11,7 +11,6 @@ import {
   ActivityIndicator,
   Alert,
   Dimensions,
-  TextInput,
   FlatList,
   ScrollView,
   Animated,
@@ -33,11 +32,11 @@ import BottomNavBar from "./components/BottomNavbar";
 import { NGROK_URL } from "@env";
 import { UserContext } from "./UserContext";
 import { RootStackParamList } from "./navigationTypes";
+// Using react-native-gesture-handler for pan & tap gestures:
 import {
   PanGestureHandler,
   TapGestureHandler,
-  GestureHandlerRootView,
-  State,
+  State as GestureState,
 } from "react-native-gesture-handler";
 
 type DashboardProps = {
@@ -74,8 +73,17 @@ type CartItem = {
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
 
-const SWIPE_THRESHOLD = 80;
-const DIRECTION_LOCK_THRESHOLD = 10;
+// -------------------------------------------------------------------
+// To adjust the image size on Dashboard:
+//   PRODUCT_HEIGHT controls how tall the product image container is.
+//   Here we set it to fill from the top until above the bottom nav bar.
+//   (You can tweak this value if needed.)
+//
+//   For example, if you want a little gap at the top, subtract an extra value:
+//     PRODUCT_HEIGHT = SCREEN_HEIGHT - NAV_BAR_HEIGHT - 20;
+// -------------------------------------------------------------------
+const PRODUCT_HEIGHT = SCREEN_HEIGHT - 100; // 60 is the nav bar height
+const NAV_BAR_HEIGHT = 70;
 
 const Dashboard: React.FC<DashboardProps> = () => {
   const {
@@ -85,20 +93,18 @@ const Dashboard: React.FC<DashboardProps> = () => {
     clearUser,
     likedProducts,
     setLikedProducts,
-  } = useContext(UserContext); // Access likedProducts from UserContext
+  } = useContext(UserContext);
 
+  // Filters for the filter modal
   const [campusMode, setCampusMode] = useState<"In Campus" | "Both">("Both");
-  const [selectedCategory, setSelectedCategory] =
-    useState<string>("#Everything");
+  const [selectedCategory, setSelectedCategory] = useState<string>("#Everything");
   const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
+
+  // Modals for product details and description
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isDetailsModalVisible, setIsDetailsModalVisible] = useState(false);
-
-  const [isDescriptionModalVisible, setIsDescriptionModalVisible] =
-    useState(false);
-  const [selectedProductDescription, setSelectedProductDescription] =
-    useState<string>("");
-  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [isDescriptionModalVisible, setIsDescriptionModalVisible] = useState(false);
+  const [selectedProductDescription, setSelectedProductDescription] = useState<string>("");
 
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
 
@@ -122,15 +128,13 @@ const Dashboard: React.FC<DashboardProps> = () => {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [cartUpdated, setCartUpdated] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
-
-  // Manage currentImageIndex in Dashboard
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   // Toast Animations
   const [errorMessage, setErrorMessage] = useState("");
-  const errorOpacity = useRef(new Animated.Value(0)).current;
+  const errorOpacity = useState(new Animated.Value(0))[0];
   const [successMessage, setSuccessMessage] = useState("");
-  const successOpacity = useRef(new Animated.Value(0)).current;
+  const successOpacity = useState(new Animated.Value(0))[0];
 
   const [userInfo, setUserInfo] = useState<User | null>(null);
 
@@ -139,15 +143,15 @@ const Dashboard: React.FC<DashboardProps> = () => {
     Animated.timing(errorOpacity, {
       toValue: 1,
       duration: 300,
-      useNativeDriver: true,
       easing: Easing.out(Easing.ease),
+      useNativeDriver: true,
     }).start(() => {
       setTimeout(() => {
         Animated.timing(errorOpacity, {
           toValue: 0,
           duration: 300,
-          useNativeDriver: true,
           easing: Easing.in(Easing.ease),
+          useNativeDriver: true,
         }).start(() => {
           setErrorMessage("");
         });
@@ -160,15 +164,15 @@ const Dashboard: React.FC<DashboardProps> = () => {
     Animated.timing(successOpacity, {
       toValue: 1,
       duration: 300,
-      useNativeDriver: true,
       easing: Easing.out(Easing.ease),
+      useNativeDriver: true,
     }).start(() => {
       setTimeout(() => {
         Animated.timing(successOpacity, {
           toValue: 0,
           duration: 300,
-          useNativeDriver: true,
           easing: Easing.in(Easing.ease),
+          useNativeDriver: true,
         }).start(() => {
           setSuccessMessage("");
         });
@@ -194,7 +198,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
           Authorization: `Bearer ${token}`,
         },
       });
-
       if (response.status === 401) {
         Alert.alert("Session Expired", "Please log in again.", [
           {
@@ -212,13 +215,11 @@ const Dashboard: React.FC<DashboardProps> = () => {
         ]);
         return;
       }
-
       if (!response.ok) {
         const responseText = await response.text();
         console.error("Error response text:", responseText);
         throw new Error("Failed to fetch user info.");
       }
-
       const data: User = await response.json();
       setUserInfo(data);
     } catch (err) {
@@ -280,7 +281,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
           Authorization: `Bearer ${token}`,
         },
       });
-
       if (response.status === 401) {
         Alert.alert("Session Expired", "Please log in again.", [
           {
@@ -298,13 +298,11 @@ const Dashboard: React.FC<DashboardProps> = () => {
         ]);
         return;
       }
-
       if (!response.ok) {
         const responseText = await response.text();
         console.error("Error response text:", responseText);
         throw new Error("Failed to fetch cart.");
       }
-
       const data = await response.json();
       if (data && Array.isArray(data.items)) {
         setCartItems(data.items);
@@ -349,19 +347,16 @@ const Dashboard: React.FC<DashboardProps> = () => {
         throw new Error("Failed to fetch liked products");
       }
       const data = await response.json();
-      // If data is null or empty, just set empty array instead of throwing error
       if (!data) {
         setLikedProducts([]);
         console.log("No liked products found");
         return;
       }
-
       if (Array.isArray(data)) {
         const likedProductIds = data.map((product: Product) => product.id);
         setLikedProducts(likedProductIds);
         console.log("Fetched Liked Products IDs:", likedProductIds);
       } else {
-        // Only throw error if data exists but isn't in the expected format
         setLikedProducts([]);
         console.log("No liked products data available");
       }
@@ -376,14 +371,11 @@ const Dashboard: React.FC<DashboardProps> = () => {
       showError("Log in first.");
       return;
     }
-
     await fetchCart();
-
     if (cartItems.some((item) => item.productId === product.id)) {
       showError("Already in cart.");
       return;
     }
-
     try {
       const response = await fetch(`${NGROK_URL}/cart/add`, {
         method: "POST",
@@ -393,7 +385,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
         },
         body: JSON.stringify({ productId: product.id, quantity: 1 }),
       });
-
       if (response.status === 401) {
         Alert.alert("Session Expired", "Please log in again.", [
           {
@@ -411,17 +402,14 @@ const Dashboard: React.FC<DashboardProps> = () => {
         ]);
         return;
       }
-
       if (response.status === 409) {
         showError("Already in cart.");
         return;
       }
-
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.message || "Failed to add item.");
       }
-
       await fetchCart();
       showSuccess("Added to cart!");
       setCartUpdated(true);
@@ -447,7 +435,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
       showError("Complete your profile.");
       return;
     }
-
     try {
       let url = `${NGROK_URL}/products/all`;
       if (campusMode === "In Campus") {
@@ -455,7 +442,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
       } else if (campusMode === "Both") {
         url += "?mode=outofcampus";
       }
-
       const response = await fetch(url, {
         method: "GET",
         headers: {
@@ -463,7 +449,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
           Authorization: `Bearer ${token}`,
         },
       });
-
       if (response.status === 401) {
         Alert.alert("Session Expired", "Please log in again.", [
           {
@@ -481,20 +466,16 @@ const Dashboard: React.FC<DashboardProps> = () => {
         ]);
         return;
       }
-
       if (!response.ok) {
         const responseText = await response.text();
         console.error("Error response:", responseText);
         throw new Error("Failed to fetch products.");
       }
-
       const contentType = response.headers.get("content-type");
       if (!contentType || !contentType.includes("application/json")) {
         throw new Error("Invalid response.");
       }
-
       const data: any[] = await response.json();
-
       if (!data || data.length === 0) {
         setAllProducts([]);
         setFilteredProducts([]);
@@ -502,7 +483,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
         setLoading(false);
         return;
       }
-
       const mappedData: Product[] = data.map((product) => ({
         id: product._id || product.id || `product-${Math.random()}`,
         title: product.title,
@@ -517,9 +497,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
         quality: product.quality,
         availability: product.availability,
       }));
-
       let filtered = mappedData;
-
       if (campusMode === "In Campus") {
         filtered = mappedData.filter(
           (product) =>
@@ -528,23 +506,13 @@ const Dashboard: React.FC<DashboardProps> = () => {
             product.availability === "In Campus Only"
         );
       }
-
       let finalFiltered = filtered;
-
       if (selectedCategory !== "#Everything") {
         const categoryFilter = selectedCategory.replace("#", "").toLowerCase();
         finalFiltered = finalFiltered.filter(
           (p) => p.category && p.category.toLowerCase() === categoryFilter
         );
       }
-
-      if (searchQuery.trim() !== "") {
-        const query = searchQuery.trim().toLowerCase();
-        finalFiltered = finalFiltered.filter(
-          (p) => p.title && p.title.toLowerCase().includes(query)
-        );
-      }
-
       setFilteredProducts(finalFiltered);
       setAllProducts(filtered);
       setError(null);
@@ -556,6 +524,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
     }
   };
 
+  // Reset current product index when products or category changes.
   useEffect(() => {
     if (allProducts.length > 0) {
       let finalFiltered = allProducts;
@@ -565,17 +534,11 @@ const Dashboard: React.FC<DashboardProps> = () => {
           (p) => p.category && p.category.toLowerCase() === categoryFilter
         );
       }
-      if (searchQuery.trim() !== "") {
-        const query = searchQuery.trim().toLowerCase();
-        finalFiltered = finalFiltered.filter(
-          (p) => p.title && p.title.toLowerCase().includes(query)
-        );
-      }
       setFilteredProducts(finalFiltered);
       setCurrentIndex(0);
-      setCurrentImageIndex(0); // Reset image index when products change
+      setCurrentImageIndex(0);
     }
-  }, [allProducts, selectedCategory, searchQuery]);
+  }, [allProducts, selectedCategory]);
 
   useEffect(() => {
     setLoading(true);
@@ -584,24 +547,23 @@ const Dashboard: React.FC<DashboardProps> = () => {
     fetchCart();
     fetchUserInfo();
     setCurrentIndex(0);
-    setCurrentImageIndex(0); // Reset image index when campusMode changes
+    setCurrentImageIndex(0);
   }, [campusMode]);
 
-  // Use useFocusEffect to fetch likedProducts when Dashboard gains focus
   useFocusEffect(
     React.useCallback(() => {
       fetchLikedProducts();
     }, [token])
   );
 
-  const toggleFilterModal = () =>
-    setIsFilterModalVisible(!isFilterModalVisible);
+  const toggleFilterModal = () => setIsFilterModalVisible(!isFilterModalVisible);
 
+  // Simplified “next product” function.
   const goToNextProduct = () => {
-    setIsDescriptionModalVisible(false); // Close description modal on swipe-up
+    setIsDescriptionModalVisible(false);
     if (currentIndex < filteredProducts.length - 1) {
       setCurrentIndex(currentIndex + 1);
-      setCurrentImageIndex(0); // Reset image index when moving to next product
+      setCurrentImageIndex(0);
     } else {
       showError("No more products.");
       setCurrentIndex(0);
@@ -609,8 +571,17 @@ const Dashboard: React.FC<DashboardProps> = () => {
     }
   };
 
-  const nextProduct = filteredProducts[currentIndex + 1] || null;
-
+  // ----------------------------------------------------------------
+  // ProductItem component using react-native-gesture-handler.
+  // Gestures:
+  // • Pan (swipe):
+  //    - Left: next image
+  //    - Right: add to cart
+  //    - Up: next product
+  //    - Down: show description
+  // • Single tap: show description
+  // • Double tap: toggle favorite
+  // ----------------------------------------------------------------
   type ProductItemProps = {
     product: Product;
     nextProduct: Product | null;
@@ -638,239 +609,105 @@ const Dashboard: React.FC<DashboardProps> = () => {
     currentImageIndex,
     setCurrentImageIndex,
   }) => {
-    const translateX = useRef(new Animated.Value(0)).current;
-    const translateY = useRef(new Animated.Value(0)).current;
+    // Reference for double-tap handler.
+    const doubleTapRef = useRef<any>(null);
+    const SWIPE_THRESHOLD = 50;
 
-    const doubleTapRef = useRef(null);
-    const singleTapRef = useRef(null);
-
-    // Use a ref for direction locking so it resets after each gesture
-    const directionLockedRef = useRef<"horizontal" | "vertical" | null>(null);
-    const isLiked = likedProducts.includes(product.id);
-    const onHandlerStateChange = ({ nativeEvent }: any) => {
-      if (nativeEvent.state === State.END) {
-        const { translationX, translationY } = nativeEvent;
-
-        if (directionLockedRef.current === "horizontal") {
+    // Pan gesture handler: determines swipe direction on release.
+    const onPanHandlerStateChange = (event: any) => {
+      if (event.nativeEvent.state === GestureState.END) {
+        const { translationX, translationY } = event.nativeEvent;
+        if (Math.abs(translationX) > Math.abs(translationY)) {
+          // Horizontal swipe.
           if (translationX < -SWIPE_THRESHOLD) {
-            // Swipe Left: Show next image
-            Animated.timing(translateX, {
-              toValue: -SCREEN_WIDTH,
-              duration: 300,
-              useNativeDriver: true,
-            }).start(({ finished }) => {
-              if (finished) {
-                const nextIdx =
-                  currentImageIndex < product.images.length - 1
-                    ? currentImageIndex + 1
-                    : 0;
-                setCurrentImageIndex(nextIdx);
-                // Prevent flicker by waiting for the new index to render
-                requestAnimationFrame(() => {
-                  translateX.setValue(0);
-                });
-              } else {
-                translateX.setValue(0);
-              }
-            });
-            directionLockedRef.current = null;
-            return;
-          }
-          if (translationX > SWIPE_THRESHOLD) {
-            // Swipe Right: Add to cart
+            // Swipe left: next image.
+            const nextIdx =
+              currentImageIndex < product.images.length - 1
+                ? currentImageIndex + 1
+                : 0;
+            setCurrentImageIndex(nextIdx);
+          } else if (translationX > SWIPE_THRESHOLD) {
+            // Swipe right: add to cart.
             onAddToCart(product);
-            directionLockedRef.current = null;
-            return;
           }
-
-          Animated.spring(translateX, {
-            toValue: 0,
-            useNativeDriver: true,
-          }).start();
-        } else if (directionLockedRef.current === "vertical") {
+        } else {
+          // Vertical swipe.
           if (translationY < -SWIPE_THRESHOLD) {
-            // Swipe Up: Navigate to next product
-            Animated.timing(translateY, {
-              toValue: -SCREEN_HEIGHT * 0.67, // Adjust to match product height
-              duration: 300,
-              useNativeDriver: true,
-            }).start(({ finished }) => {
-              if (finished) {
-                // Call onNextProduct FIRST
-                onNextProduct();
-                // Then wait for a frame to reset translateY
-                requestAnimationFrame(() => {
-                  translateY.setValue(0);
-                });
-              } else {
-                translateY.setValue(0);
-              }
-            });
-            directionLockedRef.current = null;
-            return;
+            // Swipe up: next product.
+            onNextProduct();
+          } else if (translationY > SWIPE_THRESHOLD) {
+            // Swipe down: show description.
+            onShowDescription(product.description);
           }
-
-          Animated.spring(translateY, {
-            toValue: 0,
-            useNativeDriver: true,
-          }).start();
-        } else {
-          Animated.spring(translateX, {
-            toValue: 0,
-            useNativeDriver: true,
-          }).start();
-          Animated.spring(translateY, {
-            toValue: 0,
-            useNativeDriver: true,
-          }).start();
         }
-
-        // Reset direction lock at the end of gesture
-        directionLockedRef.current = null;
       }
     };
 
-    const onGestureEvent = ({ nativeEvent }: any) => {
-      const { translationX, translationY } = nativeEvent;
-      const absX = Math.abs(translationX);
-      const absY = Math.abs(translationY);
-
-      if (!directionLockedRef.current) {
-        if (absX > absY && absX > DIRECTION_LOCK_THRESHOLD) {
-          directionLockedRef.current = "horizontal";
-        } else if (absY > absX && absY > DIRECTION_LOCK_THRESHOLD) {
-          directionLockedRef.current = "vertical";
-        }
-      }
-
-      if (directionLockedRef.current === "horizontal") {
-        // Only allow left-swipe movement visually
-        if (translationX < 0) {
-          translateX.setValue(translationX);
-        } else {
-          translateX.setValue(0);
-        }
-        translateY.setValue(0);
-      } else if (directionLockedRef.current === "vertical") {
-        translateY.setValue(translationY);
-        translateX.setValue(0);
-      }
+    // Tap handlers.
+    const onSingleTap = () => {
+      onShowDescription(product.description);
     };
-
     const onDoubleTap = () => {
       onToggleFavorite(product.id);
     };
 
-    const onSingleTap = () => {
-      onShowDescription(product.description);
-    };
+    // Determine current and next image URIs.
+    const currentImageURI =
+      product.images && product.images.length > 0
+        ? product.images[currentImageIndex]
+        : "https://via.placeholder.com/150";
+    const nextImageIndex =
+      currentImageIndex < product.images.length - 1 ? currentImageIndex + 1 : 0;
+    const nextImageURI =
+      product.images && product.images.length > 0
+        ? product.images[nextImageIndex]
+        : "https://via.placeholder.com/150";
 
-    const isTop = index === currentIndex;
-
-    // If there's no next product, just reuse the same product image to avoid null references
+    // Next product preview image.
     const actualNextProduct = nextProduct || product;
     const nextProductImage =
       actualNextProduct.images && actualNextProduct.images.length > 0
         ? actualNextProduct.images[0]
         : "https://via.placeholder.com/150";
 
-    // Current image + next image horizontally
-    const getNextImageIndex = () =>
-      currentImageIndex < product.images.length - 1 ? currentImageIndex + 1 : 0;
-
-    const nextImageIndex = getNextImageIndex();
-
-    const currentImageURI =
-      product.images && product.images.length > 0
-        ? product.images[currentImageIndex]
-        : "https://via.placeholder.com/150";
-
-    const nextImageURI =
-      product.images && product.images.length > 0
-        ? product.images[nextImageIndex]
-        : "https://via.placeholder.com/150";
-
     return (
       <View
         style={[
           styles.stackedProduct,
-          isTop ? styles.topProduct : styles.bottomProduct,
+          index === currentIndex ? styles.topProduct : styles.bottomProduct,
         ]}
       >
-        {isTop && (
-          <View style={styles.topIconsContainer}>
-            <TouchableOpacity
-              style={[styles.iconContainer]}
-              onPress={() => onToggleFavorite(product.id)}
-              accessibilityLabel="Toggle Favorite"
-            >
-              <Ionicons
-                name={isFavorite ? "heart" : "heart-outline"}
-                size={22}
-                color={isFavorite ? "#FF3B30" : "#FFFFFF"}
-              />
-            </TouchableOpacity>
-          </View>
-        )}
-
-        <PanGestureHandler
-          onGestureEvent={onGestureEvent}
-          onHandlerStateChange={onHandlerStateChange}
-        >
-          <Animated.View
-            style={{
-              width: SCREEN_WIDTH,
-              height: SCREEN_HEIGHT * 0.67,
-              transform: [
-                { translateX: translateX },
-                { translateY: translateY },
-              ],
+        <PanGestureHandler onHandlerStateChange={onPanHandlerStateChange}>
+          <TapGestureHandler
+            onHandlerStateChange={(event) => {
+              if (event.nativeEvent.state === GestureState.ACTIVE) {
+                onSingleTap();
+              }
             }}
+            waitFor={doubleTapRef}
+            numberOfTaps={1}
           >
-            {/* Next product below current product (swipe up preview) */}
-            <View
-              style={{
-                position: "absolute",
-                top: SCREEN_HEIGHT * 0.67,
-                width: SCREEN_WIDTH,
-                height: SCREEN_HEIGHT * 0.67,
-              }}
-            >
-              <Image
-                source={{ uri: nextProductImage }}
-                style={styles.productImage}
-                resizeMode="cover"
-              />
-              <LinearGradient
-                colors={["rgba(0,0,0,0.5)", "transparent"]}
-                style={styles.topGradientOverlay}
-              />
-              <LinearGradient
-                colors={["transparent", "rgba(0,0,0,0.6)"]}
-                style={styles.bottomGradientOverlay}
-              />
-            </View>
-
-            {/* TapGestureHandler for the current + next images horizontally */}
             <TapGestureHandler
               ref={doubleTapRef}
               numberOfTaps={2}
-              onActivated={onDoubleTap}
+              onHandlerStateChange={(event) => {
+                if (event.nativeEvent.state === GestureState.ACTIVE) {
+                  onDoubleTap();
+                }
+              }}
             >
-              <TapGestureHandler
-                ref={singleTapRef}
-                waitFor={doubleTapRef}
-                numberOfTaps={1}
-                onActivated={onSingleTap}
-              >
+              <View style={{ width: SCREEN_WIDTH, height: PRODUCT_HEIGHT, backgroundColor: "#000" }}>
+                {/* Removed Next product preview view */}
+                {/* Swipeable image container */}
                 <View
                   style={{
+                    flexDirection: "row",
                     width: SCREEN_WIDTH * 2,
                     height: "100%",
-                    flexDirection: "row",
+                    backgroundColor: "#000",
                   }}
                 >
-                  {/* Current image (left half) */}
+                  {/* Current image */}
                   <View style={{ width: SCREEN_WIDTH, height: "100%" }}>
                     <LinearGradient
                       colors={["rgba(0,0,0,0.5)", "transparent"]}
@@ -878,16 +715,16 @@ const Dashboard: React.FC<DashboardProps> = () => {
                     />
                     <Image
                       source={{ uri: currentImageURI }}
-                      style={styles.productImage}
+                      style={[styles.productImage, { backgroundColor: "#000" }]}
+                      fadeDuration={0}
                       resizeMode="cover"
                     />
                     <LinearGradient
-                      colors={["transparent", "rgba(0,0,0,0.6)"]}
+                      colors={["transparent", "rgba(0,0,0,0.3)"]}
                       style={styles.bottomGradientOverlay}
                     />
                   </View>
-
-                  {/* Next image horizontally (right half) */}
+                  {/* Next image */}
                   <View style={{ width: SCREEN_WIDTH, height: "100%" }}>
                     <LinearGradient
                       colors={["rgba(0,0,0,0.5)", "transparent"]}
@@ -895,32 +732,40 @@ const Dashboard: React.FC<DashboardProps> = () => {
                     />
                     <Image
                       source={{ uri: nextImageURI }}
-                      style={styles.productImage}
+                      style={[styles.productImage, { backgroundColor: "#000" }]}
+                      fadeDuration={0}
                       resizeMode="cover"
                     />
                     <LinearGradient
-                      colors={["transparent", "rgba(0,0,0,0.6)"]}
+                      colors={["transparent", "rgba(0,0,0,0.3)"]}
                       style={styles.bottomGradientOverlay}
                     />
                   </View>
                 </View>
-              </TapGestureHandler>
+              </View>
             </TapGestureHandler>
-          </Animated.View>
+          </TapGestureHandler>
         </PanGestureHandler>
-
-        {/* Keep the product info outside the Animated View 
-            so it doesn't disappear and reappear on left swipe */}
-        {isTop && (
+        {index === currentIndex && (
           <>
             <View style={styles.productInfoBubble}>
               <View style={styles.productInfoTextContainer}>
-                <Text style={styles.productInfoTitle}>{product.title}</Text>
                 <Text style={styles.productInfoPrice}>
                   ${product.price.toFixed(2)}
                 </Text>
               </View>
               <View style={styles.productInfoActions}>
+                <TouchableOpacity
+                  style={styles.iconButton}
+                  onPress={() => onToggleFavorite(product.id)}
+                  accessibilityLabel="Toggle Favorite"
+                >
+                  <Ionicons
+                    name={isFavorite ? "heart" : "heart-outline"}
+                    size={20}
+                    color={isFavorite ? "#FF3B30" : "#FFFFFF"}
+                  />
+                </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.iconButton}
                   onPress={() => {
@@ -932,21 +777,15 @@ const Dashboard: React.FC<DashboardProps> = () => {
                   }}
                   accessibilityLabel="Next Image"
                 >
-                  <Ionicons name="close" size={20} color="#FF3B30" />
+                  <Ionicons name="arrow-forward" size={20} color="#FF3B6F" />
                 </TouchableOpacity>
-
                 <TouchableOpacity
                   style={styles.iconButton}
                   onPress={() => onShowDescription(product.description)}
                   accessibilityLabel="Info"
                 >
-                  <Ionicons
-                    name="information-circle"
-                    size={20}
-                    color="#FFFFFF"
-                  />
+                  <Ionicons name="information-circle" size={20} color="#FFFFFF" />
                 </TouchableOpacity>
-
                 <TouchableOpacity
                   style={styles.iconButton}
                   onPress={() => onAddToCart(product)}
@@ -954,9 +793,15 @@ const Dashboard: React.FC<DashboardProps> = () => {
                 >
                   <Ionicons name="cart" size={20} color="#34C759" />
                 </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.iconButton}
+                  onPress={onNextProduct}
+                  accessibilityLabel="Next Product"
+                >
+                  <Ionicons name="close" size={20} color="#FFFFFF" />
+                </TouchableOpacity>
               </View>
             </View>
-
             <View style={styles.imageIndicatorsContainer}>
               {product.images.map((_, idx) => (
                 <View
@@ -974,28 +819,8 @@ const Dashboard: React.FC<DashboardProps> = () => {
     );
   };
 
-  const renderActiveFilters = () => {
-    const categoryDisplay =
-      selectedCategory === "#Everything"
-        ? "All"
-        : selectedCategory.replace("#", "");
-    const modeDisplay =
-      campusMode === "Both" ? "In & Out of Campus" : "In Campus";
-
-    return (
-      <View style={styles.filterTagsContainer}>
-        <View style={styles.filterTag}>
-          <Text style={styles.filterTagText}>{categoryDisplay}</Text>
-        </View>
-        <View style={styles.filterTag}>
-          <Text style={styles.filterTagText}>{modeDisplay}</Text>
-        </View>
-      </View>
-    );
-  };
-
   return (
-    <GestureHandlerRootView style={styles.rootContainer}>
+    <View style={styles.rootContainer}>
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <LinearGradient
           colors={["#000000", "#000000"]}
@@ -1021,7 +846,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
               <Text style={styles.toastText}>{errorMessage}</Text>
             </Animated.View>
           ) : null}
-
           {successMessage ? (
             <Animated.View
               style={[
@@ -1042,24 +866,10 @@ const Dashboard: React.FC<DashboardProps> = () => {
               <Text style={styles.toastText}>{successMessage}</Text>
             </Animated.View>
           ) : null}
-
+          {/* Top Bar with only the filter icon.
+              (The header items such as logo, gridly text, cart, and profile are handled
+               by App.tsx and appear over this content on Dashboard via headerTransparent.) */}
           <View style={styles.topBar}>
-            <View style={styles.searchBarContainer}>
-              <Ionicons
-                name="search-outline"
-                size={16}
-                color="#CCCCCC"
-                style={{ marginLeft: 10, marginRight: 5 }}
-              />
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Search..."
-                placeholderTextColor="#AAAAAA"
-                value={searchQuery}
-                onChangeText={(text) => setSearchQuery(text)}
-                returnKeyType="search"
-              />
-            </View>
             <TouchableOpacity
               style={styles.topBarIconContainer}
               onPress={toggleFilterModal}
@@ -1068,9 +878,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
               <Ionicons name="options-outline" size={22} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
-
-          {renderActiveFilters()}
-
           {loading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color="#007AFF" />
@@ -1116,15 +923,13 @@ const Dashboard: React.FC<DashboardProps> = () => {
                       setIsDescriptionModalVisible(true);
                     }}
                     onNextProduct={goToNextProduct}
-                    isFavorite={likedProducts.includes(product.id)} // Updated here
+                    isFavorite={likedProducts.includes(product.id)}
                     currentImageIndex={currentImageIndex}
                     setCurrentImageIndex={setCurrentImageIndex}
                   />
                 ))}
             </View>
           )}
-
-          {/* Filter Modal */}
           <Modal
             visible={isFilterModalVisible}
             animationType="slide"
@@ -1138,7 +943,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
             >
               <View style={styles.filterModalContainer}>
                 <Text style={styles.filterModalTitle}>Filters</Text>
-
                 <View style={styles.divider} />
                 <Text style={styles.sectionTitle}>Category</Text>
                 <FlatList
@@ -1162,9 +966,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
                             : "ellipse-outline"
                         }
                         size={20}
-                        color={
-                          selectedCategory === item ? "#BB86FC" : "#FFFFFF"
-                        }
+                        color={selectedCategory === item ? "#BB86FC" : "#FFFFFF"}
                         style={{ marginRight: 10 }}
                       />
                       <Text
@@ -1179,7 +981,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
                     </TouchableOpacity>
                   )}
                 />
-
                 <View style={styles.divider} />
                 <Text style={styles.sectionTitle}>Mode</Text>
                 <FlatList
@@ -1203,9 +1004,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
                             : "ellipse-outline"
                         }
                         size={20}
-                        color={
-                          campusMode === item.value ? "#BB86FC" : "#FFFFFF"
-                        }
+                        color={campusMode === item.value ? "#BB86FC" : "#FFFFFF"}
                         style={{ marginRight: 10 }}
                       />
                       <Text
@@ -1220,7 +1019,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
                     </TouchableOpacity>
                   )}
                 />
-
                 <TouchableOpacity
                   style={styles.applyButton}
                   onPress={() => {
@@ -1231,7 +1029,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
                 >
                   <Text style={styles.applyButtonText}>Apply Filters</Text>
                 </TouchableOpacity>
-
                 <TouchableOpacity
                   onPress={toggleFilterModal}
                   style={styles.modalClose}
@@ -1242,12 +1039,38 @@ const Dashboard: React.FC<DashboardProps> = () => {
               </View>
             </TouchableOpacity>
           </Modal>
-
-          {/* Details Modal */}
+          <Modal
+            visible={isDescriptionModalVisible}
+            animationType="slide"
+            transparent={true}
+            onRequestClose={() => setIsDescriptionModalVisible(false)}
+          >
+            <TouchableOpacity
+              style={styles.centerModalOverlay}
+              activeOpacity={1}
+              onPressOut={() => setIsDescriptionModalVisible(false)}
+            >
+              <View style={styles.descriptionModalContent}>
+                <Text style={styles.modalTitle}>Description</Text>
+                <ScrollView>
+                  <Text style={styles.descriptionText}>
+                    {selectedProductDescription}
+                  </Text>
+                </ScrollView>
+                <TouchableOpacity
+                  onPress={() => setIsDescriptionModalVisible(false)}
+                  style={styles.modalClose}
+                  accessibilityLabel="Close Description Modal"
+                >
+                  <Ionicons name="close-outline" size={24} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
+          </Modal>
           <Modal
             visible={isDetailsModalVisible}
-            transparent
             animationType="slide"
+            transparent={true}
             onRequestClose={() => setIsDetailsModalVisible(false)}
           >
             <TouchableOpacity
@@ -1280,52 +1103,17 @@ const Dashboard: React.FC<DashboardProps> = () => {
                       style={styles.modalClose}
                       accessibilityLabel="Close Details Modal"
                     >
-                      <Ionicons
-                        name="close-outline"
-                        size={24}
-                        color="#FFFFFF"
-                      />
+                      <Ionicons name="close-outline" size={24} color="#FFFFFF" />
                     </TouchableOpacity>
                   </>
                 )}
               </View>
             </TouchableOpacity>
           </Modal>
-
-          {/* Description Modal */}
-          <Modal
-            visible={isDescriptionModalVisible}
-            transparent
-            animationType="slide"
-            onRequestClose={() => setIsDescriptionModalVisible(false)}
-          >
-            <TouchableOpacity
-              style={styles.modalOverlay}
-              activeOpacity={1}
-              onPressOut={() => setIsDescriptionModalVisible(false)}
-            >
-              <View style={styles.descriptionModalContent}>
-                <Text style={styles.modalTitle}>Description</Text>
-                <ScrollView>
-                  <Text style={styles.descriptionText}>
-                    {selectedProductDescription}
-                  </Text>
-                </ScrollView>
-                <TouchableOpacity
-                  onPress={() => setIsDescriptionModalVisible(false)}
-                  style={styles.modalClose}
-                  accessibilityLabel="Close Description Modal"
-                >
-                  <Ionicons name="close-outline" size={24} color="#FFFFFF" />
-                </TouchableOpacity>
-              </View>
-            </TouchableOpacity>
-          </Modal>
-
           <BottomNavBar />
         </LinearGradient>
       </TouchableWithoutFeedback>
-    </GestureHandlerRootView>
+    </View>
   );
 };
 
@@ -1336,10 +1124,22 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#000000",
   },
+  // Gradient background with bottom padding for the nav bar.
   gradientBackground: {
     flex: 1,
-    paddingBottom: 60,
     backgroundColor: "#000000",
+    paddingBottom: NAV_BAR_HEIGHT,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.3)",
+    justifyContent: "flex-end",
+  },
+  centerModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.3)",
+    justifyContent: "center",
+    alignItems: "center",
   },
   smallToastContainer: {
     position: "absolute",
@@ -1358,63 +1158,28 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: "center",
   },
+  // Top Bar: Only the filter icon remains.
   topBar: {
-    height: 60,
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 10,
-    paddingTop: Platform.OS === "ios" ? 15 : 10,
-    marginBottom: 5,
+    position: "absolute",
+    top: Platform.OS === "ios" ? 66 : 40, // Increased from 40/20 to 60/40
+    left: 20,
+    zIndex: 10,
   },
-  searchBarContainer: {
-    flex: 1,
-    flexDirection: "row",
-    backgroundColor: "#2C2C2C",
-    borderRadius: 8,
-    alignItems: "center",
-    height: 36,
-  },
-  searchInput: {
-    flex: 1,
-    color: "#FFFFFF",
-    fontSize: 13,
-    height: 36,
-    paddingRight: 10,
-  },
+
   topBarIconContainer: {
     padding: 6,
-    marginLeft: 10,
-    backgroundColor: "#2C2C2C",
+    backgroundColor: "rgba(0,0,0,0.5)",
     borderRadius: 8,
-  },
-  filterTagsContainer: {
-    flexDirection: "row",
-    paddingHorizontal: 15,
-    paddingVertical: 6,
-  },
-  filterTag: {
-    backgroundColor: "#262626",
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    marginRight: 5,
-    marginTop: -9,
-  },
-  filterTagText: {
-    color: "#FFFFFF",
-    fontSize: 12,
   },
   productStack: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    marginTop: -24,
   },
   stackedProduct: {
     position: "absolute",
     width: SCREEN_WIDTH,
-    height: SCREEN_HEIGHT * 0.669,
-    justifyContent: "flex-start",
+    height: PRODUCT_HEIGHT,
     backgroundColor: "transparent",
     overflow: "hidden",
     zIndex: 1,
@@ -1426,13 +1191,13 @@ const styles = StyleSheet.create({
   bottomProduct: {
     zIndex: 1,
     opacity: 0,
-    transform: [{ scale: 0.95 }, { translateY: SCREEN_HEIGHT * 0.05 }],
+    transform: [{ scale: 0.95 }, { translateY: 20 }],
   },
   productImage: {
     width: "100%",
     height: "100%",
     resizeMode: "cover",
-    transform: [{ translateY: -1 }],
+    backgroundColor: "#000",
   },
   topGradientOverlay: {
     position: "absolute",
@@ -1445,21 +1210,47 @@ const styles = StyleSheet.create({
     position: "absolute",
     bottom: 0,
     width: "100%",
-    height: 200,
+    height: 100,
     zIndex: 2,
   },
-  topIconsContainer: {
+  productInfoBubble: {
     position: "absolute",
-    top: 15,
-    right: 15,
+    bottom: 20,
+    left: 12,
+    right: 12,
     flexDirection: "row",
-    zIndex: 10,
+    alignItems: "center",
+    justifyContent: "space-between",
+    zIndex: 3,
+    backgroundColor: "rgba(0,0,0,0.3)",
+    borderRadius: 10,
+    padding: 10,
   },
-  iconContainer: {
+  productInfoTextContainer: {
+    flex: 1,
+    marginRight: 10,
+  },
+  productInfoTitle: {
+    color: "#FFFFFF",
+    fontSize: 22,
+    fontWeight: "700",
+    marginBottom: 2,
+  },
+  productInfoPrice: {
+    color: "#A1A1A1",
+    fontSize: 18,
+    fontWeight: "600",
+  },
+  productInfoActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginLeft: 12,
+  },
+  iconButton: {
+    backgroundColor: "rgba(50,50,50,0.6)",
+    padding: 8,
+    borderRadius: 50,
     marginLeft: 10,
-    padding: 7,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    borderRadius: 20,
   },
   imageIndicatorsContainer: {
     position: "absolute",
@@ -1478,44 +1269,6 @@ const styles = StyleSheet.create({
   imageIndicatorDotActive: {
     backgroundColor: "#FFFFFF",
   },
-  productInfoBubble: {
-    position: "absolute",
-    bottom: 20,
-    left: 12,
-    right: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    zIndex: 3,
-  },
-  productInfoTextContainer: {
-    flex: 1,
-    marginRight: 10,
-    justifyContent: "center",
-  },
-  productInfoTitle: {
-    color: "#FFFFFF",
-    fontSize: 20,
-    fontWeight: "700",
-    marginBottom: 2,
-  },
-  productInfoPrice: {
-    color: "#A1A1A1",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  productInfoActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "flex-start",
-    marginLeft: 12,
-  },
-  iconButton: {
-    backgroundColor: "#333",
-    padding: 8,
-    borderRadius: 50,
-    marginLeft: 10,
-  },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
@@ -1524,7 +1277,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 8,
     color: "#FFFFFF",
-    fontSize: 14,
+    fontSize: 16,
   },
   errorContainer: {
     flex: 1,
@@ -1534,7 +1287,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: "#FF3B30",
-    fontSize: 14,
+    fontSize: 16,
     textAlign: "center",
     marginBottom: 8,
   },
@@ -1542,11 +1295,11 @@ const styles = StyleSheet.create({
     backgroundColor: "#007AFF",
     paddingVertical: 10,
     paddingHorizontal: 20,
-    borderRadius: 20,
+    borderRadius: 25,
   },
   retryButtonText: {
     color: "#FFFFFF",
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: "500",
   },
   noProductsContainer: {
@@ -1556,23 +1309,17 @@ const styles = StyleSheet.create({
   },
   noProductsText: {
     color: "#FFFFFF",
-    fontSize: 16,
-  },
-  // Updated Filter Modal Styles
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.3)",
-    justifyContent: "flex-end",
+    fontSize: 18,
   },
   filterModalContainer: {
-    backgroundColor: "#0B0B0B",
+    backgroundColor: "#1A1A1A",
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 16,
     maxHeight: "80%",
   },
   filterModalTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: "700",
     color: "#FFFFFF",
     marginBottom: 12,
@@ -1587,7 +1334,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     color: "#FFFFFF",
-    alignSelf: "flex-start",
     marginBottom: 5,
     fontWeight: "600",
   },
@@ -1597,7 +1343,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   filterModalOptionSelected: {
-    backgroundColor: "#BB86FC20", // Slightly transparent highlight
+    backgroundColor: "#BB86FC20",
     borderRadius: 10,
   },
   filterModalOptionText: {
@@ -1614,7 +1360,6 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     marginTop: 15,
     alignItems: "center",
-    transform: [{ translateY: -9 }], // Shifts the button up by 5 units
   },
   applyButtonText: {
     color: "#FFFFFF",
@@ -1626,7 +1371,6 @@ const styles = StyleSheet.create({
     top: 10,
     right: 10,
   },
-  // Details Modal Styles
   detailsModalContent: {
     width: "90%",
     backgroundColor: "#1E1E1E",
@@ -1668,7 +1412,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: "center",
   },
-  // Description Modal Styles
   descriptionModalContent: {
     width: "85%",
     backgroundColor: "#1E1E1E",
@@ -1676,7 +1419,6 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     alignItems: "center",
     maxHeight: "70%",
-    position: "relative",
   },
   modalTitle: {
     fontSize: 20,
