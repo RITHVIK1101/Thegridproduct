@@ -71,9 +71,7 @@ const ActivityScreen: React.FC = () => {
   const isFocused = useIsFocused();
   const { userId, token } = useContext(UserContext);
 
-  const [activeSegment, setActiveSegment] = useState<
-    "Products" | "Gigs" | "Requested"
-  >("Products");
+  const [activeSegment, setActiveSegment] = useState<"Products" | "Gigs" | "Requested">("Products");
 
   // Products State
   const [products, setProducts] = useState<Product[]>([]);
@@ -88,17 +86,12 @@ const ActivityScreen: React.FC = () => {
   const [errorGigs, setErrorGigs] = useState<string | null>(null);
 
   // Requested Products State
-  const [requestedProducts, setRequestedProducts] = useState<ProductRequest[]>(
-    []
-  );
-  const [filteredRequestedProducts, setFilteredRequestedProducts] = useState<
-    ProductRequest[]
-  >([]);
+  const [requestedProducts, setRequestedProducts] = useState<ProductRequest[]>([]);
+  const [filteredRequestedProducts, setFilteredRequestedProducts] = useState<ProductRequest[]>([]);
   const [loadingRequested, setLoadingRequested] = useState<boolean>(false);
   const [errorRequested, setErrorRequested] = useState<string | null>(null);
 
   const [searchQuery, setSearchQuery] = useState<string>("");
-
   const inputRef = useRef<TextInput>(null);
 
   // Fetch user products
@@ -108,7 +101,6 @@ const ActivityScreen: React.FC = () => {
       setLoadingProducts(false);
       return;
     }
-
     try {
       const response = await fetch(`${NGROK_URL}/products/user`, {
         method: "GET",
@@ -117,7 +109,6 @@ const ActivityScreen: React.FC = () => {
           Authorization: `Bearer ${token}`,
         },
       });
-
       const contentType = response.headers.get("content-type");
       if (!response.ok) {
         const errorText = await response.text();
@@ -128,7 +119,6 @@ const ActivityScreen: React.FC = () => {
         console.error("Unexpected content-type:", contentType, errorText);
         throw new Error("Unexpected response format.");
       }
-
       const data: Product[] = await response.json();
       if (!data || data.length === 0) {
         setProducts([]);
@@ -137,9 +127,7 @@ const ActivityScreen: React.FC = () => {
         setProducts(data);
         setFilteredProducts(
           data.filter((product) =>
-            (product.title || "")
-              .toLowerCase()
-              .includes(searchQuery.toLowerCase())
+            (product.title || "").toLowerCase().includes(searchQuery.toLowerCase())
           )
         );
       }
@@ -170,7 +158,6 @@ const ActivityScreen: React.FC = () => {
           Authorization: `Bearer ${token}`,
         },
       });
-
       const contentType = response.headers.get("content-type");
       if (!response.ok) {
         const errorText = await response.text();
@@ -181,9 +168,7 @@ const ActivityScreen: React.FC = () => {
         console.error("Unexpected content-type:", contentType, errorText);
         throw new Error("Unexpected response format.");
       }
-
       const data = await response.json();
-
       const gigsData: Gig[] = data.gigs || [];
       if (!gigsData || gigsData.length === 0) {
         setGigs([]);
@@ -215,7 +200,6 @@ const ActivityScreen: React.FC = () => {
       setLoadingRequested(false);
       return;
     }
-
     try {
       const response = await fetch(`${NGROK_URL}/requests/my`, {
         method: "GET",
@@ -224,20 +208,16 @@ const ActivityScreen: React.FC = () => {
           Authorization: `Bearer ${token}`,
         },
       });
-
       const contentType = response.headers.get("content-type");
       if (!response.ok) {
         const errorText = await response.text();
         console.error("Error response text:", errorText);
-        throw new Error(
-          "Failed to fetch your requested products. Server error."
-        );
+        throw new Error("Failed to fetch your requested products. Server error.");
       } else if (!contentType || !contentType.includes("application/json")) {
         const errorText = await response.text();
         console.error("Unexpected content-type:", contentType, errorText);
         throw new Error("Unexpected response format.");
       }
-
       const data: ProductRequest[] = await response.json();
       if (!data || data.length === 0) {
         setRequestedProducts([]);
@@ -336,7 +316,6 @@ const ActivityScreen: React.FC = () => {
       Alert.alert("Error", "You are not authenticated.");
       return;
     }
-
     try {
       const response = await fetch(`${NGROK_URL}/products/${productId}`, {
         method: "DELETE",
@@ -345,15 +324,12 @@ const ActivityScreen: React.FC = () => {
           Authorization: `Bearer ${token}`,
         },
       });
-
       const contentType = response.headers.get("content-type");
       if (!contentType || !contentType.includes("application/json")) {
         const text = await response.text();
         throw new Error(`Unexpected response: ${response.status} ${text}`);
       }
-
       const data = await response.json();
-
       if (response.ok) {
         setProducts((prev) => prev.filter((p) => p.id !== productId));
         setFilteredProducts((prev) => prev.filter((p) => p.id !== productId));
@@ -377,7 +353,6 @@ const ActivityScreen: React.FC = () => {
       Alert.alert("Error", "You are not authenticated.");
       return;
     }
-
     try {
       const response = await fetch(`${NGROK_URL}/services/${gigId}`, {
         method: "DELETE",
@@ -386,15 +361,12 @@ const ActivityScreen: React.FC = () => {
           Authorization: `Bearer ${token}`,
         },
       });
-
       const contentType = response.headers.get("content-type");
       if (!contentType || !contentType.includes("application/json")) {
         const text = await response.text();
         throw new Error(`Unexpected response: ${response.status} ${text}`);
       }
-
       const data = await response.json();
-
       if (response.ok) {
         setGigs((prev) => prev.filter((g) => g.id !== gigId));
         setFilteredGigs((prev) => prev.filter((g) => g.id !== gigId));
@@ -418,7 +390,6 @@ const ActivityScreen: React.FC = () => {
       Alert.alert("Error", "You are not authenticated.");
       return;
     }
-
     try {
       const response = await fetch(`${NGROK_URL}/requests/my/${requestId}`, {
         method: "DELETE",
@@ -427,15 +398,12 @@ const ActivityScreen: React.FC = () => {
           Authorization: `Bearer ${token}`,
         },
       });
-
       const contentType = response.headers.get("content-type");
       if (!contentType || !contentType.includes("application/json")) {
         const text = await response.text();
         throw new Error(`Unexpected response: ${response.status} ${text}`);
       }
-
       const data = await response.json();
-
       if (response.ok) {
         setRequestedProducts((prev) =>
           prev.filter((req) => req.id !== requestId)
@@ -475,78 +443,84 @@ const ActivityScreen: React.FC = () => {
 
   // Navigate to edit gig screen
   const navigateToEditGig = (gigId: string) => {
-    navigation.navigate("EditGig", { gigId });
+    // For gigs, the edit icon is removed.
+    // Optionally, you can navigate to a detailed view of the gig.
+    navigation.navigate("JobDetail", { jobId: gigId });
   };
 
   // Navigate to view requested product details (Assuming there's a screen)
   const navigateToViewRequestedProduct = (requestedProductId: string) => {
-    // Placeholder for navigation
     Alert.alert("Info", "Requested Products feature coming soon!");
   };
 
-  // Fetch data when screen is focused or active segment changes
-  useEffect(() => {
-    if (isFocused) {
-      fetchData();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isFocused, activeSegment]);
+  // ---------------------------
+  // New Component: GigItem
+  // ---------------------------
+  const GigItem: React.FC<{ item: Gig }> = ({ item }) => {
+    const [expanded, setExpanded] = useState(false);
+    const maxDescriptionLength = 100;
+    const description =
+      item.description.length > maxDescriptionLength && !expanded
+        ? item.description.substring(0, maxDescriptionLength) + "..."
+        : item.description;
+    const toggleExpanded = () => setExpanded(!expanded);
+    const daysActive = calculateDaysActive(item.postedDate);
+    const status = daysActive > 30 ? "Expired" : `Active for ${daysActive} days`;
 
-  // Filter data based on search query
-  useEffect(() => {
-    if (activeSegment === "Products") {
-      const filtered = products.filter((product) =>
-        (product.title || "").toLowerCase().includes(searchQuery.toLowerCase())
-      );
-      setFilteredProducts(filtered);
-    } else if (activeSegment === "Gigs") {
-      const filtered = gigs.filter((gig) =>
-        (gig.title || "").toLowerCase().includes(searchQuery.toLowerCase())
-      );
-      setFilteredGigs(filtered);
-    } else if (activeSegment === "Requested") {
-      const filtered = requestedProducts.filter((req) =>
-        req.productName ? req.productName.includes(searchQuery) : false
-      );
-      setFilteredRequestedProducts(filtered);
-    }
-  }, [searchQuery, products, gigs, requestedProducts, activeSegment]);
+    return (
+      <View style={styles.itemContainer}>
+        <TouchableOpacity
+          onPress={() => navigation.navigate("JobDetail", { jobId: item.id })}
+          style={styles.itemTouchArea}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.itemTitle}>{item.title || "No Title"}</Text>
+          <Text style={styles.itemPrice}>
+            {item.price === "Open to Communication"
+              ? item.price
+              : `$${item.price}`}
+          </Text>
+          <Text style={styles.itemDate}>
+            Posted: {new Date(item.postedDate).toDateString()}
+          </Text>
+          <Text style={styles.itemCategory}>Category: {item.category}</Text>
+          <Text style={styles.itemDescription}>{description}</Text>
+          {item.description.length > maxDescriptionLength && (
+            <TouchableOpacity onPress={toggleExpanded}>
+              <Text style={styles.readMore}>
+                {expanded ? "Show Less" : "Read More"}
+              </Text>
+            </TouchableOpacity>
+          )}
+          <Text
+            style={[
+              styles.itemStatus,
+              status.includes("Expired") && { color: "#FF3B30" },
+            ]}
+          >
+            {status}
+          </Text>
+        </TouchableOpacity>
 
-  // Handle pull-to-refresh
-  const handleRefresh = () => {
-    fetchData();
+        <View style={styles.iconRow}>
+          {/* Removed the edit (pencil) icon for gigs */}
+          <TouchableOpacity
+            onPress={() => handleDeleteGig(item.id)}
+            style={styles.iconTouchable}
+            hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="trash-outline" size={18} color="#FF3B30" />
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
   };
-
-  // Reusable EmptyList component
-  const EmptyList = ({
-    message,
-    buttonText,
-    onPress,
-  }: {
-    message: string;
-    buttonText: string;
-    onPress: () => void;
-  }) => (
-    <View style={styles.emptyContainer}>
-      <Ionicons name="information-circle-outline" size={50} color="#BB86FC" />
-      <Text style={styles.emptyText}>{message}</Text>
-      <TouchableOpacity
-        style={styles.emptyButton}
-        onPress={onPress}
-        activeOpacity={0.7}
-      >
-        <Text style={styles.emptyButtonText}>{buttonText}</Text>
-        <Ionicons name="arrow-forward" size={20} color="#fff" />
-      </TouchableOpacity>
-    </View>
-  );
 
   // Render a single product item
   const renderProduct = ({ item }: { item: Product }) => {
     const daysActive = calculateDaysActive(item.postedDate);
-    const status =
-      daysActive > 30 ? "Expired" : `Active for ${daysActive} days`;
-
+    const status = daysActive > 30 ? "Expired" : `Active for ${daysActive} days`;
     return (
       <View style={styles.itemContainer}>
         <TouchableOpacity
@@ -559,12 +533,7 @@ const ActivityScreen: React.FC = () => {
           <Text style={styles.itemDate}>
             Posted: {new Date(item.postedDate).toDateString()}
           </Text>
-          <Text
-            style={[
-              styles.itemStatus,
-              status.includes("Expired") && { color: "#FF3B30" },
-            ]}
-          >
+          <Text style={styles.itemStatus}>
             {status}
           </Text>
           {item.selectedTags?.length > 0 && (
@@ -604,68 +573,10 @@ const ActivityScreen: React.FC = () => {
     );
   };
 
-  // Render a single gig item
-  const renderGig = ({ item }: { item: Gig }) => {
-    const daysActive = calculateDaysActive(item.postedDate);
-    const status =
-      daysActive > 30 ? "Expired" : `Active for ${daysActive} days`;
-
-    return (
-      <View style={styles.itemContainer}>
-        <TouchableOpacity
-          onPress={() => navigateToEditGig(item.id)}
-          style={styles.itemTouchArea}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.itemTitle}>{item.title || "No Title"}</Text>
-          <Text style={styles.itemPrice}>
-            {item.price === "Open to Communication"
-              ? item.price
-              : `$${item.price}`}
-          </Text>
-          <Text style={styles.itemDate}>
-            Posted: {new Date(item.postedDate).toDateString()}
-          </Text>
-          <Text style={styles.itemCategory}>Category: {item.category}</Text>
-          <Text style={styles.itemDescription}>{item.description}</Text>
-          <Text
-            style={[
-              styles.itemStatus,
-              status.includes("Expired") && { color: "#FF3B30" },
-            ]}
-          >
-            {status}
-          </Text>
-        </TouchableOpacity>
-
-        <View style={styles.iconRow}>
-          <TouchableOpacity
-            onPress={() => navigateToEditGig(item.id)}
-            style={styles.iconTouchable}
-            hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="pencil-outline" size={18} color="#BB86FC" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => handleDeleteGig(item.id)}
-            style={styles.iconTouchable}
-            hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="trash-outline" size={18} color="#FF3B30" />
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  };
-
-  // Render a single requested product item (no price/date, but shows name, description, days active)
+  // Render a single requested product item
   const renderRequestedProduct = ({ item }: { item: ProductRequest }) => {
     const daysActive = calculateDaysActive(item.createdAt);
-    const status =
-      daysActive > 30 ? "Expired" : `Active for ${daysActive} days`;
-
+    const status = daysActive > 30 ? "Expired" : `Active for ${daysActive} days`;
     return (
       <View style={styles.itemContainer}>
         <TouchableOpacity
@@ -715,7 +626,6 @@ const ActivityScreen: React.FC = () => {
         </View>
       );
     }
-
     if (errorRequested) {
       return (
         <View style={styles.errorContainer}>
@@ -723,7 +633,6 @@ const ActivityScreen: React.FC = () => {
         </View>
       );
     }
-
     return (
       <FlatList
         data={filteredRequestedProducts}
@@ -759,7 +668,6 @@ const ActivityScreen: React.FC = () => {
           </View>
         );
       }
-
       if (errorProducts) {
         return (
           <View style={styles.errorContainer}>
@@ -767,7 +675,6 @@ const ActivityScreen: React.FC = () => {
           </View>
         );
       }
-
       return (
         <FlatList
           data={filteredProducts}
@@ -798,7 +705,6 @@ const ActivityScreen: React.FC = () => {
           </View>
         );
       }
-
       if (errorGigs) {
         return (
           <View style={styles.errorContainer}>
@@ -806,12 +712,11 @@ const ActivityScreen: React.FC = () => {
           </View>
         );
       }
-
       return (
         <FlatList
           data={filteredGigs}
           keyExtractor={(item) => item.id}
-          renderItem={renderGig}
+          renderItem={({ item }) => <GigItem item={item} />}
           contentContainerStyle={styles.listContainer}
           ListEmptyComponent={
             !loadingGigs && !errorGigs ? (
@@ -832,6 +737,61 @@ const ActivityScreen: React.FC = () => {
       return renderRequested();
     }
   };
+
+  // Handle pull-to-refresh
+  const handleRefresh = () => {
+    fetchData();
+  };
+
+  // Reusable EmptyList component
+  const EmptyList = ({
+    message,
+    buttonText,
+    onPress,
+  }: {
+    message: string;
+    buttonText: string;
+    onPress: () => void;
+  }) => (
+    <View style={styles.emptyContainer}>
+      <Ionicons name="information-circle-outline" size={50} color="#BB86FC" />
+      <Text style={styles.emptyText}>{message}</Text>
+      <TouchableOpacity
+        style={styles.emptyButton}
+        onPress={onPress}
+        activeOpacity={0.7}
+      >
+        <Text style={styles.emptyButtonText}>{buttonText}</Text>
+        <Ionicons name="arrow-forward" size={20} color="#fff" />
+      </TouchableOpacity>
+    </View>
+  );
+
+  useEffect(() => {
+    if (isFocused) {
+      fetchData();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFocused, activeSegment]);
+
+  useEffect(() => {
+    if (activeSegment === "Products") {
+      const filtered = products.filter((product) =>
+        (product.title || "").toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      setFilteredProducts(filtered);
+    } else if (activeSegment === "Gigs") {
+      const filtered = gigs.filter((gig) =>
+        (gig.title || "").toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      setFilteredGigs(filtered);
+    } else if (activeSegment === "Requested") {
+      const filtered = requestedProducts.filter((req) =>
+        req.productName ? req.productName.includes(searchQuery) : false
+      );
+      setFilteredRequestedProducts(filtered);
+    }
+  }, [searchQuery, products, gigs, requestedProducts, activeSegment]);
 
   return (
     <View style={styles.mainContainer}>
@@ -915,10 +875,7 @@ const ActivityScreen: React.FC = () => {
               returnKeyType="search"
             />
             {searchQuery.length > 0 && (
-              <TouchableOpacity
-                onPress={() => setSearchQuery("")}
-                activeOpacity={0.7}
-              >
+              <TouchableOpacity onPress={() => setSearchQuery("")} activeOpacity={0.7}>
                 <Ionicons
                   name="close-circle"
                   size={20}
@@ -1025,7 +982,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 100, // To prevent content from being hidden behind BottomNavBar
     paddingTop: 10,
-    flexGrow: 1, // Ensure FlatList can center EmptyList
+    flexGrow: 1,
   },
   itemContainer: {
     position: "relative",
@@ -1073,6 +1030,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#BB86FC",
     marginBottom: 4,
+  },
+  readMore: {
+    fontSize: 12,
+    color: "#BB86FC",
+    fontWeight: "600",
+    marginTop: 4,
   },
   tagBadge: {
     backgroundColor: "#333",

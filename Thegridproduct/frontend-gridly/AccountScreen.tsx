@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Alert,
   ScrollView,
+  TouchableOpacity,
 } from "react-native";
 import { UserContext } from "./UserContext"; // Adjust the path if necessary
 import { NGROK_URL } from "@env";
@@ -100,30 +101,42 @@ const AccountScreen: React.FC = () => {
     return (
       <View style={styles.errorContainer}>
         <Text style={styles.errorText}>{error}</Text>
-        {/* Optionally, add a retry button */}
+        <TouchableOpacity style={styles.retryButton} onPress={fetchUserData}>
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </TouchableOpacity>
       </View>
     );
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <ScrollView
+      contentContainerStyle={styles.container}
+      bounces={false}
+      keyboardShouldPersistTaps="handled"
+    >
       <Text style={styles.title}>My Account</Text>
-      <View style={styles.infoContainer}>
+      <View style={styles.infoRow}>
         <Text style={styles.label}>First Name:</Text>
         <Text style={styles.value}>{userData.firstName}</Text>
       </View>
-      <View style={styles.infoContainer}>
+      <View style={styles.divider} />
+      <View style={styles.infoRow}>
         <Text style={styles.label}>Last Name:</Text>
         <Text style={styles.value}>{userData.lastName}</Text>
       </View>
-      <View style={styles.infoContainer}>
+      <View style={styles.divider} />
+      <View style={styles.infoRow}>
         <Text style={styles.label}>Email:</Text>
         <Text style={styles.value}>{userData.email}</Text>
       </View>
-      <View style={styles.infoContainer}>
+      <View style={styles.divider} />
+      <View style={styles.infoRow}>
         <Text style={styles.label}>Institution:</Text>
         <Text style={styles.value}>{userData.institution}</Text>
       </View>
+      <Text style={styles.note}>
+        Note: The above information cannot be changed.
+      </Text>
     </ScrollView>
   );
 };
@@ -133,21 +146,24 @@ export default AccountScreen;
 const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
-    backgroundColor: "#121212",
+    backgroundColor: "#000", // Pure black background
     padding: 20,
+    paddingBottom: 40,
+    // Align content to the top
+    justifyContent: "flex-start",
   },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#121212",
+    backgroundColor: "#000",
   },
   errorContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: "#000",
     paddingHorizontal: 15,
-    backgroundColor: "#121212",
   },
   errorText: {
     color: "#FF6B6B",
@@ -155,26 +171,52 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: 10,
   },
+  retryButton: {
+    backgroundColor: "#BB86FC",
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 5,
+  },
+  retryButtonText: {
+    color: "#000",
+    fontSize: 16,
+    fontWeight: "600",
+  },
   title: {
-    fontSize: 24,
+    fontSize: 28,
     color: "#BB86FC",
     fontWeight: "700",
     marginBottom: 20,
     textAlign: "center",
+    // Reduced top margin for an upward shift
+    marginTop: 10,
   },
-  infoContainer: {
+  infoRow: {
     flexDirection: "row",
-    marginBottom: 15,
+    alignItems: "center",
+    paddingVertical: 10,
   },
   label: {
-    fontSize: 16,
+    fontSize: 18,
     color: "#fff",
     fontWeight: "600",
-    width: 120, // Fixed width for labels
+    width: 140, // Fixed width for labels
   },
   value: {
-    fontSize: 16,
+    fontSize: 18,
     color: "#ccc",
     flex: 1,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: "#333",
+    marginVertical: 5,
+  },
+  note: {
+    marginTop: 20,
+    fontSize: 14,
+    color: "#777",
+    textAlign: "center",
+    fontStyle: "italic",
   },
 });

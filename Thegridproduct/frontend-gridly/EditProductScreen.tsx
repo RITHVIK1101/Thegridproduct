@@ -808,7 +808,7 @@ export default EditProduct;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#121212",
+    backgroundColor: "#000000", // Updated to dark dark black
     padding: 20,
   },
   progressContainer: {

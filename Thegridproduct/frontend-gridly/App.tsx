@@ -37,20 +37,11 @@ import JobDetails from "./JobDetails"; // Import the new JobDetails screen
 import RequestProduct from "./RequestProduct"; // Import the RequestProduct screen
 import { RootStackParamList } from "./navigationTypes";
 
-// Terms of Service Screen
-const TermsOfServiceScreen: React.FC = () => (
-  <View style={styles.termsScreenContainer}>
-    <Text style={styles.termsHeading}>Terms of Service</Text>
-    <ScrollView style={styles.termsScroll}>
-      <Text style={styles.termsText}>
-        Welcome to Gridly. By using our platform, you agree to the following terms...
-        {"\n\n"}
-        Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla facilisi.
-        Phasellus non urna nec sapien dictum luctus.
-      </Text>
-    </ScrollView>
-  </View>
-);
+// Import the separate Terms of Service content
+import TermsOfServiceContent from "./TermsOfServiceContent";
+
+// Terms of Service Screen now simply renders the imported content
+const TermsOfServiceScreen: React.FC = () => <TermsOfServiceContent />;
 
 // Liked Items Screen
 const LikedItemsScreen: React.FC = () => {
@@ -152,7 +143,7 @@ const UserMenuScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
               color="#FFFFFF"
               style={{ marginRight: 10 }}
             />
-            <Text style={styles.bottomSheetOptionText}>View Terms of Service</Text>
+            <Text style={styles.bottomSheetOptionText}>View Terms of Use</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.bottomSheetOption}
