@@ -23,8 +23,10 @@ import {
 } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import BottomNavBar from "./components/BottomNavbar";
-import { fetchConversations, postMessage, getMessages } from "./api";
-import { ABLY_API_KEY, CLOUDINARY_URL, UPLOAD_PRESET } from "@env";
+import { fetchConversations } from "./api"; // API to fetch chat list from MongoDB
+// For sending messages we’ll use Firestore directly
+import { doc, onSnapshot, updateDoc, arrayUnion } from "firebase/firestore";
+import { CLOUDINARY_URL, UPLOAD_PRESET } from "@env";
 import { Conversation, Message } from "./types";
 import { UserContext } from "./UserContext";
 import Ably from "ably";
