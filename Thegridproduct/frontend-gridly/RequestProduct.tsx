@@ -157,7 +157,10 @@ const RequestProduct: React.FC = () => {
             <Text style={styles.modalText}>Product Requested Successfully!</Text>
             <TouchableOpacity
               style={styles.closeModalButton}
-              onPress={() => setIsSuccessModalVisible(false)}
+              onPress={() => {
+                setIsSuccessModalVisible(false);
+                navigation.goBack();
+              }}
             >
               <Text style={styles.closeModalButtonText}>Close</Text>
             </TouchableOpacity>
