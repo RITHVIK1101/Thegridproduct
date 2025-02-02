@@ -90,6 +90,14 @@ const Dashboard: React.FC<DashboardProps> = () => {
 
   // Filters for the filter modal
   const [campusMode, setCampusMode] = useState<"In Campus" | "Both">("Both");
+  // Updated categories with Tickets integrated between MaleClothing and Other.
+  const categories = [
+    "#Everything",
+    "#FemaleClothing",
+    "#MaleClothing",
+    "#Tickets",
+    "#Other",
+  ];
   const [selectedCategory, setSelectedCategory] = useState<string>("#Everything");
   const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
 
@@ -101,13 +109,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
   const [requestedProducts, setRequestedProducts] = useState<RequestedProduct[]>([]);
 
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
-
-  const categories = [
-    "#Everything",
-    "#FemaleClothing",
-    "#MaleClothing",
-    "#Other",
-  ];
 
   const campusOptions: Array<{ label: string; value: "In Campus" | "Both" }> = [
     { label: "In and Out of Campus", value: "Both" },
@@ -880,14 +881,14 @@ const Dashboard: React.FC<DashboardProps> = () => {
             </TouchableOpacity>
           </View>
 
-          {/* NEW: Requested Products Stories Section (no outer container background) */}
+          {/* Requested Products Stories Section */}
           {requestedProducts.length > 0 && (
             <View style={styles.requestedStoriesContainer}>
               <View style={styles.requestedHeader}>
                 <Text style={styles.requestedLabel}>Requested Products</Text>
                 <TouchableOpacity
                   style={styles.viewAllButton}
-                  onPress={() => Alert.alert("View All", "This will route to a full list soon.")}
+                  onPress={() => navigation.navigate("RequestedProductsPage")}
                   accessibilityLabel="View All Requested Products"
                 >
                   <Text style={styles.viewAllText}>View All</Text>
@@ -1397,7 +1398,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginBottom: 4,
   },
-  // NEW: Styles for the requested products "stories" section
+  // Styles for the requested products "stories" section
   requestedStoriesContainer: {
     position: "absolute",
     top: PRODUCT_HEIGHT / 2 - 280, // shifted up slightly more
@@ -1405,7 +1406,6 @@ const styles = StyleSheet.create({
     right: 0,
     paddingHorizontal: 10,
     zIndex: 11,
-    // No background color here, so the image remains visible
   },
   requestedHeader: {
     flexDirection: "row",
@@ -1427,9 +1427,8 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "bold",
   },
-  // Updated storyItem: individual bubble for product names
   storyItem: {
-    backgroundColor: "rgba(0,0,0,0.5)", // semi-transparent dark bubble
+    backgroundColor: "rgba(0,0,0,0.5)",
     paddingVertical: 4,
     paddingHorizontal: 8,
     borderRadius: 12,
@@ -1441,13 +1440,11 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     textAlign: "center",
   },
-  // Ensure horizontal scrolling content container style is applied
   requestedScrollContent: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 4,
   },
-  // Added style for the ScrollView itself
   requestedScrollView: {
     height: 40,
   },
