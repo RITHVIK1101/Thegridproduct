@@ -20,8 +20,8 @@ import {
 import { RootStackParamList } from "../navigationTypes";
 import { UserContext } from "../UserContext";
 import { NGROK_URL } from "@env";
+import { fetchConversations } from "../api";
 
-// Define a type for a gig (as used in your Jobs screen)
 interface Gig {
   id: string;
   title: string;
@@ -34,18 +34,16 @@ interface Gig {
 const BottomNavBar: React.FC = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const route = useRoute();
-  const { token } = useContext(UserContext);
+  const { token, userId } = useContext(UserContext);
   const [isModalVisible, setIsModalVisible] = useState(false);
 
-  // Animation value for spinning the add button
+  // Animation for spinning the add button
   const spinValue = useRef(new Animated.Value(0)).current;
-
-  // Define the spinning animation
   const spinAnimation = useRef(
     Animated.loop(
       Animated.timing(spinValue, {
         toValue: 1,
-        duration: 1000, // 1 second for a full rotation
+        duration: 1000,
         easing: Easing.linear,
         useNativeDriver: true,
       })
@@ -57,14 +55,13 @@ const BottomNavBar: React.FC = () => {
       spinAnimation.start();
     } else {
       spinAnimation.stop();
-      spinValue.setValue(0); // Reset rotation
+      spinValue.setValue(0);
     }
     return () => {
       spinAnimation.stop();
     };
   }, [isModalVisible, spinAnimation, spinValue]);
 
-  // Interpolate spinValue to rotate from 0deg to 360deg
   const spin = spinValue.interpolate({
     inputRange: [0, 1],
     outputRange: ["0deg", "360deg"],
@@ -74,19 +71,13 @@ const BottomNavBar: React.FC = () => {
     setIsModalVisible(!isModalVisible);
   };
 
-  // Determine the current route name
   const currentRouteName = route.name as keyof RootStackParamList;
 
-  // Helper function to check if a tab is active
   const isActive = (routeName: keyof RootStackParamList) => {
     return currentRouteName === routeName;
   };
 
-  // Use reset to instantly switch without stacking or transitions
-  const switchScreen = (
-    targetRoute: keyof RootStackParamList,
-    params?: object
-  ) => {
+  const switchScreen = (targetRoute: keyof RootStackParamList, params?: object) => {
     navigation.dispatch(
       CommonActions.reset({
         index: 0,
@@ -95,8 +86,18 @@ const BottomNavBar: React.FC = () => {
     );
   };
 
-  // Reduced hitSlop values for smaller touchable areas
   const hitSlopValue = { top: 10, bottom: 10, left: 10, right: 10 };
+
+  // Prefetch chats for Messaging tab
+  const prefetchChats = async (): Promise<any[]> => {
+    try {
+      const chats = await fetchConversations(userId, token);
+      return chats;
+    } catch (error) {
+      console.error("Error prefetching chats:", error);
+      return [];
+    }
+  };
 
   // --- Prefetch function for Jobs ---
   const prefetchJobs = async (): Promise<Gig[]> => {
@@ -112,7 +113,6 @@ const BottomNavBar: React.FC = () => {
         throw new Error(`Failed to fetch gigs: ${response.status}`);
       }
       const data = await response.json();
-      // Check if data is in { gigs: [...] } format or an array directly.
       if (data && Array.isArray(data.gigs)) {
         return data.gigs;
       } else if (Array.isArray(data)) {
@@ -129,7 +129,7 @@ const BottomNavBar: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      {/* Home Tab with a 50ms delay; if already on Home, do nothing */}
+      {/* Home Tab */}
       <TouchableOpacity
         style={styles.navItem}
         onPress={() => {
@@ -142,17 +142,11 @@ const BottomNavBar: React.FC = () => {
         accessibilityLabel="Navigate to Home"
         hitSlop={hitSlopValue}
       >
-        <Ionicons
-          name={isActive("Dashboard") ? "home" : "home-outline"}
-          size={24}
-          color="#FFFFFF"
-        />
-        <Text style={[styles.navText, isActive("Dashboard") && styles.navTextActive]}>
-          Home
-        </Text>
+        <Ionicons name={isActive("Dashboard") ? "home" : "home-outline"} size={24} color="#FFFFFF" />
+        <Text style={[styles.navText, isActive("Dashboard") && styles.navTextActive]}>Home</Text>
       </TouchableOpacity>
 
-      {/* Jobs Tab with a 50ms delay and pre-fetch; if already on Jobs, do nothing */}
+      {/* Jobs Tab */}
       <TouchableOpacity
         style={styles.navItem}
         onPress={async () => {
@@ -160,23 +154,17 @@ const BottomNavBar: React.FC = () => {
             const gigs = await prefetchJobs();
             setTimeout(() => {
               switchScreen("Jobs", { preFetchedGigs: gigs });
-            }, 50);
+            }, 10);
           }
         }}
         accessibilityLabel="Navigate to Jobs"
         hitSlop={hitSlopValue}
       >
-        <Ionicons
-          name={isActive("Jobs") ? "briefcase" : "briefcase-outline"}
-          size={24}
-          color="#FFFFFF"
-        />
-        <Text style={[styles.navText, isActive("Jobs") && styles.navTextActive]}>
-          Jobs
-        </Text>
+        <Ionicons name={isActive("Jobs") ? "briefcase" : "briefcase-outline"} size={24} color="#FFFFFF" />
+        <Text style={[styles.navText, isActive("Jobs") && styles.navTextActive]}>Jobs</Text>
       </TouchableOpacity>
 
-      {/* Add Button – no delay needed */}
+      {/* Add Button */}
       <TouchableOpacity
         style={styles.navItem}
         onPress={toggleModal}
@@ -188,30 +176,25 @@ const BottomNavBar: React.FC = () => {
         </Animated.View>
       </TouchableOpacity>
 
-      {/* Messaging Tab with a 50ms delay; if already on Messaging, do nothing */}
+      {/* Messaging Tab – prefetch chats before switching */}
       <TouchableOpacity
         style={styles.navItem}
-        onPress={() => {
+        onPress={async () => {
           if (!isActive("Messaging")) {
+            const preFetchedChats = await prefetchChats();
             setTimeout(() => {
-              switchScreen("Messaging");
-            }, 50);
+              switchScreen("Messaging", { preFetchedChats });
+            }, 10);
           }
         }}
         accessibilityLabel="Navigate to Messaging"
         hitSlop={hitSlopValue}
       >
-        <Ionicons
-          name={isActive("Messaging") ? "chatbubble" : "chatbubble-outline"}
-          size={24}
-          color="#FFFFFF"
-        />
-        <Text style={[styles.navText, isActive("Messaging") && styles.navTextActive]}>
-          Messages
-        </Text>
+        <Ionicons name={isActive("Messaging") ? "chatbubble" : "chatbubble-outline"} size={24} color="#FFFFFF" />
+        <Text style={[styles.navText, isActive("Messaging") && styles.navTextActive]}>Messages</Text>
       </TouchableOpacity>
 
-      {/* Activity Tab with a 50ms delay; if already on Activity, do nothing */}
+      {/* Activity Tab */}
       <TouchableOpacity
         style={styles.navItem}
         onPress={() => {
@@ -224,28 +207,13 @@ const BottomNavBar: React.FC = () => {
         accessibilityLabel="Navigate to Activity"
         hitSlop={hitSlopValue}
       >
-        <Ionicons
-          name={isActive("Activity") ? "stats-chart" : "stats-chart-outline"}
-          size={24}
-          color="#FFFFFF"
-        />
-        <Text style={[styles.navText, isActive("Activity") && styles.navTextActive]}>
-          Activity
-        </Text>
+        <Ionicons name={isActive("Activity") ? "stats-chart" : "stats-chart-outline"} size={24} color="#FFFFFF" />
+        <Text style={[styles.navText, isActive("Activity") && styles.navTextActive]}>Activity</Text>
       </TouchableOpacity>
 
       {/* Modal for Add Options */}
-      <Modal
-        visible={isModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={toggleModal}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPressOut={toggleModal}
-        >
+      <Modal visible={isModalVisible} transparent animationType="fade" onRequestClose={toggleModal}>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPressOut={toggleModal}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Add Options</Text>
             <View style={styles.modalButtonsContainer}>
@@ -280,11 +248,7 @@ const BottomNavBar: React.FC = () => {
                 <Text style={styles.modalButtonText}>Request Product</Text>
               </TouchableOpacity>
             </View>
-            <TouchableOpacity
-              onPress={toggleModal}
-              style={styles.modalClose}
-              accessibilityLabel="Close Add Options Modal"
-            >
+            <TouchableOpacity onPress={toggleModal} style={styles.modalClose} accessibilityLabel="Close Add Options Modal">
               <Ionicons name="close-outline" size={24} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
