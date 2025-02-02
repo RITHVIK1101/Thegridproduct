@@ -60,35 +60,33 @@ type MessagingScreenRouteProp = RouteProp<RootStackParamList, "Messaging">;
 type MessagingScreenProps = { route: MessagingScreenRouteProp };
 
 const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
-  // Chats & Messages
-  const [chats, setChats] = useState<Chat[]>([]);
+  // If chats are passed via route (prefetched from BottomNavBar), use them; otherwise, start with an empty array.
+  const preFetchedChats: Chat[] = route.params?.preFetchedChats || [];
+  const [chats, setChats] = useState<Chat[]>(preFetchedChats);
   const [filteredChats, setFilteredChats] = useState<Chat[]>([]);
   const [filter, setFilter] = useState<"all" | "products" | "gigs">("all");
   const [isChatModalVisible, setChatModalVisible] = useState<boolean>(false);
   const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
   const [newMessage, setNewMessage] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
+  // "sending" state is still used for image messages if needed
   const [sending, setSending] = useState<boolean>(false);
 
   // Image Upload
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
-  const [isImagePreviewModalVisible, setIsImagePreviewModalVisible] =
-    useState<boolean>(false);
+  const [isImagePreviewModalVisible, setIsImagePreviewModalVisible] = useState<boolean>(false);
   const [isUploadingImage, setIsUploadingImage] = useState<boolean>(false);
 
   // Filter Modal
   const [filterMenuVisible, setFilterMenuVisible] = useState<boolean>(false);
 
   // Requests Modal State
-  const [isRequestsModalVisible, setRequestsModalVisible] =
-    useState<boolean>(false);
+  const [isRequestsModalVisible, setRequestsModalVisible] = useState<boolean>(false);
   const [incomingRequests, setIncomingRequests] = useState<Request[]>([]);
   const [outgoingRequests, setOutgoingRequests] = useState<Request[]>([]);
   const [loadingRequests, setLoadingRequests] = useState<boolean>(false);
   const [errorRequests, setErrorRequests] = useState<string | null>(null);
-  const [processingRequestId, setProcessingRequestId] = useState<string | null>(
-    null
-  );
+  const [processingRequestId, setProcessingRequestId] = useState<string | null>(null);
 
   // Report Modal State
   const [reportModalVisible, setReportModalVisible] = useState<boolean>(false);
@@ -98,9 +96,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
   const [isReportSuccessModalVisible, setIsReportSuccessModalVisible] = useState<boolean>(false);
 
   // Tabs for Requests Modal
-  const [selectedRequestsTab, setSelectedRequestsTab] = useState<
-    "incoming" | "outgoing"
-  >("incoming");
+  const [selectedRequestsTab, setSelectedRequestsTab] = useState<"incoming" | "outgoing">("incoming");
 
   // User & Token from Context
   const { userId, token } = useContext(UserContext);
@@ -115,24 +111,15 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
   const { chatId: routeChatId } = route.params || {};
 
   // Animation for Requests Modal Slide-Up
-  const slideAnim = useRef(
-    new Animated.Value(Dimensions.get("window").height)
-  ).current;
+  const slideAnim = useRef(new Animated.Value(Dimensions.get("window").height)).current;
 
   // Chat Filtering Logic
-  const applyFilter = (
-    chatsToFilter: Chat[],
-    f: "all" | "products" | "gigs"
-  ) => {
+  const applyFilter = (chatsToFilter: Chat[], f: "all" | "products" | "gigs") => {
     if (f === "all") return chatsToFilter;
     if (f === "products") {
-      return chatsToFilter.filter(
-        (c) => c.productTitle && c.productTitle.trim() !== ""
-      );
+      return chatsToFilter.filter((c) => c.productTitle && c.productTitle.trim() !== "");
     } else {
-      return chatsToFilter.filter(
-        (c) => !c.productTitle || c.productTitle.trim() === ""
-      );
+      return chatsToFilter.filter((c) => !c.productTitle || c.productTitle.trim() === "");
     }
   };
 
@@ -140,7 +127,13 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     setFilteredChats(applyFilter(chats, filter));
   }, [chats, filter]);
 
-  // Fetch Chats from your REST API (MongoDB)
+  // If no prefetched chats exist, fetch them on mount
+  useEffect(() => {
+    if (chats.length === 0 && userId && token) {
+      fetchUserChats();
+    }
+  }, [userId, token]);
+
   const fetchUserChats = async () => {
     if (!userId || !token) return;
     setLoading(true);
@@ -162,19 +155,11 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
   };
 
   useEffect(() => {
-    if (userId && token) {
-      fetchUserChats();
-    }
-  }, [userId, token]);
-
-  useEffect(() => {
     if (selectedChat) {
       const chatDocRef = doc(firestoreDB, "chatRooms", selectedChat.chatID);
       onSnapshot(chatDocRef, (docSnap) => {
         if (!docSnap.exists()) {
-          console.warn(
-            "🚨 Chat room does not exist in Firestore! Check chatID."
-          );
+          console.warn("🚨 Chat room does not exist in Firestore! Check chatID.");
         } else {
           console.log("✅ Chat room found:", docSnap.data());
         }
@@ -182,7 +167,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }
   }, [selectedChat, firestoreDB]);
 
-  // Fetch a specific chat if not already in the list
   const fetchSpecificChat = async (chatId: string) => {
     setLoading(true);
     try {
@@ -201,20 +185,16 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }
   };
 
-  // Open a chat (set it as selected so we can subscribe to Firestore for realtime messages)
+  // Open a chat by first fetching messages then displaying the chat modal
   const openChat = async (chat: Chat) => {
     setLoading(true);
     try {
+      // Clear previous messages (if any) then fetch new messages
       setSelectedChat({ ...chat, messages: [] });
-
-      // Fetch latest messages from backend
       const messages = await getMessages(chat.chatID, token);
       setSelectedChat({ ...chat, messages });
-
       setChatModalVisible(true);
       setNewMessage("");
-
-      // Scroll to latest message
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
       }, 100);
@@ -226,69 +206,47 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }
   };
 
-  // Send a text message by updating the Firestore chat room document
+  // Send a text message with an optimistic update so it appears immediately
   const sendMessage = async () => {
     if (!newMessage.trim() || !selectedChat) {
       Alert.alert("Error", "Please enter a message.");
       return;
     }
-    setSending(true);
     const messageContent = newMessage.trim();
+    // Create a new message object
+    const newMessageObj: Message = {
+      _id: Date.now().toString(),
+      senderId: userId,
+      content: messageContent,
+      timestamp: new Date().toISOString(),
+    };
+    // Optimistically update the UI immediately
+    setSelectedChat((prev) =>
+      prev ? { ...prev, messages: [...(prev.messages || []), newMessageObj] } : prev
+    );
     setNewMessage("");
-
+    setTimeout(() => {
+      flatListRef.current?.scrollToEnd({ animated: true });
+    }, 100);
+    // Then asynchronously post the message to the server
     try {
-      console.log("📤 Sending message via API...");
-
-      // Send message to backend using `postMessage`
-      const status = await postMessage(
-        selectedChat.chatID,
-        messageContent,
-        token,
-        userId
-      );
-
+      const status = await postMessage(selectedChat.chatID, messageContent, token, userId);
       if (status !== "success") {
         throw new Error("Failed to send message");
       }
-
-      console.log("✅ Message sent successfully via API!");
-
-      // Optimistically update UI before fetching latest messages
-      const newMessageObj: Message = {
-        _id: Date.now().toString(), // Temporary ID
-        senderId: userId, // Use 'senderId' to match backend
-        content: messageContent,
-        timestamp: new Date().toISOString(),
-      };
-
-      setSelectedChat((prev) =>
-        prev
-          ? { ...prev, messages: [...(prev.messages || []), newMessageObj] }
-          : prev
-      );
-
-      // Auto-scroll to the bottom after sending
-      setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
-      }, 200);
     } catch (error) {
       console.error("🔥 sendMessage error:", error);
       Alert.alert("Error", "Failed to send message.");
-    } finally {
-      setSending(false);
+      // Optionally, remove the optimistically added message or mark it as failed
     }
   };
 
   // Handle image selection and preview
   const handleImagePress = async () => {
     try {
-      const { status } =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== "granted") {
-        Alert.alert(
-          "Permission Required",
-          "Permission to access the camera roll is required!"
-        );
+        Alert.alert("Permission Required", "Permission to access the camera roll is required!");
         return;
       }
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -364,7 +322,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }
   };
 
-  // (Requests modal functions remain unchanged; they use your REST API for chat requests)
+  // Requests modal functions
   const fetchUserRequests = async () => {
     if (!userId || !token) {
       setErrorRequests("User not authenticated.");
@@ -425,10 +383,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
           if (newChat) {
             openChat(newChat);
           } else {
-            await fetchUserChats();
-            if (chats.length > 0) {
-              openChat(chats[chats.length - 1]);
-            }
+            openChat(chats[chats.length - 1]);
           }
         }
       } else {
@@ -492,9 +447,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
           minute: "2-digit",
         })
       : "";
-    const initials = `${item.user.firstName.charAt(
-      0
-    )}${item.user.lastName.charAt(0)}`.toUpperCase();
+    const initials = `${item.user.firstName.charAt(0)}${item.user.lastName.charAt(0)}`.toUpperCase();
     return (
       <Pressable
         style={styles.chatItemContainer}
@@ -531,21 +484,15 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     );
   };
 
-  // Updated renderMessage uses senderId (with lowercase d) for comparison
   const renderMessage = ({ item }: { item: Message }) => {
     const isImageMessage = item.content.startsWith("[Image] ");
-    const imageUri = isImageMessage
-      ? item.content.replace("[Image] ", "")
-      : null;
-    const isCurrentUser = item.senderId === userId; // Use senderId from backend
-
+    const imageUri = isImageMessage ? item.content.replace("[Image] ", "") : null;
+    const isCurrentUser = item.senderId === userId;
     return (
       <View
         style={[
           styles.messageContainer,
-          isCurrentUser
-            ? styles.myMessageContainer
-            : styles.theirMessageContainer,
+          isCurrentUser ? styles.myMessageContainer : styles.theirMessageContainer,
         ]}
       >
         <View
@@ -555,18 +502,12 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
           ]}
         >
           {isImageMessage ? (
-            <Image
-              source={{ uri: imageUri! }}
-              style={styles.messageImage}
-              resizeMode="cover"
-            />
+            <Image source={{ uri: imageUri! }} style={styles.messageImage} resizeMode="cover" />
           ) : (
             <Text
               style={[
                 styles.messageText,
-                isCurrentUser
-                  ? styles.myMessageTextColor
-                  : styles.theirMessageTextColor,
+                isCurrentUser ? styles.myMessageTextColor : styles.theirMessageTextColor,
               ]}
             >
               {item.content}
@@ -575,9 +516,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
           <Text
             style={[
               styles.messageTimestamp,
-              isCurrentUser
-                ? styles.myTimestampColor
-                : styles.theirTimestampColor,
+              isCurrentUser ? styles.myTimestampColor : styles.theirTimestampColor,
             ]}
           >
             {new Date(item.timestamp).toLocaleTimeString([], {
@@ -596,11 +535,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     type: c.productTitle ? "product" : "gig",
   }));
 
-  const handleNavigateFromProductOrGig = (item: {
-    chatID: string;
-    title: string;
-    type: string;
-  }) => {
+  const handleNavigateFromProductOrGig = (item: { chatID: string; title: string; type: string; }) => {
     const chat = chats.find((c) => c.chatID === item.chatID);
     if (chat) {
       openChat(chat);
@@ -628,7 +563,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }
   };
 
-  // When the user presses Report, first close the chat modal then open the report screen.
+  // When Report is pressed, close the chat modal then open the report modal.
   const handleReportPress = () => {
     setChatModalVisible(false);
     setTimeout(() => {
@@ -636,9 +571,8 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }, 300);
   };
 
-  // Instead of an alert, we show a success popup similar to your gig screen
   const handleReportSubmit = () => {
-    // Here you can add code to actually send the report to your backend
+    // (Send report to backend if needed)
     setReportModalVisible(false);
     setIsReportSuccessModalVisible(true);
     setReportDescription("");
@@ -677,8 +611,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
               <TouchableOpacity
                 style={[
                   styles.acceptButton,
-                  processingRequestId === item.requestId &&
-                    styles.buttonDisabled,
+                  processingRequestId === item.requestId && styles.buttonDisabled,
                 ]}
                 onPress={() => acceptRequest(item.requestId)}
                 disabled={processingRequestId === item.requestId}
@@ -693,8 +626,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
               <TouchableOpacity
                 style={[
                   styles.rejectButton,
-                  processingRequestId === item.requestId &&
-                    styles.buttonDisabled,
+                  processingRequestId === item.requestId && styles.buttonDisabled,
                 ]}
                 onPress={() => rejectRequest(item.requestId)}
                 disabled={processingRequestId === item.requestId}
@@ -724,8 +656,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         </View>
       );
     };
-    const dataToShow =
-      selectedRequestsTab === "incoming" ? incomingRequests : outgoingRequests;
+    const dataToShow = selectedRequestsTab === "incoming" ? incomingRequests : outgoingRequests;
     return (
       <Modal
         visible={isRequestsModalVisible}
@@ -733,69 +664,32 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         transparent={true}
         onRequestClose={() => setRequestsModalVisible(false)}
       >
-        <Animated.View
-          style={[
-            styles.requestsModalContainer,
-            { transform: [{ translateY: slideAnim }] },
-          ]}
-        >
+        <Animated.View style={[styles.requestsModalContainer, { transform: [{ translateY: slideAnim }] }]}>
           <SafeAreaView style={styles.requestsSafeArea}>
             <View style={styles.requestsHeader}>
-              <Pressable
-                onPress={() => setRequestsModalVisible(false)}
-                style={styles.closeButton}
-                accessibilityLabel="Close Requests"
-              >
+              <Pressable onPress={() => setRequestsModalVisible(false)} style={styles.closeButton} accessibilityLabel="Close Requests">
                 <Ionicons name="close" size={24} color="#FFFFFF" />
               </Pressable>
               <Text style={styles.requestsHeaderTitle}>Your Requests</Text>
             </View>
             <View style={styles.requestsTabsRow}>
-              <Pressable
-                onPress={() => setSelectedRequestsTab("incoming")}
-                style={[
-                  styles.requestsTab,
-                  selectedRequestsTab === "incoming" &&
-                    styles.activeRequestsTab,
-                ]}
-                accessibilityLabel="Incoming Requests Tab"
-              >
-                <Text
-                  style={[
-                    styles.requestsTabText,
-                    selectedRequestsTab === "incoming" &&
-                      styles.activeRequestsTabText,
-                  ]}
-                >
+              <Pressable onPress={() => setSelectedRequestsTab("incoming")}
+                style={[styles.requestsTab, selectedRequestsTab === "incoming" && styles.activeRequestsTab]}
+                accessibilityLabel="Incoming Requests Tab">
+                <Text style={[styles.requestsTabText, selectedRequestsTab === "incoming" && styles.activeRequestsTabText]}>
                   Incoming
                 </Text>
               </Pressable>
-              <Pressable
-                onPress={() => setSelectedRequestsTab("outgoing")}
-                style={[
-                  styles.requestsTab,
-                  selectedRequestsTab === "outgoing" &&
-                    styles.activeRequestsTab,
-                ]}
-                accessibilityLabel="Outgoing Requests Tab"
-              >
-                <Text
-                  style={[
-                    styles.requestsTabText,
-                    selectedRequestsTab === "outgoing" &&
-                      styles.activeRequestsTabText,
-                  ]}
-                >
+              <Pressable onPress={() => setSelectedRequestsTab("outgoing")}
+                style={[styles.requestsTab, selectedRequestsTab === "outgoing" && styles.activeRequestsTab]}
+                accessibilityLabel="Outgoing Requests Tab">
+                <Text style={[styles.requestsTabText, selectedRequestsTab === "outgoing" && styles.activeRequestsTabText]}>
                   Outgoing
                 </Text>
               </Pressable>
             </View>
             {loadingRequests ? (
-              <ActivityIndicator
-                size="large"
-                color="#BB86FC"
-                style={{ marginTop: 20 }}
-              />
+              <ActivityIndicator size="large" color="#BB86FC" style={{ marginTop: 20 }} />
             ) : errorRequests ? (
               <View style={styles.requestsErrorContainer}>
                 <Text style={styles.requestsErrorText}>{errorRequests}</Text>
@@ -809,15 +703,11 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                   ListEmptyComponent={
                     <View style={styles.sectionEmptyContainer}>
                       <Text style={styles.sectionEmptyText}>
-                        {selectedRequestsTab === "incoming"
-                          ? "No incoming requests."
-                          : "No outgoing requests."}
+                        {selectedRequestsTab === "incoming" ? "No incoming requests." : "No outgoing requests."}
                       </Text>
                     </View>
                   }
-                  ItemSeparatorComponent={() => (
-                    <View style={styles.requestsSeparatorLine} />
-                  )}
+                  ItemSeparatorComponent={() => <View style={styles.requestsSeparatorLine} />}
                   refreshing={loadingRequests}
                   onRefresh={fetchUserRequests}
                 />
@@ -898,48 +788,44 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         {/* Requests Modal */}
         {renderRequestsModal()}
 
-        {/* Purchases Section */}
-        {(filter === "all" || filter === "products") &&
-          productsOrGigs.length > 0 && (
-            <View style={styles.horizontalListContainer}>
-              <Text style={styles.sectionTitle}>Your Purchases</Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                style={styles.horizontalScroll}
-              >
-                {productsOrGigs.map((item, index) => (
-                  <Pressable
-                    key={item.chatID + index}
-                    style={styles.productGigItem}
-                    onPress={() => handleNavigateFromProductOrGig(item)}
-                    accessibilityLabel={`Navigate to ${item.type} titled ${item.title}`}
-                  >
-                    <Text style={styles.productGigItemText}>{item.title}</Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
-            </View>
-          )}
+        {/* Listings Section */}
+        {chats.length > 0 && (
+          <View style={styles.horizontalListContainer}>
+            <Text style={styles.sectionTitle}>Your Purchases</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.horizontalScroll}
+            >
+              {productsOrGigs.map((item, index) => (
+                <Pressable
+                  key={item.chatID + index}
+                  style={styles.productGigItem}
+                  onPress={() => handleNavigateFromProductOrGig(item)}
+                  accessibilityLabel={`Navigate to ${item.type} titled ${item.title}`}
+                >
+                  <Text style={styles.productGigItemText}>{item.title}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        )}
 
         <View style={styles.separatorAfterPurchases} />
 
         {/* Main Chats List */}
         {loading ? (
           <ActivityIndicator size="large" color="#BB86FC" />
+        ) : chats.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>No chats found.</Text>
+          </View>
         ) : (
           <FlatList
             data={filteredChats}
             keyExtractor={(item, index) => item.chatID || index.toString()}
             renderItem={renderChat}
-            ListEmptyComponent={
-              <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>No chats found.</Text>
-              </View>
-            }
-            contentContainerStyle={
-              filteredChats.length === 0 && styles.flatListContainer
-            }
+            contentContainerStyle={filteredChats.length === 0 && styles.flatListContainer}
             ItemSeparatorComponent={() => <View style={styles.separatorLine} />}
           />
         )}
@@ -981,13 +867,10 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                       </View>
                       <View style={styles.chatHeaderTextContainer}>
                         <Text style={styles.chatHeaderUserName}>
-                          {selectedChat.user.firstName}{" "}
-                          {selectedChat.user.lastName}
+                          {selectedChat.user.firstName} {selectedChat.user.lastName}
                         </Text>
                         <Text style={styles.chatHeaderSubTitle}>
-                          {selectedChat.productTitle
-                            ? selectedChat.productTitle
-                            : "Job"}
+                          {selectedChat.productTitle ? selectedChat.productTitle : "Job"}
                         </Text>
                       </View>
                     </View>
@@ -1046,14 +929,9 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                     <Pressable
                       style={styles.sendButton}
                       onPress={sendMessage}
-                      disabled={sending}
                       accessibilityLabel="Send Message"
                     >
-                      {sending ? (
-                        <ActivityIndicator color="#fff" />
-                      ) : (
-                        <Ionicons name="send" size={18} color="#fff" />
-                      )}
+                      <Ionicons name="send" size={18} color="#fff" />
                     </Pressable>
                   </View>
                   <View style={styles.inputBarLine} />
@@ -1123,7 +1001,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         >
           <View style={[styles.modalSafeArea, { backgroundColor: "#000" }]}>
             <SafeAreaView style={{ flex: 1 }}>
-              {/* Report screen header (similar to chat header) */}
               <View style={styles.enhancedChatHeader}>
                 <Pressable
                   onPress={() => setReportModalVisible(false)}
@@ -1149,10 +1026,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                 <Text style={styles.reportInfoText}>
                   The Gridly team will reach out to you soon.
                 </Text>
-                <Pressable
-                  style={styles.reportSubmitButton}
-                  onPress={handleReportSubmit}
-                >
+                <Pressable style={styles.reportSubmitButton} onPress={handleReportSubmit}>
                   <Text style={styles.reportSubmitButtonText}>Submit</Text>
                 </Pressable>
               </View>
@@ -1161,11 +1035,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         </Modal>
 
         {/* Report Success Modal */}
-        <Modal
-          transparent
-          visible={isReportSuccessModalVisible}
-          animationType="fade"
-        >
+        <Modal transparent visible={isReportSuccessModalVisible} animationType="fade">
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
               <Ionicons name="checkmark-circle" size={60} color="#9C27B0" />
@@ -1174,7 +1044,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
           </View>
         </Modal>
 
-        {/* Bottom Navigation */}
         <BottomNavBar />
       </SafeAreaView>
     </View>
@@ -1714,17 +1583,14 @@ const styles = StyleSheet.create({
     color: "#AAAAAA",
     fontFamily: "HelveticaNeue",
   },
-  // Updated style for Report Button in chat header
   reportButton: {
     marginLeft: 10,
   },
-  // New style for Report Modal content area
   reportContent: {
     flex: 1,
     padding: 20,
     backgroundColor: "#000",
   },
-  // Updated reportInput: larger text area for report submission
   reportInput: {
     backgroundColor: "#333",
     color: "#fff",
