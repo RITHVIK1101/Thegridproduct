@@ -75,8 +75,8 @@ const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
 // -------------------------------------------------------------------
 // PRODUCT_HEIGHT controls how tall the product image container is.
 // -------------------------------------------------------------------
-const PRODUCT_HEIGHT = SCREEN_HEIGHT - 100; // 60 is the nav bar height
-const NAV_BAR_HEIGHT = 70;
+const PRODUCT_HEIGHT = SCREEN_HEIGHT - 80; // 60 is the nav bar height
+const NAV_BAR_HEIGHT = 90;
 
 const Dashboard: React.FC<DashboardProps> = () => {
   const {
@@ -561,9 +561,9 @@ const Dashboard: React.FC<DashboardProps> = () => {
   // ProductItem component using react-native-gesture-handler.
   // Gestures:
   // • Pan (swipe):
-  //    - Left: next image (more sensitive)
-  //    - Right: add to cart (more sensitive)
-  //    - Up: next product (more sensitive)
+  //    - Left: next image (if available)
+  //    - Right: previous image (if available)
+  //    - Up: next product
   //    - Down: show description (full details)
   // • Single tap: show description
   // • Double tap: toggle favorite
@@ -608,16 +608,20 @@ const Dashboard: React.FC<DashboardProps> = () => {
       if (event.nativeEvent.state === GestureState.END) {
         const { translationX, translationY } = event.nativeEvent;
         if (Math.abs(translationX) > Math.abs(translationY)) {
+          // Horizontal swipe:
           if (translationX < -SWIPE_THRESHOLD) {
-            const nextIdx =
-              currentImageIndex < product.images.length - 1
-                ? currentImageIndex + 1
-                : 0;
-            setCurrentImageIndex(nextIdx);
+            // Swipe left: go to next image only if not on the last image.
+            if (currentImageIndex < product.images.length - 1) {
+              setCurrentImageIndex(currentImageIndex + 1);
+            }
           } else if (translationX > SWIPE_THRESHOLD) {
-            onAddToCart(product);
+            // Swipe right: go back to the previous image if available.
+            if (currentImageIndex > 0) {
+              setCurrentImageIndex(currentImageIndex - 1);
+            }
           }
         } else {
+          // Vertical swipe:
           if (translationY < -SWIPE_THRESHOLD) {
             onNextProduct();
           } else if (translationY > SWIPE_THRESHOLD) {
@@ -640,7 +644,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
         ? product.images[currentImageIndex]
         : "https://via.placeholder.com/150";
     const nextImageIndex =
-      currentImageIndex < product.images.length - 1 ? currentImageIndex + 1 : 0;
+      currentImageIndex < product.images.length - 1 ? currentImageIndex + 1 : currentImageIndex;
     const nextImageURI =
       product.images && product.images.length > 0
         ? product.images[nextImageIndex]
@@ -769,11 +773,9 @@ const Dashboard: React.FC<DashboardProps> = () => {
                 <TouchableOpacity
                   style={styles.iconButton}
                   onPress={() => {
-                    const newIdx =
-                      currentImageIndex < product.images.length - 1
-                        ? currentImageIndex + 1
-                        : 0;
-                    setCurrentImageIndex(newIdx);
+                    if (currentImageIndex < product.images.length - 1) {
+                      setCurrentImageIndex(currentImageIndex + 1);
+                    }
                   }}
                   accessibilityLabel="Next Image"
                 >
