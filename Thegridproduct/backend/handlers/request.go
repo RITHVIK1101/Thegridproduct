@@ -16,30 +16,25 @@ import (
 
 // CreateProductRequestHandler handles the creation of a new product request.
 func CreateProductRequestHandler(w http.ResponseWriter, r *http.Request) {
-	// Set response content type to JSON
 	w.Header().Set("Content-Type", "application/json")
 
-	// Ensure the request method is POST
 	if r.Method != http.MethodPost {
 		WriteJSONError(w, "Invalid request method", http.StatusMethodNotAllowed)
 		return
 	}
 
-	// Retrieve authenticated user ID from context
 	userId, ok := r.Context().Value(userIDKey).(string)
 	if !ok || userId == "" {
 		WriteJSONError(w, "User not authenticated", http.StatusUnauthorized)
 		return
 	}
 
-	// Convert userId string to primitive.ObjectID
 	userObjID, err := primitive.ObjectIDFromHex(userId)
 	if err != nil {
 		WriteJSONError(w, "Invalid user ID format", http.StatusBadRequest)
 		return
 	}
 
-	// Decode the request body into ProductRequest
 	var productRequest models.ProductRequest
 	if err := json.NewDecoder(r.Body).Decode(&productRequest); err != nil {
 		log.Printf("Error decoding request body: %v", err)
@@ -47,21 +42,18 @@ func CreateProductRequestHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate required fields
 	if productRequest.ProductName == "" || productRequest.Description == "" {
 		WriteJSONError(w, "Product name and description are required", http.StatusBadRequest)
 		return
 	}
 
-	// Populate additional fields
 	productRequest.UserID = userObjID
 	productRequest.CreatedAt = time.Now()
 
-	// Insert the product request into MongoDB
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	collection := db.GetCollection("gridlyapp", "product_requests") // Ensure this collection exists
+	collection := db.GetCollection("gridlyapp", "product_requests")
 	result, err := collection.InsertOne(ctx, productRequest)
 	if err != nil {
 		log.Printf("Error inserting product request: %v", err)
@@ -69,7 +61,6 @@ func CreateProductRequestHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Respond with success message and the inserted ID
 	response := map[string]interface{}{
 		"message": "Product request created successfully",
 		"id":      result.InsertedID.(primitive.ObjectID).Hex(),
@@ -79,30 +70,25 @@ func CreateProductRequestHandler(w http.ResponseWriter, r *http.Request) {
 
 // GetMyProductRequestsHandler retrieves all product requests made by the authenticated user.
 func GetMyProductRequestsHandler(w http.ResponseWriter, r *http.Request) {
-	// Set response content type to JSON
 	w.Header().Set("Content-Type", "application/json")
 
-	// Ensure the request method is GET
 	if r.Method != http.MethodGet {
 		WriteJSONError(w, "Invalid request method", http.StatusMethodNotAllowed)
 		return
 	}
 
-	// Retrieve authenticated user ID from context
 	userId, ok := r.Context().Value(userIDKey).(string)
 	if !ok || userId == "" {
 		WriteJSONError(w, "User not authenticated", http.StatusUnauthorized)
 		return
 	}
 
-	// Convert userId string to primitive.ObjectID
 	userObjID, err := primitive.ObjectIDFromHex(userId)
 	if err != nil {
 		WriteJSONError(w, "Invalid user ID format", http.StatusBadRequest)
 		return
 	}
 
-	// Query MongoDB for product requests made by the user
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -129,30 +115,25 @@ func GetMyProductRequestsHandler(w http.ResponseWriter, r *http.Request) {
 
 // GetAllOtherProductRequestsHandler retrieves all product requests except those made by the authenticated user.
 func GetAllOtherProductRequestsHandler(w http.ResponseWriter, r *http.Request) {
-	// Set response content type to JSON
 	w.Header().Set("Content-Type", "application/json")
 
-	// Ensure the request method is GET
 	if r.Method != http.MethodGet {
 		WriteJSONError(w, "Invalid request method", http.StatusMethodNotAllowed)
 		return
 	}
 
-	// Retrieve authenticated user ID from context
 	userId, ok := r.Context().Value(userIDKey).(string)
 	if !ok || userId == "" {
 		WriteJSONError(w, "User not authenticated", http.StatusUnauthorized)
 		return
 	}
 
-	// Convert userId string to primitive.ObjectID
 	userObjID, err := primitive.ObjectIDFromHex(userId)
 	if err != nil {
 		WriteJSONError(w, "Invalid user ID format", http.StatusBadRequest)
 		return
 	}
 
-	// Query MongoDB for product requests not made by the user
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -175,4 +156,72 @@ func GetAllOtherProductRequestsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	WriteJSON(w, productRequests, http.StatusOK)
+}
+
+// DeleteProductRequestHandler deletes a product request by ID, ensuring only the owner can delete it.
+func DeleteProductRequestHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method != http.MethodDelete {
+		WriteJSONError(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
+
+	userId, ok := r.Context().Value(userIDKey).(string)
+	if !ok || userId == "" {
+		WriteJSONError(w, "User not authenticated", http.StatusUnauthorized)
+		return
+	}
+
+	userObjID, err := primitive.ObjectIDFromHex(userId)
+	if err != nil {
+		WriteJSONError(w, "Invalid user ID format", http.StatusBadRequest)
+		return
+	}
+
+	var req struct {
+		RequestID string `json:"requestId"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		WriteJSONError(w, "Invalid request payload", http.StatusBadRequest)
+		return
+	}
+	if req.RequestID == "" {
+		WriteJSONError(w, "Request ID is required", http.StatusBadRequest)
+		return
+	}
+
+	requestObjID, err := primitive.ObjectIDFromHex(req.RequestID)
+	if err != nil {
+		WriteJSONError(w, "Invalid request ID format", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	collection := db.GetCollection("gridlyapp", "product_requests")
+
+	// Check if the request exists and belongs to the user
+	var existingRequest models.ProductRequest
+	err = collection.FindOne(ctx, bson.M{"_id": requestObjID, "userId": userObjID}).Decode(&existingRequest)
+	if err != nil {
+		if err.Error() == "mongo: no documents in result" {
+			WriteJSONError(w, "Product request not found or unauthorized", http.StatusNotFound)
+			return
+		}
+		log.Printf("Error finding product request: %v", err)
+		WriteJSONError(w, "Error finding product request", http.StatusInternalServerError)
+		return
+	}
+
+	// Delete the request
+	_, err = collection.DeleteOne(ctx, bson.M{"_id": requestObjID})
+	if err != nil {
+		log.Printf("Error deleting product request: %v", err)
+		WriteJSONError(w, "Error deleting product request", http.StatusInternalServerError)
+		return
+	}
+
+	WriteJSON(w, map[string]string{"message": "Product request deleted successfully"}, http.StatusOK)
 }

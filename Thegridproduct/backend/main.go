@@ -93,6 +93,7 @@ func main() {
 	protected.HandleFunc("/requests", handlers.CreateProductRequestHandler).Methods("POST")
 	protected.HandleFunc("/requests/my", handlers.GetMyProductRequestsHandler).Methods("GET")
 	protected.HandleFunc("/requests/all", handlers.GetAllOtherProductRequestsHandler).Methods("GET")
+	protected.HandleFunc("/requests/{id}", handlers.DeleteProductRequestHandler).Methods("DELETE")
 
 	// AI Processing
 	protected.HandleFunc("/services", handlers.AddGigHandler).Methods("POST")

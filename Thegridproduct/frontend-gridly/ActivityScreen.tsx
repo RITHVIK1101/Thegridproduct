@@ -69,7 +69,9 @@ const ActivityScreen: React.FC = () => {
   const isFocused = useIsFocused();
   const { userId, token } = useContext(UserContext);
 
-  const [activeSegment, setActiveSegment] = useState<"Products" | "Gigs" | "Requested">("Products");
+  const [activeSegment, setActiveSegment] = useState<
+    "Products" | "Gigs" | "Requested"
+  >("Products");
 
   // Products State
   const [products, setProducts] = useState<Product[]>([]);
@@ -82,8 +84,12 @@ const ActivityScreen: React.FC = () => {
   const [errorGigs, setErrorGigs] = useState<string | null>(null);
 
   // Requested Products State
-  const [requestedProducts, setRequestedProducts] = useState<ProductRequest[]>([]);
-  const [filteredRequestedProducts, setFilteredRequestedProducts] = useState<ProductRequest[]>([]);
+  const [requestedProducts, setRequestedProducts] = useState<ProductRequest[]>(
+    []
+  );
+  const [filteredRequestedProducts, setFilteredRequestedProducts] = useState<
+    ProductRequest[]
+  >([]);
   const [errorRequested, setErrorRequested] = useState<string | null>(null);
 
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -121,7 +127,9 @@ const ActivityScreen: React.FC = () => {
         setProducts(data);
         setFilteredProducts(
           data.filter((product) =>
-            (product.title || "").toLowerCase().includes(searchQuery.toLowerCase())
+            (product.title || "")
+              .toLowerCase()
+              .includes(searchQuery.toLowerCase())
           )
         );
       }
@@ -200,7 +208,9 @@ const ActivityScreen: React.FC = () => {
       if (!response.ok) {
         const errorText = await response.text();
         console.error("Error response text:", errorText);
-        throw new Error("Failed to fetch your requested products. Server error.");
+        throw new Error(
+          "Failed to fetch your requested products. Server error."
+        );
       } else if (!contentType || !contentType.includes("application/json")) {
         const errorText = await response.text();
         console.error("Unexpected content-type:", contentType, errorText);
@@ -215,7 +225,9 @@ const ActivityScreen: React.FC = () => {
         setFilteredRequestedProducts(
           data.filter((req) =>
             req.productName
-              ? req.productName.toLowerCase().includes(searchQuery.toLowerCase())
+              ? req.productName
+                  .toLowerCase()
+                  .includes(searchQuery.toLowerCase())
               : false
           )
         );
@@ -278,7 +290,47 @@ const ActivityScreen: React.FC = () => {
     );
   };
 
-  // Handle deletion of a requested product
+  const deleteRequestedProduct = async (requestId: string) => {
+    if (!token) {
+      Alert.alert("Error", "You are not authenticated.");
+      return;
+    }
+    try {
+      const response = await fetch(`${NGROK_URL}/requests/${requestId}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`Unexpected response: ${response.status} ${text}`);
+      }
+
+      setRequestedProducts((prev) =>
+        prev.filter((req) => req.id !== requestId)
+      );
+      setFilteredRequestedProducts((prev) =>
+        prev.filter((req) => req.id !== requestId)
+      );
+
+      // ✅ Refresh the list after deletion
+      fetchData();
+
+      Alert.alert("Success", "Requested product removed successfully.");
+    } catch (error) {
+      console.error("Error removing requested product:", error);
+      Alert.alert(
+        "Error",
+        error instanceof Error
+          ? error.message
+          : "An unexpected error occurred while removing the requested product."
+      );
+    }
+  };
+
   const handleDeleteRequestedProduct = (requestId: string) => {
     Alert.alert(
       "Confirm Deletion",
@@ -369,50 +421,6 @@ const ActivityScreen: React.FC = () => {
     }
   };
 
-  // Delete a requested product
-  const deleteRequestedProduct = async (requestId: string) => {
-    if (!token) {
-      Alert.alert("Error", "You are not authenticated.");
-      return;
-    }
-    try {
-      const response = await fetch(`${NGROK_URL}/requests/my/${requestId}`, {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      const contentType = response.headers.get("content-type");
-      if (!contentType || !contentType.includes("application/json")) {
-        const text = await response.text();
-        throw new Error(`Unexpected response: ${response.status} ${text}`);
-      }
-      const data = await response.json();
-      if (response.ok) {
-        setRequestedProducts((prev) =>
-          prev.filter((req) => req.id !== requestId)
-        );
-        setFilteredRequestedProducts((prev) =>
-          prev.filter((req) => req.id !== requestId)
-        );
-        Alert.alert("Success", "Requested product removed successfully.");
-      } else {
-        const errorMessage =
-          data.error || "Failed to remove the requested product.";
-        Alert.alert("Error", errorMessage);
-      }
-    } catch (error) {
-      console.error("Error removing requested product:", error);
-      Alert.alert(
-        "Error",
-        error instanceof Error
-          ? error.message
-          : "An unexpected error occurred while removing the requested product."
-      );
-    }
-  };
-
   // Calculate days active
   const calculateDaysActive = (postedDate: string): number => {
     const posted = new Date(postedDate);
@@ -448,7 +456,8 @@ const ActivityScreen: React.FC = () => {
         : item.description;
     const toggleExpanded = () => setExpanded(!expanded);
     const daysActive = calculateDaysActive(item.postedDate);
-    const status = daysActive > 30 ? "Expired" : `Active for ${daysActive} days`;
+    const status =
+      daysActive > 30 ? "Expired" : `Active for ${daysActive} days`;
 
     return (
       <View style={styles.itemContainer}>
@@ -502,7 +511,8 @@ const ActivityScreen: React.FC = () => {
   // Render a single product item
   const renderProduct = ({ item }: { item: Product }) => {
     const daysActive = calculateDaysActive(item.postedDate);
-    const status = daysActive > 30 ? "Expired" : `Active for ${daysActive} days`;
+    const status =
+      daysActive > 30 ? "Expired" : `Active for ${daysActive} days`;
     return (
       <View style={styles.itemContainer}>
         <TouchableOpacity
@@ -556,7 +566,8 @@ const ActivityScreen: React.FC = () => {
   // Render a single requested product item
   const renderRequestedProduct = ({ item }: { item: ProductRequest }) => {
     const daysActive = calculateDaysActive(item.createdAt);
-    const status = daysActive > 30 ? "Expired" : `Active for ${daysActive} days`;
+    const status =
+      daysActive > 30 ? "Expired" : `Active for ${daysActive} days`;
     return (
       <View style={styles.itemContainer}>
         <TouchableOpacity
@@ -760,7 +771,10 @@ const ActivityScreen: React.FC = () => {
               returnKeyType="search"
             />
             {searchQuery.length > 0 && (
-              <TouchableOpacity onPress={() => setSearchQuery("")} activeOpacity={0.7}>
+              <TouchableOpacity
+                onPress={() => setSearchQuery("")}
+                activeOpacity={0.7}
+              >
                 <Ionicons
                   name="close-circle"
                   size={20}
