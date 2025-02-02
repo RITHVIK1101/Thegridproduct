@@ -32,6 +32,8 @@ export type RootStackParamList = {
   UserMenu: undefined;
   TermsOfService: undefined;
   LikedItems: undefined;
-  ProductDetails: { productId: string }; // Added ProductDetails
-  RequestProduct: undefined; // Added RequestProduct
+  ProductDetails: { productId: string };
+  RequestProduct: undefined;
+  // NEW: Add new route for the requested products page
+  RequestedProductsPage: undefined;
 };
