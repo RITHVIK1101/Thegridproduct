@@ -90,6 +90,10 @@ const RequestProduct: React.FC = () => {
       setIsSuccessModalVisible(true);
       setProductName("");
       setDescription("");
+      setTimeout(() => {
+        setIsSuccessModalVisible(false);
+        navigation.goBack();
+      }, 1500);
     } catch (error) {
       setIsSubmitting(false);
       showError(error.message || "An error occurred. Please try again.");
@@ -175,15 +179,6 @@ const RequestProduct: React.FC = () => {
             <Text style={styles.modalText}>
               Product Requested Successfully!
             </Text>
-            <TouchableOpacity
-              style={styles.closeModalButton}
-              onPress={() => {
-                setIsSuccessModalVisible(false);
-                navigation.goBack();
-              }}
-            >
-              <Text style={styles.closeModalButtonText}>Close</Text>
-            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -289,17 +284,5 @@ const styles = StyleSheet.create({
     color: "#fff",
     textAlign: "center",
     marginVertical: 10,
-  },
-  closeModalButton: {
-    backgroundColor: "#BB86FC",
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 10,
-    marginTop: 10,
-  },
-  closeModalButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
   },
 });
