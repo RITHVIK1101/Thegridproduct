@@ -22,6 +22,17 @@ func main() {
 	if err != nil {
 		log.Println("Error loading .env file, proceeding with system environment variables")
 	}
+	// Load SMTP Credentials
+	smtpUser := os.Getenv("SMTP_USER")
+	smtpPass := os.Getenv("SMTP_PASS")
+	smtpHost := os.Getenv("SMTP_HOST")
+	smtpPort := os.Getenv("SMTP_PORT")
+
+	if smtpUser == "" || smtpPass == "" || smtpHost == "" || smtpPort == "" {
+		log.Fatal("SMTP credentials are missing. Check .env file or system environment variables.")
+	} else {
+		log.Println("SMTP credentials loaded successfully")
+	}
 
 	// Retrieve and validate JWT secret key
 	jwtSecret := os.Getenv("JWT_SECRET_KEY")
@@ -102,6 +113,7 @@ func main() {
 	protected.HandleFunc("/services/{id}", handlers.GetSingleGigHandler).Methods("GET")
 	protected.HandleFunc("/services/{id}", handlers.UpdateGigHandler).Methods("PUT")
 	protected.HandleFunc("/services/{id}", handlers.DeleteGigHandler).Methods("DELETE")
+	protected.HandleFunc("/report", handlers.ReportChatHandler).Methods("POST")
 
 	// AI Processing
 	protected.HandleFunc("/ai/process", handlers.ProcessAIInput).Methods("POST")

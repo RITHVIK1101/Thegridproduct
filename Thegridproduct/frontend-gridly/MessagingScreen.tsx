@@ -31,7 +31,7 @@ import {
   updateDoc,
   arrayUnion,
 } from "firebase/firestore";
-import { CLOUDINARY_URL, UPLOAD_PRESET } from "@env";
+import { CLOUDINARY_URL, UPLOAD_PRESET, NGROK_URL } from "@env";
 import { Conversation, Message } from "./types";
 import { UserContext } from "./UserContext";
 import * as ImagePicker from "expo-image-picker";
@@ -74,29 +74,48 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
 
   // Image Upload
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
-  const [isImagePreviewModalVisible, setIsImagePreviewModalVisible] = useState<boolean>(false);
+  const [isImagePreviewModalVisible, setIsImagePreviewModalVisible] =
+    useState<boolean>(false);
   const [isUploadingImage, setIsUploadingImage] = useState<boolean>(false);
 
   // Filter Modal
   const [filterMenuVisible, setFilterMenuVisible] = useState<boolean>(false);
 
   // Requests Modal State
-  const [isRequestsModalVisible, setRequestsModalVisible] = useState<boolean>(false);
+  const [isRequestsModalVisible, setRequestsModalVisible] =
+    useState<boolean>(false);
   const [incomingRequests, setIncomingRequests] = useState<Request[]>([]);
   const [outgoingRequests, setOutgoingRequests] = useState<Request[]>([]);
   const [loadingRequests, setLoadingRequests] = useState<boolean>(false);
   const [errorRequests, setErrorRequests] = useState<string | null>(null);
-  const [processingRequestId, setProcessingRequestId] = useState<string | null>(null);
+  const [processingRequestId, setProcessingRequestId] = useState<string | null>(
+    null
+  );
 
   // Report Modal State
   const [reportModalVisible, setReportModalVisible] = useState<boolean>(false);
+  const [reportReason, setReportReason] = useState<string>(
+    "Inappropriate Behavior"
+  ); // Default reason
+  const [customReason, setCustomReason] = useState<string>(""); // Custom reason if "Other" is selected
   const [reportDescription, setReportDescription] = useState<string>("");
+  // Predefined reasons
+  const reportReasons = [
+    "Inappropriate Behavior",
+    "Fraudulent Activity",
+    "Harassment",
+    "Scamming",
+    "Other",
+  ];
 
   // Report Success Popup State
-  const [isReportSuccessModalVisible, setIsReportSuccessModalVisible] = useState<boolean>(false);
+  const [isReportSuccessModalVisible, setIsReportSuccessModalVisible] =
+    useState<boolean>(false);
 
   // Tabs for Requests Modal
-  const [selectedRequestsTab, setSelectedRequestsTab] = useState<"incoming" | "outgoing">("incoming");
+  const [selectedRequestsTab, setSelectedRequestsTab] = useState<
+    "incoming" | "outgoing"
+  >("incoming");
 
   // User & Token from Context
   const { userId, token } = useContext(UserContext);
@@ -111,15 +130,24 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
   const { chatId: routeChatId } = route.params || {};
 
   // Animation for Requests Modal Slide-Up
-  const slideAnim = useRef(new Animated.Value(Dimensions.get("window").height)).current;
+  const slideAnim = useRef(
+    new Animated.Value(Dimensions.get("window").height)
+  ).current;
 
   // Chat Filtering Logic
-  const applyFilter = (chatsToFilter: Chat[], f: "all" | "products" | "gigs") => {
+  const applyFilter = (
+    chatsToFilter: Chat[],
+    f: "all" | "products" | "gigs"
+  ) => {
     if (f === "all") return chatsToFilter;
     if (f === "products") {
-      return chatsToFilter.filter((c) => c.productTitle && c.productTitle.trim() !== "");
+      return chatsToFilter.filter(
+        (c) => c.productTitle && c.productTitle.trim() !== ""
+      );
     } else {
-      return chatsToFilter.filter((c) => !c.productTitle || c.productTitle.trim() === "");
+      return chatsToFilter.filter(
+        (c) => !c.productTitle || c.productTitle.trim() === ""
+      );
     }
   };
 
@@ -159,7 +187,9 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       const chatDocRef = doc(firestoreDB, "chatRooms", selectedChat.chatID);
       onSnapshot(chatDocRef, (docSnap) => {
         if (!docSnap.exists()) {
-          console.warn("🚨 Chat room does not exist in Firestore! Check chatID.");
+          console.warn(
+            "🚨 Chat room does not exist in Firestore! Check chatID."
+          );
         } else {
           console.log("✅ Chat room found:", docSnap.data());
         }
@@ -222,7 +252,9 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     };
     // Optimistically update the UI immediately
     setSelectedChat((prev) =>
-      prev ? { ...prev, messages: [...(prev.messages || []), newMessageObj] } : prev
+      prev
+        ? { ...prev, messages: [...(prev.messages || []), newMessageObj] }
+        : prev
     );
     setNewMessage("");
     setTimeout(() => {
@@ -230,7 +262,12 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }, 100);
     // Then asynchronously post the message to the server
     try {
-      const status = await postMessage(selectedChat.chatID, messageContent, token, userId);
+      const status = await postMessage(
+        selectedChat.chatID,
+        messageContent,
+        token,
+        userId
+      );
       if (status !== "success") {
         throw new Error("Failed to send message");
       }
@@ -244,9 +281,13 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
   // Handle image selection and preview
   const handleImagePress = async () => {
     try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const { status } =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== "granted") {
-        Alert.alert("Permission Required", "Permission to access the camera roll is required!");
+        Alert.alert(
+          "Permission Required",
+          "Permission to access the camera roll is required!"
+        );
         return;
       }
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -447,7 +488,9 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
           minute: "2-digit",
         })
       : "";
-    const initials = `${item.user.firstName.charAt(0)}${item.user.lastName.charAt(0)}`.toUpperCase();
+    const initials = `${item.user.firstName.charAt(
+      0
+    )}${item.user.lastName.charAt(0)}`.toUpperCase();
     return (
       <Pressable
         style={styles.chatItemContainer}
@@ -486,13 +529,17 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
 
   const renderMessage = ({ item }: { item: Message }) => {
     const isImageMessage = item.content.startsWith("[Image] ");
-    const imageUri = isImageMessage ? item.content.replace("[Image] ", "") : null;
+    const imageUri = isImageMessage
+      ? item.content.replace("[Image] ", "")
+      : null;
     const isCurrentUser = item.senderId === userId;
     return (
       <View
         style={[
           styles.messageContainer,
-          isCurrentUser ? styles.myMessageContainer : styles.theirMessageContainer,
+          isCurrentUser
+            ? styles.myMessageContainer
+            : styles.theirMessageContainer,
         ]}
       >
         <View
@@ -502,12 +549,18 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
           ]}
         >
           {isImageMessage ? (
-            <Image source={{ uri: imageUri! }} style={styles.messageImage} resizeMode="cover" />
+            <Image
+              source={{ uri: imageUri! }}
+              style={styles.messageImage}
+              resizeMode="cover"
+            />
           ) : (
             <Text
               style={[
                 styles.messageText,
-                isCurrentUser ? styles.myMessageTextColor : styles.theirMessageTextColor,
+                isCurrentUser
+                  ? styles.myMessageTextColor
+                  : styles.theirMessageTextColor,
               ]}
             >
               {item.content}
@@ -516,7 +569,9 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
           <Text
             style={[
               styles.messageTimestamp,
-              isCurrentUser ? styles.myTimestampColor : styles.theirTimestampColor,
+              isCurrentUser
+                ? styles.myTimestampColor
+                : styles.theirTimestampColor,
             ]}
           >
             {new Date(item.timestamp).toLocaleTimeString([], {
@@ -535,7 +590,11 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     type: c.productTitle ? "product" : "gig",
   }));
 
-  const handleNavigateFromProductOrGig = (item: { chatID: string; title: string; type: string; }) => {
+  const handleNavigateFromProductOrGig = (item: {
+    chatID: string;
+    title: string;
+    type: string;
+  }) => {
     const chat = chats.find((c) => c.chatID === item.chatID);
     if (chat) {
       openChat(chat);
@@ -611,7 +670,8 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
               <TouchableOpacity
                 style={[
                   styles.acceptButton,
-                  processingRequestId === item.requestId && styles.buttonDisabled,
+                  processingRequestId === item.requestId &&
+                    styles.buttonDisabled,
                 ]}
                 onPress={() => acceptRequest(item.requestId)}
                 disabled={processingRequestId === item.requestId}
@@ -626,7 +686,8 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
               <TouchableOpacity
                 style={[
                   styles.rejectButton,
-                  processingRequestId === item.requestId && styles.buttonDisabled,
+                  processingRequestId === item.requestId &&
+                    styles.buttonDisabled,
                 ]}
                 onPress={() => rejectRequest(item.requestId)}
                 disabled={processingRequestId === item.requestId}
@@ -656,7 +717,8 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         </View>
       );
     };
-    const dataToShow = selectedRequestsTab === "incoming" ? incomingRequests : outgoingRequests;
+    const dataToShow =
+      selectedRequestsTab === "incoming" ? incomingRequests : outgoingRequests;
     return (
       <Modal
         visible={isRequestsModalVisible}
@@ -664,32 +726,69 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         transparent={true}
         onRequestClose={() => setRequestsModalVisible(false)}
       >
-        <Animated.View style={[styles.requestsModalContainer, { transform: [{ translateY: slideAnim }] }]}>
+        <Animated.View
+          style={[
+            styles.requestsModalContainer,
+            { transform: [{ translateY: slideAnim }] },
+          ]}
+        >
           <SafeAreaView style={styles.requestsSafeArea}>
             <View style={styles.requestsHeader}>
-              <Pressable onPress={() => setRequestsModalVisible(false)} style={styles.closeButton} accessibilityLabel="Close Requests">
+              <Pressable
+                onPress={() => setRequestsModalVisible(false)}
+                style={styles.closeButton}
+                accessibilityLabel="Close Requests"
+              >
                 <Ionicons name="close" size={24} color="#FFFFFF" />
               </Pressable>
               <Text style={styles.requestsHeaderTitle}>Your Requests</Text>
             </View>
             <View style={styles.requestsTabsRow}>
-              <Pressable onPress={() => setSelectedRequestsTab("incoming")}
-                style={[styles.requestsTab, selectedRequestsTab === "incoming" && styles.activeRequestsTab]}
-                accessibilityLabel="Incoming Requests Tab">
-                <Text style={[styles.requestsTabText, selectedRequestsTab === "incoming" && styles.activeRequestsTabText]}>
+              <Pressable
+                onPress={() => setSelectedRequestsTab("incoming")}
+                style={[
+                  styles.requestsTab,
+                  selectedRequestsTab === "incoming" &&
+                    styles.activeRequestsTab,
+                ]}
+                accessibilityLabel="Incoming Requests Tab"
+              >
+                <Text
+                  style={[
+                    styles.requestsTabText,
+                    selectedRequestsTab === "incoming" &&
+                      styles.activeRequestsTabText,
+                  ]}
+                >
                   Incoming
                 </Text>
               </Pressable>
-              <Pressable onPress={() => setSelectedRequestsTab("outgoing")}
-                style={[styles.requestsTab, selectedRequestsTab === "outgoing" && styles.activeRequestsTab]}
-                accessibilityLabel="Outgoing Requests Tab">
-                <Text style={[styles.requestsTabText, selectedRequestsTab === "outgoing" && styles.activeRequestsTabText]}>
+              <Pressable
+                onPress={() => setSelectedRequestsTab("outgoing")}
+                style={[
+                  styles.requestsTab,
+                  selectedRequestsTab === "outgoing" &&
+                    styles.activeRequestsTab,
+                ]}
+                accessibilityLabel="Outgoing Requests Tab"
+              >
+                <Text
+                  style={[
+                    styles.requestsTabText,
+                    selectedRequestsTab === "outgoing" &&
+                      styles.activeRequestsTabText,
+                  ]}
+                >
                   Outgoing
                 </Text>
               </Pressable>
             </View>
             {loadingRequests ? (
-              <ActivityIndicator size="large" color="#BB86FC" style={{ marginTop: 20 }} />
+              <ActivityIndicator
+                size="large"
+                color="#BB86FC"
+                style={{ marginTop: 20 }}
+              />
             ) : errorRequests ? (
               <View style={styles.requestsErrorContainer}>
                 <Text style={styles.requestsErrorText}>{errorRequests}</Text>
@@ -703,11 +802,15 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                   ListEmptyComponent={
                     <View style={styles.sectionEmptyContainer}>
                       <Text style={styles.sectionEmptyText}>
-                        {selectedRequestsTab === "incoming" ? "No incoming requests." : "No outgoing requests."}
+                        {selectedRequestsTab === "incoming"
+                          ? "No incoming requests."
+                          : "No outgoing requests."}
                       </Text>
                     </View>
                   }
-                  ItemSeparatorComponent={() => <View style={styles.requestsSeparatorLine} />}
+                  ItemSeparatorComponent={() => (
+                    <View style={styles.requestsSeparatorLine} />
+                  )}
                   refreshing={loadingRequests}
                   onRefresh={fetchUserRequests}
                 />
@@ -825,7 +928,9 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
             data={filteredChats}
             keyExtractor={(item, index) => item.chatID || index.toString()}
             renderItem={renderChat}
-            contentContainerStyle={filteredChats.length === 0 && styles.flatListContainer}
+            contentContainerStyle={
+              filteredChats.length === 0 && styles.flatListContainer
+            }
             ItemSeparatorComponent={() => <View style={styles.separatorLine} />}
           />
         )}
@@ -867,10 +972,13 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                       </View>
                       <View style={styles.chatHeaderTextContainer}>
                         <Text style={styles.chatHeaderUserName}>
-                          {selectedChat.user.firstName} {selectedChat.user.lastName}
+                          {selectedChat.user.firstName}{" "}
+                          {selectedChat.user.lastName}
                         </Text>
                         <Text style={styles.chatHeaderSubTitle}>
-                          {selectedChat.productTitle ? selectedChat.productTitle : "Job"}
+                          {selectedChat.productTitle
+                            ? selectedChat.productTitle
+                            : "Job"}
                         </Text>
                       </View>
                     </View>
@@ -1026,7 +1134,10 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                 <Text style={styles.reportInfoText}>
                   The Gridly team will reach out to you soon.
                 </Text>
-                <Pressable style={styles.reportSubmitButton} onPress={handleReportSubmit}>
+                <Pressable
+                  style={styles.reportSubmitButton}
+                  onPress={handleReportSubmit}
+                >
                   <Text style={styles.reportSubmitButtonText}>Submit</Text>
                 </Pressable>
               </View>
@@ -1035,11 +1146,17 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         </Modal>
 
         {/* Report Success Modal */}
-        <Modal transparent visible={isReportSuccessModalVisible} animationType="fade">
+        <Modal
+          transparent
+          visible={isReportSuccessModalVisible}
+          animationType="fade"
+        >
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
               <Ionicons name="checkmark-circle" size={60} color="#9C27B0" />
-              <Text style={styles.modalText}>Report Submitted Successfully!</Text>
+              <Text style={styles.modalText}>
+                Report Submitted Successfully!
+              </Text>
             </View>
           </View>
         </Modal>
