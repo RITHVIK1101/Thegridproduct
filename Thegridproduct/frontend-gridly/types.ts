@@ -1,7 +1,10 @@
 export interface User {
   firstName: string;
   lastName: string;
+  userId?: string;  // ✅ Optional
+  email?: string;   // ✅ Optional
 }
+
 
 export interface Message {
   _id?: string; // Optional for real-time messages that may not have an `_id` yet

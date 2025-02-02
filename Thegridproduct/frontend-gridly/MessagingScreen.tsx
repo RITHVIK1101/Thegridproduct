@@ -630,14 +630,66 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }, 300);
   };
 
-  const handleReportSubmit = () => {
-    // (Send report to backend if needed)
-    setReportModalVisible(false);
-    setIsReportSuccessModalVisible(true);
-    setReportDescription("");
-    setTimeout(() => {
-      setIsReportSuccessModalVisible(false);
-    }, 1500);
+  const handleReportSubmit = async () => {
+    if (!selectedChat) {
+      Alert.alert("Error", "No chat selected for reporting.");
+      return;
+    }
+
+    // Get the reported user's ID from chat messages
+    const reportedUserId = selectedChat.messages?.find(
+      (msg) => msg.senderId !== userId
+    )?.senderId;
+
+    if (!reportedUserId) {
+      Alert.alert("Error", "Could not determine the user ID to report.");
+      return;
+    }
+
+    if (!reportDescription.trim()) {
+      Alert.alert("Error", "Please enter a description.");
+      return;
+    }
+
+    const finalReason =
+      reportReason === "Other" ? customReason.trim() : reportReason;
+
+    if (!finalReason) {
+      Alert.alert("Error", "Please enter a reason for reporting.");
+      return;
+    }
+
+    try {
+      const response = await axios.post(
+        `${NGROK_URL}/report`,
+        {
+          chatId: selectedChat.chatID,
+          reporterUserId: userId, // Current user
+          reportedUserId, // Extracted senderId of the other person
+          reason: finalReason,
+          description: reportDescription.trim(),
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (response.status === 200) {
+        setReportModalVisible(false);
+        setIsReportSuccessModalVisible(true);
+        setTimeout(() => {
+          setIsReportSuccessModalVisible(false);
+        }, 1500);
+      } else {
+        throw new Error("Failed to submit report");
+      }
+    } catch (error) {
+      console.error("Error submitting report:", error);
+      Alert.alert("Error", "Failed to submit report.");
+    }
   };
 
   const renderRequestsModal = () => {
@@ -1104,7 +1156,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
           visible={reportModalVisible}
           animationType="slide"
           transparent={false}
-          presentationStyle="fullScreen"
           onRequestClose={() => setReportModalVisible(false)}
         >
           <View style={[styles.modalSafeArea, { backgroundColor: "#000" }]}>
@@ -1122,7 +1173,40 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                 </View>
                 <View style={{ width: 24 }} />
               </View>
+
               <View style={styles.reportContent}>
+                <Text style={styles.reportLabel}>Reason for Report:</Text>
+                {reportReasons.map((reason) => (
+                  <Pressable
+                    key={reason}
+                    style={[
+                      styles.reasonOption,
+                      reportReason === reason && styles.selectedReason,
+                    ]}
+                    onPress={() => setReportReason(reason)}
+                  >
+                    <Text
+                      style={[
+                        styles.reasonText,
+                        reportReason === reason && styles.selectedReasonText,
+                      ]}
+                    >
+                      {reason}
+                    </Text>
+                  </Pressable>
+                ))}
+
+                {reportReason === "Other" && (
+                  <TextInput
+                    style={[styles.reportInput, { height: 40 }]}
+                    placeholder="Enter your reason..."
+                    placeholderTextColor="#888"
+                    value={customReason}
+                    onChangeText={setCustomReason}
+                  />
+                )}
+
+                <Text style={styles.reportLabel}>Description:</Text>
                 <TextInput
                   style={[styles.reportInput, { height: 150 }]}
                   placeholder="Describe the issue..."
@@ -1131,6 +1215,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                   onChangeText={setReportDescription}
                   multiline
                 />
+
                 <Text style={styles.reportInfoText}>
                   The Gridly team will reach out to you soon.
                 </Text>
@@ -1332,6 +1417,35 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: "#333333",
     marginVertical: 8,
+  },
+  reportLabel: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#FFFFFF",
+    marginBottom: 8,
+    fontFamily: "HelveticaNeue-Medium",
+  },
+  reasonOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#222",
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    borderRadius: 8,
+    marginVertical: 5,
+  },
+  selectedReason: {
+    backgroundColor: "#BB86FC", // Highlight selected reason
+  },
+  reasonText: {
+    fontSize: 14,
+    color: "#FFFFFF",
+    fontFamily: "HelveticaNeue",
+    marginLeft: 10,
+  },
+  selectedReasonText: {
+    color: "#000", // Different text color when selected
+    fontWeight: "bold",
   },
   chatDetails: {
     flex: 1,
