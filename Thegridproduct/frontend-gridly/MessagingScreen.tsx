@@ -90,6 +90,13 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     null
   );
 
+  // Report Modal State
+  const [reportModalVisible, setReportModalVisible] = useState<boolean>(false);
+  const [reportDescription, setReportDescription] = useState<string>("");
+
+  // Report Success Popup State
+  const [isReportSuccessModalVisible, setIsReportSuccessModalVisible] = useState<boolean>(false);
+
   // Tabs for Requests Modal
   const [selectedRequestsTab, setSelectedRequestsTab] = useState<
     "incoming" | "outgoing"
@@ -621,6 +628,25 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }
   };
 
+  // When the user presses Report, first close the chat modal then open the report screen.
+  const handleReportPress = () => {
+    setChatModalVisible(false);
+    setTimeout(() => {
+      setReportModalVisible(true);
+    }, 300);
+  };
+
+  // Instead of an alert, we show a success popup similar to your gig screen
+  const handleReportSubmit = () => {
+    // Here you can add code to actually send the report to your backend
+    setReportModalVisible(false);
+    setIsReportSuccessModalVisible(true);
+    setReportDescription("");
+    setTimeout(() => {
+      setIsReportSuccessModalVisible(false);
+    }, 1500);
+  };
+
   const renderRequestsModal = () => {
     if (isRequestsModalVisible) {
       Animated.timing(slideAnim, {
@@ -965,6 +991,13 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                         </Text>
                       </View>
                     </View>
+                    <Pressable
+                      onPress={handleReportPress}
+                      style={styles.reportButton}
+                      accessibilityLabel="Report User"
+                    >
+                      <Ionicons name="flag" size={24} color="#F08080" />
+                    </Pressable>
                     <View style={styles.chatHeaderBottomLine} />
                   </View>
                 )}
@@ -1077,6 +1110,67 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                 </View>
               )}
             </SafeAreaView>
+          </View>
+        </Modal>
+
+        {/* Report Modal */}
+        <Modal
+          visible={reportModalVisible}
+          animationType="slide"
+          transparent={false}
+          presentationStyle="fullScreen"
+          onRequestClose={() => setReportModalVisible(false)}
+        >
+          <View style={[styles.modalSafeArea, { backgroundColor: "#000" }]}>
+            <SafeAreaView style={{ flex: 1 }}>
+              {/* Report screen header (similar to chat header) */}
+              <View style={styles.enhancedChatHeader}>
+                <Pressable
+                  onPress={() => setReportModalVisible(false)}
+                  style={styles.backButton}
+                  accessibilityLabel="Go Back"
+                >
+                  <Ionicons name="arrow-back" size={24} color="#BB86FC" />
+                </Pressable>
+                <View style={styles.chatHeaderInfo}>
+                  <Text style={styles.chatHeaderUserName}>Report User</Text>
+                </View>
+                <View style={{ width: 24 }} />
+              </View>
+              <View style={styles.reportContent}>
+                <TextInput
+                  style={[styles.reportInput, { height: 150 }]}
+                  placeholder="Describe the issue..."
+                  placeholderTextColor="#888"
+                  value={reportDescription}
+                  onChangeText={setReportDescription}
+                  multiline
+                />
+                <Text style={styles.reportInfoText}>
+                  The Gridly team will reach out to you soon.
+                </Text>
+                <Pressable
+                  style={styles.reportSubmitButton}
+                  onPress={handleReportSubmit}
+                >
+                  <Text style={styles.reportSubmitButtonText}>Submit</Text>
+                </Pressable>
+              </View>
+            </SafeAreaView>
+          </View>
+        </Modal>
+
+        {/* Report Success Modal */}
+        <Modal
+          transparent
+          visible={isReportSuccessModalVisible}
+          animationType="fade"
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Ionicons name="checkmark-circle" size={60} color="#9C27B0" />
+              <Text style={styles.modalText}>Report Submitted Successfully!</Text>
+            </View>
           </View>
         </Modal>
 
@@ -1619,5 +1713,62 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#AAAAAA",
     fontFamily: "HelveticaNeue",
+  },
+  // Updated style for Report Button in chat header
+  reportButton: {
+    marginLeft: 10,
+  },
+  // New style for Report Modal content area
+  reportContent: {
+    flex: 1,
+    padding: 20,
+    backgroundColor: "#000",
+  },
+  // Updated reportInput: larger text area for report submission
+  reportInput: {
+    backgroundColor: "#333",
+    color: "#fff",
+    borderRadius: 6,
+    padding: 15,
+    minHeight: 150,
+    textAlignVertical: "top",
+    marginBottom: 15,
+    fontFamily: "HelveticaNeue",
+    fontSize: 16,
+  },
+  reportInfoText: {
+    fontSize: 12,
+    color: "#AAAAAA",
+    marginBottom: 15,
+    fontFamily: "HelveticaNeue",
+  },
+  reportSubmitButton: {
+    backgroundColor: "#BB86FC",
+    paddingVertical: 10,
+    borderRadius: 6,
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  reportSubmitButtonText: {
+    color: "#000",
+    fontSize: 16,
+    fontFamily: "HelveticaNeue-Bold",
+  },
+  reportCloseButton: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+  },
+  modalContent: {
+    backgroundColor: "#1E1E1E",
+    padding: 30,
+    borderRadius: 15,
+    alignItems: "center",
+    gap: 15,
+  },
+  modalText: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#fff",
   },
 });
