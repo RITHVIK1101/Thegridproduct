@@ -57,7 +57,6 @@ func main() {
 	protected := router.PathPrefix("/").Subrouter()
 	protected.Use(handlers.AuthMiddleware)
 
-	// Product Routes
 	protected.HandleFunc("/products", handlers.AddProductHandler).Methods("POST")
 	protected.HandleFunc("/products/user", handlers.GetUserProductsHandler).Methods("GET")
 	protected.HandleFunc("/products/all", handlers.GetAllProductsHandler).Methods("GET")
@@ -67,11 +66,22 @@ func main() {
 	protected.HandleFunc("/products/{id}", handlers.DeleteProductHandler).Methods("DELETE")
 	protected.HandleFunc("/products/{id}", handlers.UpdateProductHandler).Methods("PUT")
 
-	// Chat Routes
+	// Liked Products
+	protected.HandleFunc("/products/{id}/like", handlers.LikeProductHandler).Methods("POST")
+	protected.HandleFunc("/products/{id}/unlike", handlers.UnlikeProductHandler).Methods("POST")
+
+	// Cart & Orders
+	protected.HandleFunc("/cart", handlers.GetCartHandler).Methods("GET")
+	protected.HandleFunc("/cart/add", handlers.AddToCartHandler).Methods("POST")
+	protected.HandleFunc("/cart/remove", handlers.RemoveFromCartHandler).Methods("POST")
+	protected.HandleFunc("/orders", handlers.GetAllOrdersHandler).Methods("GET")
+
+	// NEW Chat Request Routes
 	protected.HandleFunc("/chat/request", handlers.RequestChatHandler).Methods("POST")
 	protected.HandleFunc("/chat/accept", handlers.AcceptChatRequestHandler).Methods("POST")
 	protected.HandleFunc("/chat/reject", handlers.RejectChatRequestHandler).Methods("POST")
 	protected.HandleFunc("/chat/requests", handlers.GetChatRequestsHandler).Methods("GET")
+
 	protected.HandleFunc("/chats/user/{userId}", handlers.GetChatsByUserHandler).Methods("GET")
 	protected.HandleFunc("/chats/{chatId}", handlers.GetChatHandler).Methods("GET")
 	protected.HandleFunc("/chats/{chatId}/messages", handlers.AddMessageHandler).Methods("POST")
@@ -79,6 +89,18 @@ func main() {
 	protected.HandleFunc("/chat/test-send-message", handlers.TestSendMessageHandler).Methods("POST")
 	// User Routes
 	protected.HandleFunc("/users/{id}", handlers.GetUserHandler).Methods("GET")
+
+	protected.HandleFunc("/requests", handlers.CreateProductRequestHandler).Methods("POST")
+	protected.HandleFunc("/requests/my", handlers.GetMyProductRequestsHandler).Methods("GET")
+	protected.HandleFunc("/requests/all", handlers.GetAllOtherProductRequestsHandler).Methods("GET")
+
+	// AI Processing
+	protected.HandleFunc("/services", handlers.AddGigHandler).Methods("POST")
+	protected.HandleFunc("/services", handlers.GetAllGigsHandler).Methods("GET")
+	protected.HandleFunc("/services/user", handlers.GetUserGigsHandler).Methods("GET")
+	protected.HandleFunc("/services/{id}", handlers.GetSingleGigHandler).Methods("GET")
+	protected.HandleFunc("/services/{id}", handlers.UpdateGigHandler).Methods("PUT")
+	protected.HandleFunc("/services/{id}", handlers.DeleteGigHandler).Methods("DELETE")
 
 	// AI Processing
 	protected.HandleFunc("/ai/process", handlers.ProcessAIInput).Methods("POST")
