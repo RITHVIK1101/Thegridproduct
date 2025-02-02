@@ -1,6 +1,4 @@
-// RequestProduct.tsx
-
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useContext } from "react";
 import {
   View,
   Text,
@@ -19,9 +17,11 @@ import {
 } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { useNavigation } from "@react-navigation/native";
+import { UserContext } from "./UserContext"; // Import the UserContext
 
 const RequestProduct: React.FC = () => {
   const navigation = useNavigation();
+  const { token } = useContext(UserContext); // Access the token from UserContext
 
   const [productName, setProductName] = useState("");
   const [description, setDescription] = useState("");
@@ -30,7 +30,6 @@ const RequestProduct: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState("");
   const errorOpacity = useRef(new Animated.Value(0)).current;
 
-  // Function to display error messages with animation
   const showError = (msg: string) => {
     setErrorMessage(msg);
     Animated.timing(errorOpacity, {
@@ -52,8 +51,7 @@ const RequestProduct: React.FC = () => {
     });
   };
 
-  // Handler for the Request Product button
-  const handleRequestProduct = () => {
+  const handleRequestProduct = async () => {
     if (!productName.trim()) {
       showError("Please enter a product name.");
       return;
@@ -64,15 +62,38 @@ const RequestProduct: React.FC = () => {
       return;
     }
 
-    // Simulate a submission process
     setIsSubmitting(true);
 
-    setTimeout(() => {
+    try {
+      const response = await fetch(
+        "https://thegridproduct-production.up.railway.app/requests",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`, // Include the JWT token in the Authorization header
+          },
+          body: JSON.stringify({
+            productName,
+            description,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to submit request");
+      }
+
+      const data = await response.json();
       setIsSubmitting(false);
       setIsSuccessModalVisible(true);
       setProductName("");
       setDescription("");
-    }, 1500);
+    } catch (error) {
+      setIsSubmitting(false);
+      showError(error.message || "An error occurred. Please try again.");
+    }
   };
 
   return (
@@ -80,7 +101,6 @@ const RequestProduct: React.FC = () => {
       style={styles.outerContainer}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      {/* Error Toast */}
       {errorMessage ? (
         <Animated.View
           style={[
@@ -107,7 +127,6 @@ const RequestProduct: React.FC = () => {
           style={styles.container}
           contentContainerStyle={{ paddingBottom: 40 }}
         >
-          {/* Slide Content */}
           <View style={styles.slideContainer}>
             <Text style={styles.stepTitle}>Request a Product</Text>
 
@@ -149,12 +168,13 @@ const RequestProduct: React.FC = () => {
         </ScrollView>
       </TouchableWithoutFeedback>
 
-      {/* Success Modal */}
       <Modal transparent visible={isSuccessModalVisible} animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Ionicons name="checkmark-circle" size={60} color="#9C27B0" />
-            <Text style={styles.modalText}>Product Requested Successfully!</Text>
+            <Text style={styles.modalText}>
+              Product Requested Successfully!
+            </Text>
             <TouchableOpacity
               style={styles.closeModalButton}
               onPress={() => {
@@ -173,20 +193,19 @@ const RequestProduct: React.FC = () => {
 
 export default RequestProduct;
 
-// Styles (matching AddGig.tsx and AddProduct.tsx)
 const styles = StyleSheet.create({
   outerContainer: {
     flex: 1,
-    backgroundColor: "#000000", // Dark background
+    backgroundColor: "#000000",
   },
   container: {
     flex: 1,
     padding: 20,
-    paddingTop: 40, // Shifted up by adding paddingTop
+    paddingTop: 40,
   },
   errorToast: {
     position: "absolute",
-    top: Platform.OS === "ios" ? 50 : 20, // Adjusted top position for different platforms
+    top: Platform.OS === "ios" ? 50 : 20,
     left: 20,
     right: 20,
     paddingVertical: 15,
@@ -201,13 +220,11 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     textAlign: "center",
   },
-  slideContainer: {
-    // Removed marginBottom since progress dot is removed
-  },
+  slideContainer: {},
   stepTitle: {
     fontSize: 24,
     fontWeight: "700",
-    color: "#BB86FC", // Consistent purple color
+    color: "#BB86FC",
     marginBottom: 20,
     textAlign: "center",
   },
@@ -233,7 +250,7 @@ const styles = StyleSheet.create({
   requestButton: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#BB86FC", // Exact same purple color as AddProduct and AddGig
+    backgroundColor: "#BB86FC",
     paddingVertical: 15,
     paddingHorizontal: 30,
     borderRadius: 12,
