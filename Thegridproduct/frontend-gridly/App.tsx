@@ -32,18 +32,15 @@ import EditProduct from "./EditProductScreen";
 import MessagingScreen from "./MessagingScreen";
 import CartScreen from "./CartScreen";
 import AccountScreen from "./AccountScreen";
-
-import JobDetails from "./JobDetails"; // Import the new JobDetails screen
-import RequestProduct from "./RequestProduct"; // Import the RequestProduct screen
+import JobDetails from "./JobDetails";
+import RequestProduct from "./RequestProduct";
+// NEW: Import the new requested products page
+import RequestedProductsPage from "./requestedProductsPage";
 import { RootStackParamList } from "./navigationTypes";
-
-// Import the separate Terms of Service content
 import TermsOfServiceContent from "./TermsOfServiceContent";
 
-// Terms of Service Screen now simply renders the imported content
 const TermsOfServiceScreen: React.FC = () => <TermsOfServiceContent />;
 
-// Liked Items Screen
 const LikedItemsScreen: React.FC = () => {
   const { favorites, allProducts } = useContext<any>(UserContext);
   const likedProducts =
@@ -72,7 +69,6 @@ const LikedItemsScreen: React.FC = () => {
   );
 };
 
-// User Menu Screen (Full Screen)
 const UserMenuScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const { clearUser, firstName, lastName, institution, studentType } =
     useContext(UserContext);
@@ -183,9 +179,6 @@ export const navigationRef = React.createRef();
 
 const Stack = createStackNavigator<RootStackParamList>();
 
-/**
- * Custom Header Title Component with Logo and Text
- */
 const HeaderTitleWithLogo: React.FC<{ title: string }> = ({ title }) => (
   <View style={styles.headerTitleContainer}>
     <Ionicons name="grid-outline" size={20} color="#FFFFFF" />
@@ -193,9 +186,6 @@ const HeaderTitleWithLogo: React.FC<{ title: string }> = ({ title }) => (
   </View>
 );
 
-/**
- * Custom Avatar Component showing the user's initials.
- */
 const UserAvatar: React.FC<{
   firstName?: string;
   lastName?: string;
@@ -215,9 +205,6 @@ const UserAvatar: React.FC<{
   );
 };
 
-/**
- * Common header right component.
- */
 const HeaderRightComponent = (
   navigation: any,
   firstName?: string,
@@ -239,9 +226,6 @@ const HeaderRightComponent = (
   </View>
 );
 
-/**
- * Helper function to generate common header options.
- */
 const getHeaderOptions = (
   navigation: any,
   firstName?: string,
@@ -294,8 +278,6 @@ const AppNavigator: React.FC = () => {
     >
       {token ? (
         <>
-          {/* Dashboard screen with a transparent header so the background image shows underneath.
-              Other screens use the common header options. */}
           <Stack.Screen
             name="Dashboard"
             component={Dashboard}
@@ -385,7 +367,7 @@ const AppNavigator: React.FC = () => {
           />
           <Stack.Screen
             name="LikedItems"
-            component={LikedProductScreen}
+            component={LikedItemsScreen}
             options={({ navigation }) =>
               getHeaderOptions(navigation, firstName, lastName, true, true)
             }
@@ -400,6 +382,14 @@ const AppNavigator: React.FC = () => {
           <Stack.Screen
             name="RequestProduct"
             component={RequestProduct}
+            options={({ navigation }) =>
+              getHeaderOptions(navigation, firstName, lastName, true, true)
+            }
+          />
+          {/* NEW: Add RequestedProductsPage route */}
+          <Stack.Screen
+            name="RequestedProductsPage"
+            component={RequestedProductsPage}
             options={({ navigation }) =>
               getHeaderOptions(navigation, firstName, lastName, true, true)
             }
