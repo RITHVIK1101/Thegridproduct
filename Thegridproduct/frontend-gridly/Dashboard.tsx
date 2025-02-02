@@ -825,6 +825,16 @@ const Dashboard: React.FC<DashboardProps> = () => {
     <View style={styles.rootContainer}>
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <LinearGradient colors={["#000000", "#000000"]} style={styles.gradientBackground}>
+          {/* Top Bar with filter button */}
+          <View style={styles.topBar}>
+            <TouchableOpacity
+              style={styles.topBarIconContainer}
+              onPress={toggleFilterModal}
+              accessibilityLabel="Filter"
+            >
+              <Ionicons name="options-outline" size={22} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
           {error ? (
             <View style={styles.errorContainer}>
               <Text style={styles.errorText}>{error}</Text>
@@ -1061,10 +1071,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: "center",
   },
-  // Success Toast is now repositioned underneath the image indicators.
   successToastContainer: {
     position: "absolute",
-    top: PRODUCT_HEIGHT / 2 - 230, // Adjusted to appear just underneath the mid-image indicators
+    top: PRODUCT_HEIGHT / 2 - 230,
     alignSelf: "center",
     backgroundColor: "#34C759",
     paddingVertical: 8,
@@ -1078,9 +1087,10 @@ const styles = StyleSheet.create({
     left: 20,
     zIndex: 10,
   },
+  // Updated filter button container: removed the grey background
   topBarIconContainer: {
     padding: 6,
-    backgroundColor: "rgba(0,0,0,0.5)",
+    backgroundColor: "transparent",
     borderRadius: 8,
   },
   productStack: {
@@ -1173,7 +1183,7 @@ const styles = StyleSheet.create({
   },
   midImageIndicatorsContainer: {
     position: "absolute",
-    top: PRODUCT_HEIGHT / 2 - 270, // Adjust this value to shift the indicators higher or lower
+    top: PRODUCT_HEIGHT / 2 - 270,
     flexDirection: "row",
     alignSelf: "center",
     zIndex: 4,
