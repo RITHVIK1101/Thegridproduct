@@ -1,5 +1,3 @@
-// AddGig.tsx
-
 import React, { useState, useContext, useRef } from "react";
 import {
   View,
@@ -210,6 +208,10 @@ const AddGig: React.FC = () => {
         return false;
     }
   };
+
+  // ------------------------------------------------------------------------------
+  // Submission function
+  // ------------------------------------------------------------------------------
   const handleSubmit = async () => {
     setIsLoading(true);
 
@@ -231,11 +233,9 @@ const AddGig: React.FC = () => {
         : formData.deliveryTime.trim(),
       description: formData.description.trim(),
       images: formData.images,
-      campusPresence: formData.campusPresence, // Include campusPresence
+      campusPresence: formData.campusPresence,
     };
 
-    // If user has chosen noExpiration or has no date set, we skip or set it as empty
-    // (thus defaulting to 30 days on backend or logic).
     if (!noExpiration && formData.expirationDate) {
       payload.expirationDate = formData.expirationDate.trim();
     }
@@ -245,7 +245,7 @@ const AddGig: React.FC = () => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`, // Include the token here
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(payload),
       });
@@ -259,6 +259,7 @@ const AddGig: React.FC = () => {
             data.message || `HTTP error! status: ${response.status}`
           );
         }
+        // Reset form and states
         setFormData({
           title: "",
           category: "",
@@ -275,10 +276,11 @@ const AddGig: React.FC = () => {
         setCurrentStep(1);
         setIsSuccessModalVisible(true);
 
+        // After a 1500ms delay (matching AddProduct), hide the modal and navigate away
         setTimeout(() => {
           setIsSuccessModalVisible(false);
-          navigation.navigate("Dashboard"); // Adjust as needed
-        }, 2000);
+          navigation.navigate("Dashboard");
+        }, 1500);
       } else {
         const errorText = await response.text();
         console.error("Unexpected response:", errorText);
@@ -349,7 +351,6 @@ const AddGig: React.FC = () => {
             });
 
             const imageUrl = response.data.secure_url;
-
             uploadedImages.push(imageUrl);
           } catch (error) {
             console.error("Error uploading image:", error);
@@ -403,7 +404,7 @@ const AddGig: React.FC = () => {
   };
 
   const handleConfirm = (date: Date) => {
-    const formattedDate = date.toISOString(); // Correct RFC3339 format
+    const formattedDate = date.toISOString();
     setFormData((prev) => ({
       ...prev,
       expirationDate: formattedDate,
@@ -511,7 +512,6 @@ const AddGig: React.FC = () => {
             onPress={() => {
               setNoDeliveryRequired(!noDeliveryRequired);
               if (!noDeliveryRequired) {
-                // Just toggled it on, so clear the field
                 setFormData((prev) => ({ ...prev, deliveryTime: "" }));
               }
             }}
@@ -526,7 +526,6 @@ const AddGig: React.FC = () => {
             </Text>
           </TouchableOpacity>
 
-          {/* Campus Presence Section with additional spacing */}
           <View style={styles.campusPresenceSection}>
             <Text style={styles.label}>Campus Presence</Text>
             <View style={styles.campusPresenceContainer}>
@@ -625,12 +624,10 @@ const AddGig: React.FC = () => {
             </TouchableOpacity>
           </View>
 
-          {/* Toggle between no expiration and setting an expiration date */}
           <TouchableOpacity
             style={styles.toggleButton}
             onPress={() => {
               setNoExpiration((prev) => !prev);
-              // If we just toggled noExpiration ON, clear the date
               if (!noExpiration) {
                 setFormData((prev) => ({ ...prev, expirationDate: "" }));
               }
@@ -648,7 +645,6 @@ const AddGig: React.FC = () => {
             </Text>
           </TouchableOpacity>
 
-          {/* If noExpiration is false, user can pick a date */}
           {!noExpiration && (
             <>
               <TouchableOpacity
@@ -663,7 +659,6 @@ const AddGig: React.FC = () => {
                 <Ionicons name="calendar-outline" size={20} color="#BB86FC" />
               </TouchableOpacity>
 
-              {/* If a date is set, allow clearing it */}
               {formData.expirationDate ? (
                 <TouchableOpacity
                   style={styles.clearDateButton}
@@ -679,8 +674,7 @@ const AddGig: React.FC = () => {
           )}
 
           <Text style={styles.optionalText}>
-            If no expiration date is set, your gig will be inactive after 30
-            days.
+            If no expiration date is set, your gig will be inactive after 30 days.
           </Text>
 
           <DateTimePickerModal
@@ -754,7 +748,6 @@ const AddGig: React.FC = () => {
       style={styles.outerContainer}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      {/* Error Toast */}
       {errorMessage ? (
         <Animated.View
           style={[
@@ -781,7 +774,6 @@ const AddGig: React.FC = () => {
           style={styles.container}
           contentContainerStyle={{ paddingBottom: 40 }}
         >
-          {/* Progress Indicators */}
           <View style={styles.progressContainer}>
             {[1, 2, 3, 4, 5, 6].map((stepNumber) => (
               <View
@@ -794,7 +786,6 @@ const AddGig: React.FC = () => {
             ))}
           </View>
 
-          {/* Slide Content */}
           <Animated.View
             style={[
               styles.slideContainer,
@@ -814,7 +805,6 @@ const AddGig: React.FC = () => {
             {slides[currentStep].content}
           </Animated.View>
 
-          {/* Navigation Buttons */}
           <View
             style={[
               styles.buttonContainer,
@@ -853,7 +843,6 @@ const AddGig: React.FC = () => {
             </TouchableOpacity>
           </View>
 
-          {/* Success Modal */}
           <Modal
             transparent
             visible={isSuccessModalVisible}
@@ -867,7 +856,6 @@ const AddGig: React.FC = () => {
             </View>
           </Modal>
 
-          {/* Info Modal (used for help or additional explanations) */}
           <Modal transparent visible={infoModalVisible} animationType="fade">
             <TouchableOpacity
               style={styles.modalOverlay}
@@ -886,7 +874,6 @@ const AddGig: React.FC = () => {
             </TouchableOpacity>
           </Modal>
 
-          {/* Categories Modal */}
           <Modal
             transparent
             visible={showCategoriesModal}
@@ -923,11 +910,10 @@ const AddGig: React.FC = () => {
 
 export default AddGig;
 
-// Styles (same as AddProduct.tsx with necessary adjustments)
 const styles = StyleSheet.create({
   outerContainer: {
     flex: 1,
-    backgroundColor: "#000000", // Dark background
+    backgroundColor: "#000000",
   },
   container: {
     flex: 1,
@@ -1200,9 +1186,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#fff",
   },
-  // New Styles for Campus Presence
   campusPresenceSection: {
-    marginTop: 20, // Added top margin to separate from Delivery Time
+    marginTop: 20,
   },
   campusPresenceContainer: {
     flexDirection: "column",
@@ -1214,9 +1199,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 10,
   },
-  presenceOptionSelected: {
-    // You can add styles for selected option if needed
-  },
+  presenceOptionSelected: {},
   presenceOptionText: {
     color: "#fff",
     fontSize: 16,
