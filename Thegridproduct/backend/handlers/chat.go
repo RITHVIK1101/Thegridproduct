@@ -679,10 +679,16 @@ func GetChatRequestsHandler(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	chatRequestsCol := db.GetCollection("gridlyapp", "chat_requests")
+	// Only include pending requests by adding the status filter.
 	filter := bson.M{
-		"$or": []bson.M{
-			{"buyerId": userObjID},
-			{"sellerId": userObjID},
+		"$and": []bson.M{
+			{
+				"$or": []bson.M{
+					{"buyerId": userObjID},
+					{"sellerId": userObjID},
+				},
+			},
+			{"status": models.ChatRequestStatusPending},
 		},
 	}
 
@@ -733,6 +739,7 @@ func GetChatRequestsHandler(w http.ResponseWriter, r *http.Request) {
 			SellerLastName:  seller.LastName,
 		}
 
+		// Separate incoming vs. outgoing based on whether the user is the buyer or seller.
 		if req.BuyerID.Hex() == userID {
 			outgoingRequests = append(outgoingRequests, enrichedReq)
 		} else if req.SellerID.Hex() == userID {

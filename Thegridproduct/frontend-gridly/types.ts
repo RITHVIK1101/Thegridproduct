@@ -6,7 +6,7 @@ export interface User {
 export interface Message {
   _id?: string; // Optional for real-time messages that may not have an `_id` yet
   sender: "user" | "other"; // Determines whether the message is from the logged-in user or another participant
-  senderID: string; // The ID of the sender
+  senderId: string; // The ID of the sender
   content: string; // The actual message content
   timestamp: string; // ISO string for timestamp consistency
   chatID?: string; // Optional, depending on whether the backend attaches chatID to messages

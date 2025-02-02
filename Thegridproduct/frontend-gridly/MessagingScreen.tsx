@@ -1,4 +1,4 @@
-// frontend/MessagingScreen.tsx
+// MessagingScreen.tsx
 
 import React, { useState, useEffect, useContext, useRef } from "react";
 import {
@@ -24,15 +24,11 @@ import {
 import Ionicons from "react-native-vector-icons/Ionicons";
 import BottomNavBar from "./components/BottomNavbar";
 import { fetchConversations, postMessage, getMessages } from "./api";
-
-// For sending messages we’ll use Firestore directly
 import {
   getFirestore,
   doc,
   onSnapshot,
   updateDoc,
-  setDoc,
-  getDoc,
   arrayUnion,
 } from "firebase/firestore";
 import { CLOUDINARY_URL, UPLOAD_PRESET } from "@env";
@@ -44,7 +40,6 @@ import axios from "axios";
 import { RouteProp, useNavigation } from "@react-navigation/native";
 import { RootStackParamList } from "./navigationTypes";
 
-// Types & Props
 type Chat = Conversation;
 
 type Request = {
@@ -166,7 +161,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
   }, [userId, token]);
 
   useEffect(() => {
-    let unsubscribe: (() => void) | undefined;
     if (selectedChat) {
       const chatDocRef = doc(firestoreDB, "chatRooms", selectedChat.chatID);
       onSnapshot(chatDocRef, (docSnap) => {
@@ -179,12 +173,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         }
       });
     }
-
-    return () => {
-      if (unsubscribe) {
-        unsubscribe();
-      }
-    };
   }, [selectedChat, firestoreDB]);
 
   // Fetch a specific chat if not already in the list
@@ -261,8 +249,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       // Optimistically update UI before fetching latest messages
       const newMessageObj: Message = {
         _id: Date.now().toString(), // Temporary ID
-        sender: "user",
-        senderID: userId,
+        senderId: userId, // Use 'senderId' to match backend
         content: messageContent,
         timestamp: new Date().toISOString(),
       };
@@ -285,7 +272,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }
   };
 
-  // Handle image selection and preview (unchanged)
+  // Handle image selection and preview
   const handleImagePress = async () => {
     try {
       const { status } =
@@ -313,7 +300,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }
   };
 
-  // Upload image to Cloudinary (unchanged)
+  // Upload image to Cloudinary
   const uploadImageToCloudinary = async (uri: string): Promise<string> => {
     setIsUploadingImage(true);
     try {
@@ -525,7 +512,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
             </Text>
             {latestMessage && (
               <View style={styles.lastMessageRow}>
-                {<View style={styles.unreadDot} />}
+                <View style={styles.unreadDot} />
                 <Text style={styles.lastMessage} numberOfLines={1}>
                   {latestMessage.content}
                 </Text>
@@ -537,23 +524,27 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     );
   };
 
+  // Updated renderMessage uses senderId (with lowercase d) for comparison
   const renderMessage = ({ item }: { item: Message }) => {
     const isImageMessage = item.content.startsWith("[Image] ");
     const imageUri = isImageMessage
       ? item.content.replace("[Image] ", "")
       : null;
-    const isUser = item.sender === "user";
+    const isCurrentUser = item.senderId === userId; // Use senderId from backend
+
     return (
       <View
         style={[
           styles.messageContainer,
-          isUser ? styles.myMessageContainer : styles.theirMessageContainer,
+          isCurrentUser
+            ? styles.myMessageContainer
+            : styles.theirMessageContainer,
         ]}
       >
         <View
           style={[
             styles.messageBubble,
-            isUser ? styles.myMessage : styles.theirMessage,
+            isCurrentUser ? styles.myMessage : styles.theirMessage,
           ]}
         >
           {isImageMessage ? (
@@ -566,7 +557,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
             <Text
               style={[
                 styles.messageText,
-                isUser
+                isCurrentUser
                   ? styles.myMessageTextColor
                   : styles.theirMessageTextColor,
               ]}
@@ -577,7 +568,9 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
           <Text
             style={[
               styles.messageTimestamp,
-              isUser ? styles.myTimestampColor : styles.theirTimestampColor,
+              isCurrentUser
+                ? styles.myTimestampColor
+                : styles.theirTimestampColor,
             ]}
           >
             {new Date(item.timestamp).toLocaleTimeString([], {
@@ -1087,7 +1080,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
           </View>
         </Modal>
 
-        {/* Bottom Nav */}
+        {/* Bottom Navigation */}
         <BottomNavBar />
       </SafeAreaView>
     </View>
@@ -1096,7 +1089,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
 
 export default MessagingScreen;
 
-/** Styles */
 const { width } = Dimensions.get("window");
 
 const styles = StyleSheet.create({
@@ -1238,14 +1230,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingVertical: 20,
   },
-
   sectionEmptyText: {
     fontSize: 16,
     color: "#888888",
     textAlign: "center",
     fontFamily: "HelveticaNeue",
   },
-
   requestActions: {
     flexDirection: "row",
     justifyContent: "flex-end",
@@ -1325,25 +1315,23 @@ const styles = StyleSheet.create({
     fontFamily: "HelveticaNeue",
   },
   acceptButton: {
-    backgroundColor: "#4CAF50", // Green color for accept
+    backgroundColor: "#4CAF50",
     padding: 10,
     borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
     marginHorizontal: 5,
   },
-
   rejectButton: {
-    backgroundColor: "#F44336", // Red color for reject
+    backgroundColor: "#F44336",
     padding: 10,
     borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
     marginHorizontal: 5,
   },
-
   buttonDisabled: {
-    backgroundColor: "#888888", // Gray for disabled state
+    backgroundColor: "#888888",
     opacity: 0.5,
   },
   modalSafeArea: {
