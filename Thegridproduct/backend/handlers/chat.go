@@ -840,6 +840,7 @@ func TestSendMessageHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{
-		"message": "Test message added to Firestore successfully",
+		"status": "success",
 	})
+
 }

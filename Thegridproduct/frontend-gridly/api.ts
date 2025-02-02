@@ -41,7 +41,6 @@ export const fetchConversations = async (
   }
 };
 
-// Post a new message
 export const postMessage = async (
   chatId: string,
   message: string,
@@ -49,15 +48,15 @@ export const postMessage = async (
   userId: string
 ): Promise<string> => {
   try {
-    const response = await fetch(`${NGROK_URL}/messages`, {
+    const response = await fetch(`${NGROK_URL}/chat/test-send-message`, {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${token}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        chatId: chatId,
-        senderId: userId, // Make sure `senderId` matches backend expectations
+        chatId: chatId,       // This field is optional if your endpoint doesn't need it in the body
+        senderId: userId,     // Make sure this field matches what your handler expects
         content: message,
       }),
     });
@@ -69,7 +68,7 @@ export const postMessage = async (
     }
 
     const data = await response.json();
-    return data.status; // Ensure backend response has `status` field
+    return data.status; // Ensure your backend returns a 'status' field
   } catch (error) {
     console.error("postMessage error:", error);
     throw new Error(error.message || "Unknown error while sending message");
