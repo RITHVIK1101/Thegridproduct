@@ -292,7 +292,6 @@ func AddMessageHandler(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, map[string]string{"message": "Message sent successfully"}, http.StatusOK)
 }
 
-// GetMessagesHandler retrieves all messages from a chat.
 func GetMessagesHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	chatIDStr, ok := vars["chatId"]
@@ -301,8 +300,9 @@ func GetMessagesHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Initialize Firestore client with credentials
 	ctx := context.Background()
-	client, err := firestore.NewClient(ctx, "gridlychat")
+	client, err := firestore.NewClient(ctx, "gridlychat", option.WithCredentialsJSON(serviceAccountJSON)) // Add credentials here
 	if err != nil {
 		log.Printf("Failed to create Firestore client: %v", err)
 		WriteJSONError(w, "Internal server error", http.StatusInternalServerError)
@@ -310,6 +310,7 @@ func GetMessagesHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer client.Close()
 
+	// Fetch chat room document from Firestore
 	chatDocRef := client.Collection("chatRooms").Doc(chatIDStr)
 	docSnap, err := chatDocRef.Get(ctx)
 	if err != nil {
@@ -318,12 +319,14 @@ func GetMessagesHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Parse messages from Firestore document
 	chatData := docSnap.Data()
 	messages, ok := chatData["messages"].([]interface{})
 	if !ok {
 		messages = []interface{}{}
 	}
 
+	// Return messages as JSON response
 	WriteJSON(w, messages, http.StatusOK)
 }
 
