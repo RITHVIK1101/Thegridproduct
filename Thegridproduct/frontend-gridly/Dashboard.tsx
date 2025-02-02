@@ -11,13 +11,13 @@ import {
   Alert,
   Dimensions,
   FlatList,
-  ScrollView,
   Animated,
   Easing,
   TouchableWithoutFeedback,
   Keyboard,
   Platform,
 } from "react-native";
+import { ScrollView, PanGestureHandler, TapGestureHandler, State as GestureState } from "react-native-gesture-handler";
 import {
   useNavigation,
   CommonActions,
@@ -31,12 +31,6 @@ import BottomNavBar from "./components/BottomNavbar";
 import { NGROK_URL } from "@env";
 import { UserContext } from "./UserContext";
 import { RootStackParamList } from "./navigationTypes";
-// Using react-native-gesture-handler for pan & tap gestures:
-import {
-  PanGestureHandler,
-  TapGestureHandler,
-  State as GestureState,
-} from "react-native-gesture-handler";
 
 type DashboardProps = {
   route: RouteProp<RootStackParamList, "Dashboard">;
@@ -70,6 +64,12 @@ type CartItem = {
   quantity: number;
 };
 
+// NEW: Type for other people's requested products (backend fields: productName and description)
+type RequestedProduct = {
+  productName: string;
+  description: string;
+};
+
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
 
 // -------------------------------------------------------------------
@@ -97,6 +97,9 @@ const Dashboard: React.FC<DashboardProps> = () => {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isDescriptionModalVisible, setIsDescriptionModalVisible] = useState(false);
 
+  // NEW: State for requested products from other users
+  const [requestedProducts, setRequestedProducts] = useState<RequestedProduct[]>([]);
+
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
 
   const categories = [
@@ -119,6 +122,9 @@ const Dashboard: React.FC<DashboardProps> = () => {
   const [cartUpdated, setCartUpdated] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+  // NEW: State to count swipe up gestures
+  const [swipeUpCount, setSwipeUpCount] = useState(0);
 
   // Toast Animations for errors and success (added-to-cart)
   const [errorMessage, setErrorMessage] = useState("");
@@ -511,6 +517,33 @@ const Dashboard: React.FC<DashboardProps> = () => {
     }
   };
 
+  // NEW: Fetch other people's requested products from /requests/all and randomly select up to 10
+  const fetchRequestedProducts = async () => {
+    if (!token) return;
+    try {
+      const response = await fetch(`${NGROK_URL}/requests/all`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      if (!response.ok) {
+        console.error("Error fetching requested products");
+        return;
+      }
+      const data: RequestedProduct[] = await response.json();
+      if (data && data.length > 0) {
+        // Randomize and pick up to 10 items
+        const shuffled = data.sort(() => 0.5 - Math.random());
+        const selected = shuffled.slice(0, 10);
+        setRequestedProducts(selected);
+      }
+    } catch (error) {
+      console.error("Error in fetchRequestedProducts:", error);
+    }
+  };
+
   // Reset current product index when products or category changes.
   useEffect(() => {
     if (allProducts.length > 0) {
@@ -534,6 +567,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
     fetchUserInfo();
     setCurrentIndex(0);
     setCurrentImageIndex(0);
+    fetchRequestedProducts(); // NEW: fetch other people's requested products on load
   }, [campusMode]);
 
   useFocusEffect(
@@ -547,6 +581,16 @@ const Dashboard: React.FC<DashboardProps> = () => {
   // Simplified “next product” function.
   const goToNextProduct = () => {
     setIsDescriptionModalVisible(false);
+    // Increment swipe up count and every 3 swipes, re-fetch requested products.
+    setSwipeUpCount((prev) => {
+      const newCount = prev + 1;
+      if (newCount === 3) {
+        fetchRequestedProducts();
+        return 0;
+      }
+      return newCount;
+    });
+
     if (currentIndex < filteredProducts.length - 1) {
       setCurrentIndex(currentIndex + 1);
       setCurrentImageIndex(0);
@@ -835,6 +879,35 @@ const Dashboard: React.FC<DashboardProps> = () => {
               <Ionicons name="options-outline" size={22} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
+
+          {/* NEW: Requested Products Stories Section (no outer container background) */}
+          {requestedProducts.length > 0 && (
+            <View style={styles.requestedStoriesContainer}>
+              <View style={styles.requestedHeader}>
+                <Text style={styles.requestedLabel}>Requested Products</Text>
+                <TouchableOpacity
+                  style={styles.viewAllButton}
+                  onPress={() => Alert.alert("View All", "This will route to a full list soon.")}
+                  accessibilityLabel="View All Requested Products"
+                >
+                  <Text style={styles.viewAllText}>View All</Text>
+                </TouchableOpacity>
+              </View>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.requestedScrollView}
+                contentContainerStyle={styles.requestedScrollContent}
+              >
+                {requestedProducts.map((req, idx) => (
+                  <View key={idx} style={styles.storyItem}>
+                    <Text style={styles.storyText}>{req.productName}</Text>
+                  </View>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
           {error ? (
             <View style={styles.errorContainer}>
               <Text style={styles.errorText}>{error}</Text>
@@ -1087,7 +1160,6 @@ const styles = StyleSheet.create({
     left: 20,
     zIndex: 10,
   },
-  // Updated filter button container: removed the grey background
   topBarIconContainer: {
     padding: 6,
     backgroundColor: "transparent",
@@ -1324,5 +1396,59 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 14,
     marginBottom: 4,
+  },
+  // NEW: Styles for the requested products "stories" section
+  requestedStoriesContainer: {
+    position: "absolute",
+    top: PRODUCT_HEIGHT / 2 - 280, // shifted up slightly more
+    left: 0,
+    right: 0,
+    paddingHorizontal: 10,
+    zIndex: 11,
+    // No background color here, so the image remains visible
+  },
+  requestedHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 4,
+    paddingHorizontal: 4,
+  },
+  requestedLabel: {
+    color: "#FFFFFF",
+    fontSize: 10,
+    fontWeight: "bold",
+  },
+  viewAllButton: {
+    padding: 4,
+  },
+  viewAllText: {
+    color: "#FFFFFF",
+    fontSize: 10,
+    fontWeight: "bold",
+  },
+  // Updated storyItem: individual bubble for product names
+  storyItem: {
+    backgroundColor: "rgba(0,0,0,0.5)", // semi-transparent dark bubble
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    marginRight: 8,
+  },
+  storyText: {
+    color: "#FFFFFF",
+    fontSize: 10,
+    fontWeight: "bold",
+    textAlign: "center",
+  },
+  // Ensure horizontal scrolling content container style is applied
+  requestedScrollContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 4,
+  },
+  // Added style for the ScrollView itself
+  requestedScrollView: {
+    height: 40,
   },
 });
