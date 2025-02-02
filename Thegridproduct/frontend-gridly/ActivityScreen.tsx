@@ -295,6 +295,7 @@ const ActivityScreen: React.FC = () => {
       Alert.alert("Error", "You are not authenticated.");
       return;
     }
+
     try {
       const response = await fetch(`${NGROK_URL}/requests/${requestId}`, {
         method: "DELETE",
@@ -304,11 +305,25 @@ const ActivityScreen: React.FC = () => {
         },
       });
 
-      if (!response.ok) {
-        const text = await response.text();
-        throw new Error(`Unexpected response: ${response.status} ${text}`);
+      // Handle non-JSON responses gracefully
+      const contentType = response.headers.get("content-type");
+      let responseData;
+      if (contentType && contentType.includes("application/json")) {
+        responseData = await response.json();
+      } else {
+        responseData = { error: await response.text() };
       }
 
+      if (!response.ok) {
+        console.error("Delete request failed:", responseData);
+        Alert.alert(
+          "Error",
+          responseData.error || "Failed to remove the requested product."
+        );
+        return;
+      }
+
+      // Remove the deleted request from state
       setRequestedProducts((prev) =>
         prev.filter((req) => req.id !== requestId)
       );
@@ -316,17 +331,15 @@ const ActivityScreen: React.FC = () => {
         prev.filter((req) => req.id !== requestId)
       );
 
-      // ✅ Refresh the list after deletion
-      fetchData();
+      // ✅ Refetch the list after deletion
+      fetchUserRequestedProducts();
 
       Alert.alert("Success", "Requested product removed successfully.");
     } catch (error) {
       console.error("Error removing requested product:", error);
       Alert.alert(
         "Error",
-        error instanceof Error
-          ? error.message
-          : "An unexpected error occurred while removing the requested product."
+        error instanceof Error ? error.message : "An unexpected error occurred."
       );
     }
   };

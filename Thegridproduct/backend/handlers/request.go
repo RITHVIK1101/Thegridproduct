@@ -10,8 +10,10 @@ import (
 	"Thegridproduct/backend/db"
 	"Thegridproduct/backend/models"
 
+	"github.com/gorilla/mux"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 // CreateProductRequestHandler handles the creation of a new product request.
@@ -158,7 +160,7 @@ func GetAllOtherProductRequestsHandler(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, productRequests, http.StatusOK)
 }
 
-// DeleteProductRequestHandler deletes a product request by ID, ensuring only the owner can delete it.
+// DeleteProductRequestHandler deletes a product request by ID
 func DeleteProductRequestHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -167,61 +169,72 @@ func DeleteProductRequestHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userId, ok := r.Context().Value(userIDKey).(string)
-	if !ok || userId == "" {
+	// Retrieve authenticated user ID from context
+	userID, ok := r.Context().Value(userIDKey).(string)
+	if !ok || userID == "" {
 		WriteJSONError(w, "User not authenticated", http.StatusUnauthorized)
 		return
 	}
 
-	userObjID, err := primitive.ObjectIDFromHex(userId)
+	userObjID, err := primitive.ObjectIDFromHex(userID)
 	if err != nil {
-		WriteJSONError(w, "Invalid user ID format", http.StatusBadRequest)
+		WriteJSONError(w, "Invalid user ID", http.StatusBadRequest)
 		return
 	}
 
-	var req struct {
-		RequestID string `json:"requestId"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		WriteJSONError(w, "Invalid request payload", http.StatusBadRequest)
-		return
-	}
-	if req.RequestID == "" {
+	// Extract request ID from URL parameters
+	vars := mux.Vars(r)
+	requestID, exists := vars["id"]
+	if !exists || requestID == "" {
 		WriteJSONError(w, "Request ID is required", http.StatusBadRequest)
 		return
 	}
 
-	requestObjID, err := primitive.ObjectIDFromHex(req.RequestID)
+	requestObjID, err := primitive.ObjectIDFromHex(requestID)
 	if err != nil {
 		WriteJSONError(w, "Invalid request ID format", http.StatusBadRequest)
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	collection := db.GetCollection("gridlyapp", "product_requests")
 
-	// Check if the request exists and belongs to the user
+	// Check if the product request exists and belongs to the user
 	var existingRequest models.ProductRequest
-	err = collection.FindOne(ctx, bson.M{"_id": requestObjID, "userId": userObjID}).Decode(&existingRequest)
+	err = collection.FindOne(ctx, bson.M{"_id": requestObjID}).Decode(&existingRequest)
 	if err != nil {
-		if err.Error() == "mongo: no documents in result" {
-			WriteJSONError(w, "Product request not found or unauthorized", http.StatusNotFound)
+		if err == mongo.ErrNoDocuments {
+			WriteJSONError(w, "Product request not found", http.StatusNotFound)
 			return
 		}
-		log.Printf("Error finding product request: %v", err)
-		WriteJSONError(w, "Error finding product request", http.StatusInternalServerError)
+		log.Printf("Error fetching product request: %v", err)
+		WriteJSONError(w, "Error fetching product request", http.StatusInternalServerError)
 		return
 	}
 
-	// Delete the request
-	_, err = collection.DeleteOne(ctx, bson.M{"_id": requestObjID})
+	// Ensure the authenticated user is the owner of the request
+	if existingRequest.UserID != userObjID {
+		WriteJSONError(w, "Unauthorized to delete this product request", http.StatusUnauthorized)
+		return
+	}
+
+	// Delete the product request
+	deleteResult, err := collection.DeleteOne(ctx, bson.M{"_id": requestObjID})
 	if err != nil {
 		log.Printf("Error deleting product request: %v", err)
 		WriteJSONError(w, "Error deleting product request", http.StatusInternalServerError)
 		return
 	}
 
-	WriteJSON(w, map[string]string{"message": "Product request deleted successfully"}, http.StatusOK)
+	if deleteResult.DeletedCount == 0 {
+		WriteJSONError(w, "Product request not found or already deleted", http.StatusNotFound)
+		return
+	}
+
+	// Respond with success message
+	json.NewEncoder(w).Encode(map[string]string{
+		"message": "Product request deleted successfully",
+	})
 }
