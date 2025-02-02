@@ -119,7 +119,6 @@ func GetChatHandler(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, enrichedChat, http.StatusOK)
 }
 
-// GetChatsByUserHandler fetches all chats for a specific user.
 func GetChatsByUserHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	userIDStr := vars["userId"]
@@ -135,9 +134,9 @@ func GetChatsByUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Initialize Firestore client
+	// Initialize Firestore client with credentials
 	ctx := context.Background()
-	client, err := firestore.NewClient(ctx, "gridlychat")
+	client, err := firestore.NewClient(ctx, "gridlychat", option.WithCredentialsJSON(serviceAccountJSON)) // Add credentials here
 	if err != nil {
 		log.Printf("Failed to create Firestore client: %v", err)
 		WriteJSONError(w, "Internal server error", http.StatusInternalServerError)
@@ -169,24 +168,27 @@ func GetChatsByUserHandler(w http.ResponseWriter, r *http.Request) {
 		// Fetch messages from Firestore
 		chatDocRef := client.Collection("chatRooms").Doc(c.ID.Hex())
 		docSnap, err := chatDocRef.Get(ctx)
-		var messages []interface{}
-		if err == nil {
-			if err := docSnap.DataTo(&messages); err != nil {
-				log.Printf("Failed to parse Firestore chat messages: %v", err)
-			}
-		} else {
-			log.Printf("No Firestore chat found for chatID %s", c.ID.Hex())
+		if err != nil {
+			log.Printf("No Firestore chat found for chatID %s: %v", c.ID.Hex(), err)
+			continue
 		}
 
-		// Convert messages from Firestore to []models.Message
-		var convertedMessages []models.Message
-		for _, msg := range messages {
+		// Parse Firestore messages
+		var messages []models.Message
+		messagesData, ok := docSnap.Data()["messages"].([]interface{})
+		if !ok {
+			log.Printf("Failed to parse messages for chatID %s", c.ID.Hex())
+			continue
+		}
+
+		for _, msg := range messagesData {
 			msgMap, ok := msg.(map[string]interface{})
 			if !ok {
 				log.Println("Skipping message due to type mismatch")
 				continue
 			}
 
+			// Parse the timestamp
 			timestampStr, ok := msgMap["timestamp"].(string)
 			if !ok {
 				log.Println("Skipping message due to missing timestamp")
@@ -199,16 +201,17 @@ func GetChatsByUserHandler(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 
+			// Create a Message struct
 			message := models.Message{
 				ID:        msgMap["_id"].(string),
 				SenderID:  msgMap["senderId"].(string),
 				Content:   msgMap["content"].(string),
 				Timestamp: parsedTime,
 			}
-			convertedMessages = append(convertedMessages, message)
+			messages = append(messages, message)
 		}
 
-		latestMessage, latestTimestamp := getLatestMessageAndTimestamp(convertedMessages)
+		latestMessage, latestTimestamp := getLatestMessageAndTimestamp(messages)
 
 		enrichedChat := EnrichedChat{
 			ChatID:          c.ID.Hex(),
