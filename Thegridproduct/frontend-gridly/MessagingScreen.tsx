@@ -48,6 +48,7 @@ import { RootStackParamList } from "./navigationTypes";
 
 type Chat = Conversation & {
   latestSenderId?: string;
+  unreadCount?: number;
 };
 
 type Request = {
@@ -242,11 +243,9 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
 
   // ─── REALTIME LISTENER FOR CHAT LIST (when not in an open chat) ─────
   // This effect subscribes to all chats in the current list so that if a new message arrives,
-  // the chat’s latest message is updated and the chat is re-sorted to the top.
+  // the chat’s latest message and unread count are updated and the chat is re-sorted to the top.
   useEffect(() => {
-    // Only run if we are in the chats list (i.e. no chat modal open) and we have chats
     if (!isChatModalVisible && chats.length > 0) {
-      // Using the documentId() in a query; note: Firestore "in" queries support up to 10 items.
       const chatIDs = chats.map((chat) => chat.chatID);
       const q = query(
         collection(firestoreDB, "chatRooms"),
@@ -257,6 +256,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
           const data = docSnap.data();
           if (data.messages) {
             const lastMessage = data.messages[data.messages.length - 1];
+            // Immediately update chat info (latest message details)
             setChats((prevChats) =>
               prevChats
                 .map((chat) => {
@@ -276,12 +276,28 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                   return bTime - aTime;
                 })
             );
+            // Asynchronously update unread count for this chat
+            (async () => {
+              try {
+                const lastReadStr = await AsyncStorage.getItem(`last_read_${docSnap.id}`);
+                const lastRead = lastReadStr ? new Date(lastReadStr).getTime() : 0;
+                const unreadCount = data.messages.filter(
+                  (msg: Message) => new Date(msg.timestamp).getTime() > lastRead
+                ).length;
+                setChats((prevChats) =>
+                  prevChats.map((chat) =>
+                    chat.chatID === docSnap.id ? { ...chat, unreadCount } : chat
+                  )
+                );
+              } catch (e) {
+                console.error("Error computing unread count for chat", docSnap.id, e);
+              }
+            })();
           }
         });
       });
       return () => unsubscribe();
     }
-  // We depend on whether the chat modal is open and on the current chat IDs.
   }, [isChatModalVisible, firestoreDB, chats.map((chat) => chat.chatID).join(",")]);
 
   const fetchSpecificChat = async (chatId: string) => {
@@ -324,7 +340,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }
   };
 
-  // ─── HANDLE BACK FROM CHAT: SAVE THE LAST MESSAGE PERSISTENTLY ─────
+  // ─── HANDLE BACK FROM CHAT: SAVE THE LAST MESSAGE PERSISTENTLY & LAST READ TIME ─────
   const handleBackFromChat = async () => {
     if (selectedChat) {
       const messages = selectedChat.messages;
@@ -344,8 +360,12 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
             latestSenderId: updatedChat.latestSenderId,
           })
         );
+        // Save the timestamp of the last read message for this chat
+        if (lastMsg && lastMsg.timestamp) {
+          await AsyncStorage.setItem(`last_read_${selectedChat.chatID}`, lastMsg.timestamp);
+        }
       } catch (e) {
-        console.error("Error saving last message:", e);
+        console.error("Error saving last message or read time:", e);
       }
       setChats((prevChats) =>
         prevChats
@@ -612,7 +632,14 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
               <Text style={styles.chatName} numberOfLines={1}>
                 {item.user.firstName} {item.user.lastName}
               </Text>
-              <Text style={styles.chatTime}>{formattedTimestamp}</Text>
+              <View style={styles.timeContainer}>
+                <Text style={styles.chatTime}>{formattedTimestamp}</Text>
+                {(item.unreadCount && item.unreadCount > 0) ? (
+                  <View style={styles.unreadBadge}>
+                    <Text style={styles.unreadBadgeText}>{item.unreadCount}</Text>
+                  </View>
+                ) : null}
+              </View>
             </View>
             <Text style={styles.chatProductName} numberOfLines={1}>
               {item.productTitle ? item.productTitle : "Job"}
@@ -1311,6 +1338,10 @@ const styles = StyleSheet.create({
   chatDetails: { flex: 1, flexDirection: "column" },
   chatHeaderRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" },
   chatName: { fontSize: 16, fontWeight: "600", color: "#FFFFFF", fontFamily: "HelveticaNeue-Medium", flex: 1, marginRight: 10 },
+  timeContainer: { 
+    position: "relative", 
+    alignItems: "flex-end" 
+  },
   chatTime: { fontSize: 12, color: "#AAAAAA", fontFamily: "HelveticaNeue" },
   chatProductName: { fontSize: 13, color: "#BBBBBB", fontFamily: "HelveticaNeue", marginTop: 2, marginBottom: 3 },
   lastMessageRow: { flexDirection: "row", alignItems: "center", marginTop: 2 },
@@ -1451,4 +1482,22 @@ const styles = StyleSheet.create({
   popupText: { color: "#FFFFFF", fontSize: 16, marginBottom: 10 },
   popupButton: { backgroundColor: "#BB86FC", paddingHorizontal: 20, paddingVertical: 8, borderRadius: 6 },
   popupButtonText: { color: "#000", fontSize: 16, fontWeight: "bold" },
+  // Updated unread badge style: absolutely positioned underneath the time text
+  unreadBadge: {
+    position: "absolute",
+    top: 22, // Moves the badge slightly lower
+    backgroundColor: "#FFFFFF", // White background for the bubble
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    alignSelf: "center", // Ensures it stays centered under the time text
+  },
+  
+  unreadBadgeText: {
+    color: "#000000", // Black text for the number
+    fontSize: 10,
+    fontWeight: "bold",
+    textAlign: "center",
+  },
+  
 });
