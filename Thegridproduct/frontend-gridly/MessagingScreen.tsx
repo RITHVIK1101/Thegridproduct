@@ -20,6 +20,7 @@ import {
   TouchableOpacity,
   Animated,
   Easing,
+  Keyboard,
 } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import BottomNavBar from "./components/BottomNavbar";
@@ -94,19 +95,15 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
 
   // Report Modal State
   const [reportModalVisible, setReportModalVisible] = useState<boolean>(false);
-  const [reportReason, setReportReason] = useState<string>(
-    "Inappropriate Behavior"
-  ); // Default reason
+  // Update default reason to "Select a Reason"
+  const [reportReason, setReportReason] = useState<string>("Select a Reason");
   const [customReason, setCustomReason] = useState<string>(""); // Custom reason if "Other" is selected
   const [reportDescription, setReportDescription] = useState<string>("");
-  // Predefined reasons
-  const reportReasons = [
-    "Inappropriate Behavior",
-    "Fraudulent Activity",
-    "Harassment",
-    "Scamming",
-    "Other",
-  ];
+
+  // New state for our custom dropdown overlay, incomplete details popup, and submission loading
+  const [isReasonDropdownVisible, setIsReasonDropdownVisible] = useState<boolean>(false);
+  const [isIncompletePopupVisible, setIsIncompletePopupVisible] = useState<boolean>(false);
+  const [isSubmittingReport, setIsSubmittingReport] = useState<boolean>(false);
 
   // Report Success Popup State
   const [isReportSuccessModalVisible, setIsReportSuccessModalVisible] =
@@ -133,6 +130,15 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
   const slideAnim = useRef(
     new Animated.Value(Dimensions.get("window").height)
   ).current;
+
+  // Dropdown reasons list
+  const reasons = [
+    "Inappropriate Behavior",
+    "Fraudulent Activity",
+    "Harassment",
+    "Scamming",
+    "Other",
+  ];
 
   // Chat Filtering Logic
   const applyFilter = (
@@ -630,42 +636,38 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }, 300);
   };
 
-  const handleReportSubmit = async () => {
-    if (!selectedChat) {
-      Alert.alert("Error", "No chat selected for reporting.");
+  // Modified submit handler with custom popup and submission loader
+  const handleModifiedReportSubmit = async () => {
+    if (
+      reportReason === "Select a Reason" ||
+      !reportDescription.trim() ||
+      (reportReason === "Other" && !customReason.trim())
+    ) {
+      setIsIncompletePopupVisible(true);
       return;
     }
+    setIsSubmittingReport(true);
 
     // Get the reported user's ID from chat messages
-    const reportedUserId = selectedChat.messages?.find(
+    const reportedUserId = selectedChat?.messages?.find(
       (msg) => msg.senderId !== userId
     )?.senderId;
 
-    if (!reportedUserId) {
-      Alert.alert("Error", "Could not determine the user ID to report.");
+    if (!selectedChat || !reportedUserId) {
+      setIsSubmittingReport(false);
+      setIsIncompletePopupVisible(true);
       return;
     }
 
-    if (!reportDescription.trim()) {
-      Alert.alert("Error", "Please enter a description.");
-      return;
-    }
-
-    const finalReason =
-      reportReason === "Other" ? customReason.trim() : reportReason;
-
-    if (!finalReason) {
-      Alert.alert("Error", "Please enter a reason for reporting.");
-      return;
-    }
+    const finalReason = reportReason === "Other" ? customReason.trim() : reportReason;
 
     try {
       const response = await axios.post(
         `${NGROK_URL}/report`,
         {
           chatId: selectedChat.chatID,
-          reporterUserId: userId, // Current user
-          reportedUserId, // Extracted senderId of the other person
+          reporterUserId: userId,
+          reportedUserId,
           reason: finalReason,
           description: reportDescription.trim(),
         },
@@ -680,15 +682,18 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       if (response.status === 200) {
         setReportModalVisible(false);
         setIsReportSuccessModalVisible(true);
+        // Stay visible for 3500ms instead of 1500ms
         setTimeout(() => {
           setIsReportSuccessModalVisible(false);
-        }, 1500);
+        }, 3500);
       } else {
         throw new Error("Failed to submit report");
       }
     } catch (error) {
       console.error("Error submitting report:", error);
-      Alert.alert("Error", "Failed to submit report.");
+      setIsIncompletePopupVisible(true);
+    } finally {
+      setIsSubmittingReport(false);
     }
   };
 
@@ -1085,6 +1090,8 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                       onChangeText={setNewMessage}
                       multiline
                       accessibilityLabel="Message Input"
+                      blurOnSubmit
+                      onSubmitEditing={Keyboard.dismiss}
                     />
                     <Pressable
                       style={styles.sendButton}
@@ -1151,15 +1158,18 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
           </View>
         </Modal>
 
-        {/* Report Modal */}
+        {/* Updated Report Modal with Clickable Dropdown using absolute positioned overlay */}
         <Modal
           visible={reportModalVisible}
           animationType="slide"
           transparent={false}
           onRequestClose={() => setReportModalVisible(false)}
         >
-          <View style={[styles.modalSafeArea, { backgroundColor: "#000" }]}>
-            <SafeAreaView style={{ flex: 1 }}>
+          <KeyboardAvoidingView
+            style={{ flex: 1, backgroundColor: "#000" }}
+            behavior={Platform.OS === "ios" ? "padding" : undefined}
+          >
+            <SafeAreaView style={{ flex: 1, padding: 20 }}>
               <View style={styles.enhancedChatHeader}>
                 <Pressable
                   onPress={() => setReportModalVisible(false)}
@@ -1175,45 +1185,69 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
               </View>
 
               <View style={styles.reportContent}>
-                <Text style={styles.reportLabel}>Reason for Report:</Text>
-                {reportReasons.map((reason) => (
-                  <Pressable
-                    key={reason}
-                    style={[
-                      styles.reasonOption,
-                      reportReason === reason && styles.selectedReason,
-                    ]}
-                    onPress={() => setReportReason(reason)}
+                <Text style={styles.reportLabel}>Select Reason:</Text>
+                {/* Clickable dropdown */}
+                <Pressable
+                  style={styles.dropdownContainer}
+                  onPress={() => setIsReasonDropdownVisible(true)}
+                >
+                  <Text
+                    style={
+                      reportReason === "Select a Reason"
+                        ? styles.dropdownPlaceholderText
+                        : styles.dropdownSelectedText
+                    }
                   >
-                    <Text
-                      style={[
-                        styles.reasonText,
-                        reportReason === reason && styles.selectedReasonText,
-                      ]}
-                    >
-                      {reason}
-                    </Text>
-                  </Pressable>
-                ))}
-
+                    {reportReason}
+                  </Text>
+                  <Ionicons
+                    name="chevron-down"
+                    size={16}
+                    color="#FFFFFF"
+                    style={styles.dropdownIcon}
+                  />
+                </Pressable>
+                {/* Instead of using a Modal for dropdown, render an absolute overlay */}
+                {isReasonDropdownVisible && (
+                  <View style={styles.dropdownAbsoluteOverlay}>
+                    <View style={styles.dropdownAbsoluteContainer}>
+                      {reasons.map((reason) => (
+                        <Pressable
+                          key={reason}
+                          style={styles.dropdownOption}
+                          onPress={() => {
+                            setReportReason(reason);
+                            setIsReasonDropdownVisible(false);
+                          }}
+                        >
+                          <Text style={styles.dropdownOptionText}>{reason}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </View>
+                )}
                 {reportReason === "Other" && (
                   <TextInput
-                    style={[styles.reportInput, { height: 40 }]}
+                    style={styles.otherReasonInput}
                     placeholder="Enter your reason..."
                     placeholderTextColor="#888"
                     value={customReason}
                     onChangeText={setCustomReason}
+                    blurOnSubmit
+                    onSubmitEditing={Keyboard.dismiss}
                   />
                 )}
 
                 <Text style={styles.reportLabel}>Description:</Text>
                 <TextInput
-                  style={[styles.reportInput, { height: 150 }]}
+                  style={styles.reportDescriptionInput}
                   placeholder="Describe the issue..."
                   placeholderTextColor="#888"
                   value={reportDescription}
                   onChangeText={setReportDescription}
                   multiline
+                  blurOnSubmit
+                  onSubmitEditing={Keyboard.dismiss}
                 />
 
                 <Text style={styles.reportInfoText}>
@@ -1221,13 +1255,18 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                 </Text>
                 <Pressable
                   style={styles.reportSubmitButton}
-                  onPress={handleReportSubmit}
+                  onPress={handleModifiedReportSubmit}
+                  disabled={isSubmittingReport}
                 >
-                  <Text style={styles.reportSubmitButtonText}>Submit</Text>
+                  {isSubmittingReport ? (
+                    <ActivityIndicator color="#000" size="small" />
+                  ) : (
+                    <Text style={styles.reportSubmitButtonText}>Submit</Text>
+                  )}
                 </Pressable>
               </View>
             </SafeAreaView>
-          </View>
+          </KeyboardAvoidingView>
         </Modal>
 
         {/* Report Success Modal */}
@@ -1242,6 +1281,26 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
               <Text style={styles.modalText}>
                 Report Submitted Successfully!
               </Text>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Custom Incomplete Details Popup */}
+        <Modal
+          transparent
+          visible={isIncompletePopupVisible}
+          animationType="fade"
+          onRequestClose={() => setIsIncompletePopupVisible(false)}
+        >
+          <View style={styles.popupOverlay}>
+            <View style={styles.popupContainer}>
+              <Text style={styles.popupText}>Please fill in all details.</Text>
+              <Pressable
+                style={styles.popupButton}
+                onPress={() => setIsIncompletePopupVisible(false)}
+              >
+                <Text style={styles.popupButtonText}>OK</Text>
+              </Pressable>
             </View>
           </View>
         </Modal>
@@ -1424,28 +1483,6 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     marginBottom: 8,
     fontFamily: "HelveticaNeue-Medium",
-  },
-  reasonOption: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#222",
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-    borderRadius: 8,
-    marginVertical: 5,
-  },
-  selectedReason: {
-    backgroundColor: "#BB86FC", // Highlight selected reason
-  },
-  reasonText: {
-    fontSize: 14,
-    color: "#FFFFFF",
-    fontFamily: "HelveticaNeue",
-    marginLeft: 10,
-  },
-  selectedReasonText: {
-    color: "#000", // Different text color when selected
-    fontWeight: "bold",
   },
   chatDetails: {
     flex: 1,
@@ -1822,12 +1859,70 @@ const styles = StyleSheet.create({
     padding: 20,
     backgroundColor: "#000",
   },
-  reportInput: {
+  // Dropdown and popup styles for the report modal
+  dropdownContainer: {
+    backgroundColor: "#1E1E1E",
+    borderWidth: 1,
+    borderColor: "#555",
+    borderRadius: 6,
+    height: 40,
+    justifyContent: "center",
+    paddingHorizontal: 10,
+    marginBottom: 8,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  dropdownPlaceholderText: {
+    color: "#888",
+    fontSize: 14,
+  },
+  dropdownSelectedText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "bold",
+  },
+  dropdownIcon: {
+    marginLeft: "auto",
+  },
+  // Instead of a modal for the dropdown, we use an absolutely positioned overlay
+  dropdownAbsoluteOverlay: {
+    position: "absolute",
+    top: 60,
+    left: 0,
+    right: 0,
+    backgroundColor: "transparent",
+    zIndex: 10,
+  },
+  dropdownAbsoluteContainer: {
+    backgroundColor: "#1E1E1E",
+    marginHorizontal: 20,
+    borderRadius: 8,
+  },
+  dropdownOption: {
+    paddingVertical: 12,
+    paddingHorizontal: 15,
+  },
+  dropdownOptionText: {
+    color: "#FFFFFF",
+    fontWeight: "bold",
+    fontSize: 16,
+  },
+  otherReasonInput: {
+    backgroundColor: "#333",
+    color: "#fff",
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    height: 40,
+    marginBottom: 10,
+    fontFamily: "HelveticaNeue",
+    fontSize: 14,
+  },
+  reportDescriptionInput: {
     backgroundColor: "#333",
     color: "#fff",
     borderRadius: 6,
     padding: 15,
-    minHeight: 150,
+    minHeight: 80,
     textAlignVertical: "top",
     marginBottom: 15,
     fontFamily: "HelveticaNeue",
@@ -1867,5 +1962,33 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "600",
     color: "#fff",
+  },
+  popupOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  popupContainer: {
+    backgroundColor: "#1E1E1E",
+    padding: 20,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  popupText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    marginBottom: 10,
+  },
+  popupButton: {
+    backgroundColor: "#BB86FC",
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 6,
+  },
+  popupButtonText: {
+    color: "#000",
+    fontSize: 16,
+    fontWeight: "bold",
   },
 });
