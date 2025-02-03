@@ -423,7 +423,7 @@ func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// If chat count reaches 3, mark the product as "talks"
-		if updatedProduct.ChatCount >= 3 && updatedProduct.Status != "talks" {
+		if updatedProduct.ChatCount >= 5 && updatedProduct.Status != "talks" {
 			_, err = productsCol.UpdateOne(
 				sessCtx,
 				bson.M{"_id": productObjectID},

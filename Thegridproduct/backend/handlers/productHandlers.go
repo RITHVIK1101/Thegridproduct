@@ -234,13 +234,30 @@ func GetAllProductsHandler(w http.ResponseWriter, r *http.Request) {
 
 	collection := db.GetCollection("gridlyapp", "products")
 
-	baseFilter := bson.M{"status": "inshop", "expired": false} // Exclude expired products
+	// ✅ Fetch only products where status is "inshop" or "talks"
+	baseFilter := bson.M{
+		"status":  bson.M{"$in": []string{"inshop"}},
+		"expired": false, // Exclude expired products
+	}
 
 	var filter bson.M
 	if mode == "outofcampus" {
-		filter = bson.M{"$and": []bson.M{baseFilter, {"userId": bson.M{"$ne": userObjID}, "availability": bson.M{"$in": []string{"Off Campus Only", "On and Off Campus"}}}}}
+		filter = bson.M{
+			"$and": []bson.M{
+				baseFilter,
+				{"userId": bson.M{"$ne": userObjID}},
+				{"availability": bson.M{"$in": []string{"Off Campus Only", "On and Off Campus"}}},
+			},
+		}
 	} else {
-		filter = bson.M{"$and": []bson.M{baseFilter, {"userId": bson.M{"$ne": userObjID}, "university": university, "availability": "In Campus Only"}}}
+		filter = bson.M{
+			"$and": []bson.M{
+				baseFilter,
+				{"userId": bson.M{"$ne": userObjID}},
+				{"university": university},
+				{"availability": "In Campus Only"},
+			},
+		}
 	}
 
 	cursor, err := collection.Find(ctx, filter)

@@ -191,13 +191,10 @@ func updateExpiredGigs() {
 
 	collection := db.GetCollection("gridlyapp", "gigs")
 
-	// Find all gigs where expirationDate has passed but expired is still false
 	filter := bson.M{
 		"expirationDate": bson.M{"$lt": time.Now()},
 		"expired":        false,
 	}
-
-	// Update expired field to true
 	update := bson.M{
 		"$set": bson.M{"expired": true},
 	}
@@ -234,10 +231,6 @@ func SearchGigsHandler(w http.ResponseWriter, r *http.Request) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-
-	// --------------------------------------------------------------------------
-	// 1) Refine the query using GPT
-	// --------------------------------------------------------------------------
 	refinedQuery, err := RefineQueryWithPrompt(cleanedQuery)
 	if err != nil {
 		log.Printf("Error refining query with GPT: %v", err)
@@ -246,12 +239,6 @@ func SearchGigsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Printf("Refined Query from GPT: %s", refinedQuery)
-
-	// --------------------------------------------------------------------------
-	// 2) Optional: Check for specific keywords to build a partial MongoDB filter
-	//    e.g. if user says "open to communication" or "30 dollars an hour"
-	//    or "non-academic" to exclude academic gigs
-	// --------------------------------------------------------------------------
 	filter := bson.M{"embeddings": bson.M{"$exists": true}}
 
 	lowerRefined := strings.ToLower(refinedQuery)
@@ -265,33 +252,20 @@ func SearchGigsHandler(w http.ResponseWriter, r *http.Request) {
 
 	if strings.Contains(lowerRefined, "30 dollars an hour") ||
 		strings.Contains(lowerRefined, "$30/hour") {
-		// If you want to specifically show gigs priced at "30 dollars an hour"
-		// You can also handle numeric conversion if your DB stores numeric prices.
-		// This is just an example of direct equality.
 		filter["price"] = "30 dollars an hour"
 	}
 
 	// EXCLUDE "academic" gigs if user specifically said "non-academic"
 	if strings.Contains(lowerRefined, "non academic") ||
 		strings.Contains(lowerRefined, "non-academic") {
-		// Example approach: exclude gigs whose category is "Academic" or "Tutoring"
-		// Adjust to your actual DB fields
 		filter["category"] = bson.M{"$ne": "Academic"}
 	}
-
-	// --------------------------------------------------------------------------
-	// 3) Generate embedding for the refined query
-	// --------------------------------------------------------------------------
 	queryEmbedding, err := embeddings.GetEmbeddingForText(ctx, refinedQuery)
 	if err != nil {
 		log.Printf("Error generating query embedding: %v", err)
 		WriteJSONError(w, "Error generating query embedding", http.StatusInternalServerError)
 		return
 	}
-
-	// --------------------------------------------------------------------------
-	// 4) Fetch relevant gigs from MongoDB with the partial filter
-	// --------------------------------------------------------------------------
 	collection := db.GetCollection("gridlyapp", "gigs")
 	cursor, err := collection.Find(
 		ctx,
@@ -329,9 +303,6 @@ func SearchGigsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// --------------------------------------------------------------------------
-	// 5) Calculate cosine similarity and match gigs
-	// --------------------------------------------------------------------------
 	type GigMatch struct {
 		ID          primitive.ObjectID `json:"id"`
 		Title       string             `json:"title"`
@@ -345,7 +316,6 @@ func SearchGigsHandler(w http.ResponseWriter, r *http.Request) {
 	for _, gig := range gigs {
 		similarity := computeCosineSimilarity(queryEmbedding, gig.Embeddings)
 
-		// Use a similarity threshold (adjust to your preference)
 		if similarity >= 0.8 {
 			matches = append(matches, GigMatch{
 				ID:          gig.ID,
@@ -384,17 +354,9 @@ func SearchGigsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// --------------------------------------------------------------------------
-	// 7) Return the matched gigs
-	// --------------------------------------------------------------------------
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(matches)
 }
-
-// --------------------------------------------------------------------------
-// RefineQueryWithPrompt refines the user query using GPT
-// Adjust the system prompt and API usage as needed.
-// --------------------------------------------------------------------------
 func RefineQueryWithPrompt(userQuery string) (string, error) {
 	client := openai.NewClient(os.Getenv("OPENAI_API_KEY"))
 
