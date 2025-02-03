@@ -497,15 +497,58 @@ func GetAllGigsHandler(w http.ResponseWriter, r *http.Request) {
 	// ✅ Ensure expired gigs are updated before fetching
 	updateExpiredGigs()
 
+	// 🔥 Retrieve authenticated user details
+	userId, ok := r.Context().Value(userIDKey).(string)
+	if !ok || userId == "" {
+		WriteJSONError(w, "User not authenticated", http.StatusUnauthorized)
+		return
+	}
+
+	userObjID, err := primitive.ObjectIDFromHex(userId)
+	if err != nil {
+		WriteJSONError(w, "Invalid user ID format", http.StatusBadRequest)
+		return
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
+	// 🔥 Fetch the user's institution from university_users or high_school_users
+	userCollection := db.GetCollection("gridlyapp", "university_users")
+	var user models.User
+	err = userCollection.FindOne(ctx, bson.M{"_id": userObjID}).Decode(&user)
+
+	if err == mongo.ErrNoDocuments {
+		userCollection = db.GetCollection("gridlyapp", "high_school_users")
+		err = userCollection.FindOne(ctx, bson.M{"_id": userObjID}).Decode(&user)
+	}
+
+	// 🚨 If user not found in both collections, return error
+	if err != nil {
+		log.Printf("Error fetching user details: %v", err)
+		WriteJSONError(w, "Error fetching user details", http.StatusInternalServerError)
+		return
+	}
+
+	// 🚀 Ensure institution is available
+	if user.Institution == "" {
+		WriteJSONError(w, "User institution information missing", http.StatusBadRequest)
+		return
+	}
+
 	collection := db.GetCollection("gridlyapp", "gigs")
 
-	// ✅ Only fetch gigs where `expired` is `false`
+	// ✅ Fetch gigs where:
+	// - `expired` is `false`
+	// - `status` is `active`
+	// - `campusPresence` is `flexible` (show to everyone) OR `inCampus` but matching user institution
 	filter := bson.M{
 		"status":  "active",
-		"expired": false, // 🔥 Exclude expired gigs
+		"expired": false,
+		"$or": []bson.M{
+			{"campusPresence": "flexible"},                                 // Show all "flexible" gigs
+			{"campusPresence": "inCampus", "university": user.Institution}, // Match institution for "inCampus"
+		},
 	}
 
 	cursor, err := collection.Find(ctx, filter)
@@ -523,6 +566,7 @@ func GetAllGigsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// ✅ Return filtered gigs
 	json.NewEncoder(w).Encode(gigs)
 }
 

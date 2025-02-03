@@ -37,6 +37,34 @@ func CreateProductRequestHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// 🔥 Fetch the user's institution before saving the request
+	userCollection := db.GetCollection("gridlyapp", "university_users")
+	var user models.User
+	err = userCollection.FindOne(ctx, bson.M{"_id": userObjID}).Decode(&user)
+
+	if err == mongo.ErrNoDocuments {
+		// 🔥 If not found in university_users, check high_school_users
+		userCollection = db.GetCollection("gridlyapp", "high_school_users")
+		err = userCollection.FindOne(ctx, bson.M{"_id": userObjID}).Decode(&user)
+	}
+
+	// 🚨 If user not found in both collections, return error
+	if err != nil {
+		log.Printf("Error fetching user details: %v", err)
+		WriteJSONError(w, "Error fetching user details", http.StatusInternalServerError)
+		return
+	}
+
+	// 🚀 Ensure institution is available
+	if user.Institution == "" {
+		WriteJSONError(w, "User institution information missing", http.StatusBadRequest)
+		return
+	}
+
+	// Decode incoming product request
 	var productRequest models.ProductRequest
 	if err := json.NewDecoder(r.Body).Decode(&productRequest); err != nil {
 		log.Printf("Error decoding request body: %v", err)
@@ -44,17 +72,18 @@ func CreateProductRequestHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Validate required fields
 	if productRequest.ProductName == "" || productRequest.Description == "" {
 		WriteJSONError(w, "Product name and description are required", http.StatusBadRequest)
 		return
 	}
 
+	// ✅ Assign necessary fields
 	productRequest.UserID = userObjID
+	productRequest.Institution = user.Institution // Store institution for filtering later
 	productRequest.CreatedAt = time.Now()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
+	// Insert into product_requests collection
 	collection := db.GetCollection("gridlyapp", "product_requests")
 	result, err := collection.InsertOne(ctx, productRequest)
 	if err != nil {
@@ -63,6 +92,7 @@ func CreateProductRequestHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// ✅ Respond with success message
 	response := map[string]interface{}{
 		"message": "Product request created successfully",
 		"id":      result.InsertedID.(primitive.ObjectID).Hex(),
@@ -115,7 +145,6 @@ func GetMyProductRequestsHandler(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, productRequests, http.StatusOK)
 }
 
-// GetAllOtherProductRequestsHandler retrieves all product requests except those made by the authenticated user.
 func GetAllOtherProductRequestsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -139,10 +168,36 @@ func GetAllOtherProductRequestsHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	collection := db.GetCollection("gridlyapp", "product_requests")
-	filter := bson.M{"userId": bson.M{"$ne": userObjID}}
+	userCollection := db.GetCollection("gridlyapp", "university_users")
+	var user models.User
+	err = userCollection.FindOne(ctx, bson.M{"_id": userObjID}).Decode(&user)
 
-	cursor, err := collection.Find(ctx, filter)
+	if err == mongo.ErrNoDocuments {
+		userCollection = db.GetCollection("gridlyapp", "high_school_users")
+		err = userCollection.FindOne(ctx, bson.M{"_id": userObjID}).Decode(&user)
+	}
+
+	// 🚨 If user not found in both collections, return error
+	if err != nil {
+		log.Printf("Error fetching user details: %v", err)
+		WriteJSONError(w, "Error fetching user details", http.StatusInternalServerError)
+		return
+	}
+
+	// 🚀 Ensure institution is available
+	if user.Institution == "" {
+		WriteJSONError(w, "User institution information missing", http.StatusBadRequest)
+		return
+	}
+
+	// 🔥 Fetch product requests from users in the same institution (excluding the current user)
+	productRequestCollection := db.GetCollection("gridlyapp", "product_requests")
+	filter := bson.M{
+		"userId":      bson.M{"$ne": userObjID}, // Exclude current user
+		"institution": user.Institution,         // Match institution
+	}
+
+	cursor, err := productRequestCollection.Find(ctx, filter)
 	if err != nil {
 		log.Printf("Error fetching product requests: %v", err)
 		WriteJSONError(w, "Error fetching product requests", http.StatusInternalServerError)
@@ -157,6 +212,7 @@ func GetAllOtherProductRequestsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// ✅ Return only filtered product requests
 	WriteJSON(w, productRequests, http.StatusOK)
 }
 

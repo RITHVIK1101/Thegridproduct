@@ -12,5 +12,6 @@ type ProductRequest struct {
 	UserID      primitive.ObjectID `json:"userId" bson:"userId"` // The user who made the request
 	ProductName string             `json:"productName" bson:"productName"`
 	Description string             `json:"description" bson:"description"`
+	Institution string             `json:"institution" bson:"institution"` // ✅ Required for filtering later
 	CreatedAt   time.Time          `json:"createdAt" bson:"createdAt"`
 }
