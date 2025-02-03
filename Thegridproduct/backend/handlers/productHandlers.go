@@ -88,10 +88,9 @@ func AddProductHandler(w http.ResponseWriter, r *http.Request) {
 	case "Both":
 		mappedAvailability = "On and Off Campus"
 	default:
-		mappedAvailability = product.Availability // fallback if unrecognized
+		mappedAvailability = product.Availability
 	}
 	product.Availability = mappedAvailability
-	//----------------------------------------------------
 
 	// Validate required fields
 	if product.Title == "" || product.Description == "" || len(product.SelectedTags) == 0 ||
@@ -161,7 +160,6 @@ func AddProductHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// GetSingleProductHandler handles fetching a single product by its ID
 func GetSingleProductHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -191,14 +189,21 @@ func GetSingleProductHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	json.NewEncoder(w).Encode(product) // LikeCount is included in the product struct
+	// Check if the product is expired
+	if time.Since(product.PostedDate).Hours() > 90*24 {
+		_, err := collection.UpdateOne(ctx, bson.M{"_id": productID}, bson.M{"$set": bson.M{"expired": true}})
+		if err != nil {
+			log.Printf("Error updating product expiration: %v", err)
+		}
+		product.Expired = true // Ensure the response reflects the change
+	}
+
+	json.NewEncoder(w).Encode(product)
 }
 
-// GetAllProductsHandler handles fetching products for either 'in campus' or 'outofcampus' mode
 func GetAllProductsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	// Validate the request method
 	if r.Method != http.MethodGet {
 		WriteJSONError(w, "Invalid request method", http.StatusMethodNotAllowed)
 		return
@@ -223,44 +228,20 @@ func GetAllProductsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse the 'mode' query parameter to determine campus mode
 	mode := r.URL.Query().Get("mode")
-	log.Println("Mode:", mode)
-
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	collection := db.GetCollection("gridlyapp", "products")
-	baseFilter := bson.M{"status": "inshop"}
-	var filter bson.M
-	if mode == "outofcampus" || mode == "out" {
-		// Out-of-campus mode: fetch products that are either Off Campus Only OR On and Off Campus
-		// excluding the user's own products.
-		filter = bson.M{
-			"$and": []bson.M{
-				baseFilter,
-				{
-					"userId":       bson.M{"$ne": userObjID},
-					"availability": bson.M{"$in": []string{"Off Campus Only", "On and Off Campus", "In Campus Only"}},
-				},
-			},
-		}
-	} else {
-		// In-campus mode (default): fetch only "In Campus Only" from the same university,
-		// excluding user's own products.
-		filter = bson.M{
-			"$and": []bson.M{
-				baseFilter,
-				{
-					"userId":       bson.M{"$ne": userObjID},
-					"university":   university,
-					"availability": "In Campus Only",
-				},
-			},
-		}
-	}
 
-	log.Println("Filter Criteria:", filter)
+	baseFilter := bson.M{"status": "inshop", "expired": false} // Exclude expired products
+
+	var filter bson.M
+	if mode == "outofcampus" {
+		filter = bson.M{"$and": []bson.M{baseFilter, {"userId": bson.M{"$ne": userObjID}, "availability": bson.M{"$in": []string{"Off Campus Only", "On and Off Campus"}}}}}
+	} else {
+		filter = bson.M{"$and": []bson.M{baseFilter, {"userId": bson.M{"$ne": userObjID}, "university": university, "availability": "In Campus Only"}}}
+	}
 
 	cursor, err := collection.Find(ctx, filter)
 	if err != nil {
@@ -277,15 +258,8 @@ func GetAllProductsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Println("Retrieved Products:", products)
-
-	// Respond with the list of products
 	w.WriteHeader(http.StatusOK)
-	if err := json.NewEncoder(w).Encode(products); err != nil {
-		log.Printf("Error encoding products to JSON: %v", err)
-		WriteJSONError(w, "Error encoding response", http.StatusInternalServerError)
-		return
-	}
+	json.NewEncoder(w).Encode(products)
 }
 
 // GetUserProductsHandler retrieves all products added by the authenticated user.

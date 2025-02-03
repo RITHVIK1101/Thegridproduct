@@ -124,7 +124,7 @@ Reported User:
 
 	// Specify the email subject and recipients
 	subject := "User Report Notification"
-	recipients := []string{"thegridly@gmail.com", "rithviksaba@gmail.com"}
+	recipients := []string{"thegridly@gmail.com"}
 	message := fmt.Sprintf("Subject: %s\n\n%s", subject, emailBody)
 
 	// SMTP configuration (ensure these are set in your environment variables)

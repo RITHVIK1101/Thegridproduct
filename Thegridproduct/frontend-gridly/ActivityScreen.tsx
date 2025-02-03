@@ -523,9 +523,10 @@ const ActivityScreen: React.FC = () => {
 
   // Render a single product item
   const renderProduct = ({ item }: { item: Product }) => {
-    const daysActive = calculateDaysActive(item.postedDate);
+    const daysUntilExpiry = 90 - calculateDaysActive(item.postedDate);
     const status =
-      daysActive > 30 ? "Expired" : `Active for ${daysActive} days`;
+      daysUntilExpiry <= 0 ? "Expired" : `Expires in ${daysUntilExpiry} days`;
+
     return (
       <View style={styles.itemContainer}>
         <TouchableOpacity
