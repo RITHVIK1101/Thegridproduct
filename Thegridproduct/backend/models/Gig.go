@@ -20,9 +20,10 @@ type Gig struct {
 	Images         []string           `bson:"images" json:"images"`
 	ExpirationDate time.Time          `bson:"expirationDate,omitempty" json:"expirationDate,omitempty"`
 	PostedDate     time.Time          `bson:"postedDate" json:"postedDate"`
-	Expired        bool               `bson:"expired" json:"expired"`
-	Status         string             `bson:"status" json:"status"` // e.g., "active", "completed"
-	LikeCount      int                `bson:"likeCount" json:"likeCount"`
-	CampusPresence string             `bson:"campusPresence" json:"campusPresence"` // "inCampus" or "flexible"
-	Embeddings     []float32          `bson:"embeddings,omitempty" json:"embeddings,omitempty"`
+	Expired        bool               `bson:"expired" json:"expired,omitempty" default:"false"`
+
+	Status         string    `bson:"status" json:"status"` // e.g., "active", "completed"
+	LikeCount      int       `bson:"likeCount" json:"likeCount"`
+	CampusPresence string    `bson:"campusPresence" json:"campusPresence"` // "inCampus" or "flexible"
+	Embeddings     []float32 `bson:"embeddings,omitempty" json:"embeddings,omitempty"`
 }

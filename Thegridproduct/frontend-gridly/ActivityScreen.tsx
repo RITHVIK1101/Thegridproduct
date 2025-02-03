@@ -460,17 +460,28 @@ const ActivityScreen: React.FC = () => {
   // ---------------------------
   // New Component: GigItem
   // ---------------------------
+  // GigItem Component
   const GigItem: React.FC<{ item: Gig }> = ({ item }) => {
     const [expanded, setExpanded] = useState(false);
     const maxDescriptionLength = 100;
+
     const description =
       item.description.length > maxDescriptionLength && !expanded
         ? item.description.substring(0, maxDescriptionLength) + "..."
         : item.description;
+
     const toggleExpanded = () => setExpanded(!expanded);
-    const daysActive = calculateDaysActive(item.postedDate);
+
+    // Calculate expiration status
+    const expirationDate = new Date(item.expiration);
+    const currentDate = new Date();
+    const timeDiff = expirationDate.getTime() - currentDate.getTime();
+    const daysUntilExpiration = Math.ceil(timeDiff / (1000 * 3600 * 24)); // Convert ms to days
+
     const status =
-      daysActive > 30 ? "Expired" : `Active for ${daysActive} days`;
+      daysUntilExpiration <= 0
+        ? "Expired"
+        : `Expires in ${daysUntilExpiration} days`;
 
     return (
       <View style={styles.itemContainer}>

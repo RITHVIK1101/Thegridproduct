@@ -19,7 +19,7 @@ type Product struct {
 	SelectedTags           []string            `json:"selectedTags" bson:"selectedTags"`                             // Required (must have at least one tag)
 	Images                 []string            `json:"images" bson:"images"`                                         // Required (must have at least one image)
 	PostedDate             time.Time           `json:"postedDate,omitempty" bson:"postedDate,omitempty"`             // Auto-generated timestamp
-	Expired                bool                `json:"expired,omitempty" bson:"expired,omitempty"`                   // Default to false
+	Expired                bool                `json:"expired" bson:"expired"`
 	IsAvailableOutOfCampus bool                `json:"isAvailableOutOfCampus" bson:"isAvailableOutOfCampus"`
 	Rating                 int                 `json:"rating" bson:"rating"`                           // Must be between 1-5
 	ListingType            string              `json:"listingType" bson:"listingType"`                 // Selling, Renting, Both

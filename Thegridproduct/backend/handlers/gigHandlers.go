@@ -126,7 +126,7 @@ func AddGigHandler(w http.ResponseWriter, r *http.Request) {
 	if strings.TrimSpace(gigReq.ExpirationDate) != "" {
 		parsedDate, err := time.Parse(time.RFC3339, gigReq.ExpirationDate)
 		if err != nil {
-			// If RFC3339 fails, try an alternate layout
+			// Try alternate date format
 			parsedDate, err = time.Parse("2006-01-02 15:04", gigReq.ExpirationDate)
 			if err != nil {
 				WriteJSONError(w, "Invalid expiration date format. Use RFC3339 or 'YYYY-MM-DD HH:MM' format.", http.StatusBadRequest)
@@ -135,8 +135,11 @@ func AddGigHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		expirationDate = parsedDate
 	} else {
-		expirationDate = time.Now().AddDate(0, 0, 30)
+		expirationDate = time.Now().AddDate(0, 0, 30) // Default to 30 days from now
 	}
+
+	// **Check if the gig is already expired**
+	isExpired := time.Now().After(expirationDate)
 
 	// Validate campusPresence
 	campusPresence := "inCampus"
@@ -157,30 +160,16 @@ func AddGigHandler(w http.ResponseWriter, r *http.Request) {
 		Images:         gigReq.Images,
 		ExpirationDate: expirationDate,
 		PostedDate:     time.Now(),
-		Expired:        false,
+		Expired:        isExpired, // Automatically set expired status
 		Status:         "active",
 		LikeCount:      0,
 		CampusPresence: campusPresence,
 	}
 
-	// 1. Generate embeddings for the gig
-	//    Combine fields as needed (e.g., Title + Description + Category)
-	textToEmbed := gigReq.Title + " " + gigReq.Description + " " + gigReq.Category
-
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	embeddingVector, err := embeddings.GetEmbeddingForText(ctx, textToEmbed)
-	if err != nil {
-		log.Printf("Error generating embeddings: %v", err)
-		WriteJSONError(w, "Error generating embeddings", http.StatusInternalServerError)
-		return
-	}
-
-	// 2. Assign the embeddings to the gig struct
-	gig.Embeddings = embeddingVector
-
-	// 3. Insert the gig into MongoDB
+	// Insert into MongoDB
 	collection := db.GetCollection("gridlyapp", "gigs")
 	result, err := collection.InsertOne(ctx, gig)
 	if err != nil {
@@ -196,6 +185,29 @@ func AddGigHandler(w http.ResponseWriter, r *http.Request) {
 		"id":      result.InsertedID,
 	})
 }
+func updateExpiredGigs() {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	collection := db.GetCollection("gridlyapp", "gigs")
+
+	// Find all gigs where expirationDate has passed but expired is still false
+	filter := bson.M{
+		"expirationDate": bson.M{"$lt": time.Now()},
+		"expired":        false,
+	}
+
+	// Update expired field to true
+	update := bson.M{
+		"$set": bson.M{"expired": true},
+	}
+
+	_, err := collection.UpdateMany(ctx, filter, update)
+	if err != nil {
+		log.Printf("Error updating expired gigs: %v", err)
+	}
+}
+
 func SearchGigsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -474,8 +486,6 @@ func GetSingleGigHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(gig)
 }
 
-// GetAllGigsHandler handles fetching all gigs with optional pagination and filtering,
-// excluding gigs posted by the current authenticated user.
 func GetAllGigsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -484,60 +494,17 @@ func GetAllGigsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Retrieve authenticated user details from context
-	userID, ok := r.Context().Value(userIDKey).(string)
-	if !ok || userID == "" {
-		WriteJSONError(w, "User not authenticated", http.StatusUnauthorized)
-		return
-	}
-
-	// Convert userID string to ObjectID
-	currentUserObjID, err := primitive.ObjectIDFromHex(userID)
-	if err != nil {
-		WriteJSONError(w, "Invalid user ID format", http.StatusBadRequest)
-		return
-	}
-
-	// Implement pagination
-	pageStr := r.URL.Query().Get("page")
-	limitStr := r.URL.Query().Get("limit")
-
-	// Parse 'page' query parameter
-	page, err := strconv.Atoi(pageStr)
-	if err != nil || page < 1 {
-		page = 1 // Default to page 1 if invalid
-	}
-
-	// Parse 'limit' query parameter
-	limit, err := strconv.Atoi(limitStr)
-	if err != nil || limit < 1 || limit > 100 {
-		limit = 10 // Default to 10 items per page if invalid or out of range
-	}
-
-	// Calculate 'skip' based on current page and limit
-	skip := int64((page - 1) * limit) // Convert to int64
-	limit64 := int64(limit)           // Convert to int64
+	// **Check and update expired gigs**
+	updateExpiredGigs()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
 	collection := db.GetCollection("gridlyapp", "gigs")
 
-	// Modify filter to exclude gigs posted by the current user
-	filter := bson.M{
-		"status": "active",
-		"userId": bson.M{"$ne": currentUserObjID},
-	}
+	filter := bson.M{"status": "active"}
 
-	// Create FindOptions with proper *int64 types
-	findOptions := options.Find()
-	findOptions.SetSkip(skip)
-	findOptions.SetLimit(limit64)
-	findOptions.SetSort(bson.D{
-		{Key: "postedDate", Value: -1}, // Sort by newest first
-	})
-
-	cursor, err := collection.Find(ctx, filter, findOptions)
+	cursor, err := collection.Find(ctx, filter)
 	if err != nil {
 		log.Printf("Error fetching gigs: %v", err)
 		WriteJSONError(w, "Error fetching gigs", http.StatusInternalServerError)
@@ -552,27 +519,7 @@ func GetAllGigsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get total count for pagination
-	totalCount, err := collection.CountDocuments(ctx, filter)
-	if err != nil {
-		log.Printf("Error counting gigs: %v", err)
-		WriteJSONError(w, "Error counting gigs", http.StatusInternalServerError)
-		return
-	}
-
-	totalPages := int((totalCount + int64(limit) - 1) / int64(limit)) // Ceiling division
-
-	// Response structure with pagination metadata
-	response := map[string]interface{}{
-		"page":       page,
-		"limit":      limit,
-		"totalPages": totalPages,
-		"totalCount": totalCount,
-		"gigs":       gigs,
-		"count":      len(gigs),
-	}
-
-	json.NewEncoder(w).Encode(response)
+	json.NewEncoder(w).Encode(gigs)
 }
 
 func UpdateGigHandler(w http.ResponseWriter, r *http.Request) {
