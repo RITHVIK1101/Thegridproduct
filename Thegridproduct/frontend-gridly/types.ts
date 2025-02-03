@@ -50,3 +50,22 @@ export type Product = {
   quality?: string;
   productStatus: 'shop' | 'talks' | 'sold'; // Added productStatus as part of the definition
 };
+export type Gig = {
+  id: string;
+  userId: string;
+  university: string;
+  studentType: string;
+  title: string;
+  category: string;
+  description: string;
+  price: string;
+  deliveryTime: string;
+  images: string[];
+  postedDate: string;
+  expirationDate?: string; // ✅ Fix: Make sure this is defined
+  expired?: boolean; // ✅ Fix: Add this too
+  status: "active" | "completed";
+  likeCount: number;
+  campusPresence: "inCampus" | "flexible";
+};
+

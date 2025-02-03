@@ -494,7 +494,7 @@ func GetAllGigsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// **Check and update expired gigs**
+	// ✅ Ensure expired gigs are updated before fetching
 	updateExpiredGigs()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
@@ -502,7 +502,11 @@ func GetAllGigsHandler(w http.ResponseWriter, r *http.Request) {
 
 	collection := db.GetCollection("gridlyapp", "gigs")
 
-	filter := bson.M{"status": "active"}
+	// ✅ Only fetch gigs where `expired` is `false`
+	filter := bson.M{
+		"status":  "active",
+		"expired": false, // 🔥 Exclude expired gigs
+	}
 
 	cursor, err := collection.Find(ctx, filter)
 	if err != nil {

@@ -460,7 +460,6 @@ const ActivityScreen: React.FC = () => {
   // ---------------------------
   // New Component: GigItem
   // ---------------------------
-  // GigItem Component
   const GigItem: React.FC<{ item: Gig }> = ({ item }) => {
     const [expanded, setExpanded] = useState(false);
     const maxDescriptionLength = 100;
@@ -472,16 +471,17 @@ const ActivityScreen: React.FC = () => {
 
     const toggleExpanded = () => setExpanded(!expanded);
 
-    // Calculate expiration status
-    const expirationDate = new Date(item.expiration);
-    const currentDate = new Date();
-    const timeDiff = expirationDate.getTime() - currentDate.getTime();
-    const daysUntilExpiration = Math.ceil(timeDiff / (1000 * 3600 * 24)); // Convert ms to days
-
-    const status =
-      daysUntilExpiration <= 0
-        ? "Expired"
-        : `Expires in ${daysUntilExpiration} days`;
+    // ✅ Fetch and format the expiration date
+    const expirationDate = item.expirationDate
+      ? new Date(item.expirationDate)
+      : null;
+    const formattedExpiration = expirationDate
+      ? expirationDate.toLocaleDateString("en-US", {
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        })
+      : "No Expiration Date";
 
     return (
       <View style={styles.itemContainer}>
@@ -508,14 +508,9 @@ const ActivityScreen: React.FC = () => {
               </Text>
             </TouchableOpacity>
           )}
-          <Text
-            style={[
-              styles.itemStatus,
-              status.includes("Expired") && { color: "#FF3B30" },
-            ]}
-          >
-            {status}
-          </Text>
+
+          {/* ✅ Show Expiration Date Here */}
+          <Text style={styles.itemDate}>Expires on: {formattedExpiration}</Text>
         </TouchableOpacity>
 
         <View style={styles.iconRow}>
