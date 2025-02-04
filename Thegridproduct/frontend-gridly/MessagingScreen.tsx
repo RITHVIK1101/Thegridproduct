@@ -43,7 +43,11 @@ import { UserContext } from "./UserContext";
 import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from "expo-image-manipulator";
 import axios from "axios";
-import { RouteProp, useNavigation, useFocusEffect } from "@react-navigation/native";
+import {
+  RouteProp,
+  useNavigation,
+  useFocusEffect,
+} from "@react-navigation/native";
 import { RootStackParamList } from "./navigationTypes";
 
 type Chat = Conversation & {
@@ -82,19 +86,23 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
 
   // Image Upload states
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
-  const [isImagePreviewModalVisible, setIsImagePreviewModalVisible] = useState<boolean>(false);
+  const [isImagePreviewModalVisible, setIsImagePreviewModalVisible] =
+    useState<boolean>(false);
   const [isUploadingImage, setIsUploadingImage] = useState<boolean>(false);
 
   // Filter Modal
   const [filterMenuVisible, setFilterMenuVisible] = useState<boolean>(false);
 
   // Requests Modal State
-  const [isRequestsModalVisible, setRequestsModalVisible] = useState<boolean>(false);
+  const [isRequestsModalVisible, setRequestsModalVisible] =
+    useState<boolean>(false);
   const [incomingRequests, setIncomingRequests] = useState<Request[]>([]);
   const [outgoingRequests, setOutgoingRequests] = useState<Request[]>([]);
   const [loadingRequests, setLoadingRequests] = useState<boolean>(false);
   const [errorRequests, setErrorRequests] = useState<string | null>(null);
-  const [processingRequestId, setProcessingRequestId] = useState<string | null>(null);
+  const [processingRequestId, setProcessingRequestId] = useState<string | null>(
+    null
+  );
 
   // Report Modal State
   const [reportModalVisible, setReportModalVisible] = useState<boolean>(false);
@@ -103,11 +111,16 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
   const [reportDescription, setReportDescription] = useState<string>("");
 
   // Other modal/popup states
-  const [isReasonDropdownVisible, setIsReasonDropdownVisible] = useState<boolean>(false);
-  const [isIncompletePopupVisible, setIsIncompletePopupVisible] = useState<boolean>(false);
+  const [isReasonDropdownVisible, setIsReasonDropdownVisible] =
+    useState<boolean>(false);
+  const [isIncompletePopupVisible, setIsIncompletePopupVisible] =
+    useState<boolean>(false);
   const [isSubmittingReport, setIsSubmittingReport] = useState<boolean>(false);
-  const [isReportSuccessModalVisible, setIsReportSuccessModalVisible] = useState<boolean>(false);
-  const [selectedRequestsTab, setSelectedRequestsTab] = useState<"incoming" | "outgoing">("incoming");
+  const [isReportSuccessModalVisible, setIsReportSuccessModalVisible] =
+    useState<boolean>(false);
+  const [selectedRequestsTab, setSelectedRequestsTab] = useState<
+    "incoming" | "outgoing"
+  >("incoming");
 
   // User & Token from Context
   const { userId, token } = useContext(UserContext);
@@ -121,7 +134,9 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
   const { chatId: routeChatId } = route.params || {};
 
   // Animation for Requests Modal Slide-Up
-  const slideAnim = useRef(new Animated.Value(Dimensions.get("window").height)).current;
+  const slideAnim = useRef(
+    new Animated.Value(Dimensions.get("window").height)
+  ).current;
 
   // Dropdown reasons list
   const reasons = [
@@ -133,20 +148,23 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
   ];
 
   // ─── CHAT FILTERING LOGIC ─────────────────────────────────────────────
-  const applyFilter = (chatsToFilter: Chat[], f: "all" | "products" | "gigs") => {
+  const applyFilter = (
+    chatsToFilter: Chat[],
+    f: "all" | "products" | "gigs"
+  ) => {
     if (f === "all") return chatsToFilter;
-    if (f === "products") {
-      return chatsToFilter.filter((c) => c.productTitle && c.productTitle.trim() !== "");
-    } else {
-      return chatsToFilter.filter((c) => !c.productTitle || c.productTitle.trim() === "");
-    }
+    return chatsToFilter.filter((c) => c.referenceType === f);
   };
 
   useEffect(() => {
     const filtered = applyFilter(chats, filter);
     const sorted = filtered.sort((a, b) => {
-      const aTime = a.latestTimestamp ? new Date(a.latestTimestamp).getTime() : 0;
-      const bTime = b.latestTimestamp ? new Date(b.latestTimestamp).getTime() : 0;
+      const aTime = a.latestTimestamp
+        ? new Date(a.latestTimestamp).getTime()
+        : 0;
+      const bTime = b.latestTimestamp
+        ? new Date(b.latestTimestamp).getTime()
+        : 0;
       return bTime - aTime; // Descending order
     });
     setFilteredChats(sorted);
@@ -173,11 +191,14 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     setLoading(true);
     try {
       const fetchedChats = await fetchConversations(userId, token);
+
       // For each fetched chat, try to retrieve the saved last message from AsyncStorage
       const mergedChats = await Promise.all(
         fetchedChats.map(async (chat) => {
           try {
-            const saved = await AsyncStorage.getItem(`chat_last_message_${chat.chatID}`);
+            const saved = await AsyncStorage.getItem(
+              `chat_last_message_${chat.chatID}`
+            );
             if (saved) {
               const parsed = JSON.parse(saved);
               return { ...chat, ...parsed };
@@ -210,7 +231,9 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       const chatDocRef = doc(firestoreDB, "chatRooms", selectedChat.chatID);
       unsubscribe = onSnapshot(chatDocRef, (docSnap) => {
         if (!docSnap.exists()) {
-          console.warn("🚨 Chat room does not exist in Firestore! Check chatID.");
+          console.warn(
+            "🚨 Chat room does not exist in Firestore! Check chatID."
+          );
         } else {
           const data = docSnap.data();
           if (data.messages) {
@@ -271,16 +294,24 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                   return chat;
                 })
                 .sort((a, b) => {
-                  const aTime = a.latestTimestamp ? new Date(a.latestTimestamp).getTime() : 0;
-                  const bTime = b.latestTimestamp ? new Date(b.latestTimestamp).getTime() : 0;
+                  const aTime = a.latestTimestamp
+                    ? new Date(a.latestTimestamp).getTime()
+                    : 0;
+                  const bTime = b.latestTimestamp
+                    ? new Date(b.latestTimestamp).getTime()
+                    : 0;
                   return bTime - aTime;
                 })
             );
             // Asynchronously update unread count for this chat
             (async () => {
               try {
-                const lastReadStr = await AsyncStorage.getItem(`last_read_${docSnap.id}`);
-                const lastRead = lastReadStr ? new Date(lastReadStr).getTime() : 0;
+                const lastReadStr = await AsyncStorage.getItem(
+                  `last_read_${docSnap.id}`
+                );
+                const lastRead = lastReadStr
+                  ? new Date(lastReadStr).getTime()
+                  : 0;
                 const unreadCount = data.messages.filter(
                   (msg: Message) => new Date(msg.timestamp).getTime() > lastRead
                 ).length;
@@ -290,7 +321,11 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                   )
                 );
               } catch (e) {
-                console.error("Error computing unread count for chat", docSnap.id, e);
+                console.error(
+                  "Error computing unread count for chat",
+                  docSnap.id,
+                  e
+                );
               }
             })();
           }
@@ -298,7 +333,11 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       });
       return () => unsubscribe();
     }
-  }, [isChatModalVisible, firestoreDB, chats.map((chat) => chat.chatID).join(",")]);
+  }, [
+    isChatModalVisible,
+    firestoreDB,
+    chats.map((chat) => chat.chatID).join(","),
+  ]);
 
   const fetchSpecificChat = async (chatId: string) => {
     setLoading(true);
@@ -362,7 +401,10 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         );
         // Save the timestamp of the last read message for this chat
         if (lastMsg && lastMsg.timestamp) {
-          await AsyncStorage.setItem(`last_read_${selectedChat.chatID}`, lastMsg.timestamp);
+          await AsyncStorage.setItem(
+            `last_read_${selectedChat.chatID}`,
+            lastMsg.timestamp
+          );
         }
       } catch (e) {
         console.error("Error saving last message or read time:", e);
@@ -373,8 +415,12 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
             chat.chatID === updatedChat.chatID ? updatedChat : chat
           )
           .sort((a, b) => {
-            const aTime = a.latestTimestamp ? new Date(a.latestTimestamp).getTime() : 0;
-            const bTime = b.latestTimestamp ? new Date(b.latestTimestamp).getTime() : 0;
+            const aTime = a.latestTimestamp
+              ? new Date(a.latestTimestamp).getTime()
+              : 0;
+            const bTime = b.latestTimestamp
+              ? new Date(b.latestTimestamp).getTime()
+              : 0;
             return bTime - aTime;
           })
       );
@@ -398,7 +444,9 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     };
     // Optimistic UI update
     setSelectedChat((prev) =>
-      prev ? { ...prev, messages: [...(prev.messages || []), newMessageObj] } : prev
+      prev
+        ? { ...prev, messages: [...(prev.messages || []), newMessageObj] }
+        : prev
     );
     setNewMessage("");
     setTimeout(() => {
@@ -406,7 +454,11 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }, 100);
     try {
       const chatDocRef = doc(firestoreDB, "chatRooms", selectedChat.chatID);
-      await setDoc(chatDocRef, { messages: arrayUnion(newMessageObj) }, { merge: true });
+      await setDoc(
+        chatDocRef,
+        { messages: arrayUnion(newMessageObj) },
+        { merge: true }
+      );
     } catch (error) {
       console.error("Error sending message:", error);
       Alert.alert("Error", "Failed to send message.");
@@ -416,9 +468,13 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
   // ─── IMAGE HANDLING ─────────────────────────────────────────────
   const handleImagePress = async () => {
     try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const { status } =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== "granted") {
-        Alert.alert("Permission Required", "Permission to access the camera roll is required!");
+        Alert.alert(
+          "Permission Required",
+          "Permission to access the camera roll is required!"
+        );
         return;
       }
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -478,7 +534,11 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         content: imageMessage,
         timestamp: new Date().toISOString(),
       };
-      await setDoc(chatDocRef, { messages: arrayUnion(messageData) }, { merge: true });
+      await setDoc(
+        chatDocRef,
+        { messages: arrayUnion(messageData) },
+        { merge: true }
+      );
       console.log("Image message sent successfully to Firestore.");
     } catch (error: any) {
       console.error("sendImageMessage error:", error);
@@ -542,7 +602,9 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       );
       if (response.status === 200) {
         Alert.alert("Success", "Chat request accepted.");
-        setIncomingRequests((prev) => prev.filter((req) => req.requestId !== requestId));
+        setIncomingRequests((prev) =>
+          prev.filter((req) => req.requestId !== requestId)
+        );
         await fetchUserChats();
         if (response.data.chatID) {
           const newChat = chats.find((c) => c.chatID === response.data.chatID);
@@ -557,7 +619,10 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       }
     } catch (error: any) {
       console.error("Error accepting request:", error);
-      Alert.alert("Error", error.response?.data?.message || "Failed to accept chat request.");
+      Alert.alert(
+        "Error",
+        error.response?.data?.message || "Failed to accept chat request."
+      );
     } finally {
       setProcessingRequestId(null);
     }
@@ -578,13 +643,18 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       );
       if (response.status === 200) {
         Alert.alert("Success", "Chat request rejected.");
-        setIncomingRequests((prev) => prev.filter((req) => req.requestId !== requestId));
+        setIncomingRequests((prev) =>
+          prev.filter((req) => req.requestId !== requestId)
+        );
       } else {
         Alert.alert("Error", "Failed to reject chat request.");
       }
     } catch (error: any) {
       console.error("Error rejecting request:", error);
-      Alert.alert("Error", error.response?.data?.message || "Failed to reject chat request.");
+      Alert.alert(
+        "Error",
+        error.response?.data?.message || "Failed to reject chat request."
+      );
     } finally {
       setProcessingRequestId(null);
     }
@@ -610,7 +680,9 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
           minute: "2-digit",
         })
       : "";
-    const initials = `${item.user.firstName.charAt(0)}${item.user.lastName.charAt(0)}`.toUpperCase();
+    const initials = `${item.user.firstName.charAt(
+      0
+    )}${item.user.lastName.charAt(0)}`.toUpperCase();
     const dotStyle =
       latestMessage && latestMessage.senderId !== userId
         ? styles.purpleDot
@@ -634,9 +706,11 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
               </Text>
               <View style={styles.timeContainer}>
                 <Text style={styles.chatTime}>{formattedTimestamp}</Text>
-                {(item.unreadCount && item.unreadCount > 0) ? (
+                {item.unreadCount && item.unreadCount > 0 ? (
                   <View style={styles.unreadBadge}>
-                    <Text style={styles.unreadBadgeText}>{item.unreadCount}</Text>
+                    <Text style={styles.unreadBadgeText}>
+                      {item.unreadCount}
+                    </Text>
                   </View>
                 ) : null}
               </View>
@@ -660,13 +734,17 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
 
   const renderMessage = ({ item }: { item: Message }) => {
     const isImageMessage = item.content.startsWith("[Image] ");
-    const imageUri = isImageMessage ? item.content.replace("[Image] ", "") : null;
+    const imageUri = isImageMessage
+      ? item.content.replace("[Image] ", "")
+      : null;
     const isCurrentUser = item.senderId === userId;
     return (
       <View
         style={[
           styles.messageContainer,
-          isCurrentUser ? styles.myMessageContainer : styles.theirMessageContainer,
+          isCurrentUser
+            ? styles.myMessageContainer
+            : styles.theirMessageContainer,
         ]}
       >
         <View
@@ -676,12 +754,18 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
           ]}
         >
           {isImageMessage ? (
-            <Image source={{ uri: imageUri! }} style={styles.messageImage} resizeMode="cover" />
+            <Image
+              source={{ uri: imageUri! }}
+              style={styles.messageImage}
+              resizeMode="cover"
+            />
           ) : (
             <Text
               style={[
                 styles.messageText,
-                isCurrentUser ? styles.myMessageTextColor : styles.theirMessageTextColor,
+                isCurrentUser
+                  ? styles.myMessageTextColor
+                  : styles.theirMessageTextColor,
               ]}
             >
               {item.content}
@@ -690,10 +774,15 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
           <Text
             style={[
               styles.messageTimestamp,
-              isCurrentUser ? styles.myTimestampColor : styles.theirTimestampColor,
+              isCurrentUser
+                ? styles.myTimestampColor
+                : styles.theirTimestampColor,
             ]}
           >
-            {new Date(item.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+            {new Date(item.timestamp).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
           </Text>
         </View>
       </View>
@@ -706,7 +795,11 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     type: c.productTitle ? "product" : "gig",
   }));
 
-  const handleNavigateFromProductOrGig = (item: { chatID: string; title: string; type: string; }) => {
+  const handleNavigateFromProductOrGig = (item: {
+    chatID: string;
+    title: string;
+    type: string;
+  }) => {
     const chat = chats.find((c) => c.chatID === item.chatID);
     if (chat) {
       openChat(chat);
@@ -720,14 +813,14 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       ? "Product Chats"
       : "Job Chats";
   const currentFilterLabel =
-    filter === "all" ? "All ×" : filter === "products" ? "Products ×" : "Jobs ×";
+    filter === "all"
+      ? "All ×"
+      : filter === "products"
+      ? "Products ×"
+      : "Jobs ×";
 
   const handleFilterPillPress = () => {
-    if (filter === "all") {
-      setFilterMenuVisible(true);
-    } else {
-      setFilter("all");
-    }
+    setFilterMenuVisible(true);
   };
 
   const handleReportPress = () => {
@@ -747,13 +840,16 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       return;
     }
     setIsSubmittingReport(true);
-    const reportedUserId = selectedChat?.messages?.find((msg) => msg.senderId !== userId)?.senderId;
+    const reportedUserId = selectedChat?.messages?.find(
+      (msg) => msg.senderId !== userId
+    )?.senderId;
     if (!selectedChat || !reportedUserId) {
       setIsSubmittingReport(false);
       setIsIncompletePopupVisible(true);
       return;
     }
-    const finalReason = reportReason === "Other" ? customReason.trim() : reportReason;
+    const finalReason =
+      reportReason === "Other" ? customReason.trim() : reportReason;
     try {
       const response = await axios.post(
         `${NGROK_URL}/report`,
@@ -816,7 +912,11 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
             </View>
             <View style={styles.requestActions}>
               <TouchableOpacity
-                style={[styles.acceptButton, processingRequestId === item.requestId && styles.buttonDisabled]}
+                style={[
+                  styles.acceptButton,
+                  processingRequestId === item.requestId &&
+                    styles.buttonDisabled,
+                ]}
                 onPress={() => acceptRequest(item.requestId)}
                 disabled={processingRequestId === item.requestId}
                 accessibilityLabel="Accept Request"
@@ -828,7 +928,11 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                 )}
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.rejectButton, processingRequestId === item.requestId && styles.buttonDisabled]}
+                style={[
+                  styles.rejectButton,
+                  processingRequestId === item.requestId &&
+                    styles.buttonDisabled,
+                ]}
                 onPress={() => rejectRequest(item.requestId)}
                 disabled={processingRequestId === item.requestId}
                 accessibilityLabel="Reject Request"
@@ -857,7 +961,8 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         </View>
       );
     };
-    const dataToShow = selectedRequestsTab === "incoming" ? incomingRequests : outgoingRequests;
+    const dataToShow =
+      selectedRequestsTab === "incoming" ? incomingRequests : outgoingRequests;
     return (
       <Modal
         visible={isRequestsModalVisible}
@@ -866,11 +971,18 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         onRequestClose={() => setRequestsModalVisible(false)}
       >
         <Animated.View
-          style={[styles.requestsModalContainer, { transform: [{ translateY: slideAnim }] }]}
+          style={[
+            styles.requestsModalContainer,
+            { transform: [{ translateY: slideAnim }] },
+          ]}
         >
           <SafeAreaView style={styles.requestsSafeArea}>
             <View style={styles.requestsHeader}>
-              <Pressable onPress={() => setRequestsModalVisible(false)} style={styles.closeButton} accessibilityLabel="Close Requests">
+              <Pressable
+                onPress={() => setRequestsModalVisible(false)}
+                style={styles.closeButton}
+                accessibilityLabel="Close Requests"
+              >
                 <Ionicons name="close" size={24} color="#FFFFFF" />
               </Pressable>
               <Text style={styles.requestsHeaderTitle}>Your Requests</Text>
@@ -878,25 +990,49 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
             <View style={styles.requestsTabsRow}>
               <Pressable
                 onPress={() => setSelectedRequestsTab("incoming")}
-                style={[styles.requestsTab, selectedRequestsTab === "incoming" && styles.activeRequestsTab]}
+                style={[
+                  styles.requestsTab,
+                  selectedRequestsTab === "incoming" &&
+                    styles.activeRequestsTab,
+                ]}
                 accessibilityLabel="Incoming Requests Tab"
               >
-                <Text style={[styles.requestsTabText, selectedRequestsTab === "incoming" && styles.activeRequestsTabText]}>
+                <Text
+                  style={[
+                    styles.requestsTabText,
+                    selectedRequestsTab === "incoming" &&
+                      styles.activeRequestsTabText,
+                  ]}
+                >
                   Incoming
                 </Text>
               </Pressable>
               <Pressable
                 onPress={() => setSelectedRequestsTab("outgoing")}
-                style={[styles.requestsTab, selectedRequestsTab === "outgoing" && styles.activeRequestsTab]}
+                style={[
+                  styles.requestsTab,
+                  selectedRequestsTab === "outgoing" &&
+                    styles.activeRequestsTab,
+                ]}
                 accessibilityLabel="Outgoing Requests Tab"
               >
-                <Text style={[styles.requestsTabText, selectedRequestsTab === "outgoing" && styles.activeRequestsTabText]}>
+                <Text
+                  style={[
+                    styles.requestsTabText,
+                    selectedRequestsTab === "outgoing" &&
+                      styles.activeRequestsTabText,
+                  ]}
+                >
                   Outgoing
                 </Text>
               </Pressable>
             </View>
             {loadingRequests ? (
-              <ActivityIndicator size="large" color="#BB86FC" style={{ marginTop: 20 }} />
+              <ActivityIndicator
+                size="large"
+                color="#BB86FC"
+                style={{ marginTop: 20 }}
+              />
             ) : errorRequests ? (
               <View style={styles.requestsErrorContainer}>
                 <Text style={styles.requestsErrorText}>{errorRequests}</Text>
@@ -910,11 +1046,15 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                   ListEmptyComponent={
                     <View style={styles.sectionEmptyContainer}>
                       <Text style={styles.sectionEmptyText}>
-                        {selectedRequestsTab === "incoming" ? "No incoming requests." : "No outgoing requests."}
+                        {selectedRequestsTab === "incoming"
+                          ? "No incoming requests."
+                          : "No outgoing requests."}
                       </Text>
                     </View>
                   }
-                  ItemSeparatorComponent={() => <View style={styles.requestsSeparatorLine} />}
+                  ItemSeparatorComponent={() => (
+                    <View style={styles.requestsSeparatorLine} />
+                  )}
                   refreshing={loadingRequests}
                   onRefresh={fetchUserRequests}
                 />
@@ -945,7 +1085,11 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
               <Ionicons name="list-circle-outline" size={24} color="#BB86FC" />
               <Text style={styles.requestsButtonText}>Requests</Text>
             </Pressable>
-            <Pressable style={styles.filterLabelButton} onPress={handleFilterPillPress} accessibilityLabel="Filter Options">
+            <Pressable
+              style={styles.filterLabelButton}
+              onPress={handleFilterPillPress}
+              accessibilityLabel="Filter Options"
+            >
               <Text style={styles.filterLabelText}>{currentFilterLabel}</Text>
             </Pressable>
           </View>
@@ -965,19 +1109,23 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                 onPress={() => {
                   setFilter("products");
                   setFilterMenuVisible(false);
+                  setFilteredChats(applyFilter(chats, "products")); // Apply the filter
                 }}
               >
                 <Text style={styles.filterModalOptionText}>Products</Text>
               </Pressable>
+
               <Pressable
                 style={styles.filterModalOption}
                 onPress={() => {
                   setFilter("gigs");
                   setFilterMenuVisible(false);
+                  setFilteredChats(applyFilter(chats, "gigs")); // Apply the filter
                 }}
               >
                 <Text style={styles.filterModalOptionText}>Jobs</Text>
               </Pressable>
+
               <Pressable
                 style={[styles.filterModalOption, styles.filterModalClose]}
                 onPress={() => setFilterMenuVisible(false)}
@@ -995,7 +1143,11 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         {chats.length > 0 && (
           <View style={styles.horizontalListContainer}>
             <Text style={styles.sectionTitle}>Your Purchases</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalScroll}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.horizontalScroll}
+            >
               {productsOrGigs.map((item, index) => (
                 <Pressable
                   key={item.chatID + index}
@@ -1024,19 +1176,33 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
             data={filteredChats}
             keyExtractor={(item, index) => item.chatID || index.toString()}
             renderItem={renderChat}
-            contentContainerStyle={filteredChats.length === 0 && styles.flatListContainer}
+            contentContainerStyle={
+              filteredChats.length === 0 && styles.flatListContainer
+            }
             ItemSeparatorComponent={() => <View style={styles.separatorLine} />}
           />
         )}
 
         {/* Chat Modal */}
-        <Modal visible={isChatModalVisible} animationType="slide" transparent={false} onRequestClose={handleBackFromChat}>
+        <Modal
+          visible={isChatModalVisible}
+          animationType="slide"
+          transparent={false}
+          onRequestClose={handleBackFromChat}
+        >
           <View style={[styles.modalSafeArea, { backgroundColor: "#000" }]}>
             <SafeAreaView style={{ flex: 1 }}>
-              <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.modalContainer}>
+              <KeyboardAvoidingView
+                behavior={Platform.OS === "ios" ? "padding" : undefined}
+                style={styles.modalContainer}
+              >
                 {selectedChat && (
                   <View style={styles.enhancedChatHeader}>
-                    <Pressable onPress={handleBackFromChat} style={styles.backButton} accessibilityLabel="Go Back">
+                    <Pressable
+                      onPress={handleBackFromChat}
+                      style={styles.backButton}
+                      accessibilityLabel="Go Back"
+                    >
                       <Ionicons name="arrow-back" size={24} color="#BB86FC" />
                     </Pressable>
                     <View style={styles.chatHeaderInfo}>
@@ -1048,14 +1214,29 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                       </View>
                       <View style={styles.chatHeaderTextContainer}>
                         <Text style={styles.chatHeaderUserName}>
-                          {selectedChat.user.firstName} {selectedChat.user.lastName}
+                          {selectedChat.user.firstName}{" "}
+                          {selectedChat.user.lastName}
                         </Text>
                         <Text style={styles.chatHeaderSubTitle}>
-                          {selectedChat.productTitle ? selectedChat.productTitle : "Job"}
+                          {selectedChat.referenceTitle || "Unknown"}
+                        </Text>
+
+                        <Text style={styles.chatHeaderSubTitle}>
+                          {selectedChat.referenceTitle || "Unknown"}
+                        </Text>
+
+                        <Text style={styles.chatHeaderSubTitle}>
+                          {selectedChat.productTitle
+                            ? selectedChat.productTitle
+                            : "Job"}
                         </Text>
                       </View>
                     </View>
-                    <Pressable onPress={handleReportPress} style={styles.reportButton} accessibilityLabel="Report User">
+                    <Pressable
+                      onPress={handleReportPress}
+                      style={styles.reportButton}
+                      accessibilityLabel="Report User"
+                    >
                       <Ionicons name="flag" size={24} color="#F08080" />
                     </Pressable>
                     <View style={styles.chatHeaderBottomLine} />
@@ -1068,11 +1249,17 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                   keyExtractor={(item, index) => item._id || index.toString()}
                   renderItem={renderMessage}
                   contentContainerStyle={styles.messagesList}
-                  onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-                  onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
+                  onContentSizeChange={() =>
+                    flatListRef.current?.scrollToEnd({ animated: true })
+                  }
+                  onLayout={() =>
+                    flatListRef.current?.scrollToEnd({ animated: true })
+                  }
                   ListEmptyComponent={
                     <View style={styles.emptyMessagesContainer}>
-                      <Text style={styles.emptyMessagesText}>Start the conversation by sending a message!</Text>
+                      <Text style={styles.emptyMessagesText}>
+                        Start the conversation by sending a message!
+                      </Text>
                     </View>
                   }
                 />
@@ -1081,7 +1268,11 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                 <View style={styles.inputBarContainer}>
                   <View style={styles.inputBarLine} />
                   <View style={styles.inputContainer}>
-                    <Pressable style={styles.iconButton} onPress={handleImagePress} accessibilityLabel="Upload Image">
+                    <Pressable
+                      style={styles.iconButton}
+                      onPress={handleImagePress}
+                      accessibilityLabel="Upload Image"
+                    >
                       <Ionicons name="image" size={20} color="#fff" />
                     </Pressable>
                     <TextInput
@@ -1095,7 +1286,11 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                       blurOnSubmit
                       onSubmitEditing={Keyboard.dismiss}
                     />
-                    <Pressable style={styles.sendButton} onPress={sendMessage} accessibilityLabel="Send Message">
+                    <Pressable
+                      style={styles.sendButton}
+                      onPress={sendMessage}
+                      accessibilityLabel="Send Message"
+                    >
                       <Ionicons name="send" size={18} color="#fff" />
                     </Pressable>
                   </View>
@@ -1130,7 +1325,12 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                   <Ionicons name="arrow-back" size={24} color="#BB86FC" />
                 </Pressable>
                 <View style={{ flex: 1 }} />
-                <Pressable onPress={confirmAddImage} style={styles.addImageButton} accessibilityLabel="Add Image" disabled={sending || isUploadingImage}>
+                <Pressable
+                  onPress={confirmAddImage}
+                  style={styles.addImageButton}
+                  accessibilityLabel="Add Image"
+                  disabled={sending || isUploadingImage}
+                >
                   {sending || isUploadingImage ? (
                     <ActivityIndicator color="#fff" size="small" />
                   ) : (
@@ -1140,7 +1340,11 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
               </View>
               {selectedImageUri && (
                 <View style={styles.imagePreviewContainer}>
-                  <Image source={{ uri: selectedImageUri }} style={styles.previewImage} resizeMode="contain" />
+                  <Image
+                    source={{ uri: selectedImageUri }}
+                    style={styles.previewImage}
+                    resizeMode="contain"
+                  />
                 </View>
               )}
             </SafeAreaView>
@@ -1148,11 +1352,23 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         </Modal>
 
         {/* Report Modal */}
-        <Modal visible={reportModalVisible} animationType="slide" transparent={false} onRequestClose={() => setReportModalVisible(false)}>
-          <KeyboardAvoidingView style={{ flex: 1, backgroundColor: "#000" }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        <Modal
+          visible={reportModalVisible}
+          animationType="slide"
+          transparent={false}
+          onRequestClose={() => setReportModalVisible(false)}
+        >
+          <KeyboardAvoidingView
+            style={{ flex: 1, backgroundColor: "#000" }}
+            behavior={Platform.OS === "ios" ? "padding" : undefined}
+          >
             <SafeAreaView style={{ flex: 1, padding: 20 }}>
               <View style={styles.enhancedChatHeader}>
-                <Pressable onPress={() => setReportModalVisible(false)} style={styles.backButton} accessibilityLabel="Go Back">
+                <Pressable
+                  onPress={() => setReportModalVisible(false)}
+                  style={styles.backButton}
+                  accessibilityLabel="Go Back"
+                >
                   <Ionicons name="arrow-back" size={24} color="#BB86FC" />
                 </Pressable>
                 <View style={styles.chatHeaderInfo}>
@@ -1163,11 +1379,25 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
 
               <View style={styles.reportContent}>
                 <Text style={styles.reportLabel}>Select Reason:</Text>
-                <Pressable style={styles.dropdownContainer} onPress={() => setIsReasonDropdownVisible(true)}>
-                  <Text style={reportReason === "Select a Reason" ? styles.dropdownPlaceholderText : styles.dropdownSelectedText}>
+                <Pressable
+                  style={styles.dropdownContainer}
+                  onPress={() => setIsReasonDropdownVisible(true)}
+                >
+                  <Text
+                    style={
+                      reportReason === "Select a Reason"
+                        ? styles.dropdownPlaceholderText
+                        : styles.dropdownSelectedText
+                    }
+                  >
                     {reportReason}
                   </Text>
-                  <Ionicons name="chevron-down" size={16} color="#FFFFFF" style={styles.dropdownIcon} />
+                  <Ionicons
+                    name="chevron-down"
+                    size={16}
+                    color="#FFFFFF"
+                    style={styles.dropdownIcon}
+                  />
                 </Pressable>
                 {isReasonDropdownVisible && (
                   <View style={styles.dropdownAbsoluteOverlay}>
@@ -1181,7 +1411,9 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                             setIsReasonDropdownVisible(false);
                           }}
                         >
-                          <Text style={styles.dropdownOptionText}>{reason}</Text>
+                          <Text style={styles.dropdownOptionText}>
+                            {reason}
+                          </Text>
                         </Pressable>
                       ))}
                     </View>
@@ -1211,8 +1443,14 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                   onSubmitEditing={Keyboard.dismiss}
                 />
 
-                <Text style={styles.reportInfoText}>The Gridly team will reach out to you soon.</Text>
-                <Pressable style={styles.reportSubmitButton} onPress={handleModifiedReportSubmit} disabled={isSubmittingReport}>
+                <Text style={styles.reportInfoText}>
+                  The Gridly team will reach out to you soon.
+                </Text>
+                <Pressable
+                  style={styles.reportSubmitButton}
+                  onPress={handleModifiedReportSubmit}
+                  disabled={isSubmittingReport}
+                >
                   {isSubmittingReport ? (
                     <ActivityIndicator color="#000" size="small" />
                   ) : (
@@ -1225,11 +1463,17 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         </Modal>
 
         {/* Report Success Modal */}
-        <Modal transparent visible={isReportSuccessModalVisible} animationType="fade">
+        <Modal
+          transparent
+          visible={isReportSuccessModalVisible}
+          animationType="fade"
+        >
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
               <Ionicons name="checkmark-circle" size={60} color="#9C27B0" />
-              <Text style={styles.modalText}>Report Submitted Successfully!</Text>
+              <Text style={styles.modalText}>
+                Report Submitted Successfully!
+              </Text>
             </View>
           </View>
         </Modal>
@@ -1244,7 +1488,10 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
           <View style={styles.popupOverlay}>
             <View style={styles.popupContainer}>
               <Text style={styles.popupText}>Please fill in all details.</Text>
-              <Pressable style={styles.popupButton} onPress={() => setIsIncompletePopupVisible(false)}>
+              <Pressable
+                style={styles.popupButton}
+                onPress={() => setIsIncompletePopupVisible(false)}
+              >
                 <Text style={styles.popupButtonText}>OK</Text>
               </Pressable>
             </View>
@@ -1278,8 +1525,17 @@ const styles = StyleSheet.create({
     fontFamily: "HelveticaNeue-Bold",
   },
   headerButtons: { flexDirection: "row", alignItems: "center" },
-  requestsButton: { flexDirection: "row", alignItems: "center", marginRight: 15 },
-  requestsButtonText: { color: "#BB86FC", fontSize: 14, fontFamily: "HelveticaNeue-Medium", marginLeft: 5 },
+  requestsButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginRight: 15,
+  },
+  requestsButtonText: {
+    color: "#BB86FC",
+    fontSize: 14,
+    fontFamily: "HelveticaNeue-Medium",
+    marginLeft: 5,
+  },
   filterLabelButton: {
     paddingHorizontal: 10,
     paddingVertical: 5,
@@ -1288,8 +1544,17 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
-  filterLabelText: { color: "#BB86FC", fontSize: 14, fontFamily: "HelveticaNeue-Medium" },
-  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", alignItems: "center" },
+  filterLabelText: {
+    color: "#BB86FC",
+    fontSize: 14,
+    fontFamily: "HelveticaNeue-Medium",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
   filterModalContainer: {
     backgroundColor: "#1E1E1E",
     borderRadius: 8,
@@ -1298,10 +1563,23 @@ const styles = StyleSheet.create({
     alignItems: "stretch",
   },
   filterModalOption: { paddingVertical: 10, alignItems: "center" },
-  filterModalOptionText: { color: "#FFFFFF", fontSize: 16, fontFamily: "HelveticaNeue-Medium" },
-  filterModalClose: { marginTop: 10, borderTopWidth: 1, borderTopColor: "#333333" },
+  filterModalOptionText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontFamily: "HelveticaNeue-Medium",
+  },
+  filterModalClose: {
+    marginTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: "#333333",
+  },
   horizontalListContainer: { marginTop: 10, paddingHorizontal: 20 },
-  sectionTitle: { color: "#BB86FC", fontSize: 16, fontFamily: "HelveticaNeue-Bold", marginBottom: 5 },
+  sectionTitle: {
+    color: "#BB86FC",
+    fontSize: 16,
+    fontFamily: "HelveticaNeue-Bold",
+    marginBottom: 5,
+  },
   horizontalScroll: { flexDirection: "row" },
   productGigItem: {
     backgroundColor: "#1E1E1E",
@@ -1316,9 +1594,22 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   productGigItemText: { color: "#FFFFFF", fontFamily: "HelveticaNeue" },
-  separatorAfterPurchases: { height: 1, backgroundColor: "#222", marginTop: 10, marginBottom: 10 },
-  flatListContainer: { flexGrow: 1, justifyContent: "center", alignItems: "center" },
-  chatItemContainer: { backgroundColor: "transparent", paddingHorizontal: 20, paddingVertical: 12 },
+  separatorAfterPurchases: {
+    height: 1,
+    backgroundColor: "#222",
+    marginTop: 10,
+    marginBottom: 10,
+  },
+  flatListContainer: {
+    flexGrow: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  chatItemContainer: {
+    backgroundColor: "transparent",
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+  },
   chatItem: { flexDirection: "row", alignItems: "center" },
   profilePicWrapper: { marginRight: 12 },
   profilePicPlaceholder: {
@@ -1329,30 +1620,107 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  sectionEmptyContainer: { alignItems: "center", justifyContent: "center", paddingVertical: 20 },
-  sectionEmptyText: { fontSize: 16, color: "#888888", textAlign: "center", fontFamily: "HelveticaNeue" },
-  requestActions: { flexDirection: "row", justifyContent: "flex-end", alignItems: "center", marginTop: 8 },
-  profilePicInitials: { color: "#000", fontSize: 18, fontWeight: "700", fontFamily: "HelveticaNeue-Bold" },
-  requestsSeparatorLine: { height: 1, backgroundColor: "#333333", marginVertical: 8 },
-  reportLabel: { fontSize: 16, fontWeight: "600", color: "#FFFFFF", marginBottom: 8, fontFamily: "HelveticaNeue-Medium" },
+  sectionEmptyContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 20,
+  },
+  sectionEmptyText: {
+    fontSize: 16,
+    color: "#888888",
+    textAlign: "center",
+    fontFamily: "HelveticaNeue",
+  },
+  requestActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    alignItems: "center",
+    marginTop: 8,
+  },
+  profilePicInitials: {
+    color: "#000",
+    fontSize: 18,
+    fontWeight: "700",
+    fontFamily: "HelveticaNeue-Bold",
+  },
+  requestsSeparatorLine: {
+    height: 1,
+    backgroundColor: "#333333",
+    marginVertical: 8,
+  },
+  reportLabel: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#FFFFFF",
+    marginBottom: 8,
+    fontFamily: "HelveticaNeue-Medium",
+  },
   chatDetails: { flex: 1, flexDirection: "column" },
-  chatHeaderRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" },
-  chatName: { fontSize: 16, fontWeight: "600", color: "#FFFFFF", fontFamily: "HelveticaNeue-Medium", flex: 1, marginRight: 10 },
-  timeContainer: { 
-    position: "relative", 
-    alignItems: "flex-end" 
+  chatHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "baseline",
+  },
+  chatName: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#FFFFFF",
+    fontFamily: "HelveticaNeue-Medium",
+    flex: 1,
+    marginRight: 10,
+  },
+  timeContainer: {
+    position: "relative",
+    alignItems: "flex-end",
   },
   chatTime: { fontSize: 12, color: "#AAAAAA", fontFamily: "HelveticaNeue" },
-  chatProductName: { fontSize: 13, color: "#BBBBBB", fontFamily: "HelveticaNeue", marginTop: 2, marginBottom: 3 },
+  chatProductName: {
+    fontSize: 13,
+    color: "#BBBBBB",
+    fontFamily: "HelveticaNeue",
+    marginTop: 2,
+    marginBottom: 3,
+  },
   lastMessageRow: { flexDirection: "row", alignItems: "center", marginTop: 2 },
-  purpleDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#9C27B0", marginRight: 5 },
-  greyDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#888888", marginRight: 5 },
-  lastMessage: { fontSize: 14, color: "#CCCCCC", fontFamily: "HelveticaNeue", flexShrink: 1 },
+  purpleDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#9C27B0",
+    marginRight: 5,
+  },
+  greyDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#888888",
+    marginRight: 5,
+  },
+  lastMessage: {
+    fontSize: 14,
+    color: "#CCCCCC",
+    fontFamily: "HelveticaNeue",
+    flexShrink: 1,
+  },
   separatorLine: { height: 0.5, backgroundColor: "#333333", marginLeft: 82 },
   emptyContainer: { marginTop: 50, alignItems: "center" },
   emptyText: { fontSize: 18, color: "#888888", fontFamily: "HelveticaNeue" },
-  acceptButton: { backgroundColor: "#4CAF50", padding: 10, borderRadius: 8, alignItems: "center", justifyContent: "center", marginHorizontal: 5 },
-  rejectButton: { backgroundColor: "#F44336", padding: 10, borderRadius: 8, alignItems: "center", justifyContent: "center", marginHorizontal: 5 },
+  acceptButton: {
+    backgroundColor: "#4CAF50",
+    padding: 10,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    marginHorizontal: 5,
+  },
+  rejectButton: {
+    backgroundColor: "#F44336",
+    padding: 10,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    marginHorizontal: 5,
+  },
   buttonDisabled: { backgroundColor: "#888888", opacity: 0.5 },
   modalSafeArea: { flex: 1 },
   modalContainer: { flex: 1 },
@@ -1376,34 +1744,104 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginRight: 10,
   },
-  headerProfilePicInitials: { fontSize: 16, fontWeight: "700", color: "#000", fontFamily: "HelveticaNeue-Bold" },
+  headerProfilePicInitials: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#000",
+    fontFamily: "HelveticaNeue-Bold",
+  },
   chatHeaderTextContainer: { flexDirection: "column", flexShrink: 1 },
-  chatHeaderUserName: { fontSize: 16, fontWeight: "700", color: "#FFFFFF", fontFamily: "HelveticaNeue-Bold" },
-  chatHeaderSubTitle: { fontSize: 13, color: "#BBBBBB", fontFamily: "HelveticaNeue", marginTop: 2 },
-  chatHeaderBottomLine: { position: "absolute", bottom: 0, left: 0, right: 0, height: 1, backgroundColor: "#333333" },
+  chatHeaderUserName: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#FFFFFF",
+    fontFamily: "HelveticaNeue-Bold",
+  },
+  chatHeaderSubTitle: {
+    fontSize: 13,
+    color: "#BBBBBB",
+    fontFamily: "HelveticaNeue",
+    marginTop: 2,
+  },
+  chatHeaderBottomLine: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 1,
+    backgroundColor: "#333333",
+  },
   messagesList: { flexGrow: 1, paddingVertical: 10, paddingHorizontal: 10 },
   messageContainer: { marginBottom: 10, flexDirection: "row", maxWidth: "80%" },
   myMessageContainer: { alignSelf: "flex-end" },
   theirMessageContainer: { alignSelf: "flex-start" },
-  messageBubble: { borderRadius: 14, padding: 8, maxWidth: "100%", flexDirection: "row", alignItems: "flex-end", flexWrap: "wrap", position: "relative" },
+  messageBubble: {
+    borderRadius: 14,
+    padding: 8,
+    maxWidth: "100%",
+    flexDirection: "row",
+    alignItems: "flex-end",
+    flexWrap: "wrap",
+    position: "relative",
+  },
   myMessage: { backgroundColor: "#BB86FC", borderTopRightRadius: 0 },
   theirMessage: { backgroundColor: "#222", borderTopLeftRadius: 0 },
   myMessageTextColor: { color: "#000000" },
   theirMessageTextColor: { color: "#FFFFFF" },
   messageText: { fontSize: 16, fontFamily: "HelveticaNeue", flexShrink: 1 },
-  messageTimestamp: { fontSize: 11, fontFamily: "HelveticaNeue", marginLeft: 5 },
+  messageTimestamp: {
+    fontSize: 11,
+    fontFamily: "HelveticaNeue",
+    marginLeft: 5,
+  },
   myTimestampColor: { color: "#333333" },
   theirTimestampColor: { color: "#999999" },
   messageImage: { width: 200, height: 200, borderRadius: 10, marginRight: 5 },
   inputBarContainer: { backgroundColor: "#000" },
   inputBarLine: { height: 1, backgroundColor: "#333333" },
-  inputContainer: { flexDirection: "row", alignItems: "center", backgroundColor: "#1E1E1E", paddingVertical: 8, paddingHorizontal: 5 },
-  messageInput: { flex: 1, color: "#FFFFFF", paddingHorizontal: 10, fontSize: 16, fontFamily: "HelveticaNeue", maxHeight: 100 },
+  inputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#1E1E1E",
+    paddingVertical: 8,
+    paddingHorizontal: 5,
+  },
+  messageInput: {
+    flex: 1,
+    color: "#FFFFFF",
+    paddingHorizontal: 10,
+    fontSize: 16,
+    fontFamily: "HelveticaNeue",
+    maxHeight: 100,
+  },
   iconButton: { marginHorizontal: 5 },
-  sendButton: { backgroundColor: "#BB86FC", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 8, justifyContent: "center", alignItems: "center", marginLeft: 5 },
-  emptyMessagesContainer: { flex: 1, justifyContent: "center", alignItems: "center", marginTop: 20 },
-  emptyMessagesText: { fontSize: 16, color: "#888888", textAlign: "center", fontFamily: "HelveticaNeue" },
-  imagePreviewContainer: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#000" },
+  sendButton: {
+    backgroundColor: "#BB86FC",
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    justifyContent: "center",
+    alignItems: "center",
+    marginLeft: 5,
+  },
+  emptyMessagesContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 20,
+  },
+  emptyMessagesText: {
+    fontSize: 16,
+    color: "#888888",
+    textAlign: "center",
+    fontFamily: "HelveticaNeue",
+  },
+  imagePreviewContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#000",
+  },
   previewImage: { width, height: undefined, aspectRatio: 1 },
   addImageButton: { marginLeft: "auto" },
   requestsModalContainer: {
@@ -1423,17 +1861,53 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   requestsSafeArea: { flex: 1 },
-  requestsHeader: { flexDirection: "row", alignItems: "center", paddingHorizontal: 20, marginBottom: 10 },
+  requestsHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    marginBottom: 10,
+  },
   closeButton: { padding: 5 },
-  requestsHeaderTitle: { fontSize: 20, fontWeight: "700", color: "#BB86FC", fontFamily: "HelveticaNeue-Bold", marginLeft: 10 },
-  requestsTabsRow: { flexDirection: "row", justifyContent: "center", marginBottom: 10 },
-  requestsTab: { flex: 1, alignItems: "center", paddingVertical: 10, marginHorizontal: 10, borderRadius: 20, backgroundColor: "#2C2C2C" },
+  requestsHeaderTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#BB86FC",
+    fontFamily: "HelveticaNeue-Bold",
+    marginLeft: 10,
+  },
+  requestsTabsRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    marginBottom: 10,
+  },
+  requestsTab: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 10,
+    marginHorizontal: 10,
+    borderRadius: 20,
+    backgroundColor: "#2C2C2C",
+  },
   activeRequestsTab: { backgroundColor: "#BB86FC" },
-  requestsTabText: { color: "#BBBBBB", fontSize: 14, fontFamily: "HelveticaNeue-Medium" },
+  requestsTabText: {
+    color: "#BBBBBB",
+    fontSize: 14,
+    fontFamily: "HelveticaNeue-Medium",
+  },
   activeRequestsTabText: { color: "#000" },
   requestsContent: { flex: 1, paddingHorizontal: 20, paddingBottom: 20 },
-  requestsErrorContainer: { flex: 1, justifyContent: "center", alignItems: "center", paddingHorizontal: 20 },
-  requestsErrorText: { color: "#FF3B30", fontSize: 14, textAlign: "center", fontFamily: "HelveticaNeue" },
+  requestsErrorContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 20,
+  },
+  requestsErrorText: {
+    color: "#FF3B30",
+    fontSize: 14,
+    textAlign: "center",
+    fontFamily: "HelveticaNeue",
+  },
   requestCard: {
     backgroundColor: "#2C2C2C",
     paddingVertical: 12,
@@ -1447,7 +1921,13 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   requestInfo: { marginBottom: 8 },
-  requestProductName: { fontSize: 16, fontWeight: "700", color: "#BB86FC", fontFamily: "HelveticaNeue-Bold", marginBottom: 3 },
+  requestProductName: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#BB86FC",
+    fontFamily: "HelveticaNeue-Bold",
+    marginBottom: 3,
+  },
   requestDate: { fontSize: 12, color: "#AAAAAA", fontFamily: "HelveticaNeue" },
   reportButton: { marginLeft: 10 },
   reportContent: { flex: 1, padding: 20, backgroundColor: "#000" },
@@ -1466,21 +1946,87 @@ const styles = StyleSheet.create({
   dropdownPlaceholderText: { color: "#888", fontSize: 14 },
   dropdownSelectedText: { color: "#FFFFFF", fontSize: 14, fontWeight: "bold" },
   dropdownIcon: { marginLeft: "auto" },
-  dropdownAbsoluteOverlay: { position: "absolute", top: 60, left: 0, right: 0, backgroundColor: "transparent", zIndex: 10 },
-  dropdownAbsoluteContainer: { backgroundColor: "#1E1E1E", marginHorizontal: 20, borderRadius: 8 },
+  dropdownAbsoluteOverlay: {
+    position: "absolute",
+    top: 60,
+    left: 0,
+    right: 0,
+    backgroundColor: "transparent",
+    zIndex: 10,
+  },
+  dropdownAbsoluteContainer: {
+    backgroundColor: "#1E1E1E",
+    marginHorizontal: 20,
+    borderRadius: 8,
+  },
   dropdownOption: { paddingVertical: 12, paddingHorizontal: 15 },
   dropdownOptionText: { color: "#FFFFFF", fontWeight: "bold", fontSize: 16 },
-  otherReasonInput: { backgroundColor: "#333", color: "#fff", borderRadius: 6, paddingHorizontal: 10, height: 40, marginBottom: 10, fontFamily: "HelveticaNeue", fontSize: 14 },
-  reportDescriptionInput: { backgroundColor: "#333", color: "#fff", borderRadius: 6, padding: 15, minHeight: 80, textAlignVertical: "top", marginBottom: 15, fontFamily: "HelveticaNeue", fontSize: 16 },
-  reportInfoText: { fontSize: 12, color: "#AAAAAA", marginBottom: 15, fontFamily: "HelveticaNeue" },
-  reportSubmitButton: { backgroundColor: "#BB86FC", paddingVertical: 10, borderRadius: 6, alignItems: "center", marginBottom: 10 },
-  reportSubmitButtonText: { color: "#000", fontSize: 16, fontFamily: "HelveticaNeue-Bold" },
-  modalContent: { backgroundColor: "#1E1E1E", padding: 30, borderRadius: 15, alignItems: "center", gap: 15 },
+  otherReasonInput: {
+    backgroundColor: "#333",
+    color: "#fff",
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    height: 40,
+    marginBottom: 10,
+    fontFamily: "HelveticaNeue",
+    fontSize: 14,
+  },
+  reportDescriptionInput: {
+    backgroundColor: "#333",
+    color: "#fff",
+    borderRadius: 6,
+    padding: 15,
+    minHeight: 80,
+    textAlignVertical: "top",
+    marginBottom: 15,
+    fontFamily: "HelveticaNeue",
+    fontSize: 16,
+  },
+  reportInfoText: {
+    fontSize: 12,
+    color: "#AAAAAA",
+    marginBottom: 15,
+    fontFamily: "HelveticaNeue",
+  },
+  reportSubmitButton: {
+    backgroundColor: "#BB86FC",
+    paddingVertical: 10,
+    borderRadius: 6,
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  reportSubmitButtonText: {
+    color: "#000",
+    fontSize: 16,
+    fontFamily: "HelveticaNeue-Bold",
+  },
+  modalContent: {
+    backgroundColor: "#1E1E1E",
+    padding: 30,
+    borderRadius: 15,
+    alignItems: "center",
+    gap: 15,
+  },
   modalText: { fontSize: 18, fontWeight: "600", color: "#fff" },
-  popupOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", alignItems: "center" },
-  popupContainer: { backgroundColor: "#1E1E1E", padding: 20, borderRadius: 8, alignItems: "center" },
+  popupOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  popupContainer: {
+    backgroundColor: "#1E1E1E",
+    padding: 20,
+    borderRadius: 8,
+    alignItems: "center",
+  },
   popupText: { color: "#FFFFFF", fontSize: 16, marginBottom: 10 },
-  popupButton: { backgroundColor: "#BB86FC", paddingHorizontal: 20, paddingVertical: 8, borderRadius: 6 },
+  popupButton: {
+    backgroundColor: "#BB86FC",
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 6,
+  },
   popupButtonText: { color: "#000", fontSize: 16, fontWeight: "bold" },
   // Updated unread badge style: absolutely positioned underneath the time text
   unreadBadge: {
@@ -1492,12 +2038,11 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     alignSelf: "center", // Ensures it stays centered under the time text
   },
-  
+
   unreadBadgeText: {
     color: "#000000", // Black text for the number
     fontSize: 10,
     fontWeight: "bold",
     textAlign: "center",
   },
-  
 });

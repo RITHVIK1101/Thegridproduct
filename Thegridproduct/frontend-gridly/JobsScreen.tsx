@@ -1,5 +1,3 @@
-// JobsScreen.tsx
-
 import React, { useState, useRef, useEffect, useContext } from "react";
 import {
   View,
@@ -201,7 +199,8 @@ const JobsScreen: React.FC = () => {
           gig.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
           gig.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
           gig.description.toLowerCase().includes(searchQuery.toLowerCase());
-        const matchCategory = currentFilter === "All" || gig.category === currentFilter;
+        const matchCategory =
+          currentFilter === "All" || gig.category === currentFilter;
         return matchSearch && matchCategory;
       })
     : [];
@@ -554,9 +553,7 @@ const JobsScreen: React.FC = () => {
                       <Text style={styles.gigDescription}>
                         {truncateDescription(gig.description, 60)}
                       </Text>
-                      <Text style={styles.gigPrice}>
-                        ${displayedPrice}
-                      </Text>
+                      <Text style={styles.gigPrice}>${displayedPrice}</Text>
                     </View>
                     <Ionicons
                       name="chevron-forward"
@@ -686,7 +683,10 @@ const JobsScreen: React.FC = () => {
                           </Text>
                         </View>
                         <Text style={styles.gigDescription}>
-                          {truncateDescription((msg as GigMessage).gig.description, 60)}
+                          {truncateDescription(
+                            (msg as GigMessage).gig.description,
+                            60
+                          )}
                         </Text>
                         <Text style={styles.gigPrice}>
                           ${getDisplayedPrice((msg as GigMessage).gig.price)}

@@ -60,13 +60,14 @@ const JobDetails: React.FC = () => {
   const [isModalVisible, setIsModalVisible] = useState<boolean>(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [autoplay, setAutoplay] = useState<boolean>(true);
-  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState<boolean>(false);
+  const [isDescriptionExpanded, setIsDescriptionExpanded] =
+    useState<boolean>(false);
 
   // Reference to the Swiper
   const swiperRef = useRef<SwiperFlatList>(null);
 
   // Autoplay timing configuration
-  const autoplayDelaySeconds = 2;  // Delay before first image slides
+  const autoplayDelaySeconds = 2; // Delay before first image slides
   const autoplayIntervalSeconds = 3; // Time each image is displayed
   const transitionPauseMs = autoplayIntervalSeconds * 1000; // Pause at last image
 
@@ -126,17 +127,54 @@ const JobDetails: React.FC = () => {
       setJobDetail(data);
     } catch (error) {
       console.error("Error fetching job details:", error);
-      Alert.alert("Error", "Unable to fetch job details. Please try again later.");
+      Alert.alert(
+        "Error",
+        "Unable to fetch job details. Please try again later."
+      );
       navigation.goBack();
     } finally {
       setLoading(false);
     }
   };
 
-  const handleMessagePress = () => {
-    if (!jobDetail) return;
-    const chatId = `chat_${userId}_${jobDetail.userId}`;
-    navigation.navigate("Messaging", { chatId, userId: jobDetail.userId });
+  const handleMessagePress = async () => {
+    if (!jobDetail || !userId || !token) {
+      Alert.alert("Error", "Missing required data. Please try again.");
+      return;
+    }
+
+    try {
+      const response = await fetch(`${NGROK_URL}/chat/request`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          senderId: userId, // The current user
+          receiverId: jobDetail.userId, // The job poster
+          referenceId: jobDetail.id, // Job ID
+          referenceType: "gig", // Indicates it's a job gig request
+          message: `Hey! I’m interested in your job listing: "${jobDetail.title}"`, // Optional message
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        Alert.alert("Success", "Chat request sent successfully!");
+        // Navigate to the Messaging screen, passing the chatId if available
+        navigation.navigate("Messaging", { chatId: data.chatId || null });
+      } else {
+        throw new Error(data.message || "Failed to send chat request.");
+      }
+    } catch (error) {
+      console.error("Error sending chat request:", error);
+      Alert.alert(
+        "Error",
+        error.message || "Failed to send request. Please try again."
+      );
+    }
   };
 
   const openImageModal = (imageUrl: string) => {
@@ -166,7 +204,10 @@ const JobDetails: React.FC = () => {
   const renderSwiperItem = ({ item }: { item: string }) => {
     const imageUrl = item.startsWith("http") ? item : `${NGROK_URL}/${item}`;
     return (
-      <TouchableOpacity onPress={() => openImageModal(imageUrl)} activeOpacity={0.8}>
+      <TouchableOpacity
+        onPress={() => openImageModal(imageUrl)}
+        activeOpacity={0.8}
+      >
         <Image
           source={{ uri: imageUrl }}
           style={styles.swiperImage}
@@ -252,7 +293,10 @@ const JobDetails: React.FC = () => {
         onRequestClose={closeImageModal}
         animationType="fade"
       >
-        <TouchableOpacity style={styles.modalBackground} onPress={closeImageModal}>
+        <TouchableOpacity
+          style={styles.modalBackground}
+          onPress={closeImageModal}
+        >
           {selectedImage && (
             <Image
               source={{ uri: selectedImage }}
@@ -305,20 +349,33 @@ const JobDetails: React.FC = () => {
         {/* Additional Details */}
         <View style={styles.additionalDetails}>
           <DetailItem label="Delivery Time" value={jobDetail.deliveryTime} />
-          <DetailItem label="Campus Presence" value={jobDetail.campusPresence} />
+          <DetailItem
+            label="Campus Presence"
+            value={jobDetail.campusPresence}
+          />
           <DetailItem label="University" value={jobDetail.university} />
-          <DetailItem label="Expiration Date" value={jobDetail.expirationDate} />
+          <DetailItem
+            label="Expiration Date"
+            value={jobDetail.expirationDate}
+          />
         </View>
 
         {/* Message Button */}
-        <TouchableOpacity style={styles.messageButton} onPress={handleMessagePress}>
+        <TouchableOpacity
+          style={styles.messageButton}
+          onPress={handleMessagePress}
+        >
           <LinearGradient
             colors={["#8E2DE2", "#4A00E0"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.messageButtonGradient}
           >
-            <Ionicons name="chatbubble-ellipses-outline" size={20} color="#fff" />
+            <Ionicons
+              name="chatbubble-ellipses-outline"
+              size={20}
+              color="#fff"
+            />
             <Text style={styles.messageButtonText}>Message</Text>
           </LinearGradient>
         </TouchableOpacity>

@@ -16,14 +16,18 @@ export interface Message {
 }
 
 export interface Conversation {
-  chatID: string; 
-  productID: string; 
-  productTitle: string; 
-  user: User; // The other participant's user information
-  latestMessage?: string; // Optional: preview of the latest message
-  latestTimestamp?: string; // Optional: timestamp of the latest message
-  messages?: Message[]; // Optional: array of messages in the conversation
+  chatID: string;
+  productID?: string;
+  productTitle?: string;
+  user: User;
+  latestMessage?: string;
+  latestTimestamp?: string;
+  messages?: Message[];
+  referenceType?: "products" | "gigs";
+  referenceTitle?: string; // ✅ Added to store either a productTitle or a gigTitle
 }
+
+
 export type Cart = {
   userId: string;
   items: Array<{
