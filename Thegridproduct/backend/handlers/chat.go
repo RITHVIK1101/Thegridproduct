@@ -22,21 +22,22 @@ import (
 	"cloud.google.com/go/firestore"
 )
 
-// EnrichedChat represents a chat with additional product and user details.
 type EnrichedChat struct {
 	ChatID          string `json:"chatID"`
-	ProductID       string `json:"productID"`
-	ProductTitle    string `json:"productTitle"`
+	ReferenceID     string `json:"referenceId"`
+	ReferenceTitle  string `json:"referenceTitle"` // ✅ Correct field for both products & gigs
+	ReferenceType   string `json:"referenceType"`
 	User            User   `json:"user"`
 	LatestMessage   string `json:"latestMessage,omitempty"`
 	LatestTimestamp string `json:"latestTimestamp,omitempty"`
 }
 
-// EnrichedChatRequest represents a chat request with product name included.
+// EnrichedChatRequest represents a chat request with product/gig title included.
 type EnrichedChatRequest struct {
 	RequestID       string `json:"requestId"`
-	ProductID       string `json:"productId"`
-	ProductTitle    string `json:"productTitle"`
+	ReferenceID     string `json:"referenceId"`
+	ReferenceTitle  string `json:"referenceTitle"` // ✅ Add this field
+	ReferenceType   string `json:"referenceType"`  // ✅ Ensure this field exists
 	BuyerID         string `json:"buyerId"`
 	SellerID        string `json:"sellerId"`
 	Status          string `json:"status"`
@@ -63,17 +64,23 @@ func (e *AppError) Error() string {
 	return e.Message
 }
 
-// GetChatHandler fetches chat details by product ID.
+// GetChatHandler fetches chat details by reference ID (product or gig).
 func GetChatHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	productIDStr, ok := vars["productId"]
-	if !ok || productIDStr == "" {
-		WriteJSONError(w, "Product ID is required", http.StatusBadRequest)
+	referenceIDStr, ok := vars["referenceId"] // Can be either ProductID or GigID
+	if !ok || referenceIDStr == "" {
+		WriteJSONError(w, "Reference ID is required", http.StatusBadRequest)
+		return
+	}
+
+	referenceType, ok := vars["referenceType"] // "product" or "gig"
+	if !ok || (referenceType != "product" && referenceType != "gig") {
+		WriteJSONError(w, "Valid referenceType (product or gig) is required", http.StatusBadRequest)
 		return
 	}
 
 	// Fetch chat from MongoDB
-	chat, err := db.GetChatByProductID(productIDStr)
+	chat, err := db.GetChatByReferenceID(referenceIDStr, referenceType)
 	if err != nil {
 		WriteJSONError(w, "Chat not found", http.StatusNotFound)
 		return
@@ -109,11 +116,12 @@ func GetChatHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Construct response
 	enrichedChat := map[string]interface{}{
-		"chatID":    chat.ID.Hex(),
-		"productID": chat.ProductID.Hex(),
-		"buyerID":   chat.BuyerID.Hex(),
-		"sellerID":  chat.SellerID.Hex(),
-		"messages":  messages,
+		"chatID":        chat.ID.Hex(),
+		"referenceID":   chat.ReferenceID.Hex(),
+		"referenceType": chat.ReferenceType,
+		"buyerID":       chat.BuyerID.Hex(),
+		"sellerID":      chat.SellerID.Hex(),
+		"messages":      messages,
 	}
 
 	WriteJSON(w, enrichedChat, http.StatusOK)
@@ -127,16 +135,15 @@ func GetChatsByUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Fetch chats from MongoDB
+	// Fetch all chats (both product and gig based) from MongoDB
 	chats, err := db.FindChatsByUser(userIDStr)
 	if err != nil {
 		WriteJSONError(w, "Failed to fetch chats", http.StatusInternalServerError)
 		return
 	}
 
-	// Initialize Firestore client with credentials
 	ctx := context.Background()
-	client, err := firestore.NewClient(ctx, "gridlychat", option.WithCredentialsJSON(serviceAccountJSON)) // Add credentials here
+	client, err := firestore.NewClient(ctx, "gridlychat", option.WithCredentialsJSON(serviceAccountJSON))
 	if err != nil {
 		log.Printf("Failed to create Firestore client: %v", err)
 		WriteJSONError(w, "Internal server error", http.StatusInternalServerError)
@@ -146,13 +153,30 @@ func GetChatsByUserHandler(w http.ResponseWriter, r *http.Request) {
 
 	var enrichedChats []EnrichedChat
 	for _, c := range chats {
-		product, err := db.GetProductByID(c.ProductID.Hex())
-		if err != nil {
-			log.Printf("Failed to fetch product details for productID %s: %v", c.ProductID.Hex(), err)
-			continue
+		var referenceTitle string
+		var referenceType string
+		var otherUserID primitive.ObjectID
+
+		// Determine the type of chat (Product or Gig)
+		if c.ReferenceType == "product" {
+			product, err := db.GetProductByID(c.ReferenceID.Hex())
+			if err != nil {
+				log.Printf("❌ Failed to fetch product details for productID %s: %v", c.ReferenceID.Hex(), err)
+				continue
+			}
+			referenceTitle = product.Title
+			referenceType = "product"
+		} else if c.ReferenceType == "gig" {
+			gig, err := db.GetGigByID(c.ReferenceID.Hex())
+			if err != nil {
+				log.Printf("❌ Failed to fetch gig details for gigID %s: %v", c.ReferenceID.Hex(), err)
+				continue
+			}
+			referenceTitle = gig.Title
+			referenceType = "gig"
 		}
 
-		var otherUserID primitive.ObjectID
+		// Identify the other user in the chat
 		if c.BuyerID.Hex() == userIDStr {
 			otherUserID = c.SellerID
 		} else {
@@ -161,7 +185,7 @@ func GetChatsByUserHandler(w http.ResponseWriter, r *http.Request) {
 
 		otherUser, err := db.GetUserByID(otherUserID.Hex())
 		if err != nil {
-			log.Printf("Failed to fetch user details for userID %s: %v", otherUserID.Hex(), err)
+			log.Printf("❌ Failed to fetch user details for userID %s: %v", otherUserID.Hex(), err)
 			continue
 		}
 
@@ -169,35 +193,42 @@ func GetChatsByUserHandler(w http.ResponseWriter, r *http.Request) {
 		chatDocRef := client.Collection("chatRooms").Doc(c.ID.Hex())
 		docSnap, err := chatDocRef.Get(ctx)
 		if err != nil {
-			log.Printf("No Firestore chat found for chatID %s: %v", c.ID.Hex(), err)
+			log.Printf("⚠️ No Firestore chat found for chatID %s: %v", c.ID.Hex(), err)
 			continue
 		}
 
 		// Parse Firestore messages
 		var messages []models.Message
-		messagesData, ok := docSnap.Data()["messages"].([]interface{})
-		if !ok {
-			log.Printf("Failed to parse messages for chatID %s", c.ID.Hex())
+		messagesData, exists := docSnap.Data()["messages"]
+		if !exists {
+			log.Printf("ℹ️ No messages found for chatID %s", c.ID.Hex())
 			continue
 		}
 
-		for _, msg := range messagesData {
+		messageSlice, ok := messagesData.([]interface{})
+		if !ok {
+			log.Printf("❌ Failed to parse messages for chatID %s (Type Assertion Failed)", c.ID.Hex())
+			continue
+		}
+
+		// Iterate over messages properly
+		for _, msg := range messageSlice {
 			msgMap, ok := msg.(map[string]interface{})
 			if !ok {
-				log.Println("Skipping message due to type mismatch")
+				log.Printf("⚠️ Skipping message due to type mismatch in chatID %s", c.ID.Hex())
 				continue
 			}
 
 			// Parse the timestamp
 			timestampStr, ok := msgMap["timestamp"].(string)
 			if !ok {
-				log.Println("Skipping message due to missing timestamp")
+				log.Printf("⚠️ Skipping message due to missing timestamp in chatID %s", c.ID.Hex())
 				continue
 			}
 
 			parsedTime, err := time.Parse(time.RFC3339, timestampStr)
 			if err != nil {
-				log.Println("Skipping message due to timestamp parsing error:", err)
+				log.Printf("⚠️ Skipping message due to timestamp parsing error in chatID %s: %v", c.ID.Hex(), err)
 				continue
 			}
 
@@ -213,10 +244,12 @@ func GetChatsByUserHandler(w http.ResponseWriter, r *http.Request) {
 
 		latestMessage, latestTimestamp := getLatestMessageAndTimestamp(messages)
 
+		// Append enriched chat details
 		enrichedChat := EnrichedChat{
 			ChatID:          c.ID.Hex(),
-			ProductID:       c.ProductID.Hex(),
-			ProductTitle:    product.Title,
+			ReferenceID:     c.ReferenceID.Hex(),
+			ReferenceTitle:  referenceTitle,
+			ReferenceType:   referenceType,
 			User:            User{FirstName: otherUser.FirstName, LastName: otherUser.LastName},
 			LatestMessage:   latestMessage,
 			LatestTimestamp: latestTimestamp,
@@ -330,27 +363,36 @@ func GetMessagesHandler(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, messages, http.StatusOK)
 }
 
-// RequestChatHandler creates a pending chat request when a user clicks "Buy".
 func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
+	// Decode request body
 	var req struct {
-		ProductID string `json:"productId"`
-		BuyerID   string `json:"buyerId"`
-		SellerID  string `json:"sellerId"`
+		ReferenceID   string `json:"referenceId"`   // Can be ProductID or GigID
+		ReferenceType string `json:"referenceType"` // "product" or "gig"
+		BuyerID       string `json:"buyerId"`
+		SellerID      string `json:"sellerId"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		WriteJSONError(w, "Invalid request payload", http.StatusBadRequest)
 		return
 	}
-	if req.ProductID == "" || req.BuyerID == "" || req.SellerID == "" {
+
+	// Validate input
+	if req.ReferenceID == "" || req.ReferenceType == "" || req.BuyerID == "" || req.SellerID == "" {
 		WriteJSONError(w, "All fields are required", http.StatusBadRequest)
 		return
 	}
 
-	productObjectID, err := primitive.ObjectIDFromHex(req.ProductID)
+	if req.ReferenceType != "product" && req.ReferenceType != "gig" {
+		WriteJSONError(w, "Invalid referenceType, must be 'product' or 'gig'", http.StatusBadRequest)
+		return
+	}
+
+	// Convert IDs to ObjectID
+	referenceObjectID, err := primitive.ObjectIDFromHex(req.ReferenceID)
 	if err != nil {
-		WriteJSONError(w, "Invalid Product ID format", http.StatusBadRequest)
+		WriteJSONError(w, "Invalid Reference ID format", http.StatusBadRequest)
 		return
 	}
 	buyerObjectID, err := primitive.ObjectIDFromHex(req.BuyerID)
@@ -375,27 +417,33 @@ func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 	callback := func(sessCtx mongo.SessionContext) (interface{}, error) {
 		chatRequests := db.GetCollection("gridlyapp", "chat_requests")
 		productsCol := db.GetCollection("gridlyapp", "products")
+		gigsCol := db.GetCollection("gridlyapp", "gigs")
 		cartCol := db.GetCollection("gridlyapp", "carts")
 
-		// Validate product availability
-		var product models.Product
-		err := productsCol.FindOne(sessCtx, bson.M{"_id": productObjectID}).Decode(&product)
-		if err != nil {
-			if err == mongo.ErrNoDocuments {
-				return nil, &AppError{Message: "Product not found", StatusCode: http.StatusNotFound}
-			}
-			return nil, err
-		}
-		if product.Status != "inshop" {
-			return nil, &AppError{Message: "Product is not available for purchase", StatusCode: http.StatusBadRequest}
+		// Determine which collection to query
+		var collection *mongo.Collection
+		if req.ReferenceType == "product" {
+			collection = productsCol
+		} else {
+			collection = gigsCol
 		}
 
-		// Check if there's already a pending chat request for this product
+		// Validate that the reference exists
+		count, err := collection.CountDocuments(sessCtx, bson.M{"_id": referenceObjectID})
+		if err != nil {
+			return nil, err
+		}
+		if count == 0 {
+			return nil, &AppError{Message: fmt.Sprintf("%s not found", req.ReferenceType), StatusCode: http.StatusNotFound}
+		}
+
+		// Check if there's already a pending chat request for this reference
 		existingRequest := models.ChatRequest{}
 		findErr := chatRequests.FindOne(sessCtx, bson.M{
-			"productId": productObjectID,
-			"buyerId":   buyerObjectID,
-			"status":    models.ChatRequestStatusPending,
+			"referenceId":   referenceObjectID,
+			"referenceType": req.ReferenceType,
+			"buyerId":       buyerObjectID,
+			"status":        models.ChatRequestStatusPending,
 		}).Decode(&existingRequest)
 		if findErr == nil {
 			return nil, &AppError{Message: "Chat request already pending", StatusCode: http.StatusConflict}
@@ -403,44 +451,47 @@ func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 			return nil, findErr
 		}
 
-		chatRequest := models.NewChatRequest(productObjectID, buyerObjectID, sellerObjectID)
+		// Create the chat request
+		chatRequest := models.NewChatRequest(referenceObjectID, req.ReferenceType, buyerObjectID, sellerObjectID)
 		_, err = chatRequests.InsertOne(sessCtx, chatRequest)
 		if err != nil {
 			return nil, err
 		}
 
-		// Update product's chat count
-		update := bson.M{"$inc": bson.M{"chatCount": 1}}
-		var updatedProduct models.Product
-		err = productsCol.FindOneAndUpdate(
-			sessCtx,
-			bson.M{"_id": productObjectID},
-			update,
-			options.FindOneAndUpdate().SetReturnDocument(options.After),
-		).Decode(&updatedProduct)
-		if err != nil {
-			return nil, err
-		}
-
-		// If chat count reaches 3, mark the product as "talks"
-		if updatedProduct.ChatCount >= 5 && updatedProduct.Status != "talks" {
-			_, err = productsCol.UpdateOne(
+		// 🔥 **If it's a product, update the chat count & check status**
+		if req.ReferenceType == "product" {
+			update := bson.M{"$inc": bson.M{"chatCount": 1}}
+			var updatedProduct models.Product
+			err = productsCol.FindOneAndUpdate(
 				sessCtx,
-				bson.M{"_id": productObjectID},
-				bson.M{"$set": bson.M{"status": "talks"}},
-			)
+				bson.M{"_id": referenceObjectID},
+				update,
+				options.FindOneAndUpdate().SetReturnDocument(options.After),
+			).Decode(&updatedProduct)
 			if err != nil {
 				return nil, err
 			}
-		}
 
-		// Remove product from buyer's cart
-		filter := bson.M{"userId": buyerObjectID}
-		updateCart := bson.M{"$pull": bson.M{"items": bson.M{"productId": productObjectID}}}
-		_, err = cartCol.UpdateOne(sessCtx, filter, updateCart)
-		if err != nil {
-			log.Printf("Failed to remove product from cart: %v", err)
-			return nil, err
+			// If chat count reaches 5, mark the product as "talks"
+			if updatedProduct.ChatCount >= 5 && updatedProduct.Status != "talks" {
+				_, err = productsCol.UpdateOne(
+					sessCtx,
+					bson.M{"_id": referenceObjectID},
+					bson.M{"$set": bson.M{"status": "talks"}},
+				)
+				if err != nil {
+					return nil, err
+				}
+			}
+
+			// Remove product from buyer's cart
+			filter := bson.M{"userId": buyerObjectID}
+			updateCart := bson.M{"$pull": bson.M{"items": bson.M{"productId": referenceObjectID}}}
+			_, err = cartCol.UpdateOne(sessCtx, filter, updateCart)
+			if err != nil {
+				log.Printf("Failed to remove product from cart: %v", err)
+				return nil, err
+			}
 		}
 
 		return nil, nil
@@ -459,11 +510,9 @@ func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{
-		"message": "Chat request sent successfully and product removed from cart",
+		"message": "Chat request sent successfully",
 	})
 }
-
-// AcceptChatRequestHandler accepts a pending chat request and creates a chat.
 func AcceptChatRequestHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -520,9 +569,10 @@ func AcceptChatRequestHandler(w http.ResponseWriter, r *http.Request) {
 		// Check if a chat already exists
 		var existingChat models.Chat
 		err = chatsCol.FindOne(sessCtx, bson.M{
-			"productId": chatReq.ProductID,
-			"buyerId":   chatReq.BuyerID,
-			"sellerId":  chatReq.SellerID,
+			"referenceId":   chatReq.ReferenceID,
+			"buyerId":       chatReq.BuyerID,
+			"sellerId":      chatReq.SellerID,
+			"referenceType": chatReq.ReferenceType,
 		}).Decode(&existingChat)
 		if err == nil {
 			return nil, &AppError{Message: "Chat already exists for this request", StatusCode: http.StatusConflict}
@@ -530,7 +580,8 @@ func AcceptChatRequestHandler(w http.ResponseWriter, r *http.Request) {
 			return nil, err
 		}
 
-		newChat = models.NewChat(chatReq.ProductID, chatReq.BuyerID, chatReq.SellerID)
+		// ✅ Create the new chat
+		newChat = models.NewChat(chatReq.ReferenceID, chatReq.ReferenceType, chatReq.BuyerID, chatReq.SellerID)
 		_, err = chatsCol.InsertOne(sessCtx, newChat)
 		if err != nil {
 			return nil, err
@@ -550,12 +601,14 @@ func AcceptChatRequestHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Create Firestore chat room asynchronously.
-	// (Make sure the parameters are passed in the correct order:
-	// newChatID, buyerID, sellerID, productID)
+	// ✅ Create Firestore chat room asynchronously
 	go func() {
-		if err := createFirestoreChatRoom(newChat.ID.Hex(), newChat.BuyerID.Hex(), newChat.SellerID.Hex(), newChat.ProductID.Hex()); err != nil {
-			log.Printf("Failed to create Firestore chat room for chat %s: %v", newChat.ID.Hex(), err)
+		log.Printf("Attempting to create Firestore chat room for chat: %s", newChat.ID.Hex())
+		err := createFirestoreChatRoom(newChat.ID.Hex(), newChat.BuyerID.Hex(), newChat.SellerID.Hex(), newChat.ReferenceID.Hex(), newChat.ReferenceType)
+		if err != nil {
+			log.Printf("🔥 Firestore chat room creation failed for chat %s: %v", newChat.ID.Hex(), err)
+		} else {
+			log.Printf("✅ Firestore chat room successfully created for chat: %s", newChat.ID.Hex())
 		}
 	}()
 
@@ -593,6 +646,7 @@ func RejectChatRequestHandler(w http.ResponseWriter, r *http.Request) {
 	callback := func(sessCtx mongo.SessionContext) (interface{}, error) {
 		chatRequests := db.GetCollection("gridlyapp", "chat_requests")
 		productsCol := db.GetCollection("gridlyapp", "products")
+		gigsCol := db.GetCollection("gridlyapp", "gigs")
 
 		requestObjID, err := primitive.ObjectIDFromHex(req.RequestID)
 		if err != nil {
@@ -612,16 +666,27 @@ func RejectChatRequestHandler(w http.ResponseWriter, r *http.Request) {
 			return nil, &AppError{Message: "Chat request is not pending", StatusCode: http.StatusBadRequest}
 		}
 
+		// Update chat request status to "rejected"
 		update := bson.M{"$set": bson.M{"status": models.ChatRequestStatusRejected}}
 		_, err = chatRequests.UpdateOne(sessCtx, bson.M{"_id": requestObjID}, update)
 		if err != nil {
 			return nil, err
 		}
 
-		// Decrease chat count for the product.
-		_, err = productsCol.UpdateOne(
+		// Determine which collection to update chat count
+		var collection *mongo.Collection
+		if chatReq.ReferenceType == "product" {
+			collection = productsCol
+		} else if chatReq.ReferenceType == "gig" {
+			collection = gigsCol
+		} else {
+			return nil, &AppError{Message: "Invalid reference type", StatusCode: http.StatusInternalServerError}
+		}
+
+		// Decrease chat count for the referenced item (product or gig)
+		_, err = collection.UpdateOne(
 			sessCtx,
-			bson.M{"_id": chatReq.ProductID},
+			bson.M{"_id": chatReq.ReferenceID},
 			bson.M{"$inc": bson.M{"chatCount": -1}},
 		)
 		if err != nil {
@@ -658,11 +723,10 @@ func getLatestMessageAndTimestamp(messages []models.Message) (string, string) {
 	return latestMsg, latestTime
 }
 
-// GetChatRequestsHandler retrieves all chat requests for a user.
 func GetChatRequestsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	// Assumes that the middleware has set a userID in the context using a key named userIDKey.
+	// Assumes middleware set userID in context
 	userID, ok := r.Context().Value(userIDKey).(string)
 	if !ok || userID == "" {
 		WriteJSONError(w, "Unauthorized: UserID not found in token", http.StatusUnauthorized)
@@ -679,15 +743,14 @@ func GetChatRequestsHandler(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	chatRequestsCol := db.GetCollection("gridlyapp", "chat_requests")
-	// Only include pending requests by adding the status filter.
+
+	// Only include pending requests
 	filter := bson.M{
 		"$and": []bson.M{
-			{
-				"$or": []bson.M{
-					{"buyerId": userObjID},
-					{"sellerId": userObjID},
-				},
-			},
+			{"$or": []bson.M{
+				{"buyerId": userObjID},
+				{"sellerId": userObjID},
+			}},
 			{"status": models.ChatRequestStatusPending},
 		},
 	}
@@ -708,12 +771,31 @@ func GetChatRequestsHandler(w http.ResponseWriter, r *http.Request) {
 
 	var incomingRequests []EnrichedChatRequest
 	var outgoingRequests []EnrichedChatRequest
+
 	for _, req := range chatRequests {
-		product, err := db.GetProductByID(req.ProductID.Hex())
-		if err != nil {
-			log.Printf("Failed to fetch product details for productID %s: %v", req.ProductID.Hex(), err)
-			continue
+		var referenceTitle string
+		var referenceType string
+
+		// ✅ Fetch the correct reference title based on type (product or gig)
+		if req.ReferenceType == "product" {
+			product, err := db.GetProductByID(req.ReferenceID.Hex())
+			if err != nil {
+				log.Printf("Failed to fetch product details for referenceID %s: %v", req.ReferenceID.Hex(), err)
+				continue
+			}
+			referenceTitle = product.Title
+			referenceType = "product"
+		} else if req.ReferenceType == "gig" {
+			gig, err := db.GetGigByID(req.ReferenceID.Hex())
+			if err != nil {
+				log.Printf("Failed to fetch gig details for referenceID %s: %v", req.ReferenceID.Hex(), err)
+				continue
+			}
+			referenceTitle = gig.Title
+			referenceType = "gig"
 		}
+
+		// ✅ Fetch buyer and seller details
 		buyer, err := db.GetUserByID(req.BuyerID.Hex())
 		if err != nil {
 			log.Printf("Failed to fetch buyer details for buyerID %s: %v", req.BuyerID.Hex(), err)
@@ -725,10 +807,12 @@ func GetChatRequestsHandler(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
+		// ✅ Create the enriched chat request object
 		enrichedReq := EnrichedChatRequest{
 			RequestID:       req.ID.Hex(),
-			ProductID:       req.ProductID.Hex(),
-			ProductTitle:    product.Title,
+			ReferenceID:     req.ReferenceID.Hex(),
+			ReferenceTitle:  referenceTitle, // ✅ Fix: Now assigned correctly
+			ReferenceType:   referenceType,  // ✅ Fix: Now assigned correctly
 			BuyerID:         req.BuyerID.Hex(),
 			SellerID:        req.SellerID.Hex(),
 			Status:          req.Status,
@@ -739,7 +823,7 @@ func GetChatRequestsHandler(w http.ResponseWriter, r *http.Request) {
 			SellerLastName:  seller.LastName,
 		}
 
-		// Separate incoming vs. outgoing based on whether the user is the buyer or seller.
+		// ✅ Separate into incoming or outgoing requests
 		if req.BuyerID.Hex() == userID {
 			outgoingRequests = append(outgoingRequests, enrichedReq)
 		} else if req.SellerID.Hex() == userID {
@@ -747,13 +831,13 @@ func GetChatRequestsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// ✅ Send the final response
 	WriteJSON(w, map[string]interface{}{
 		"incomingRequests": incomingRequests,
 		"outgoingRequests": outgoingRequests,
 	}, http.StatusOK)
 }
 
-// serviceAccountJSON holds the Firebase service account credentials.
 var serviceAccountJSON = []byte(`{
   "type": "service_account",
   "project_id": "gridlychat",
@@ -768,8 +852,8 @@ var serviceAccountJSON = []byte(`{
   "universe_domain": "googleapis.com"
 }`)
 
-// createFirestoreChatRoom creates a new chat room in Firestore.
-func createFirestoreChatRoom(newChatID, buyerID, sellerID, productID string) error {
+// createFirestoreChatRoom creates a new chat room in Firestore for both products and gigs.
+func createFirestoreChatRoom(chatID, buyerID, sellerID, referenceID, referenceType string) error {
 	ctx := context.Background()
 	client, err := firestore.NewClient(ctx, "gridlychat", option.WithCredentialsJSON(serviceAccountJSON))
 	if err != nil {
@@ -777,21 +861,22 @@ func createFirestoreChatRoom(newChatID, buyerID, sellerID, productID string) err
 	}
 	defer client.Close()
 
-	docRef := client.Collection("chatRooms").Doc(newChatID)
+	docRef := client.Collection("chatRooms").Doc(chatID)
 	data := map[string]interface{}{
-		"chatID":    newChatID,
-		"productID": productID,
-		"buyerID":   buyerID,
-		"sellerID":  sellerID,
-		"createdAt": time.Now().Format(time.RFC3339),
-		"messages":  []interface{}{},
+		"chatID":        chatID,
+		"referenceID":   referenceID,   // ✅ Can be either a ProductID or a GigID
+		"referenceType": referenceType, // ✅ "product" or "gig"
+		"buyerID":       buyerID,
+		"sellerID":      sellerID,
+		"createdAt":     time.Now().Format(time.RFC3339),
+		"messages":      []interface{}{},
 	}
 
 	_, err = docRef.Set(ctx, data)
 	if err != nil {
 		return fmt.Errorf("failed to create Firestore chat room: %v", err)
 	}
-	log.Printf("Firestore chat room created: %s", newChatID)
+	log.Printf("Firestore chat room created: %s (Type: %s)", chatID, referenceType)
 	return nil
 }
 

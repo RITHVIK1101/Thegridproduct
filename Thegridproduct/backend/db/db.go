@@ -99,6 +99,30 @@ func GetCollection(database, collection string) *mongo.Collection {
 	return MongoDBClient.Database(database).Collection(collection)
 }
 
+// GetGigByID fetches a gig by its ObjectID.
+func GetGigByID(gigIDStr string) (*models.Gig, error) {
+	// Convert string ID to MongoDB ObjectID
+	gigObjectID, err := primitive.ObjectIDFromHex(gigIDStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid Gig ID format")
+	}
+
+	// Get gigs collection
+	collection := GetCollection("gridlyapp", "gigs")
+
+	// Search for the gig
+	var gig models.Gig
+	err = collection.FindOne(context.TODO(), bson.M{"_id": gigObjectID}).Decode(&gig)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, fmt.Errorf("gig not found")
+		}
+		return nil, err
+	}
+
+	return &gig, nil
+}
+
 // CreateChat creates a new chat document (using a string ID or letting Mongo handle _id)
 func CreateChat(chat *models.Chat) error {
 	col := GetCollection("gridlyapp", "chats")
@@ -221,19 +245,29 @@ func GetChatByProductID(productID string) (*models.Chat, error) {
 	return &chat, nil
 }
 
-// GetChatByID loads a single Chat doc by its _id (string)
-func GetChatByID(chatID string) (*models.Chat, error) {
-	col := GetCollection("gridlyapp", "chats")
-
-	var chat models.Chat
-	if err := col.FindOne(context.TODO(), bson.M{"_id": chatID}).Decode(&chat); err != nil {
-		if err == mongo.ErrNoDocuments {
-			log.Printf("Chat with ID '%s' not found", chatID)
-			return nil, errors.New("chat not found")
-		}
-		log.Printf("Error fetching chat by ID '%s': %v", chatID, err)
-		return nil, fmt.Errorf("error fetching chat: %v", err)
+// GetChatByReferenceID fetches a chat based on reference ID (Product or Gig) and type.
+func GetChatByReferenceID(referenceIDStr, referenceType string) (*models.Chat, error) {
+	// Convert string ID to MongoDB ObjectID
+	referenceObjectID, err := primitive.ObjectIDFromHex(referenceIDStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid Reference ID format")
 	}
+
+	// Get chats collection
+	collection := GetCollection("gridlyapp", "chats")
+
+	// Search for the chat where referenceID matches and the type is correct
+	filter := bson.M{"referenceId": referenceObjectID, "referenceType": referenceType}
+	var chat models.Chat
+
+	err = collection.FindOne(context.TODO(), filter).Decode(&chat)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, fmt.Errorf("chat not found")
+		}
+		return nil, err
+	}
+
 	return &chat, nil
 }
 
