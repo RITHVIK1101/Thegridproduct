@@ -1,4 +1,6 @@
-import React, { useState, useContext, useRef } from "react";
+// AddGig.tsx
+
+import React, { useState, useContext, useRef, useLayoutEffect } from "react";
 import {
   View,
   Text,
@@ -26,34 +28,19 @@ import { useNavigation } from "@react-navigation/native";
 import { UserContext } from "./UserContext";
 import axios from "axios";
 
-/** Available categories to choose from. */
-const AVAILABLE_CATEGORIES = [
-  "Tutoring",
-  "Design",
-  "Delivering",
-  "Other",
-] as const;
+const AVAILABLE_CATEGORIES = ["Tutoring", "Design", "Delivering", "Other"] as const;
 
-/** Define the multi-step flow with a union type for convenience.
- *  We have 6 steps total.
- */
 type Step = 1 | 2 | 3 | 4 | 5 | 6;
 
-/** Shape of our gig form data. */
 interface FormData {
   title: string;
   category: string;
-  price: string; // numeric or empty
+  price: string; // may be empty if open to communication
   isPriceOpenToComm: boolean;
-  deliveryTime: string; // optional
+  deliveryTime: string;
   description: string;
-  images: string[]; // up to 5
-  /** Expiration date field (optional).
-   *  The gig will become inactive by this time if set.
-   *  If unset (empty), the gig defaults to 30 days.
-   */
+  images: string[];
   expirationDate: string;
-  /** Campus presence field */
   campusPresence: "inCampus" | "flexible";
 }
 
@@ -64,10 +51,23 @@ const AddGig: React.FC = () => {
   const navigation = useNavigation();
   const { userId, token, institution, studentType } = useContext(UserContext);
 
+  // Add a header back button (similar to AddProduct)
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerTitle: "",
+      headerLeft: () => (
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerBackButton}>
+          <Ionicons name="arrow-back" size={24} color="#fff" />
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation]);
+
+  // Multi–step form state
   const [currentStep, setCurrentStep] = useState<Step>(1);
   const [slideAnim] = useState(new Animated.Value(0));
 
-  // Categories modal visibility
+  // Modal for category picker
   const [showCategoriesModal, setShowCategoriesModal] = useState(false);
 
   // Form state
@@ -80,33 +80,29 @@ const AddGig: React.FC = () => {
     description: "",
     images: [],
     expirationDate: "",
-    campusPresence: "inCampus", // Default value
+    campusPresence: "inCampus",
   });
 
-  // Delivery time toggle
+  // Toggles for optional fields
   const [noDeliveryRequired, setNoDeliveryRequired] = useState(false);
-
-  // Toggle for expiration date
   const [noExpiration, setNoExpiration] = useState<boolean>(false);
 
-  // Loading and success states
+  // Loading, success and error states
   const [isLoading, setIsLoading] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [isSuccessModalVisible, setIsSuccessModalVisible] = useState(false);
-
-  // Info modal states (for additional explanations)
-  const [infoModalVisible, setInfoModalVisible] = useState(false);
-  const [infoModalText, setInfoModalText] = useState("");
-
-  // Error toast states
   const [errorMessage, setErrorMessage] = useState("");
   const errorOpacity = useRef(new Animated.Value(0)).current;
 
-  // DateTime Picker states
+  // Info modal state (for extra explanations)
+  const [infoModalVisible, setInfoModalVisible] = useState(false);
+  const [infoModalText, setInfoModalText] = useState("");
+
+  // DateTime Picker state
   const [isDatePickerVisible, setDatePickerVisibility] = useState(false);
 
   // ------------------------------------------------------------------------------
-  // Helper functions for error handling
+  // Show error toast
   // ------------------------------------------------------------------------------
   const showError = (msg: string) => {
     setErrorMessage(msg);
@@ -130,7 +126,7 @@ const AddGig: React.FC = () => {
   };
 
   // ------------------------------------------------------------------------------
-  // Animation for sliding transitions between steps
+  // Slide animation between steps
   // ------------------------------------------------------------------------------
   const animateSlide = (direction: "forward" | "backward") => {
     Animated.sequence([
@@ -148,7 +144,7 @@ const AddGig: React.FC = () => {
   };
 
   // ------------------------------------------------------------------------------
-  // Step navigation functions
+  // Navigation between steps
   // ------------------------------------------------------------------------------
   const handleNext = () => {
     if (!validateCurrentStep()) return;
@@ -168,7 +164,7 @@ const AddGig: React.FC = () => {
   };
 
   // ------------------------------------------------------------------------------
-  // Step validation function
+  // Validation for each step
   // ------------------------------------------------------------------------------
   const validateCurrentStep = (): boolean => {
     switch (currentStep) {
@@ -184,15 +180,12 @@ const AddGig: React.FC = () => {
         return true;
       case 2:
         if (!formData.isPriceOpenToComm && !formData.price.trim()) {
-          showError(
-            "Please specify a price or choose 'Open to Communication'."
-          );
+          showError("Please specify a price or choose 'Open to Communication'.");
           return false;
         }
         return true;
       case 3:
-        // Delivery time is optional, so no strict requirement if blank
-        // Also, campusPresence is always set due to default value
+        // Delivery time is optional; campusPresence has a default value.
         return true;
       case 4:
         if (!formData.description.trim()) {
@@ -201,8 +194,10 @@ const AddGig: React.FC = () => {
         }
         return true;
       case 5:
+        // No required fields on expiration date step
         return true;
       case 6:
+        // Images are optional but you can impose a check if desired (here we allow zero images)
         return true;
       default:
         return false;
@@ -210,7 +205,7 @@ const AddGig: React.FC = () => {
   };
 
   // ------------------------------------------------------------------------------
-  // Submission function
+  // Submit the gig
   // ------------------------------------------------------------------------------
   const handleSubmit = async () => {
     setIsLoading(true);
@@ -221,16 +216,11 @@ const AddGig: React.FC = () => {
       return;
     }
 
-    // Construct the payload
     const payload: any = {
       title: formData.title.trim(),
       category: formData.category,
-      price: formData.isPriceOpenToComm
-        ? "Open to Communication"
-        : formData.price.trim(),
-      deliveryTime: noDeliveryRequired
-        ? "Not Required"
-        : formData.deliveryTime.trim(),
+      price: formData.isPriceOpenToComm ? "Open to Communication" : formData.price.trim(),
+      deliveryTime: noDeliveryRequired ? "Not Required" : formData.deliveryTime.trim(),
       description: formData.description.trim(),
       images: formData.images,
       campusPresence: formData.campusPresence,
@@ -255,11 +245,9 @@ const AddGig: React.FC = () => {
       if (contentType && contentType.includes("application/json")) {
         const data = await response.json();
         if (!response.ok) {
-          throw new Error(
-            data.message || `HTTP error! status: ${response.status}`
-          );
+          throw new Error(data.message || `HTTP error! status: ${response.status}`);
         }
-        // Reset form and states
+        // Reset the form after successful submission
         setFormData({
           title: "",
           category: "",
@@ -276,10 +264,10 @@ const AddGig: React.FC = () => {
         setCurrentStep(1);
         setIsSuccessModalVisible(true);
 
-        // After a 1500ms delay (matching AddProduct), hide the modal and navigate away
+        // Instead of navigating to the dashboard, go back to the previous screen
         setTimeout(() => {
           setIsSuccessModalVisible(false);
-          navigation.navigate("Dashboard");
+          navigation.goBack();
         }, 1500);
       } else {
         const errorText = await response.text();
@@ -288,18 +276,14 @@ const AddGig: React.FC = () => {
       }
     } catch (error: unknown) {
       console.error("Error:", error);
-      showError(
-        error instanceof Error
-          ? error.message
-          : "Failed to post the gig. Please try again."
-      );
+      showError(error instanceof Error ? error.message : "An unknown error occurred.");
     } finally {
       setIsLoading(false);
     }
   };
 
   // ------------------------------------------------------------------------------
-  // Image upload handling
+  // Image upload handler
   // ------------------------------------------------------------------------------
   const handleImageUpload = async () => {
     if (formData.images.length >= 5) {
@@ -317,11 +301,7 @@ const AddGig: React.FC = () => {
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         setIsUploadingImage(true);
-
-        const selectedAssets = result.assets.slice(
-          0,
-          5 - formData.images.length
-        );
+        const selectedAssets = result.assets.slice(0, 5 - formData.images.length);
         const uploadedImages: string[] = [];
 
         for (const asset of selectedAssets) {
@@ -329,11 +309,7 @@ const AddGig: React.FC = () => {
           const manipulatedImage = await ImageManipulator.manipulateAsync(
             uri,
             [{ resize: { width: 800 } }],
-            {
-              compress: 0.7,
-              format: ImageManipulator.SaveFormat.JPEG,
-              base64: true,
-            }
+            { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG, base64: true }
           );
 
           const formDataImage = new FormData();
@@ -345,11 +321,8 @@ const AddGig: React.FC = () => {
 
           try {
             const response = await axios.post(CLOUDINARY_URL, formDataImage, {
-              headers: {
-                "Content-Type": "application/x-www-form-urlencoded",
-              },
+              headers: { "Content-Type": "application/x-www-form-urlencoded" },
             });
-
             const imageUrl = response.data.secure_url;
             uploadedImages.push(imageUrl);
           } catch (error) {
@@ -357,12 +330,10 @@ const AddGig: React.FC = () => {
             showError("Image upload failed. Please try again.");
           }
         }
-
         setFormData((prev) => ({
           ...prev,
           images: [...prev.images, ...uploadedImages],
         }));
-
         setIsUploadingImage(false);
       }
     } catch (error) {
@@ -380,7 +351,7 @@ const AddGig: React.FC = () => {
   };
 
   // ------------------------------------------------------------------------------
-  // Info modal
+  // Info modal handlers
   // ------------------------------------------------------------------------------
   const openInfoModal = (text: string) => {
     setInfoModalText(text);
@@ -413,7 +384,7 @@ const AddGig: React.FC = () => {
   };
 
   // ------------------------------------------------------------------------------
-  // Define multi-step slides
+  // Define multi–step slides
   // ------------------------------------------------------------------------------
   const slides: Record<number, { title: string; content: JSX.Element }> = {
     1: {
@@ -428,7 +399,6 @@ const AddGig: React.FC = () => {
             value={formData.title}
             onChangeText={(text) => setFormData({ ...formData, title: text })}
           />
-
           <Text style={styles.label}>Category</Text>
           <TouchableOpacity
             style={styles.dropdown}
@@ -462,7 +432,6 @@ const AddGig: React.FC = () => {
             />
             <Text style={styles.perHourText}>/hour</Text>
           </View>
-
           <TouchableOpacity
             style={styles.toggleButton}
             onPress={() =>
@@ -474,11 +443,7 @@ const AddGig: React.FC = () => {
             }
           >
             <Ionicons
-              name={
-                formData.isPriceOpenToComm
-                  ? "checkmark-circle"
-                  : "ellipse-outline"
-              }
+              name={formData.isPriceOpenToComm ? "checkmark-circle" : "ellipse-outline"}
               size={24}
               color={formData.isPriceOpenToComm ? "#BB86FC" : "#ccc"}
             />
@@ -492,7 +457,7 @@ const AddGig: React.FC = () => {
       ),
     },
     3: {
-      title: "Delivery Time",
+      title: "Delivery Time & Campus Presence",
       content: (
         <>
           <Text style={styles.label}>Delivery Time</Text>
@@ -501,12 +466,9 @@ const AddGig: React.FC = () => {
             placeholder="e.g., 2 days"
             placeholderTextColor="#888"
             value={formData.deliveryTime}
-            onChangeText={(text) =>
-              setFormData({ ...formData, deliveryTime: text })
-            }
+            onChangeText={(text) => setFormData({ ...formData, deliveryTime: text })}
             editable={!noDeliveryRequired}
           />
-
           <TouchableOpacity
             style={styles.toggleButton}
             onPress={() => {
@@ -521,63 +483,32 @@ const AddGig: React.FC = () => {
               size={24}
               color={noDeliveryRequired ? "#BB86FC" : "#ccc"}
             />
-            <Text style={styles.toggleText}>
-              My gig does not require a delivery time
-            </Text>
+            <Text style={styles.toggleText}>My gig does not require a delivery time</Text>
           </TouchableOpacity>
-
           <View style={styles.campusPresenceSection}>
             <Text style={styles.label}>Campus Presence</Text>
             <View style={styles.campusPresenceContainer}>
               <TouchableOpacity
-                style={[
-                  styles.presenceOption,
-                  formData.campusPresence === "inCampus" &&
-                    styles.presenceOptionSelected,
-                ]}
-                onPress={() =>
-                  setFormData({ ...formData, campusPresence: "inCampus" })
-                }
+                style={styles.presenceOption}
+                onPress={() => setFormData({ ...formData, campusPresence: "inCampus" })}
               >
                 <Ionicons
-                  name={
-                    formData.campusPresence === "inCampus"
-                      ? "checkmark-circle"
-                      : "ellipse-outline"
-                  }
+                  name={formData.campusPresence === "inCampus" ? "checkmark-circle" : "ellipse-outline"}
                   size={24}
-                  color={
-                    formData.campusPresence === "inCampus" ? "#BB86FC" : "#ccc"
-                  }
+                  color={formData.campusPresence === "inCampus" ? "#BB86FC" : "#ccc"}
                 />
-                <Text style={styles.presenceOptionText}>
-                  In Campus Presence Required
-                </Text>
+                <Text style={styles.presenceOptionText}>In Campus Presence Required</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[
-                  styles.presenceOption,
-                  formData.campusPresence === "flexible" &&
-                    styles.presenceOptionSelected,
-                ]}
-                onPress={() =>
-                  setFormData({ ...formData, campusPresence: "flexible" })
-                }
+                style={styles.presenceOption}
+                onPress={() => setFormData({ ...formData, campusPresence: "flexible" })}
               >
                 <Ionicons
-                  name={
-                    formData.campusPresence === "flexible"
-                      ? "checkmark-circle"
-                      : "ellipse-outline"
-                  }
+                  name={formData.campusPresence === "flexible" ? "checkmark-circle" : "ellipse-outline"}
                   size={24}
-                  color={
-                    formData.campusPresence === "flexible" ? "#BB86FC" : "#ccc"
-                  }
+                  color={formData.campusPresence === "flexible" ? "#BB86FC" : "#ccc"}
                 />
-                <Text style={styles.presenceOptionText}>
-                  In and Out of Campus is Fine
-                </Text>
+                <Text style={styles.presenceOptionText}>In and Out of Campus is Fine</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -596,9 +527,7 @@ const AddGig: React.FC = () => {
             multiline
             numberOfLines={6}
             value={formData.description}
-            onChangeText={(text) =>
-              setFormData({ ...formData, description: text })
-            }
+            onChangeText={(text) => setFormData({ ...formData, description: text })}
           />
         </>
       ),
@@ -616,14 +545,9 @@ const AddGig: React.FC = () => {
                 )
               }
             >
-              <Ionicons
-                name="information-circle-outline"
-                size={20}
-                color="#BB86FC"
-              />
+              <Ionicons name="information-circle-outline" size={20} color="#BB86FC" />
             </TouchableOpacity>
           </View>
-
           <TouchableOpacity
             style={styles.toggleButton}
             onPress={() => {
@@ -639,18 +563,12 @@ const AddGig: React.FC = () => {
               color={noExpiration ? "#BB86FC" : "#ccc"}
             />
             <Text style={styles.toggleText}>
-              {noExpiration
-                ? "No Expiration (30-day default)"
-                : "Use No Expiration Date"}
+              {noExpiration ? "No Expiration (30-day default)" : "Use No Expiration Date"}
             </Text>
           </TouchableOpacity>
-
           {!noExpiration && (
             <>
-              <TouchableOpacity
-                style={styles.datePickerButton}
-                onPress={showDatePicker}
-              >
+              <TouchableOpacity style={styles.datePickerButton} onPress={showDatePicker}>
                 <Text style={styles.datePickerText}>
                   {formData.expirationDate
                     ? new Date(formData.expirationDate).toLocaleString()
@@ -658,13 +576,10 @@ const AddGig: React.FC = () => {
                 </Text>
                 <Ionicons name="calendar-outline" size={20} color="#BB86FC" />
               </TouchableOpacity>
-
               {formData.expirationDate ? (
                 <TouchableOpacity
                   style={styles.clearDateButton}
-                  onPress={() =>
-                    setFormData((prev) => ({ ...prev, expirationDate: "" }))
-                  }
+                  onPress={() => setFormData((prev) => ({ ...prev, expirationDate: "" }))}
                 >
                   <Ionicons name="trash-outline" size={20} color="#BB86FC" />
                   <Text style={styles.clearDateButtonText}>Clear Date</Text>
@@ -672,11 +587,9 @@ const AddGig: React.FC = () => {
               ) : null}
             </>
           )}
-
           <Text style={styles.optionalText}>
             If no expiration date is set, your gig will be inactive after 30 days.
           </Text>
-
           <DateTimePickerModal
             isVisible={isDatePickerVisible}
             mode="datetime"
@@ -700,49 +613,29 @@ const AddGig: React.FC = () => {
               <ActivityIndicator size="small" color="#fff" />
             ) : (
               <>
-                <Ionicons
-                  name="cloud-upload-outline"
-                  size={24}
-                  color="#BB86FC"
-                />
+                <Ionicons name="cloud-upload-outline" size={24} color="#BB86FC" />
                 <Text style={styles.uploadButtonText}>
-                  {formData.images.length > 0
-                    ? "Add More Images"
-                    : "Upload Images"}
+                  {formData.images.length > 0 ? "Add More Images" : "Upload Images"}
                 </Text>
               </>
             )}
           </TouchableOpacity>
-
           <View style={styles.imagesContainer}>
             {formData.images.map((image, index) => (
               <View key={index} style={styles.imageContainer}>
                 <Image source={{ uri: image }} style={styles.image} />
-                <TouchableOpacity
-                  style={styles.removeButton}
-                  onPress={() => removeImage(index)}
-                >
-                  <Ionicons
-                    name="close-circle-outline"
-                    size={24}
-                    color="#BB86FC"
-                  />
+                <TouchableOpacity style={styles.removeButton} onPress={() => removeImage(index)}>
+                  <Ionicons name="close-circle-outline" size={24} color="#BB86FC" />
                 </TouchableOpacity>
               </View>
             ))}
           </View>
-
-          <Text style={styles.optionalText}>
-            You can upload up to 5 images.
-          </Text>
+          <Text style={styles.optionalText}>You can upload up to 5 images.</Text>
         </>
       ),
     },
   };
 
-  // ------------------------------------------------------------------------------
-  // Render
-  // ------------------------------------------------------------------------------
   return (
     <KeyboardAvoidingView
       style={styles.outerContainer}
@@ -768,12 +661,8 @@ const AddGig: React.FC = () => {
           <Text style={styles.errorToastText}>{errorMessage}</Text>
         </Animated.View>
       ) : null}
-
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <ScrollView
-          style={styles.container}
-          contentContainerStyle={{ paddingBottom: 40 }}
-        >
+        <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
           <View style={styles.progressContainer}>
             {[1, 2, 3, 4, 5, 6].map((stepNumber) => (
               <View
@@ -785,7 +674,6 @@ const AddGig: React.FC = () => {
               />
             ))}
           </View>
-
           <Animated.View
             style={[
               styles.slideContainer,
@@ -804,13 +692,10 @@ const AddGig: React.FC = () => {
             <Text style={styles.stepTitle}>{slides[currentStep].title}</Text>
             {slides[currentStep].content}
           </Animated.View>
-
           <View
             style={[
               styles.buttonContainer,
-              {
-                justifyContent: currentStep > 1 ? "space-between" : "flex-end",
-              },
+              { justifyContent: currentStep > 1 ? "space-between" : "flex-end" },
             ]}
           >
             {currentStep > 1 && (
@@ -819,35 +704,18 @@ const AddGig: React.FC = () => {
                 <Text style={styles.backButtonText}>Back</Text>
               </TouchableOpacity>
             )}
-
-            <TouchableOpacity
-              style={[
-                styles.nextButton,
-                isLoading && currentStep === 6 && styles.buttonDisabled,
-              ]}
-              onPress={handleNext}
-              disabled={isLoading && currentStep === 6}
-            >
+            <TouchableOpacity style={styles.nextButton} onPress={handleNext} disabled={isLoading}>
               {isLoading && currentStep === 6 ? (
                 <ActivityIndicator size="small" color="#fff" />
               ) : (
                 <>
-                  <Text style={styles.nextButtonText}>
-                    {currentStep === 6 ? "Post Gig" : "Next"}
-                  </Text>
-                  {currentStep < 6 && (
-                    <Ionicons name="arrow-forward" size={24} color="#fff" />
-                  )}
+                  <Text style={styles.nextButtonText}>{currentStep === 6 ? "Post Gig" : "Next"}</Text>
+                  {currentStep < 6 && <Ionicons name="arrow-forward" size={24} color="#fff" />}
                 </>
               )}
             </TouchableOpacity>
           </View>
-
-          <Modal
-            transparent
-            visible={isSuccessModalVisible}
-            animationType="fade"
-          >
+          <Modal transparent visible={isSuccessModalVisible} animationType="fade">
             <View style={styles.modalOverlay}>
               <View style={styles.modalContent}>
                 <Ionicons name="checkmark-circle" size={60} color="#9C27B0" />
@@ -855,36 +723,23 @@ const AddGig: React.FC = () => {
               </View>
             </View>
           </Modal>
-
           <Modal transparent visible={infoModalVisible} animationType="fade">
-            <TouchableOpacity
-              style={styles.modalOverlay}
-              activeOpacity={1}
-              onPressOut={closeInfoModal}
-            >
+            <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPressOut={closeInfoModal}>
               <View style={styles.infoModalContent}>
                 <Text style={styles.infoModalText}>{infoModalText}</Text>
-                <TouchableOpacity
-                  style={styles.closeInfoButton}
-                  onPress={closeInfoModal}
-                >
+                <TouchableOpacity style={styles.closeInfoButton} onPress={closeInfoModal}>
                   <Text style={styles.closeInfoButtonText}>Close</Text>
                 </TouchableOpacity>
               </View>
             </TouchableOpacity>
           </Modal>
-
           <Modal
             transparent
             visible={showCategoriesModal}
             animationType="fade"
             onRequestClose={() => setShowCategoriesModal(false)}
           >
-            <TouchableOpacity
-              style={styles.modalOverlay}
-              activeOpacity={1}
-              onPressOut={() => setShowCategoriesModal(false)}
-            >
+            <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPressOut={() => setShowCategoriesModal(false)}>
               <View style={styles.modalPickerContent}>
                 <Text style={styles.modalTitle}>Select a Category</Text>
                 {AVAILABLE_CATEGORIES.map((cat) => (
@@ -902,6 +757,13 @@ const AddGig: React.FC = () => {
               </View>
             </TouchableOpacity>
           </Modal>
+          <DateTimePickerModal
+            isVisible={isDatePickerVisible}
+            mode="datetime"
+            onConfirm={handleConfirm}
+            onCancel={hideDatePicker}
+            minimumDate={new Date()}
+          />
         </ScrollView>
       </TouchableWithoutFeedback>
     </KeyboardAvoidingView>
@@ -911,6 +773,9 @@ const AddGig: React.FC = () => {
 export default AddGig;
 
 const styles = StyleSheet.create({
+  headerBackButton: {
+    marginLeft: 15,
+  },
   outerContainer: {
     flex: 1,
     backgroundColor: "#000000",
@@ -1097,6 +962,7 @@ const styles = StyleSheet.create({
   backButton: {
     flexDirection: "row",
     alignItems: "center",
+    padding: 15,
     gap: 10,
   },
   backButtonText: {
@@ -1112,9 +978,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 30,
     borderRadius: 12,
     gap: 10,
-  },
-  buttonDisabled: {
-    backgroundColor: "#3A3A3A",
   },
   nextButtonText: {
     color: "#fff",
@@ -1199,7 +1062,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 10,
   },
-  presenceOptionSelected: {},
   presenceOptionText: {
     color: "#fff",
     fontSize: 16,
