@@ -1,6 +1,6 @@
 // AddProduct.tsx
 
-import React, { useState, useContext, useRef } from "react";
+import React, { useState, useContext, useRef, useLayoutEffect } from "react";
 import {
   View,
   Text,
@@ -67,6 +67,18 @@ interface FormData {
 const AddProduct: React.FC = () => {
   const navigation = useNavigation();
   const { userId, token, institution, studentType } = useContext(UserContext);
+
+  // Instead of hiding the header back button, we add one.
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerTitle: "",
+      headerLeft: () => (
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerBackButton}>
+          <Ionicons name="arrow-back" size={24} color="#fff" />
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation]);
 
   const [step, setStep] = useState(1);
   const [slideAnim] = useState(new Animated.Value(0));
@@ -367,7 +379,7 @@ const AddProduct: React.FC = () => {
       } else if (formData.listingType === "Both") {
         backendAvailability = "On and Off Campus";
       } else {
-        // selling only
+        // Selling only
         switch (formData.availability) {
           case "In Campus":
             backendAvailability = "In Campus Only";
@@ -426,6 +438,7 @@ const AddProduct: React.FC = () => {
         if (!response.ok) {
           throw new Error(data.message || `HTTP error! status: ${response.status}`);
         }
+        // Reset the form data after successful submission
         setFormData({
           images: [],
           title: "",
@@ -444,9 +457,10 @@ const AddProduct: React.FC = () => {
         });
         setIsSuccessModalVisible(true);
 
+        // After a short delay, close the modal and go back to the previous screen
         setTimeout(() => {
           setIsSuccessModalVisible(false);
-          navigation.navigate("Dashboard");
+          navigation.goBack();
         }, 1500);
       } else {
         const errorText = await response.text();
@@ -1037,6 +1051,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
+  },
+  headerBackButton: {
+    marginLeft: 15,
   },
   errorToast: {
     position: "absolute",
