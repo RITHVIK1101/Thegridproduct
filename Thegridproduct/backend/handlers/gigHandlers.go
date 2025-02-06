@@ -505,9 +505,11 @@ func GetAllGigsHandler(w http.ResponseWriter, r *http.Request) {
 	// - `expired` is `false`
 	// - `status` is `active`
 	// - `campusPresence` is `flexible` (show to everyone) OR `inCampus` but matching user institution
+	// - 🔥 Exclude gigs where `userId` matches the current user's ID
 	filter := bson.M{
 		"status":  "active",
 		"expired": false,
+		"userId":  bson.M{"$ne": userObjID}, // Exclude user's own gigs
 		"$or": []bson.M{
 			{"campusPresence": "flexible"},                                 // Show all "flexible" gigs
 			{"campusPresence": "inCampus", "university": user.Institution}, // Match institution for "inCampus"
