@@ -9,7 +9,6 @@ import {
   ScrollView,
   Image,
   TouchableOpacity,
-  Alert,
   Dimensions,
   Modal,
 } from "react-native";
@@ -41,12 +40,9 @@ interface JobDetail {
   campusPresence: string; // New field for Campus Presence
   expirationDate: string; // New field for Expiration Date
   postedDate: string; // Date Posted
-  // Removed studentType and status
 }
 
 const { width } = Dimensions.get("window");
-
-// Configure how many characters to display before "Read More"
 const DESCRIPTION_CHAR_LIMIT = 200;
 
 const JobDetails: React.FC = () => {
@@ -63,13 +59,18 @@ const JobDetails: React.FC = () => {
   const [isDescriptionExpanded, setIsDescriptionExpanded] =
     useState<boolean>(false);
 
+  // States for custom modals (confirmation, success, error)
+  const [showConfirmModal, setShowConfirmModal] = useState<boolean>(false);
+  const [showSuccessModal, setShowSuccessModal] = useState<boolean>(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
   // Reference to the Swiper
   const swiperRef = useRef<SwiperFlatList>(null);
 
   // Autoplay timing configuration
-  const autoplayDelaySeconds = 2; // Delay before first image slides
-  const autoplayIntervalSeconds = 3; // Time each image is displayed
-  const transitionPauseMs = autoplayIntervalSeconds * 1000; // Pause at last image
+  const autoplayDelaySeconds = 2;
+  const autoplayIntervalSeconds = 3;
+  const transitionPauseMs = autoplayIntervalSeconds * 1000;
 
   useEffect(() => {
     fetchJobDetails();
@@ -127,19 +128,23 @@ const JobDetails: React.FC = () => {
       setJobDetail(data);
     } catch (error) {
       console.error("Error fetching job details:", error);
-      Alert.alert(
-        "Error",
-        "Unable to fetch job details. Please try again later."
-      );
       navigation.goBack();
     } finally {
       setLoading(false);
     }
   };
 
-  const handleMessagePress = async () => {
+  // Called when the "Message" button is pressed.
+  // Instead of immediately sending a chat request, we show a confirmation modal.
+  const onMessageButtonPress = () => {
+    setShowConfirmModal(true);
+  };
+
+  // Called when user confirms sending the chat request.
+  const confirmSendChatRequest = async () => {
+    setShowConfirmModal(false);
     if (!jobDetail || !userId || !token) {
-      Alert.alert("Error", "Missing required data. Please try again.");
+      setErrorMessage("Missing required data. Please try again.");
       return;
     }
 
@@ -151,7 +156,7 @@ const JobDetails: React.FC = () => {
       sellerId: jobDetail.userId,
     };
 
-    console.log("📤 Sending Chat Request:", payload); // Log exact payload
+    console.log("📤 Sending Chat Request:", payload);
 
     try {
       const response = await fetch(`${NGROK_URL}/chat/request`, {
@@ -164,34 +169,31 @@ const JobDetails: React.FC = () => {
       });
 
       const data = await response.json();
-      console.log("🚀 API Response:", data); // Log full response
+      console.log("🚀 API Response:", data);
 
       if (response.ok) {
-        Alert.alert("Success", "Chat request sent successfully!");
-        navigation.navigate("Messaging", { chatId: data.chatId || null });
+        // Show success modal to notify the user.
+        setShowSuccessModal(true);
       } else {
         console.error("⚠️ API Error:", data);
         throw new Error(data.error || "Failed to send chat request.");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("🚨 Error sending chat request:", error);
-      Alert.alert(
-        "Error",
-        error.message || "Failed to send request. Please try again."
-      );
+      setErrorMessage(error.message || "Failed to send request. Please try again.");
     }
   };
 
   const openImageModal = (imageUrl: string) => {
     setSelectedImage(imageUrl);
     setIsModalVisible(true);
-    setAutoplay(false); // Pause autoplay while modal is open
+    setAutoplay(false);
   };
 
   const closeImageModal = () => {
     setIsModalVisible(false);
     setSelectedImage(null);
-    setAutoplay(true); // Resume autoplay
+    setAutoplay(true);
   };
 
   // Reusable component to display label & value
@@ -239,14 +241,11 @@ const JobDetails: React.FC = () => {
 
   const displayedImages = jobDetail.images.slice(0, 5);
   const lastImageIndex = displayedImages.length - 1;
-
-  // Description logic: truncated vs. full
   const { description = "" } = jobDetail;
   const isLongDescription = description.length > DESCRIPTION_CHAR_LIMIT;
   const truncatedDescription = isLongDescription
     ? description.slice(0, DESCRIPTION_CHAR_LIMIT) + "..."
     : description;
-
   const displayedDescription = isDescriptionExpanded
     ? description
     : truncatedDescription;
@@ -261,7 +260,7 @@ const JobDetails: React.FC = () => {
             autoplay={autoplay}
             autoplayDelay={autoplayDelaySeconds}
             autoplayInterval={autoplayIntervalSeconds}
-            autoplayLoop={false} // We'll manually handle returning to the first image
+            autoplayLoop={false}
             index={0}
             showPagination
             paginationStyle={styles.paginationStyle}
@@ -269,9 +268,10 @@ const JobDetails: React.FC = () => {
             paginationActiveColor="#BB86FC"
             data={displayedImages}
             renderItem={renderSwiperItem}
-            keyExtractor={(item, index) => `${jobDetail.id}_image_${index}`}
+            keyExtractor={(item, index) =>
+              `${jobDetail.id}_image_${index}`
+            }
             onChangeIndex={({ index }) => {
-              // If we're at the last image, wait, then smoothly slide back to index 0
               if (index === lastImageIndex) {
                 setTimeout(() => {
                   if (swiperRef.current) {
@@ -312,12 +312,84 @@ const JobDetails: React.FC = () => {
         </TouchableOpacity>
       </Modal>
 
+      {/* Confirmation Modal */}
+      <Modal
+        visible={showConfirmModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowConfirmModal(false)}
+      >
+        <View style={styles.popupContainer}>
+          <View style={styles.popupContent}>
+            <Text style={styles.popupTitle}>Confirm Chat Request</Text>
+            <Text style={styles.popupMessage}>
+              Are you sure you want to send a chat request? Once sent, please wait until the other person accepts it.
+            </Text>
+            <View style={styles.popupButtons}>
+              <TouchableOpacity
+                style={[styles.popupButton, styles.cancelButton]}
+                onPress={() => setShowConfirmModal(false)}
+              >
+                <Text style={styles.popupButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.popupButton, styles.confirmButton]}
+                onPress={confirmSendChatRequest}
+              >
+                <Text style={styles.popupButtonText}>Confirm</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Success Modal */}
+      <Modal
+        visible={showSuccessModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowSuccessModal(false)}
+      >
+        <View style={styles.popupContainer}>
+          <View style={styles.popupContent}>
+            <Text style={styles.popupTitle}>Chat Request Sent</Text>
+            <Text style={styles.popupMessage}>
+              Your chat request has been sent. Please wait until the other person accepts it.
+            </Text>
+            <TouchableOpacity
+              style={[styles.bubbleButton]}
+              onPress={() => setShowSuccessModal(false)}
+            >
+              <Text style={styles.bubbleButtonText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Error Modal */}
+      <Modal
+        visible={errorMessage !== null}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setErrorMessage(null)}
+      >
+        <View style={styles.popupContainer}>
+          <View style={styles.popupContent}>
+            <Text style={styles.popupTitle}>Error</Text>
+            <Text style={styles.popupMessage}>{errorMessage}</Text>
+            <TouchableOpacity
+              style={[styles.bubbleButton]}
+              onPress={() => setErrorMessage(null)}
+            >
+              <Text style={styles.bubbleButtonText}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       {/* Details Container */}
       <View style={styles.detailsContainer}>
-        {/* Title */}
         <Text style={styles.title}>{jobDetail.title}</Text>
-
-        {/* Description (with Read More / Read Less) */}
         <Text style={styles.description}>{displayedDescription}</Text>
         {isLongDescription && (
           <TouchableOpacity
@@ -328,8 +400,6 @@ const JobDetails: React.FC = () => {
             </Text>
           </TouchableOpacity>
         )}
-
-        {/* Category/Type */}
         <View style={styles.categoryRow}>
           <Ionicons
             name={categoryIcons[jobDetail.category] || "grid-outline"}
@@ -339,39 +409,26 @@ const JobDetails: React.FC = () => {
           />
           <Text style={styles.category}>{jobDetail.category}</Text>
         </View>
-
-        {/* Price */}
         <Text style={styles.price}>
           Price:{" "}
           {jobDetail.price.toLowerCase() === "open to communication"
             ? "Open to Communication"
             : `$${parseFloat(jobDetail.price).toFixed(2)}`}
         </Text>
-
-        {/* Date Posted */}
         <Text style={styles.datePosted}>Posted on {jobDetail.postedDate}</Text>
-
-        {/* Additional Details */}
         <View style={styles.additionalDetails}>
           <DetailItem label="Delivery Time" value={jobDetail.deliveryTime} />
-          <DetailItem
-            label="Campus Presence"
-            value={jobDetail.campusPresence}
-          />
+          <DetailItem label="Campus Presence" value={jobDetail.campusPresence} />
           <DetailItem label="University" value={jobDetail.university} />
-          <DetailItem
-            label="Expiration Date"
-            value={jobDetail.expirationDate}
-          />
+          <DetailItem label="Expiration Date" value={jobDetail.expirationDate} />
         </View>
-
         {/* Message Button */}
         <TouchableOpacity
           style={styles.messageButton}
-          onPress={handleMessagePress}
+          onPress={onMessageButtonPress}
         >
           <LinearGradient
-            colors={["#8E2DE2", "#4A00E0"]}
+            colors={["#8E2DE2", "#4A00E0"]} // Purplish gradient
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.messageButtonGradient}
@@ -406,7 +463,7 @@ export default JobDetails;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#000000", // Pure black background
+    backgroundColor: "#000000",
   },
   loadingContainer: {
     flex: 1,
@@ -423,7 +480,6 @@ const styles = StyleSheet.create({
     height: 250,
     borderRadius: 15,
   },
-  // If no images, display a simple "No material provided." text
   noMaterialContainer: {
     marginTop: 10,
     marginBottom: 10,
@@ -457,9 +513,9 @@ const styles = StyleSheet.create({
   },
   description: {
     color: "#E0E0E0",
-    fontSize: 20, // Larger font for readability
+    fontSize: 20,
     lineHeight: 28,
-    marginBottom: 5, // Slightly less margin to place "Read More" closer
+    marginBottom: 5,
   },
   readMoreText: {
     color: "#BB86FC",
@@ -517,7 +573,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 6,
-    elevation: 8, // For Android shadow
+    elevation: 8,
   },
   messageButtonGradient: {
     flexDirection: "row",
@@ -544,5 +600,70 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     borderRadius: 15,
+  },
+  /* Popup Modal Styles */
+  popupContainer: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  popupContent: {
+    backgroundColor: "#1E1E1E",
+    borderRadius: 10,
+    padding: 20,
+    width: "100%",
+    maxWidth: 400,
+    alignItems: "center",
+  },
+  popupTitle: {
+    color: "#FFFFFF",
+    fontSize: 20,
+    fontWeight: "700",
+    marginBottom: 10,
+    textAlign: "center",
+  },
+  popupMessage: {
+    color: "#E0E0E0",
+    fontSize: 16,
+    textAlign: "center",
+    marginBottom: 20,
+  },
+  popupButtons: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    width: "100%",
+  },
+  popupButton: {
+    flex: 1,
+    paddingVertical: 12,
+    marginHorizontal: 5,
+    borderRadius: 5,
+    alignItems: "center",
+  },
+  confirmButton: {
+    backgroundColor: "#4A00E0", // Purplish button style
+  },
+  cancelButton: {
+    backgroundColor: "#555555",
+  },
+  popupButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  // Bubble style for the "Close" and error OK button
+  bubbleButton: {
+    backgroundColor: "#4A00E0",
+    borderRadius: 30,
+    paddingVertical: 12,
+    paddingHorizontal: 25,
+    alignSelf: "center",
+  },
+  bubbleButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });
