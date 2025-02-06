@@ -143,6 +143,16 @@ const JobDetails: React.FC = () => {
       return;
     }
 
+    // Build payload
+    const payload = {
+      referenceId: jobDetail.id,
+      referenceType: "gig",
+      buyerId: userId,
+      sellerId: jobDetail.userId,
+    };
+
+    console.log("📤 Sending Chat Request:", payload); // Log exact payload
+
     try {
       const response = await fetch(`${NGROK_URL}/chat/request`, {
         method: "POST",
@@ -150,26 +160,21 @@ const JobDetails: React.FC = () => {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          senderId: userId, // The current user
-          receiverId: jobDetail.userId, // The job poster
-          referenceId: jobDetail.id, // Job ID
-          referenceType: "gig", // Indicates it's a job gig request
-          message: `Hey! I’m interested in your job listing: "${jobDetail.title}"`, // Optional message
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await response.json();
+      console.log("🚀 API Response:", data); // Log full response
 
       if (response.ok) {
         Alert.alert("Success", "Chat request sent successfully!");
-        // Navigate to the Messaging screen, passing the chatId if available
         navigation.navigate("Messaging", { chatId: data.chatId || null });
       } else {
-        throw new Error(data.message || "Failed to send chat request.");
+        console.error("⚠️ API Error:", data);
+        throw new Error(data.error || "Failed to send chat request.");
       }
     } catch (error) {
-      console.error("Error sending chat request:", error);
+      console.error("🚨 Error sending chat request:", error);
       Alert.alert(
         "Error",
         error.message || "Failed to send request. Please try again."

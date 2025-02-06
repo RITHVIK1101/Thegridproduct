@@ -302,7 +302,6 @@ const CartScreen: React.FC = () => {
     }
   };
 
-  // Handle Message for single product
   const messageProduct = async (product: CartProduct) => {
     if (!userId) {
       Alert.alert("Error", "User not authenticated.");
@@ -314,6 +313,17 @@ const CartScreen: React.FC = () => {
     }
 
     setIsMessaging(true);
+
+    // Define the payload
+    const payload = {
+      referenceId: product.id, // Send productId as referenceId
+      referenceType: "product", // Specify it's a product message
+      buyerId: userId, // Buyer is the logged-in user
+      sellerId: product.sellerId, // Seller is the product owner
+    };
+
+    console.log("📤 Sending Chat Request:", payload); // Debug log
+
     try {
       const response = await fetch(`${NGROK_URL}/chat/request`, {
         method: "POST",
@@ -321,57 +331,28 @@ const CartScreen: React.FC = () => {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          productId: product.id, // Send only productId
-          buyerId: userId, // Included buyerId
-          sellerId: product.sellerId, // Included sellerId
-        }),
+        body: JSON.stringify(payload),
       });
 
-      if (response.status === 401) {
-        Alert.alert("Session Expired", "Please log in again.", [
-          {
-            text: "OK",
-            onPress: async () => {
-              await clearUser();
-              navigation.dispatch(
-                CommonActions.reset({
-                  index: 0,
-                  routes: [{ name: "Login" }],
-                })
-              );
-            },
-          },
-        ]);
-        return;
+      const data = await response.json();
+      console.log("🚀 API Response:", data);
+
+      if (response.ok) {
+        // Show confirmation popup
+        setMessagePopupVisible(true);
+        setTimeout(() => {
+          setMessagePopupVisible(false);
+        }, 2000);
+
+        // Remove successfully messaged product from cart
+        setCartProducts((prev) => prev.filter((p) => p.id !== product.id));
+      } else {
+        console.error("⚠️ Chat Request Error:", data);
+        throw new Error(data.message || "Failed to send chat request.");
       }
-
-      if (!response.ok) {
-        let errorMessage = "Failed to request chat.";
-        try {
-          const errorData = await response.json();
-          errorMessage = errorData.message || errorMessage;
-          console.error("Chat Request Error Data:", errorData);
-        } catch (parseError) {
-          console.error(
-            "Error parsing chat request error response:",
-            parseError
-          );
-        }
-        throw new Error(errorMessage);
-      }
-
-      // Show quick confirmation popup
-      setMessagePopupVisible(true);
-      setTimeout(() => {
-        setMessagePopupVisible(false);
-      }, 2000);
-
-      // Remove the product from the local cart state
-      setCartProducts((prev) => prev.filter((p) => p.id !== product.id));
-    } catch (err: any) {
-      console.error("Chat Request Error:", err);
-      Alert.alert("Error", err.message || "Failed to send chat request.");
+    } catch (error: any) {
+      console.error("🚨 Error sending chat request:", error);
+      Alert.alert("Error", error.message || "Failed to send request.");
     } finally {
       setIsMessaging(false);
     }
@@ -502,7 +483,7 @@ const CartScreen: React.FC = () => {
             onPress={() => messageProduct(item)}
             style={styles.messageButton}
             accessibilityLabel={`Message about ${item.title}`}
-            disabled={isMessaging} // Disable during messaging
+            disabled={isMessaging} // Disable while sending request
           >
             {isMessaging ? (
               <ActivityIndicator size="small" color="black" />
@@ -518,6 +499,7 @@ const CartScreen: React.FC = () => {
             )}
           </TouchableOpacity>
         </LinearGradient>
+
         <TouchableOpacity
           onPress={() => confirmRemoveFromCart(item)}
           style={styles.removeButton}

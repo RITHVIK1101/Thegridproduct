@@ -185,36 +185,37 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }, [userId, token])
   );
 
-  // Merge saved last message for each chat from AsyncStorage
   const fetchUserChats = async () => {
     if (!userId || !token) return;
     setLoading(true);
     try {
       const fetchedChats = await fetchConversations(userId, token);
 
-      // For each fetched chat, try to retrieve the saved last message from AsyncStorage
+      // Ensure referenceTitle is properly assigned
       const mergedChats = await Promise.all(
         fetchedChats.map(async (chat) => {
           try {
             const saved = await AsyncStorage.getItem(
               `chat_last_message_${chat.chatID}`
             );
-            if (saved) {
-              const parsed = JSON.parse(saved);
-              return { ...chat, ...parsed };
-            }
+            const parsed = saved ? JSON.parse(saved) : {};
+            return {
+              ...chat,
+              ...parsed,
+              referenceTitle: chat.referenceTitle || "Unnamed Item", // Ensure this is never undefined
+            };
           } catch (e) {
             console.error("Error retrieving saved last message:", e);
+            return chat;
           }
-          return chat;
         })
       );
+
       setChats(mergedChats);
+
       if (routeChatId) {
         const chat = mergedChats.find((c) => c.chatID === routeChatId);
-        if (chat) {
-          openChat(chat);
-        }
+        if (chat) openChat(chat);
       }
     } catch (error) {
       console.error("Error fetching chats:", error);
@@ -238,20 +239,29 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
           const data = docSnap.data();
           if (data.messages) {
             setSelectedChat((prev) => {
-              if (!prev) return { ...selectedChat, messages: data.messages };
+              if (!prev)
+                return { ...selectedChat, messages: data.messages || [] }; // Ensure messages is an array
+
+              if (!prev.messages || !Array.isArray(data.messages)) {
+                return prev;
+              }
+
               if (data.messages.length < prev.messages.length) {
                 return prev;
               }
+
               if (
                 data.messages.length === prev.messages.length &&
                 prev.messages.length > 0 &&
-                data.messages[data.messages.length - 1]._id ===
-                  prev.messages[prev.messages.length - 1]._id
+                data.messages[data.messages.length - 1]?._id ===
+                  prev.messages[prev.messages.length - 1]?._id
               ) {
                 return prev;
               }
+
               return { ...prev, messages: data.messages };
             });
+
             setTimeout(() => {
               flatListRef.current?.scrollToEnd({ animated: true });
             }, 100);
@@ -660,13 +670,12 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }
   };
 
-  // ─── RENDER FUNCTIONS ─────────────────────────────────────────────
   const renderChat = ({ item }: { item: Chat }) => {
     if (!item.user) {
       console.warn(`Chat with chatID ${item.chatID} is missing user data.`);
       return null;
     }
-    // Build a latestMessage object that now includes senderId.
+
     const latestMessage = item.latestMessage
       ? {
           content: item.latestMessage,
@@ -674,19 +683,18 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
           senderId: item.latestSenderId,
         }
       : null;
+
     const formattedTimestamp = latestMessage
       ? new Date(latestMessage.timestamp).toLocaleTimeString([], {
           hour: "2-digit",
           minute: "2-digit",
         })
       : "";
-    const initials = `${item.user.firstName.charAt(
-      0
-    )}${item.user.lastName.charAt(0)}`.toUpperCase();
-    const dotStyle =
-      latestMessage && latestMessage.senderId !== userId
-        ? styles.purpleDot
-        : styles.greyDot;
+
+    // ✅ Ensure correct mapping of referenceType
+    const chatType = item.referenceType === "products" ? "Product" : "Gig"; // Matches API response
+    const chatTitle = item.referenceTitle || "Unnamed Item"; // Ensure no "Job" is displayed
+
     return (
       <Pressable
         style={styles.chatItemContainer}
@@ -696,7 +704,10 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         <View style={styles.chatItem}>
           <View style={styles.profilePicWrapper}>
             <View style={styles.profilePicPlaceholder}>
-              <Text style={styles.profilePicInitials}>{initials}</Text>
+              <Text style={styles.profilePicInitials}>
+                {item.user.firstName.charAt(0).toUpperCase()}
+                {item.user.lastName.charAt(0).toUpperCase()}
+              </Text>
             </View>
           </View>
           <View style={styles.chatDetails}>
@@ -715,12 +726,20 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                 ) : null}
               </View>
             </View>
+            {/* ✅ Corrected Display for Product/Gig Name */}
             <Text style={styles.chatProductName} numberOfLines={1}>
-              {item.productTitle ? item.productTitle : "Job"}
+              {chatType}: {chatTitle}
             </Text>
+
             {latestMessage && (
               <View style={styles.lastMessageRow}>
-                <View style={dotStyle} />
+                <View
+                  style={
+                    latestMessage.senderId !== userId
+                      ? styles.purpleDot
+                      : styles.greyDot
+                  }
+                />
                 <Text style={styles.lastMessage} numberOfLines={1}>
                   {latestMessage.content}
                 </Text>
@@ -791,7 +810,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
 
   const productsOrGigs = chats.map((c) => ({
     chatID: c.chatID,
-    title: c.productTitle ? c.productTitle : "Job",
+    title: c.productTitle ? c.productTitle : "Product",
     type: c.productTitle ? "product" : "gig",
   }));
 
@@ -1228,7 +1247,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                         <Text style={styles.chatHeaderSubTitle}>
                           {selectedChat.productTitle
                             ? selectedChat.productTitle
-                            : "Job"}
+                            : "Product"}
                         </Text>
                       </View>
                     </View>
