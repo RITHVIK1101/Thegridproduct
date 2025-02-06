@@ -72,9 +72,9 @@ func GetChatHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	referenceType, ok := vars["referenceType"] // "product" or "gig"
-	if !ok || (referenceType != "product" && referenceType != "gig") {
-		WriteJSONError(w, "Valid referenceType (product or gig) is required", http.StatusBadRequest)
+	referenceType, ok := vars["referenceType"]
+	if !ok || (referenceType != "product" && referenceType != "gig" && referenceType != "product_request") {
+		WriteJSONError(w, "Valid referenceType (product, gig, or product_request) is required", http.StatusBadRequest)
 		return
 	}
 
@@ -156,7 +156,6 @@ func GetChatsByUserHandler(w http.ResponseWriter, r *http.Request) {
 		var referenceType string
 		var otherUserID primitive.ObjectID
 
-		// Determine the type of chat (Product or Gig)
 		if c.ReferenceType == "product" {
 			product, err := db.GetProductByID(c.ReferenceID.Hex())
 			if err != nil {
@@ -173,6 +172,14 @@ func GetChatsByUserHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			referenceTitle = gig.Title
 			referenceType = "gig"
+		} else if c.ReferenceType == "product_request" {
+			productRequest, err := db.GetProductRequestByID(c.ReferenceID.Hex())
+			if err != nil {
+				log.Printf("❌ Failed to fetch product request details for requestID %s: %v", c.ReferenceID.Hex(), err)
+				continue
+			}
+			referenceTitle = productRequest.ProductName
+			referenceType = "product_request"
 		}
 
 		// Identify the other user in the chat
@@ -367,8 +374,8 @@ func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Decode request body
 	var req struct {
-		ReferenceID   string `json:"referenceId"`   // Can be ProductID or GigID
-		ReferenceType string `json:"referenceType"` // "product" or "gig"
+		ReferenceID   string `json:"referenceId"`   // Can be ProductID, GigID, or ProductRequestID
+		ReferenceType string `json:"referenceType"` // "product", "gig", or "product_request"
 		BuyerID       string `json:"buyerId"`
 		SellerID      string `json:"sellerId"`
 	}
@@ -383,8 +390,9 @@ func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.ReferenceType != "product" && req.ReferenceType != "gig" {
-		WriteJSONError(w, "Invalid referenceType, must be 'product' or 'gig'", http.StatusBadRequest)
+	// Ensure the reference type is valid
+	if req.ReferenceType != "product" && req.ReferenceType != "gig" && req.ReferenceType != "product_request" {
+		WriteJSONError(w, "Invalid referenceType, must be 'product', 'gig', or 'product_request'", http.StatusBadRequest)
 		return
 	}
 
@@ -417,8 +425,9 @@ func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 		chatRequests := db.GetCollection("gridlyapp", "chat_requests")
 		var referenceTitle string
 
-		// Fetch the reference (gig or product) to obtain the title
-		if req.ReferenceType == "gig" {
+		// Fetch the reference title from the correct collection
+		switch req.ReferenceType {
+		case "gig":
 			gigsCol := db.GetCollection("gridlyapp", "gigs")
 			var gig models.Gig
 			err := gigsCol.FindOne(sessCtx, bson.M{"_id": referenceObjectID}).Decode(&gig)
@@ -426,7 +435,8 @@ func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 				return nil, &AppError{Message: "Gig not found", StatusCode: http.StatusNotFound}
 			}
 			referenceTitle = gig.Title
-		} else { // "product"
+
+		case "product":
 			productsCol := db.GetCollection("gridlyapp", "products")
 			var product models.Product
 			err := productsCol.FindOne(sessCtx, bson.M{"_id": referenceObjectID}).Decode(&product)
@@ -434,6 +444,15 @@ func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 				return nil, &AppError{Message: "Product not found", StatusCode: http.StatusNotFound}
 			}
 			referenceTitle = product.Title
+
+		case "product_request":
+			requestsCol := db.GetCollection("gridlyapp", "product_requests")
+			var productRequest models.ProductRequest
+			err := requestsCol.FindOne(sessCtx, bson.M{"_id": referenceObjectID}).Decode(&productRequest)
+			if err != nil {
+				return nil, &AppError{Message: "Product request not found", StatusCode: http.StatusNotFound}
+			}
+			referenceTitle = productRequest.ProductName // ✅ Use "productName" field from product_requests
 		}
 
 		// Check if there's already a pending chat request for this reference by the buyer
@@ -458,8 +477,9 @@ func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 			return nil, err
 		}
 
-		// ✅ Update "requestedBy" for products as well
-		if req.ReferenceType == "gig" {
+		// ✅ Update "requestedBy" field for all types
+		switch req.ReferenceType {
+		case "gig":
 			gigsCol := db.GetCollection("gridlyapp", "gigs")
 			_, err = gigsCol.UpdateOne(
 				sessCtx,
@@ -469,12 +489,24 @@ func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				return nil, err
 			}
-		} else if req.ReferenceType == "product" {
+
+		case "product":
 			productsCol := db.GetCollection("gridlyapp", "products")
 			_, err = productsCol.UpdateOne(
 				sessCtx,
 				bson.M{"_id": referenceObjectID},
 				bson.M{"$addToSet": bson.M{"requestedBy": buyerObjectID}}, // ✅ Adds buyer to requestedBy for products
+			)
+			if err != nil {
+				return nil, err
+			}
+
+		case "product_request":
+			requestsCol := db.GetCollection("gridlyapp", "product_requests")
+			_, err = requestsCol.UpdateOne(
+				sessCtx,
+				bson.M{"_id": referenceObjectID},
+				bson.M{"$addToSet": bson.M{"requestedBy": buyerObjectID}}, // ✅ Adds buyer to requestedBy for product requests
 			)
 			if err != nil {
 				return nil, err
@@ -661,12 +693,13 @@ func RejectChatRequestHandler(w http.ResponseWriter, r *http.Request) {
 			return nil, err
 		}
 
-		// Determine which collection to update chat count
 		var collection *mongo.Collection
 		if chatReq.ReferenceType == "product" {
 			collection = productsCol
 		} else if chatReq.ReferenceType == "gig" {
 			collection = gigsCol
+		} else if chatReq.ReferenceType == "product_request" {
+			collection = db.GetCollection("gridlyapp", "product_requests")
 		} else {
 			return nil, &AppError{Message: "Invalid reference type", StatusCode: http.StatusInternalServerError}
 		}
@@ -781,6 +814,14 @@ func GetChatRequestsHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			referenceTitle = gig.Title
 			referenceType = "gig"
+		} else if req.ReferenceType == "product_request" {
+			productRequest, err := db.GetProductRequestByID(req.ReferenceID.Hex())
+			if err != nil {
+				log.Printf("Failed to fetch product request details for requestID %s: %v", req.ReferenceID.Hex(), err)
+				continue
+			}
+			referenceTitle = productRequest.ProductName
+			referenceType = "product_request"
 		}
 
 		// ✅ Fetch buyer and seller details
@@ -853,11 +894,12 @@ func createFirestoreChatRoom(chatID, buyerID, sellerID, referenceID, referenceTy
 	data := map[string]interface{}{
 		"chatID":        chatID,
 		"referenceID":   referenceID,   // ✅ Can be either a ProductID or a GigID
-		"referenceType": referenceType, // ✅ "product" or "gig"
-		"buyerID":       buyerID,
-		"sellerID":      sellerID,
-		"createdAt":     time.Now().Format(time.RFC3339),
-		"messages":      []interface{}{},
+		"referenceType": referenceType, // ✅ "product", "gig", or "product_request"
+
+		"buyerID":   buyerID,
+		"sellerID":  sellerID,
+		"createdAt": time.Now().Format(time.RFC3339),
+		"messages":  []interface{}{},
 	}
 
 	_, err = docRef.Set(ctx, data)

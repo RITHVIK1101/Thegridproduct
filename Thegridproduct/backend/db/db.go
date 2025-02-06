@@ -311,6 +311,32 @@ func findUserInCollection(dbName, collName, userID string) (*models.User, error)
 	return &usr, nil
 }
 
+// GetProductRequestByID fetches a product request by its ID.
+func GetProductRequestByID(requestID string) (*models.ProductRequest, error) {
+	// Convert request ID to ObjectID
+	requestObjID, err := primitive.ObjectIDFromHex(requestID)
+	if err != nil {
+		return nil, err
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	collection := GetCollection("gridlyapp", "product_requests")
+
+	var productRequest models.ProductRequest
+	err = collection.FindOne(ctx, bson.M{"_id": requestObjID}).Decode(&productRequest)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, nil // Return nil if not found
+		}
+		log.Printf("Error fetching product request: %v", err)
+		return nil, err
+	}
+
+	return &productRequest, nil
+}
+
 // UpdateProductStatusAndBuyer updates the product's 'status' and 'buyerId' fields, by string ID
 func UpdateProductStatusAndBuyer(productID, buyerID, newStatus string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
