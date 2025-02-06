@@ -415,18 +415,28 @@ func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 
 	callback := func(sessCtx mongo.SessionContext) (interface{}, error) {
 		chatRequests := db.GetCollection("gridlyapp", "chat_requests")
-		gigsCol := db.GetCollection("gridlyapp", "gigs")
+		var referenceTitle string
 
-		// Validate that the reference exists
-		count, err := gigsCol.CountDocuments(sessCtx, bson.M{"_id": referenceObjectID})
-		if err != nil {
-			return nil, err
-		}
-		if count == 0 {
-			return nil, &AppError{Message: "Gig not found", StatusCode: http.StatusNotFound}
+		// Fetch the reference (gig or product) to obtain the title
+		if req.ReferenceType == "gig" {
+			gigsCol := db.GetCollection("gridlyapp", "gigs")
+			var gig models.Gig
+			err := gigsCol.FindOne(sessCtx, bson.M{"_id": referenceObjectID}).Decode(&gig)
+			if err != nil {
+				return nil, &AppError{Message: "Gig not found", StatusCode: http.StatusNotFound}
+			}
+			referenceTitle = gig.Title
+		} else { // "product"
+			productsCol := db.GetCollection("gridlyapp", "products")
+			var product models.Product
+			err := productsCol.FindOne(sessCtx, bson.M{"_id": referenceObjectID}).Decode(&product)
+			if err != nil {
+				return nil, &AppError{Message: "Product not found", StatusCode: http.StatusNotFound}
+			}
+			referenceTitle = product.Title
 		}
 
-		// Check if there's already a pending chat request for this gig
+		// Check if there's already a pending chat request for this reference by the buyer
 		existingRequest := models.ChatRequest{}
 		findErr := chatRequests.FindOne(sessCtx, bson.M{
 			"referenceId":   referenceObjectID,
@@ -440,15 +450,17 @@ func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 			return nil, findErr
 		}
 
-		// Create the chat request
-		chatRequest := models.NewChatRequest(referenceObjectID, req.ReferenceType, buyerObjectID, sellerObjectID)
+		// Create the chat request with the reference title
+		chatRequest := models.NewChatRequest(referenceObjectID, req.ReferenceType, referenceTitle, buyerObjectID, sellerObjectID)
+
 		_, err = chatRequests.InsertOne(sessCtx, chatRequest)
 		if err != nil {
 			return nil, err
 		}
 
-		// 🔥 **If it's a gig, update the gig status to "requested"**
+		// If it's a gig, update the gig's document to add the buyer to the "requestedBy" array (if needed)
 		if req.ReferenceType == "gig" {
+			gigsCol := db.GetCollection("gridlyapp", "gigs")
 			_, err = gigsCol.UpdateOne(
 				sessCtx,
 				bson.M{"_id": referenceObjectID},

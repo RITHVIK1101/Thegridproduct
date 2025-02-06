@@ -104,13 +104,11 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     null
   );
 
-  // Report Modal State
   const [reportModalVisible, setReportModalVisible] = useState<boolean>(false);
   const [reportReason, setReportReason] = useState<string>("Select a Reason");
   const [customReason, setCustomReason] = useState<string>(""); // For "Other"
   const [reportDescription, setReportDescription] = useState<string>("");
 
-  // Other modal/popup states
   const [isReasonDropdownVisible, setIsReasonDropdownVisible] =
     useState<boolean>(false);
   const [isIncompletePopupVisible, setIsIncompletePopupVisible] =
@@ -202,7 +200,8 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
             return {
               ...chat,
               ...parsed,
-              referenceTitle: chat.referenceTitle || "Unnamed Item", // Ensure this is never undefined
+              latestMessage: parsed.latestMessage || chat.latestMessage || "", // ✅ Ensure latestMessage is set
+              referenceTitle: chat.referenceTitle || "Unnamed Item",
             };
           } catch (e) {
             console.error("Error retrieving saved last message:", e);
@@ -296,9 +295,9 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                   if (chat.chatID === docSnap.id) {
                     return {
                       ...chat,
-                      latestMessage: lastMessage?.content,
-                      latestTimestamp: lastMessage?.timestamp,
-                      latestSenderId: lastMessage?.senderId,
+                      latestMessage: lastMessage?.content || "", // ✅ Ensure latestMessage is always set
+                      latestTimestamp: lastMessage?.timestamp || "",
+                      latestSenderId: lastMessage?.senderId || "",
                     };
                   }
                   return chat;
@@ -313,6 +312,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                   return bTime - aTime;
                 })
             );
+
             // Asynchronously update unread count for this chat
             (async () => {
               try {
@@ -726,9 +726,11 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                 ) : null}
               </View>
             </View>
-            {/* ✅ Corrected Display for Product/Gig Name */}
             <Text style={styles.chatProductName} numberOfLines={1}>
-              {chatType}: {chatTitle}
+              {item.referenceType === "product"
+                ? "Product Name: "
+                : "Gig Name: "}
+              {item.referenceTitle || "Unnamed Item"}
             </Text>
 
             {latestMessage && (
@@ -741,7 +743,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                   }
                 />
                 <Text style={styles.lastMessage} numberOfLines={1}>
-                  {latestMessage.content}
+                  {latestMessage.content || ""}
                 </Text>
               </View>
             )}
@@ -919,16 +921,28 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         useNativeDriver: true,
       }).start();
     }
+
     const renderRequestItem = ({ item }: { item: Request }) => {
-      if (selectedRequestsTab === "incoming") {
-        return (
-          <View style={styles.requestCard}>
-            <View style={styles.requestInfo}>
-              <Text style={styles.requestProductName}>{item.productTitle}</Text>
-              <Text style={styles.requestDate}>
-                Requested on: {new Date(item.createdAt).toLocaleDateString()}
-              </Text>
-            </View>
+      return (
+        <View style={styles.requestCard}>
+          <View style={styles.requestInfo}>
+            <Text style={styles.requestProductName}>
+              {item.referenceType === "product" ? "Product Name:" : "Gig Name:"}{" "}
+              {item.referenceTitle || "Unnamed Item"}
+            </Text>
+
+            <Text style={styles.requestSender}>
+              From:{" "}
+              {selectedRequestsTab === "incoming"
+                ? `${item.buyerFirstName} ${item.buyerLastName}`
+                : `${item.sellerFirstName} ${item.sellerLastName}`}
+            </Text>
+            <Text style={styles.requestDate}>
+              Created on: {new Date(item.createdAt).toLocaleDateString()}
+            </Text>
+          </View>
+
+          {selectedRequestsTab === "incoming" ? (
             <View style={styles.requestActions}>
               <TouchableOpacity
                 style={[
@@ -963,25 +977,16 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                 )}
               </TouchableOpacity>
             </View>
-          </View>
-        );
-      }
-      return (
-        <View style={styles.requestCard}>
-          <View style={styles.requestInfo}>
-            <Text style={styles.requestProductName}>{item.productTitle}</Text>
-            <Text style={styles.requestDate}>
-              Created on: {new Date(item.createdAt).toLocaleDateString()}
-            </Text>
-          </View>
-          <View style={styles.requestActions}>
-            <Text style={{ color: "#BBBBBB" }}>No actions for outgoing.</Text>
-          </View>
+          ) : (
+            <View style={styles.requestActions}></View>
+          )}
         </View>
       );
     };
+
     const dataToShow =
       selectedRequestsTab === "incoming" ? incomingRequests : outgoingRequests;
+
     return (
       <Modal
         visible={isRequestsModalVisible}
@@ -1695,7 +1700,7 @@ const styles = StyleSheet.create({
   chatTime: { fontSize: 12, color: "#AAAAAA", fontFamily: "HelveticaNeue" },
   chatProductName: {
     fontSize: 13,
-    color: "#BBBBBB",
+    color: "#FFFFFF",
     fontFamily: "HelveticaNeue",
     marginTop: 2,
     marginBottom: 3,
@@ -1776,9 +1781,16 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontFamily: "HelveticaNeue-Bold",
   },
+  requestSender: {
+    fontSize: 14,
+    color: "#FFFFFF", // White text for readability
+    fontFamily: "HelveticaNeue-Medium",
+    marginBottom: 4,
+  },
+
   chatHeaderSubTitle: {
     fontSize: 13,
-    color: "#BBBBBB",
+    color: "#FFFFFF",
     fontFamily: "HelveticaNeue",
     marginTop: 2,
   },

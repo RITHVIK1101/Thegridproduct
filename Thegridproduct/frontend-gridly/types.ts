@@ -54,6 +54,21 @@ export type Product = {
   quality?: string;
   productStatus: 'shop' | 'talks' | 'sold'; // Added productStatus as part of the definition
 };
+export type Request = {
+  requestId: string;
+  referenceId: string;
+  referenceTitle: string; // ✅ Add this field
+  referenceType: "product" | "gig"; // ✅ Ensure correct type
+  buyerId: string;
+  sellerId: string;
+  status: string;
+  createdAt: string;
+  buyerFirstName: string;
+  buyerLastName: string;
+  sellerFirstName: string;
+  sellerLastName: string;
+};
+
 export type Gig = {
   id: string;
   userId: string;
