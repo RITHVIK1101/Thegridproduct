@@ -91,21 +91,51 @@ const categoriesFilter = [
   "Other",
 ];
 
-// Helper function to get featured gigs based on the current cycle
-const getCurrentCycle = (): number => {
-  const now = new Date();
-  const cycle = Math.floor(now.getTime() / (12 * 60 * 60 * 1000));
-  return cycle;
-};
+/* ----------------- Helper Functions ----------------- */
 
-const getFeaturedGigs = (gigs: Gig[]): Gig[] => {
+// Standard Fisher–Yates shuffle for randomizing every time the page loads.
+function shuffleArray<T>(array: T[]): T[] {
+  const copy = array.slice();
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+
+// A simple seeded random generator
+function getSeededRandom(seed: number): number {
+  const x = Math.sin(seed) * 10000;
+  return x - Math.floor(x);
+}
+
+// Seeded shuffle to deterministically randomize the gigs based on the seed.
+function seededShuffle<T>(array: T[], seed: number): T[] {
+  const copy = array.slice();
+  let currentSeed = seed;
+  for (let i = copy.length - 1; i > 0; i--) {
+    currentSeed++;
+    const j = Math.floor(getSeededRandom(currentSeed) * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+
+// Get today's seed based on the current date (e.g. "2025-02-05")
+function getTodaySeed(): number {
+  const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  return parseInt(today, 10);
+}
+
+// Select 3 featured gigs in a deterministic (seeded) way.
+function getFeaturedGigs(gigs: Gig[]): Gig[] {
   if (gigs.length === 0) return [];
-  const cycle = getCurrentCycle();
-  const firstIndex = cycle % gigs.length;
-  const secondIndex = (cycle + 1) % gigs.length;
-  return gigs.length === 1 ? [gigs[0]] : [gigs[firstIndex], gigs[secondIndex]];
-};
+  const seed = getTodaySeed();
+  const shuffled = seededShuffle(gigs, seed);
+  return shuffled.slice(0, Math.min(3, gigs.length));
+}
 
+// Check for greetings in user text.
 const isGreeting = (text: string): boolean => {
   const greetings = [
     "hello",
@@ -145,6 +175,8 @@ const JobsScreen: React.FC = () => {
   // otherwise, start with null.
   const preFetchedGigs: Gig[] | undefined = route.params?.preFetchedGigs;
   const [gigs, setGigs] = useState<Gig[] | null>(preFetchedGigs || null);
+  // We'll use a separate state for the randomized "all services" list.
+  const [randomGigs, setRandomGigs] = useState<Gig[]>([]);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearchBar, setShowSearchBar] = useState(false);
@@ -170,6 +202,13 @@ const JobsScreen: React.FC = () => {
     }
   }, []);
 
+  // Once gigs are loaded, randomize the "all services" list.
+  useEffect(() => {
+    if (gigs) {
+      setRandomGigs(shuffleArray(gigs));
+    }
+  }, [gigs]);
+
   const fetchGigs = async () => {
     try {
       const response = await fetch(`${NGROK_URL}/services`, {
@@ -192,18 +231,19 @@ const JobsScreen: React.FC = () => {
     }
   };
 
+  // Compute featured gigs using the seeded shuffle (3 per day).
   const featuredGigs = gigs ? getFeaturedGigs(gigs) : [];
-  const filteredGigs = gigs
-    ? gigs.filter((gig) => {
-        const matchSearch =
-          gig.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          gig.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          gig.description.toLowerCase().includes(searchQuery.toLowerCase());
-        const matchCategory =
-          currentFilter === "All" || gig.category === currentFilter;
-        return matchSearch && matchCategory;
-      })
-    : [];
+
+  // Filtered gigs based on current filter and search query,
+  // using the randomized order from randomGigs.
+  const filteredGigs = randomGigs.filter((gig) => {
+    const matchSearch =
+      gig.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      gig.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      gig.description.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchCategory = currentFilter === "All" || gig.category === currentFilter;
+    return matchSearch && matchCategory;
+  });
 
   const panResponder = useRef(
     PanResponder.create({
@@ -514,7 +554,7 @@ const JobsScreen: React.FC = () => {
           ))}
         </ScrollView>
 
-        {/* All Gigs */}
+        {/* All Services */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>All Services</Text>
           <TouchableOpacity onPress={toggleSearchBar}>
@@ -526,50 +566,48 @@ const JobsScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
 
-        {gigs !== null ? (
-          filteredGigs.length > 0 ? (
-            filteredGigs.map((gig) => {
-              const displayedPrice = getDisplayedPrice(gig.price);
-              return (
-                <TouchableOpacity
-                  key={gig.id}
-                  onPress={() =>
-                    navigation.navigate("JobDetail", { jobId: gig.id })
-                  }
-                  activeOpacity={0.8}
-                >
-                  <View style={styles.gigCard}>
-                    <View style={styles.gigInfo}>
-                      <Text style={styles.gigTitle}>{gig.title}</Text>
-                      <View style={styles.gigCategoryRow}>
-                        <Ionicons
-                          name={categoryIcons[gig.category] || "grid-outline"}
-                          size={16}
-                          color="#BB86FC"
-                          style={{ marginRight: 6 }}
-                        />
-                        <Text style={styles.gigCategory}>{gig.category}</Text>
-                      </View>
-                      <Text style={styles.gigDescription}>
-                        {truncateDescription(gig.description, 60)}
-                      </Text>
-                      <Text style={styles.gigPrice}>${displayedPrice}</Text>
+        {randomGigs.length > 0 ? (
+          randomGigs.map((gig) => {
+            const displayedPrice = getDisplayedPrice(gig.price);
+            return (
+              <TouchableOpacity
+                key={gig.id}
+                onPress={() =>
+                  navigation.navigate("JobDetail", { jobId: gig.id })
+                }
+                activeOpacity={0.8}
+              >
+                <View style={styles.gigCard}>
+                  <View style={styles.gigInfo}>
+                    <Text style={styles.gigTitle}>{gig.title}</Text>
+                    <View style={styles.gigCategoryRow}>
+                      <Ionicons
+                        name={categoryIcons[gig.category] || "grid-outline"}
+                        size={16}
+                        color="#BB86FC"
+                        style={{ marginRight: 6 }}
+                      />
+                      <Text style={styles.gigCategory}>{gig.category}</Text>
                     </View>
-                    <Ionicons
-                      name="chevron-forward"
-                      size={20}
-                      color="#BB86FC"
-                    />
+                    <Text style={styles.gigDescription}>
+                      {truncateDescription(gig.description, 60)}
+                    </Text>
+                    <Text style={styles.gigPrice}>${displayedPrice}</Text>
                   </View>
-                </TouchableOpacity>
-              );
-            })
-          ) : (
-            <Text style={styles.noResultsText}>
-              No services found for "{currentFilter}"
-            </Text>
-          )
-        ) : null}
+                  <Ionicons
+                    name="chevron-forward"
+                    size={20}
+                    color="#BB86FC"
+                  />
+                </View>
+              </TouchableOpacity>
+            );
+          })
+        ) : (
+          <Text style={styles.noResultsText}>
+            No services found for "{currentFilter}"
+          </Text>
+        )}
       </ScrollView>
 
       {/* Bottom Navbar */}
