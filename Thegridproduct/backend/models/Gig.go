@@ -22,8 +22,9 @@ type Gig struct {
 	PostedDate     time.Time          `bson:"postedDate" json:"postedDate"`
 	Expired        bool               `bson:"expired" json:"expired,omitempty" default:"false"`
 
-	Status         string    `bson:"status" json:"status"` // e.g., "active", "completed"
-	LikeCount      int       `bson:"likeCount" json:"likeCount"`
-	CampusPresence string    `bson:"campusPresence" json:"campusPresence"` // "inCampus" or "flexible"
-	Embeddings     []float32 `bson:"embeddings,omitempty" json:"embeddings,omitempty"`
+	Status         string               `bson:"status" json:"status"` // e.g., "active", "completed"
+	LikeCount      int                  `bson:"likeCount" json:"likeCount"`
+	CampusPresence string               `bson:"campusPresence" json:"campusPresence"` // "inCampus" or "flexible"
+	Embeddings     []float32            `bson:"embeddings,omitempty" json:"embeddings,omitempty"`
+	RequestedBy    []primitive.ObjectID `bson:"requestedBy,omitempty"`
 }

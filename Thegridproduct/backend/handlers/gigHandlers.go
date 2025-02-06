@@ -480,20 +480,16 @@ func GetAllGigsHandler(w http.ResponseWriter, r *http.Request) {
 	userCollection := db.GetCollection("gridlyapp", "university_users")
 	var user models.User
 	err = userCollection.FindOne(ctx, bson.M{"_id": userObjID}).Decode(&user)
-
 	if err == mongo.ErrNoDocuments {
 		userCollection = db.GetCollection("gridlyapp", "high_school_users")
 		err = userCollection.FindOne(ctx, bson.M{"_id": userObjID}).Decode(&user)
 	}
-
-	// 🚨 If user not found in both collections, return error
 	if err != nil {
 		log.Printf("Error fetching user details: %v", err)
 		WriteJSONError(w, "Error fetching user details", http.StatusInternalServerError)
 		return
 	}
 
-	// 🚀 Ensure institution is available
 	if user.Institution == "" {
 		WriteJSONError(w, "User institution information missing", http.StatusBadRequest)
 		return
@@ -506,10 +502,14 @@ func GetAllGigsHandler(w http.ResponseWriter, r *http.Request) {
 	// - `status` is `active`
 	// - `campusPresence` is `flexible` (show to everyone) OR `inCampus` but matching user institution
 	// - 🔥 Exclude gigs where `userId` matches the current user's ID
+	// - 🔥 Exclude gigs where current user's ID is in the `requestedBy` field
 	filter := bson.M{
-		"status":  "active",
+		"status":  bson.M{"$in": []string{"active"}},
 		"expired": false,
 		"userId":  bson.M{"$ne": userObjID}, // Exclude user's own gigs
+		"requestedBy": bson.M{
+			"$nin": []primitive.ObjectID{userObjID},
+		},
 		"$or": []bson.M{
 			{"campusPresence": "flexible"},                                 // Show all "flexible" gigs
 			{"campusPresence": "inCampus", "university": user.Institution}, // Match institution for "inCampus"

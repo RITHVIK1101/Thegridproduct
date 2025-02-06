@@ -16,7 +16,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 	"google.golang.org/api/option"
 
 	"cloud.google.com/go/firestore"
@@ -416,28 +415,18 @@ func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 
 	callback := func(sessCtx mongo.SessionContext) (interface{}, error) {
 		chatRequests := db.GetCollection("gridlyapp", "chat_requests")
-		productsCol := db.GetCollection("gridlyapp", "products")
 		gigsCol := db.GetCollection("gridlyapp", "gigs")
-		cartCol := db.GetCollection("gridlyapp", "carts")
-
-		// Determine which collection to query
-		var collection *mongo.Collection
-		if req.ReferenceType == "product" {
-			collection = productsCol
-		} else {
-			collection = gigsCol
-		}
 
 		// Validate that the reference exists
-		count, err := collection.CountDocuments(sessCtx, bson.M{"_id": referenceObjectID})
+		count, err := gigsCol.CountDocuments(sessCtx, bson.M{"_id": referenceObjectID})
 		if err != nil {
 			return nil, err
 		}
 		if count == 0 {
-			return nil, &AppError{Message: fmt.Sprintf("%s not found", req.ReferenceType), StatusCode: http.StatusNotFound}
+			return nil, &AppError{Message: "Gig not found", StatusCode: http.StatusNotFound}
 		}
 
-		// Check if there's already a pending chat request for this reference
+		// Check if there's already a pending chat request for this gig
 		existingRequest := models.ChatRequest{}
 		findErr := chatRequests.FindOne(sessCtx, bson.M{
 			"referenceId":   referenceObjectID,
@@ -458,38 +447,14 @@ func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 			return nil, err
 		}
 
-		// 🔥 **If it's a product, update the chat count & check status**
-		if req.ReferenceType == "product" {
-			update := bson.M{"$inc": bson.M{"chatCount": 1}}
-			var updatedProduct models.Product
-			err = productsCol.FindOneAndUpdate(
+		// 🔥 **If it's a gig, update the gig status to "requested"**
+		if req.ReferenceType == "gig" {
+			_, err = gigsCol.UpdateOne(
 				sessCtx,
 				bson.M{"_id": referenceObjectID},
-				update,
-				options.FindOneAndUpdate().SetReturnDocument(options.After),
-			).Decode(&updatedProduct)
+				bson.M{"$addToSet": bson.M{"requestedBy": buyerObjectID}},
+			)
 			if err != nil {
-				return nil, err
-			}
-
-			// If chat count reaches 5, mark the product as "talks"
-			if updatedProduct.ChatCount >= 5 && updatedProduct.Status != "talks" {
-				_, err = productsCol.UpdateOne(
-					sessCtx,
-					bson.M{"_id": referenceObjectID},
-					bson.M{"$set": bson.M{"status": "talks"}},
-				)
-				if err != nil {
-					return nil, err
-				}
-			}
-
-			// Remove product from buyer's cart
-			filter := bson.M{"userId": buyerObjectID}
-			updateCart := bson.M{"$pull": bson.M{"items": bson.M{"productId": referenceObjectID}}}
-			_, err = cartCol.UpdateOne(sessCtx, filter, updateCart)
-			if err != nil {
-				log.Printf("Failed to remove product from cart: %v", err)
 				return nil, err
 			}
 		}
@@ -513,6 +478,7 @@ func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 		"message": "Chat request sent successfully",
 	})
 }
+
 func AcceptChatRequestHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
