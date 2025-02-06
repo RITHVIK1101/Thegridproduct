@@ -571,7 +571,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     setErrorRequests(null);
     try {
       const response = await axios.get(
-        "https://thegridproduct-production.up.railway.app/chat/requests",
+        "https://thegridproduct-production.up.railway.app/chat/request",
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -812,8 +812,8 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
 
   const productsOrGigs = chats.map((c) => ({
     chatID: c.chatID,
-    title: c.productTitle ? c.productTitle : "Product",
-    type: c.productTitle ? "product" : "gig",
+    title: c.referenceTitle || "Unnamed Item", // Ensure correct reference title is used
+    type: c.referenceType || "product", // Use actual type
   }));
 
   const handleNavigateFromProductOrGig = (item: {
@@ -1179,7 +1179,10 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                   onPress={() => handleNavigateFromProductOrGig(item)}
                   accessibilityLabel={`Navigate to ${item.type} titled ${item.title}`}
                 >
-                  <Text style={styles.productGigItemText}>{item.title}</Text>
+                  <Text style={styles.productGigItemText}>
+                    {item.type === "product" ? "Product: " : "Gig: "}{" "}
+                    {item.title}
+                  </Text>
                 </Pressable>
               ))}
             </ScrollView>
@@ -1242,17 +1245,15 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                           {selectedChat.user.lastName}
                         </Text>
                         <Text style={styles.chatHeaderSubTitle}>
-                          {selectedChat.referenceTitle || "Unknown"}
-                        </Text>
-
-                        <Text style={styles.chatHeaderSubTitle}>
-                          {selectedChat.referenceTitle || "Unknown"}
-                        </Text>
-
-                        <Text style={styles.chatHeaderSubTitle}>
-                          {selectedChat.productTitle
-                            ? selectedChat.productTitle
-                            : "Product"}
+                          {selectedChat?.referenceType
+                            ? selectedChat.referenceType
+                                .charAt(0)
+                                .toUpperCase() +
+                              selectedChat.referenceType.slice(1)
+                            : ""}
+                          {selectedChat?.referenceTitle
+                            ? `: ${selectedChat.referenceTitle}`
+                            : ""}
                         </Text>
                       </View>
                     </View>
