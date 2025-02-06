@@ -145,44 +145,6 @@ func GetMyProductRequestsHandler(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, productRequests, http.StatusOK)
 }
 
-// GetProductRequestByIDHandler retrieves a product request by its ID.
-func GetProductRequestByID(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	// Extract request ID from URL parameters
-	vars := mux.Vars(r)
-	requestID, exists := vars["id"]
-	if !exists || requestID == "" {
-		WriteJSONError(w, "Request ID is required", http.StatusBadRequest)
-		return
-	}
-
-	requestObjID, err := primitive.ObjectIDFromHex(requestID)
-	if err != nil {
-		WriteJSONError(w, "Invalid request ID format", http.StatusBadRequest)
-		return
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	collection := db.GetCollection("gridlyapp", "product_requests")
-
-	var productRequest models.ProductRequest
-	err = collection.FindOne(ctx, bson.M{"_id": requestObjID}).Decode(&productRequest)
-	if err != nil {
-		if err == mongo.ErrNoDocuments {
-			WriteJSONError(w, "Product request not found", http.StatusNotFound)
-			return
-		}
-		log.Printf("Error fetching product request: %v", err)
-		WriteJSONError(w, "Error fetching product request", http.StatusInternalServerError)
-		return
-	}
-
-	WriteJSON(w, productRequest, http.StatusOK)
-}
-
 func GetAllOtherProductRequestsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -228,11 +190,12 @@ func GetAllOtherProductRequestsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 🔥 Fetch product requests from users in the same institution (excluding the current user)
+	// 🔥 Fetch product requests from users in the same institution (excluding the current user and already requested ones)
 	productRequestCollection := db.GetCollection("gridlyapp", "product_requests")
 	filter := bson.M{
 		"userId":      bson.M{"$ne": userObjID}, // Exclude current user
 		"institution": user.Institution,         // Match institution
+		"requestedBy": bson.M{"$ne": userObjID}, // Exclude if user already requested
 	}
 
 	cursor, err := productRequestCollection.Find(ctx, filter)

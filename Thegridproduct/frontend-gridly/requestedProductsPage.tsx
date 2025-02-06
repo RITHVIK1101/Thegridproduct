@@ -20,20 +20,31 @@ import { UserContext } from "./UserContext";
 
 const { width, height } = Dimensions.get("window");
 
+// Update your type to include an id and sellerId
 type RequestedProduct = {
+  id: string;
   productName: string;
   description: string;
+  sellerId: string;
 };
 
 const RequestedProductsPage: React.FC = () => {
-  const { token } = useContext(UserContext);
-  const [requestedProducts, setRequestedProducts] = useState<RequestedProduct[]>([]);
+  const { token, userId } = useContext(UserContext);
+  const [requestedProducts, setRequestedProducts] = useState<
+    RequestedProduct[]
+  >([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [isSearchActive, setIsSearchActive] = useState<boolean>(false);
-  const [selectedProduct, setSelectedProduct] = useState<RequestedProduct | null>(null);
+  const [selectedProduct, setSelectedProduct] =
+    useState<RequestedProduct | null>(null);
   const [modalVisible, setModalVisible] = useState<boolean>(false);
+
+  // States for chat request modals
+  const [showConfirmModal, setShowConfirmModal] = useState<boolean>(false);
+  const [showSuccessModal, setShowSuccessModal] = useState<boolean>(false);
+  const [requestError, setRequestError] = useState<string | null>(null);
 
   // Helper function to randomize array order
   const shuffleArray = (array: RequestedProduct[]) => {
@@ -58,9 +69,15 @@ const RequestedProductsPage: React.FC = () => {
       if (!response.ok) {
         throw new Error("Failed to fetch requested products.");
       }
-      const data: RequestedProduct[] = await response.json();
-      // Randomize order every time
-      setRequestedProducts(shuffleArray(data));
+      const data = await response.json();
+
+      // ✅ Ensure sellerId is set from userId
+      const processedData = data.map((product) => ({
+        ...product,
+        sellerId: product.userId, // ✅ Fixing the missing sellerId
+      }));
+
+      setRequestedProducts(shuffleArray(processedData));
       setError(null);
     } catch (err: any) {
       console.error("Error fetching requested products:", err);
@@ -97,14 +114,81 @@ const RequestedProductsPage: React.FC = () => {
   };
 
   const renderProductItem = ({ item }: { item: RequestedProduct }) => (
-    <TouchableOpacity style={styles.productItem} onPress={() => openModal(item)}>
+    <TouchableOpacity
+      style={styles.productItem}
+      onPress={() => openModal(item)}
+    >
       <View style={styles.productInfo}>
         <Text style={styles.productName}>{item.productName}</Text>
-        <Text style={styles.productDescription}>{truncate(item.description, 60)}</Text>
+        <Text style={styles.productDescription}>
+          {truncate(item.description, 60)}
+        </Text>
       </View>
       <Ionicons name="chevron-forward" size={20} color="#BB86FC" />
     </TouchableOpacity>
   );
+
+  const onMessageButtonPress = () => {
+    console.log(
+      "Message button pressed, closing product modal and opening confirmation"
+    );
+    setModalVisible(false); // dismiss product details
+    setShowConfirmModal(true); // then show confirmation
+  };
+
+  const confirmSendChatRequest = async () => {
+    setShowConfirmModal(false);
+    if (!selectedProduct || !userId || !token) {
+      setRequestError("Missing required data. Please try again.");
+      return;
+    }
+
+    const payload = {
+      referenceId: selectedProduct.id, // ✅ Should be non-empty
+      referenceType: "product_request", // ✅ Must match backend
+      buyerId: userId, // ✅ Should be non-empty
+      sellerId: selectedProduct.sellerId, // ✅ Should be non-empty
+    };
+
+    console.log("📤 Sending Product Request Chat:", payload);
+
+    // Ensure no empty values before proceeding
+    if (
+      !payload.referenceId ||
+      !payload.referenceType ||
+      !payload.buyerId ||
+      !payload.sellerId
+    ) {
+      console.error("🚨 Missing fields in request payload:", payload);
+      setRequestError("Some required fields are missing.");
+      return;
+    }
+
+    try {
+      const response = await fetch(`${NGROK_URL}/chat/request`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await response.json();
+      console.log("🚀 Chat Request Response:", data);
+
+      if (response.ok) {
+        setShowSuccessModal(true);
+      } else {
+        throw new Error(data.error || "Failed to send chat request.");
+      }
+    } catch (error: any) {
+      console.error("🚨 Error sending chat request:", error);
+      setRequestError(
+        error.message || "Failed to send request. Please try again."
+      );
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -127,7 +211,10 @@ const RequestedProductsPage: React.FC = () => {
             onChangeText={setSearchQuery}
           />
           {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery("")} style={styles.clearButton}>
+            <TouchableOpacity
+              onPress={() => setSearchQuery("")}
+              style={styles.clearButton}
+            >
               <Ionicons name="close" size={20} color="#888" />
             </TouchableOpacity>
           )}
@@ -151,17 +238,31 @@ const RequestedProductsPage: React.FC = () => {
       {/* Modal for Product Details */}
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <LinearGradient colors={["#000000", "#1F0033"]} style={styles.modalContainer}>
+          <LinearGradient
+            colors={["#000000", "#1F0033"]}
+            style={styles.modalContainer}
+          >
             <ScrollView contentContainerStyle={styles.modalContent}>
               {selectedProduct && (
                 <>
-                  <Text style={styles.modalTitle}>{selectedProduct.productName}</Text>
-                  <Text style={styles.modalText}>{selectedProduct.description}</Text>
+                  <Text style={styles.modalTitle}>
+                    {selectedProduct.productName}
+                  </Text>
+                  <Text style={styles.modalText}>
+                    {selectedProduct.description}
+                  </Text>
                   <TouchableOpacity
                     style={styles.modalButton}
-                    onPress={() => Alert.alert("Message", "Message functionality coming soon!")}
+                    onPress={() => {
+                      console.log("Message button pressed");
+                      onMessageButtonPress();
+                    }}
                   >
-                    <Ionicons name="chatbubble-ellipses-outline" size={20} color="#000" />
+                    <Ionicons
+                      name="chatbubble-ellipses-outline"
+                      size={20}
+                      color="#000"
+                    />
                     <Text style={styles.modalButtonText}>Message</Text>
                   </TouchableOpacity>
                 </>
@@ -171,6 +272,83 @@ const RequestedProductsPage: React.FC = () => {
               </TouchableOpacity>
             </ScrollView>
           </LinearGradient>
+        </View>
+      </Modal>
+
+      {/* Confirmation Modal */}
+      <Modal
+        visible={showConfirmModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowConfirmModal(false)}
+      >
+        <View style={styles.popupContainer}>
+          <View style={styles.popupContent}>
+            <Text style={styles.popupTitle}>Confirm Chat Request</Text>
+            <Text style={styles.popupMessage}>
+              Are you sure you want to send a chat request? Once sent, please
+              wait until the other person accepts it.
+            </Text>
+            <View style={styles.popupButtons}>
+              <TouchableOpacity
+                style={[styles.popupButton, styles.cancelButton]}
+                onPress={() => setShowConfirmModal(false)}
+              >
+                <Text style={styles.popupButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.popupButton, styles.confirmButton]}
+                onPress={confirmSendChatRequest}
+              >
+                <Text style={styles.popupButtonText}>Confirm</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Success Modal */}
+      <Modal
+        visible={showSuccessModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowSuccessModal(false)}
+      >
+        <View style={styles.popupContainer}>
+          <View style={styles.popupContent}>
+            <Text style={styles.popupTitle}>Chat Request Sent</Text>
+            <Text style={styles.popupMessage}>
+              Your chat request has been sent. Please wait until the other
+              person accepts it.
+            </Text>
+            <TouchableOpacity
+              style={styles.bubbleButton}
+              onPress={() => setShowSuccessModal(false)}
+            >
+              <Text style={styles.bubbleButtonText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Error Modal */}
+      <Modal
+        visible={requestError !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setRequestError(null)}
+      >
+        <View style={styles.popupContainer}>
+          <View style={styles.popupContent}>
+            <Text style={styles.popupTitle}>Error</Text>
+            <Text style={styles.popupMessage}>{requestError}</Text>
+            <TouchableOpacity
+              style={styles.bubbleButton}
+              onPress={() => setRequestError(null)}
+            >
+              <Text style={styles.bubbleButtonText}>OK</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </Modal>
     </SafeAreaView>
@@ -299,5 +477,68 @@ const styles = StyleSheet.create({
   },
   modalClose: {
     marginTop: 10,
+  },
+  popupContainer: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  popupContent: {
+    backgroundColor: "#1E1E1E",
+    borderRadius: 10,
+    padding: 20,
+    width: "100%",
+    maxWidth: 400,
+    alignItems: "center",
+  },
+  popupTitle: {
+    color: "#FFFFFF",
+    fontSize: 20,
+    fontWeight: "700",
+    marginBottom: 10,
+    textAlign: "center",
+  },
+  popupMessage: {
+    color: "#E0E0E0",
+    fontSize: 16,
+    textAlign: "center",
+    marginBottom: 20,
+  },
+  popupButtons: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    width: "100%",
+  },
+  popupButton: {
+    flex: 1,
+    paddingVertical: 12,
+    marginHorizontal: 5,
+    borderRadius: 5,
+    alignItems: "center",
+  },
+  confirmButton: {
+    backgroundColor: "#4A00E0",
+  },
+  cancelButton: {
+    backgroundColor: "#555555",
+  },
+  popupButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  bubbleButton: {
+    backgroundColor: "#4A00E0",
+    borderRadius: 30,
+    paddingVertical: 12,
+    paddingHorizontal: 25,
+    alignSelf: "center",
+  },
+  bubbleButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });

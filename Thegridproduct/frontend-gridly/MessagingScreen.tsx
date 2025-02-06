@@ -145,12 +145,17 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     "Other",
   ];
 
-  // ─── CHAT FILTERING LOGIC ─────────────────────────────────────────────
   const applyFilter = (
     chatsToFilter: Chat[],
-    f: "all" | "products" | "gigs"
+    f: "all" | "products" | "gigs" | "product_request"
   ) => {
     if (f === "all") return chatsToFilter;
+    if (f === "products") {
+      return chatsToFilter.filter((c) => c.referenceType === "product");
+    }
+    if (f === "gigs") {
+      return chatsToFilter.filter((c) => c.referenceType === "gig");
+    }
     return chatsToFilter.filter((c) => c.referenceType === f);
   };
 
@@ -223,7 +228,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       setLoading(false);
     }
   };
-
   // ─── REALTIME LISTENER FOR SELECTED CHAT ─────────────────────────────
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
@@ -560,7 +564,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }
   };
 
-  // ─── REQUESTS AND REPORT HANDLING (UNCHANGED) ─────────────
   const fetchUserRequests = async () => {
     if (!userId || !token) {
       setErrorRequests("User not authenticated.");
@@ -669,7 +672,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       setProcessingRequestId(null);
     }
   };
-
   const renderChat = ({ item }: { item: Chat }) => {
     if (!item.user) {
       console.warn(`Chat with chatID ${item.chatID} is missing user data.`);
@@ -691,9 +693,15 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         })
       : "";
 
-    // ✅ Ensure correct mapping of referenceType
-    const chatType = item.referenceType === "products" ? "Product" : "Gig"; // Matches API response
-    const chatTitle = item.referenceTitle || "Unnamed Item"; // Ensure no "Job" is displayed
+    // Determine the chat type label based on referenceType
+    const chatTypeLabel =
+      item.referenceType === "product"
+        ? "Product Name: "
+        : item.referenceType === "gig"
+        ? "Gig Name: "
+        : item.referenceType === "product_request"
+        ? "Product Request Name: "
+        : "Unnamed Item";
 
     return (
       <Pressable
@@ -727,10 +735,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
               </View>
             </View>
             <Text style={styles.chatProductName} numberOfLines={1}>
-              {item.referenceType === "product"
-                ? "Product Name: "
-                : "Gig Name: "}
-              {item.referenceTitle || "Unnamed Item"}
+              {chatTypeLabel} {item.referenceTitle || "Unnamed Item"}
             </Text>
 
             {latestMessage && (
@@ -815,7 +820,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     title: c.referenceTitle || "Unnamed Item", // Ensure correct reference title is used
     type: c.referenceType || "product", // Use actual type
   }));
-
   const handleNavigateFromProductOrGig = (item: {
     chatID: string;
     title: string;
@@ -832,18 +836,26 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       ? "All Chats"
       : filter === "products"
       ? "Product Chats"
-      : "Job Chats";
+      : filter === "gigs"
+      ? "Job Chats"
+      : filter === "product_request"
+      ? "Product Request Chats"
+      : "All Chats";
+
   const currentFilterLabel =
     filter === "all"
       ? "All ×"
       : filter === "products"
       ? "Products ×"
-      : "Jobs ×";
+      : filter === "gigs"
+      ? "Jobs ×"
+      : filter === "product_request"
+      ? "Product Requests ×"
+      : "All ×";
 
   const handleFilterPillPress = () => {
     setFilterMenuVisible(true);
   };
-
   const handleReportPress = () => {
     setChatModalVisible(false);
     setTimeout(() => {
@@ -923,12 +935,20 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }
 
     const renderRequestItem = ({ item }: { item: Request }) => {
+      const referenceTypeLabel =
+        item.referenceType === "product"
+          ? "Product Name: "
+          : item.referenceType === "gig"
+          ? "Gig Name: "
+          : item.referenceType === "product_request"
+          ? "Product Request Name: "
+          : "Unnamed Item";
+
       return (
         <View style={styles.requestCard}>
           <View style={styles.requestInfo}>
             <Text style={styles.requestProductName}>
-              {item.referenceType === "product" ? "Product Name:" : "Gig Name:"}{" "}
-              {item.referenceTitle || "Unnamed Item"}
+              {referenceTypeLabel} {item.referenceTitle || "Unnamed Item"}
             </Text>
 
             <Text style={styles.requestSender}>
@@ -1120,6 +1140,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         </View>
 
         {/* Filter Modal */}
+        {/* Filter Modal */}
         <Modal
           visible={filterMenuVisible}
           animationType="fade"
@@ -1131,9 +1152,20 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
               <Pressable
                 style={styles.filterModalOption}
                 onPress={() => {
+                  setFilter("all");
+                  setFilterMenuVisible(false);
+                  setFilteredChats(applyFilter(chats, "all"));
+                }}
+              >
+                <Text style={styles.filterModalOptionText}>All</Text>
+              </Pressable>
+
+              <Pressable
+                style={styles.filterModalOption}
+                onPress={() => {
                   setFilter("products");
                   setFilterMenuVisible(false);
-                  setFilteredChats(applyFilter(chats, "products")); // Apply the filter
+                  setFilteredChats(applyFilter(chats, "products"));
                 }}
               >
                 <Text style={styles.filterModalOptionText}>Products</Text>
@@ -1144,10 +1176,23 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                 onPress={() => {
                   setFilter("gigs");
                   setFilterMenuVisible(false);
-                  setFilteredChats(applyFilter(chats, "gigs")); // Apply the filter
+                  setFilteredChats(applyFilter(chats, "gigs"));
                 }}
               >
                 <Text style={styles.filterModalOptionText}>Jobs</Text>
+              </Pressable>
+
+              <Pressable
+                style={styles.filterModalOption}
+                onPress={() => {
+                  setFilter("product_request");
+                  setFilterMenuVisible(false);
+                  setFilteredChats(applyFilter(chats, "product_request"));
+                }}
+              >
+                <Text style={styles.filterModalOptionText}>
+                  Product Requests
+                </Text>
               </Pressable>
 
               <Pressable
