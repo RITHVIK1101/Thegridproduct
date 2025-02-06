@@ -200,7 +200,6 @@ func GetSingleProductHandler(w http.ResponseWriter, r *http.Request) {
 
 	json.NewEncoder(w).Encode(product)
 }
-
 func GetAllProductsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -234,10 +233,13 @@ func GetAllProductsHandler(w http.ResponseWriter, r *http.Request) {
 
 	collection := db.GetCollection("gridlyapp", "products")
 
-	// ✅ Fetch only products where status is "inshop" or "talks"
+	// ✅ Base filter to fetch products that are not expired and available in shop
 	baseFilter := bson.M{
 		"status":  bson.M{"$in": []string{"inshop"}},
 		"expired": false, // Exclude expired products
+		"requestedBy": bson.M{
+			"$ne": userObjID, // ✅ Exclude products where the user has already requested
+		},
 	}
 
 	var filter bson.M

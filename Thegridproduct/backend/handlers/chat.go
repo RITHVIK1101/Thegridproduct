@@ -458,13 +458,23 @@ func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 			return nil, err
 		}
 
-		// If it's a gig, update the gig's document to add the buyer to the "requestedBy" array (if needed)
+		// ✅ Update "requestedBy" for products as well
 		if req.ReferenceType == "gig" {
 			gigsCol := db.GetCollection("gridlyapp", "gigs")
 			_, err = gigsCol.UpdateOne(
 				sessCtx,
 				bson.M{"_id": referenceObjectID},
-				bson.M{"$addToSet": bson.M{"requestedBy": buyerObjectID}},
+				bson.M{"$addToSet": bson.M{"requestedBy": buyerObjectID}}, // Adds buyer to requestedBy array
+			)
+			if err != nil {
+				return nil, err
+			}
+		} else if req.ReferenceType == "product" {
+			productsCol := db.GetCollection("gridlyapp", "products")
+			_, err = productsCol.UpdateOne(
+				sessCtx,
+				bson.M{"_id": referenceObjectID},
+				bson.M{"$addToSet": bson.M{"requestedBy": buyerObjectID}}, // ✅ Adds buyer to requestedBy for products
 			)
 			if err != nil {
 				return nil, err
