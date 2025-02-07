@@ -92,11 +92,15 @@ func AddProductHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	product.Availability = mappedAvailability
 
-	// Validate required fields
 	if product.Title == "" || product.Description == "" || len(product.SelectedTags) == 0 ||
-		len(product.Images) == 0 || (product.ListingType != "Renting" && (product.Rating < 1 || product.Rating > 5)) ||
-		(product.ListingType != "Renting" && product.Price == 0) {
+		len(product.Images) == 0 || (product.ListingType != "Renting" && product.Price == 0) {
 		WriteJSONError(w, "Missing required fields or invalid input", http.StatusBadRequest)
+		return
+	}
+
+	// ✅ Make rating optional: Only validate if it's provided and non-zero
+	if product.Rating != 0 && (product.Rating < 1 || product.Rating > 5) {
+		WriteJSONError(w, "Rating must be between 1 and 5 if provided", http.StatusBadRequest)
 		return
 	}
 
