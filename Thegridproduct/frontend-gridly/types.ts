@@ -52,8 +52,10 @@ export type Product = {
   postedDate: string;
   rating?: number;
   quality?: string;
-  productStatus: 'shop' | 'talks' | 'sold'; // Added productStatus as part of the definition
+  productStatus: "shop" | "talks" | "sold";
+  selectedTags?: string[]; // ✅ Add this line
 };
+
 export type Request = {
   requestId: string;
   referenceId: string;

@@ -42,7 +42,12 @@ function mapAvailabilityToBackend(availability: AvailabilityUI): string {
   }
 }
 
-const availableTags = ["#FemaleClothing", "#MaleClothing", "#Other"] as const;
+const availableTags = [
+  "#FemaleClothing",
+  "#MaleClothing",
+  "#Tickets",
+  "#Other",
+] as const;
 const durationUnits: DurationUnit[] = ["Hours", "Days", "Weeks", "Months"];
 const listingTypes: ListingType[] = ["Selling", "Renting", "Both"];
 const conditions: Condition[] = ["New", "Used"];
@@ -73,7 +78,10 @@ const AddProduct: React.FC = () => {
     navigation.setOptions({
       headerTitle: "",
       headerLeft: () => (
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerBackButton}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.headerBackButton}
+        >
           <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
       ),
@@ -184,7 +192,10 @@ const AddProduct: React.FC = () => {
       if (!result.canceled && result.assets && result.assets.length > 0) {
         setIsUploadingImage(true);
 
-        const selectedAssets = result.assets.slice(0, 3 - formData.images.length);
+        const selectedAssets = result.assets.slice(
+          0,
+          3 - formData.images.length
+        );
 
         for (const asset of selectedAssets) {
           const uri = asset.uri;
@@ -275,7 +286,11 @@ const AddProduct: React.FC = () => {
         return true;
       case 3:
         if (formData.listingType !== "Renting") {
-          if (!["In Campus", "Out of Campus", "Both"].includes(formData.availability)) {
+          if (
+            !["In Campus", "Out of Campus", "Both"].includes(
+              formData.availability
+            )
+          ) {
             showError("Please select a valid availability option.");
             return false;
           }
@@ -287,12 +302,19 @@ const AddProduct: React.FC = () => {
           return false;
         }
 
-        if (formData.listingType === "Selling" && formData.condition === "Used" && formData.rating === 0) {
+        if (
+          formData.listingType === "Selling" &&
+          formData.condition === "Used" &&
+          formData.rating === 0
+        ) {
           showError("Please rate the product if it's used.");
           return false;
         }
 
-        if ((formData.listingType === "Renting" || formData.listingType === "Both")) {
+        if (
+          formData.listingType === "Renting" ||
+          formData.listingType === "Both"
+        ) {
           if (!formData.condition) {
             showError("Please specify if the product is New or Used.");
             return false;
@@ -309,12 +331,20 @@ const AddProduct: React.FC = () => {
         }
         return true;
       case 5:
-        if ((formData.listingType === "Selling" || formData.listingType === "Both") && !formData.price.trim()) {
+        if (
+          (formData.listingType === "Selling" ||
+            formData.listingType === "Both") &&
+          !formData.price.trim()
+        ) {
           showError("Please enter a buying price (In Campus).");
           return false;
         }
 
-        if ((formData.listingType === "Renting" || formData.listingType === "Both") && !formData.rentPrice.trim()) {
+        if (
+          (formData.listingType === "Renting" ||
+            formData.listingType === "Both") &&
+          !formData.rentPrice.trim()
+        ) {
           showError("Please enter a renting price (In Campus).");
           return false;
         }
@@ -330,7 +360,8 @@ const AddProduct: React.FC = () => {
 
         if (
           formData.listingType === "Selling" &&
-          (formData.availability === "Out of Campus" || formData.availability === "Both") &&
+          (formData.availability === "Out of Campus" ||
+            formData.availability === "Both") &&
           !formData.outOfCampusPrice.trim()
         ) {
           showError("Please enter a buying price (Out of Campus).");
@@ -352,18 +383,25 @@ const AddProduct: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const price = formData.price ? parseFloat(formData.price.trim()) : undefined;
+      const price = formData.price
+        ? parseFloat(formData.price.trim())
+        : undefined;
       const outOfCampusPrice = formData.outOfCampusPrice
         ? parseFloat(formData.outOfCampusPrice.trim())
         : undefined;
-      const rentPrice = formData.rentPrice ? parseFloat(formData.rentPrice.trim()) : undefined;
+      const rentPrice = formData.rentPrice
+        ? parseFloat(formData.rentPrice.trim())
+        : undefined;
 
       if (
         (formData.price && (isNaN(price!) || price! < 0)) ||
-        (formData.outOfCampusPrice && (isNaN(outOfCampusPrice!) || outOfCampusPrice! < 0)) ||
+        (formData.outOfCampusPrice &&
+          (isNaN(outOfCampusPrice!) || outOfCampusPrice! < 0)) ||
         (formData.rentPrice && (isNaN(rentPrice!) || rentPrice! < 0))
       ) {
-        throw new Error("Please enter valid positive numerical values for prices.");
+        throw new Error(
+          "Please enter valid positive numerical values for prices."
+        );
       }
 
       if (formData.selectedTags.length === 0) {
@@ -436,7 +474,9 @@ const AddProduct: React.FC = () => {
       if (contentType && contentType.includes("application/json")) {
         const data = await response.json();
         if (!response.ok) {
-          throw new Error(data.message || `HTTP error! status: ${response.status}`);
+          throw new Error(
+            data.message || `HTTP error! status: ${response.status}`
+          );
         }
         // Reset the form data after successful submission
         setFormData({
@@ -469,7 +509,9 @@ const AddProduct: React.FC = () => {
       }
     } catch (error: unknown) {
       console.error("Error:", error);
-      showError(error instanceof Error ? error.message : "An unknown error occurred.");
+      showError(
+        error instanceof Error ? error.message : "An unknown error occurred."
+      );
     } finally {
       setIsLoading(false);
     }
@@ -490,7 +532,9 @@ const AddProduct: React.FC = () => {
       title: "Upload Images & Enter Title",
       content: (
         <>
-          <Text style={styles.imageCounter}>{`${formData.images.length}/3 Images`}</Text>
+          <Text
+            style={styles.imageCounter}
+          >{`${formData.images.length}/3 Images`}</Text>
           <View style={styles.imageUploadContainer}>
             <TouchableOpacity
               style={styles.uploadButton}
@@ -501,7 +545,11 @@ const AddProduct: React.FC = () => {
                 <ActivityIndicator size="small" color="#BB86FC" />
               ) : (
                 <>
-                  <Ionicons name="cloud-upload-outline" size={30} color="#BB86FC" />
+                  <Ionicons
+                    name="cloud-upload-outline"
+                    size={30}
+                    color="#BB86FC"
+                  />
                   <Text style={styles.uploadButtonText}>Upload Images</Text>
                 </>
               )}
@@ -514,7 +562,11 @@ const AddProduct: React.FC = () => {
                     style={styles.removeButton}
                     onPress={() => removeImage(index)}
                   >
-                    <Ionicons name="close-circle-outline" size={24} color="#BB86FC" />
+                    <Ionicons
+                      name="close-circle-outline"
+                      size={24}
+                      color="#BB86FC"
+                    />
                   </TouchableOpacity>
                 </View>
               ))}
@@ -538,8 +590,18 @@ const AddProduct: React.FC = () => {
           <View style={styles.sectionContainer}>
             <View style={styles.titleWithInfo}>
               <Text style={styles.sectionTitle}>Listing Type</Text>
-              <TouchableOpacity onPress={() => openInfoModal("Select how you want to offer your product:\n- Selling: In-campus (hand) or Out-of-campus (ship in 7 days).\n- Renting: Always in-campus.\n- Both: Offer both buying and renting.")}>
-                <Ionicons name="information-circle-outline" size={20} color="#BB86FC" />
+              <TouchableOpacity
+                onPress={() =>
+                  openInfoModal(
+                    "Select how you want to offer your product:\n- Selling: In-campus (hand) or Out-of-campus (ship in 7 days).\n- Renting: Always in-campus.\n- Both: Offer both buying and renting."
+                  )
+                }
+              >
+                <Ionicons
+                  name="information-circle-outline"
+                  size={20}
+                  color="#BB86FC"
+                />
               </TouchableOpacity>
             </View>
             <View style={styles.optionsContainer}>
@@ -548,14 +610,18 @@ const AddProduct: React.FC = () => {
                   key={type}
                   style={[
                     styles.optionButton,
-                    formData.listingType === type ? styles.optionButtonSelected : null,
+                    formData.listingType === type
+                      ? styles.optionButtonSelected
+                      : null,
                   ]}
                   onPress={() =>
                     setFormData({
                       ...formData,
                       listingType: type,
                       availability:
-                        type === "Renting" ? "In Campus" : formData.availability,
+                        type === "Renting"
+                          ? "In Campus"
+                          : formData.availability,
                       outOfCampusPrice: "",
                       rentPrice: "",
                       rentDuration: "",
@@ -568,7 +634,9 @@ const AddProduct: React.FC = () => {
                   <Text
                     style={[
                       styles.optionText,
-                      formData.listingType === type ? styles.optionTextSelected : null,
+                      formData.listingType === type
+                        ? styles.optionTextSelected
+                        : null,
                     ]}
                   >
                     {type}
@@ -589,13 +657,25 @@ const AddProduct: React.FC = () => {
             <View style={styles.sectionContainer}>
               <View style={styles.titleWithInfo}>
                 <Text style={styles.sectionTitle}>Availability</Text>
-                <TouchableOpacity onPress={() => openInfoModal("Renting is always in-campus only. You will hand over the product directly without shipping.")}>
-                  <Ionicons name="information-circle-outline" size={20} color="#BB86FC" />
+                <TouchableOpacity
+                  onPress={() =>
+                    openInfoModal(
+                      "Renting is always in-campus only. You will hand over the product directly without shipping."
+                    )
+                  }
+                >
+                  <Ionicons
+                    name="information-circle-outline"
+                    size={20}
+                    color="#BB86FC"
+                  />
                 </TouchableOpacity>
               </View>
               <View style={styles.lockedAvailability}>
                 <Ionicons name="lock-closed" size={20} color="#BB86FC" />
-                <Text style={styles.lockedAvailabilityText}>In Campus (Forced)</Text>
+                <Text style={styles.lockedAvailabilityText}>
+                  In Campus (Forced)
+                </Text>
               </View>
             </View>
           </>
@@ -604,15 +684,27 @@ const AddProduct: React.FC = () => {
             <View style={styles.sectionContainer}>
               <View style={styles.titleWithInfo}>
                 <Text style={styles.sectionTitle}>Availability</Text>
-                <TouchableOpacity onPress={() => openInfoModal("In Campus: Hand delivery.\nOut of Campus: Must ship within 7 days.\nBoth: Provide separate prices for in-campus and out-of-campus.")}>
-                  <Ionicons name="information-circle-outline" size={20} color="#BB86FC" />
+                <TouchableOpacity
+                  onPress={() =>
+                    openInfoModal(
+                      "In Campus: Hand delivery.\nOut of Campus: Must ship within 7 days.\nBoth: Provide separate prices for in-campus and out-of-campus."
+                    )
+                  }
+                >
+                  <Ionicons
+                    name="information-circle-outline"
+                    size={20}
+                    color="#BB86FC"
+                  />
                 </TouchableOpacity>
               </View>
               <View style={styles.optionsContainer}>
                 <TouchableOpacity
                   style={[
                     styles.optionButton,
-                    formData.availability === "In Campus" ? styles.optionButtonSelected : null,
+                    formData.availability === "In Campus"
+                      ? styles.optionButtonSelected
+                      : null,
                   ]}
                   onPress={() =>
                     setFormData({
@@ -662,7 +754,9 @@ const AddProduct: React.FC = () => {
                 <TouchableOpacity
                   style={[
                     styles.optionButton,
-                    formData.availability === "Both" ? styles.optionButtonSelected : null,
+                    formData.availability === "Both"
+                      ? styles.optionButtonSelected
+                      : null,
                   ]}
                   onPress={() =>
                     setFormData({
@@ -675,7 +769,9 @@ const AddProduct: React.FC = () => {
                   <Text
                     style={[
                       styles.optionText,
-                      formData.availability === "Both" ? styles.optionTextSelected : null,
+                      formData.availability === "Both"
+                        ? styles.optionTextSelected
+                        : null,
                     ]}
                   >
                     Both
@@ -694,8 +790,18 @@ const AddProduct: React.FC = () => {
           <View style={styles.sectionContainer}>
             <View style={styles.titleWithInfo}>
               <Text style={styles.sectionTitle}>Select Tags</Text>
-              <TouchableOpacity onPress={() => openInfoModal("Tags help categorize your product (e.g. #FemaleClothing). Select at least one.")}>
-                <Ionicons name="information-circle-outline" size={20} color="#BB86FC" />
+              <TouchableOpacity
+                onPress={() =>
+                  openInfoModal(
+                    "Tags help categorize your product (e.g. #FemaleClothing). Select at least one."
+                  )
+                }
+              >
+                <Ionicons
+                  name="information-circle-outline"
+                  size={20}
+                  color="#BB86FC"
+                />
               </TouchableOpacity>
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -704,14 +810,18 @@ const AddProduct: React.FC = () => {
                   key={tag}
                   style={[
                     styles.tag,
-                    formData.selectedTags.includes(tag) ? styles.tagSelected : null,
+                    formData.selectedTags.includes(tag)
+                      ? styles.tagSelected
+                      : null,
                   ]}
                   onPress={() => toggleTag(tag)}
                 >
                   <Text
                     style={[
                       styles.tagText,
-                      formData.selectedTags.includes(tag) ? styles.tagTextSelected : null,
+                      formData.selectedTags.includes(tag)
+                        ? styles.tagTextSelected
+                        : null,
                     ]}
                   >
                     {tag}
@@ -721,12 +831,23 @@ const AddProduct: React.FC = () => {
             </ScrollView>
           </View>
 
-          {(formData.listingType === "Selling" || formData.listingType === "Both") && (
+          {(formData.listingType === "Selling" ||
+            formData.listingType === "Both") && (
             <View style={styles.sectionContainer}>
               <View style={styles.titleWithInfo}>
                 <Text style={styles.sectionTitle}>Condition</Text>
-                <TouchableOpacity onPress={() => openInfoModal("Select 'New' or 'Used'. Used items can be rated for quality.")}>
-                  <Ionicons name="information-circle-outline" size={20} color="#BB86FC" />
+                <TouchableOpacity
+                  onPress={() =>
+                    openInfoModal(
+                      "Select 'New' or 'Used'. Used items can be rated for quality."
+                    )
+                  }
+                >
+                  <Ionicons
+                    name="information-circle-outline"
+                    size={20}
+                    color="#BB86FC"
+                  />
                 </TouchableOpacity>
               </View>
               <View style={styles.optionsContainer}>
@@ -735,7 +856,9 @@ const AddProduct: React.FC = () => {
                     key={condition}
                     style={[
                       styles.optionButton,
-                      formData.condition === condition ? styles.optionButtonSelected : null,
+                      formData.condition === condition
+                        ? styles.optionButtonSelected
+                        : null,
                     ]}
                     onPress={() =>
                       setFormData({
@@ -748,7 +871,9 @@ const AddProduct: React.FC = () => {
                     <Text
                       style={[
                         styles.optionText,
-                        formData.condition === condition ? styles.optionTextSelected : null,
+                        formData.condition === condition
+                          ? styles.optionTextSelected
+                          : null,
                       ]}
                     >
                       {condition}
@@ -760,13 +885,26 @@ const AddProduct: React.FC = () => {
                 <View style={styles.sectionContainer}>
                   <View style={styles.titleWithInfo}>
                     <Text style={styles.sectionTitle}>Rate Quality</Text>
-                    <TouchableOpacity onPress={() => openInfoModal("Rate the quality of the used item, from 1 (Poor) to 5 (Excellent).")}>
-                      <Ionicons name="information-circle-outline" size={20} color="#BB86FC" />
+                    <TouchableOpacity
+                      onPress={() =>
+                        openInfoModal(
+                          "Rate the quality of the used item, from 1 (Poor) to 5 (Excellent)."
+                        )
+                      }
+                    >
+                      <Ionicons
+                        name="information-circle-outline"
+                        size={20}
+                        color="#BB86FC"
+                      />
                     </TouchableOpacity>
                   </View>
                   <View style={styles.ratingContainer}>
                     {[1, 2, 3, 4, 5].map((star) => (
-                      <TouchableOpacity key={star} onPress={() => setRatingValue(star)}>
+                      <TouchableOpacity
+                        key={star}
+                        onPress={() => setRatingValue(star)}
+                      >
                         <Ionicons
                           name="star"
                           size={30}
@@ -780,12 +918,23 @@ const AddProduct: React.FC = () => {
             </View>
           )}
 
-          {(formData.listingType === "Renting" || formData.listingType === "Both") && (
+          {(formData.listingType === "Renting" ||
+            formData.listingType === "Both") && (
             <View style={styles.sectionContainer}>
               <View style={styles.titleWithInfo}>
                 <Text style={styles.sectionTitle}>Rent Duration</Text>
-                <TouchableOpacity onPress={() => openInfoModal("Rent duration sets how long the renter can use the product before returning it to you on-campus.")}>
-                  <Ionicons name="information-circle-outline" size={20} color="#BB86FC" />
+                <TouchableOpacity
+                  onPress={() =>
+                    openInfoModal(
+                      "Rent duration sets how long the renter can use the product before returning it to you on-campus."
+                    )
+                  }
+                >
+                  <Ionicons
+                    name="information-circle-outline"
+                    size={20}
+                    color="#BB86FC"
+                  />
                 </TouchableOpacity>
               </View>
               <View style={styles.rentDurationContainer}>
@@ -795,7 +944,9 @@ const AddProduct: React.FC = () => {
                   placeholderTextColor="#888"
                   keyboardType="numeric"
                   value={formData.rentDuration}
-                  onChangeText={(text) => setFormData({ ...formData, rentDuration: text })}
+                  onChangeText={(text) =>
+                    setFormData({ ...formData, rentDuration: text })
+                  }
                 />
                 <View style={styles.durationUnitContainer}>
                   {durationUnits.map((unit) => (
@@ -803,7 +954,9 @@ const AddProduct: React.FC = () => {
                       key={unit}
                       style={[
                         styles.durationUnitButton,
-                        formData.durationUnit === unit ? styles.durationUnitButtonSelected : null,
+                        formData.durationUnit === unit
+                          ? styles.durationUnitButtonSelected
+                          : null,
                       ]}
                       onPress={() =>
                         setFormData({
@@ -836,12 +989,25 @@ const AddProduct: React.FC = () => {
       title: "Prices & Description",
       content: (
         <>
-          {(formData.listingType === "Selling" || formData.listingType === "Both") && (
+          {(formData.listingType === "Selling" ||
+            formData.listingType === "Both") && (
             <>
               <View style={styles.titleWithInfoRow}>
-                <Text style={styles.sectionSubtitle}>Buying Price (In Campus) $</Text>
-                <TouchableOpacity onPress={() => openInfoModal("In-campus transactions are done by hand, no shipping required.")}>
-                  <Ionicons name="information-circle-outline" size={18} color="#BB86FC" />
+                <Text style={styles.sectionSubtitle}>
+                  Buying Price (In Campus) $
+                </Text>
+                <TouchableOpacity
+                  onPress={() =>
+                    openInfoModal(
+                      "In-campus transactions are done by hand, no shipping required."
+                    )
+                  }
+                >
+                  <Ionicons
+                    name="information-circle-outline"
+                    size={18}
+                    color="#BB86FC"
+                  />
                 </TouchableOpacity>
               </View>
               <TextInput
@@ -850,17 +1016,33 @@ const AddProduct: React.FC = () => {
                 placeholderTextColor="#888"
                 keyboardType="numeric"
                 value={formData.price}
-                onChangeText={(text) => setFormData({ ...formData, price: text })}
+                onChangeText={(text) =>
+                  setFormData({ ...formData, price: text })
+                }
               />
 
-              {((formData.listingType === "Both" && formData.availability === "Both") ||
+              {((formData.listingType === "Both" &&
+                formData.availability === "Both") ||
                 (formData.listingType === "Selling" &&
-                  (formData.availability === "Both" || formData.availability === "Out of Campus"))) && (
+                  (formData.availability === "Both" ||
+                    formData.availability === "Out of Campus"))) && (
                 <>
                   <View style={styles.titleWithInfoRow}>
-                    <Text style={styles.sectionSubtitle}>Buying Price (Out of Campus) $</Text>
-                    <TouchableOpacity onPress={() => openInfoModal("Out-of-campus requires you to ship the product within 7 days. Price should cover shipping.")}>
-                      <Ionicons name="information-circle-outline" size={18} color="#BB86FC" />
+                    <Text style={styles.sectionSubtitle}>
+                      Buying Price (Out of Campus) $
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() =>
+                        openInfoModal(
+                          "Out-of-campus requires you to ship the product within 7 days. Price should cover shipping."
+                        )
+                      }
+                    >
+                      <Ionicons
+                        name="information-circle-outline"
+                        size={18}
+                        color="#BB86FC"
+                      />
                     </TouchableOpacity>
                   </View>
                   <TextInput
@@ -878,12 +1060,25 @@ const AddProduct: React.FC = () => {
             </>
           )}
 
-          {(formData.listingType === "Renting" || formData.listingType === "Both") && (
+          {(formData.listingType === "Renting" ||
+            formData.listingType === "Both") && (
             <>
               <View style={styles.titleWithInfoRow}>
-                <Text style={styles.sectionSubtitle}>Renting Price (In Campus) $</Text>
-                <TouchableOpacity onPress={() => openInfoModal("Renting is always on-campus, so you'll hand over and take back the item in person.")}>
-                  <Ionicons name="information-circle-outline" size={18} color="#BB86FC" />
+                <Text style={styles.sectionSubtitle}>
+                  Renting Price (In Campus) $
+                </Text>
+                <TouchableOpacity
+                  onPress={() =>
+                    openInfoModal(
+                      "Renting is always on-campus, so you'll hand over and take back the item in person."
+                    )
+                  }
+                >
+                  <Ionicons
+                    name="information-circle-outline"
+                    size={18}
+                    color="#BB86FC"
+                  />
                 </TouchableOpacity>
               </View>
               <TextInput
@@ -901,7 +1096,9 @@ const AddProduct: React.FC = () => {
 
           <View style={{ marginTop: 20 }}>
             <View style={styles.titleWithInfoRow}>
-              <Text style={styles.sectionSubtitle}>Additional Description (Optional)</Text>
+              <Text style={styles.sectionSubtitle}>
+                Additional Description (Optional)
+              </Text>
             </View>
             <TextInput
               style={[styles.input, styles.descriptionInput]}
@@ -909,7 +1106,9 @@ const AddProduct: React.FC = () => {
               placeholderTextColor="#888"
               multiline
               value={formData.description}
-              onChangeText={(text) => setFormData({ ...formData, description: text })}
+              onChangeText={(text) =>
+                setFormData({ ...formData, description: text })
+              }
             />
           </View>
         </>
@@ -1009,11 +1208,17 @@ const AddProduct: React.FC = () => {
             </TouchableOpacity>
           </View>
 
-          <Modal transparent visible={isSuccessModalVisible} animationType="fade">
+          <Modal
+            transparent
+            visible={isSuccessModalVisible}
+            animationType="fade"
+          >
             <View style={styles.modalOverlay}>
               <View style={styles.modalContent}>
                 <Ionicons name="checkmark-circle" size={60} color="#9C27B0" />
-                <Text style={styles.modalText}>Product Posted Successfully!</Text>
+                <Text style={styles.modalText}>
+                  Product Posted Successfully!
+                </Text>
               </View>
             </View>
           </Modal>

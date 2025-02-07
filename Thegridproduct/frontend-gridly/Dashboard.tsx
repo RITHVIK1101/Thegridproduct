@@ -17,7 +17,12 @@ import {
   Keyboard,
   Platform,
 } from "react-native";
-import { ScrollView, PanGestureHandler, TapGestureHandler, State as GestureState } from "react-native-gesture-handler";
+import {
+  ScrollView,
+  PanGestureHandler,
+  TapGestureHandler,
+  State as GestureState,
+} from "react-native-gesture-handler";
 import {
   useNavigation,
   CommonActions,
@@ -49,6 +54,7 @@ type Product = {
   rating?: number;
   quality?: string;
   availability: string;
+  selectedTags?: string[];
 };
 
 type User = {
@@ -98,15 +104,19 @@ const Dashboard: React.FC<DashboardProps> = () => {
     "#Tickets",
     "#Other",
   ];
-  const [selectedCategory, setSelectedCategory] = useState<string>("#Everything");
+  const [selectedCategory, setSelectedCategory] =
+    useState<string>("#Everything");
   const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
 
   // For product details displayed in the description modal
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [isDescriptionModalVisible, setIsDescriptionModalVisible] = useState(false);
+  const [isDescriptionModalVisible, setIsDescriptionModalVisible] =
+    useState(false);
 
   // NEW: State for requested products from other users
-  const [requestedProducts, setRequestedProducts] = useState<RequestedProduct[]>([]);
+  const [requestedProducts, setRequestedProducts] = useState<
+    RequestedProduct[]
+  >([]);
 
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
 
@@ -492,7 +502,13 @@ const Dashboard: React.FC<DashboardProps> = () => {
         rating: product.rating,
         quality: product.quality,
         availability: product.availability,
+        selectedTags: product.selectedTags || [], // Ensure selectedTags is always an array
       }));
+
+      console.log("Mapped products:", mappedData);
+
+      console.log("Current filters - Campus Mode:", campusMode);
+      console.log("Current filters - Selected Category:", selectedCategory);
       let filtered = mappedData;
       if (campusMode === "In Campus") {
         filtered = mappedData.filter(
@@ -504,11 +520,12 @@ const Dashboard: React.FC<DashboardProps> = () => {
       }
       let finalFiltered = filtered;
       if (selectedCategory !== "#Everything") {
-        const categoryFilter = selectedCategory.replace("#", "").toLowerCase();
         finalFiltered = finalFiltered.filter(
-          (p) => p.category && p.category.toLowerCase() === categoryFilter
+          (p) => p.selectedTags?.includes(selectedCategory) // ✅ Compare directly
         );
       }
+
+      console.log("Final filtered products (category):", finalFiltered);
       setFilteredProducts(finalFiltered);
       setAllProducts(filtered);
       setError(null);
@@ -550,9 +567,8 @@ const Dashboard: React.FC<DashboardProps> = () => {
     if (allProducts.length > 0) {
       let finalFiltered = allProducts;
       if (selectedCategory !== "#Everything") {
-        const categoryFilter = selectedCategory.replace("#", "").toLowerCase();
         finalFiltered = finalFiltered.filter(
-          (p) => p.category && p.category.toLowerCase() === categoryFilter
+          (p) => p.selectedTags?.includes(selectedCategory) // ✅ Correct tag filtering
         );
       }
       setFilteredProducts(finalFiltered);
@@ -577,7 +593,8 @@ const Dashboard: React.FC<DashboardProps> = () => {
     }, [token])
   );
 
-  const toggleFilterModal = () => setIsFilterModalVisible(!isFilterModalVisible);
+  const toggleFilterModal = () =>
+    setIsFilterModalVisible(!isFilterModalVisible);
 
   // Simplified “next product” function.
   const goToNextProduct = () => {
@@ -689,7 +706,9 @@ const Dashboard: React.FC<DashboardProps> = () => {
         ? product.images[currentImageIndex]
         : "https://via.placeholder.com/150";
     const nextImageIndex =
-      currentImageIndex < product.images.length - 1 ? currentImageIndex + 1 : currentImageIndex;
+      currentImageIndex < product.images.length - 1
+        ? currentImageIndex + 1
+        : currentImageIndex;
     const nextImageURI =
       product.images && product.images.length > 0
         ? product.images[nextImageIndex]
@@ -727,7 +746,13 @@ const Dashboard: React.FC<DashboardProps> = () => {
                 }
               }}
             >
-              <View style={{ width: SCREEN_WIDTH, height: PRODUCT_HEIGHT, backgroundColor: "#000" }}>
+              <View
+                style={{
+                  width: SCREEN_WIDTH,
+                  height: PRODUCT_HEIGHT,
+                  backgroundColor: "#000",
+                }}
+              >
                 {/* Swipeable image container */}
                 <View
                   style={{
@@ -777,7 +802,8 @@ const Dashboard: React.FC<DashboardProps> = () => {
                       key={idx}
                       style={[
                         styles.imageIndicatorDot,
-                        idx === currentImageIndex && styles.imageIndicatorDotActive,
+                        idx === currentImageIndex &&
+                          styles.imageIndicatorDotActive,
                       ]}
                     />
                   ))}
@@ -790,7 +816,9 @@ const Dashboard: React.FC<DashboardProps> = () => {
           <>
             <View style={styles.productInfoBubble}>
               <View style={styles.productInfoTextContainer}>
-                <TouchableOpacity onPress={() => setTitleExpanded(!titleExpanded)}>
+                <TouchableOpacity
+                  onPress={() => setTitleExpanded(!titleExpanded)}
+                >
                   <Text
                     style={styles.productInfoTitle}
                     numberOfLines={titleExpanded ? undefined : 1}
@@ -831,7 +859,11 @@ const Dashboard: React.FC<DashboardProps> = () => {
                   onPress={() => onShowDescription(product)}
                   accessibilityLabel="Show Details"
                 >
-                  <Ionicons name="information-circle" size={20} color="#FFFFFF" />
+                  <Ionicons
+                    name="information-circle"
+                    size={20}
+                    color="#FFFFFF"
+                  />
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.iconButton}
@@ -869,7 +901,10 @@ const Dashboard: React.FC<DashboardProps> = () => {
   return (
     <View style={styles.rootContainer}>
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <LinearGradient colors={["#000000", "#000000"]} style={styles.gradientBackground}>
+        <LinearGradient
+          colors={["#000000", "#000000"]}
+          style={styles.gradientBackground}
+        >
           {/* Top Bar with filter button */}
           <View style={styles.topBar}>
             <TouchableOpacity
@@ -968,7 +1003,9 @@ const Dashboard: React.FC<DashboardProps> = () => {
               <View style={styles.descriptionModalContent}>
                 {selectedProduct && (
                   <ScrollView>
-                    <Text style={styles.modalTitle}>{selectedProduct.title}</Text>
+                    <Text style={styles.modalTitle}>
+                      {selectedProduct.title}
+                    </Text>
                     <Text style={styles.detailText}>
                       Price: ${selectedProduct.price.toFixed(2)}
                     </Text>
@@ -976,7 +1013,8 @@ const Dashboard: React.FC<DashboardProps> = () => {
                       Condition: {selectedProduct.quality || "New"}
                     </Text>
                     <Text style={styles.detailText}>
-                      Rating: {selectedProduct.rating ? selectedProduct.rating : "N/A"}
+                      Rating:{" "}
+                      {selectedProduct.rating ? selectedProduct.rating : "N/A"}
                     </Text>
                     <Text style={styles.detailText}>Description:</Text>
                     <Text style={styles.descriptionText}>
@@ -1018,21 +1056,29 @@ const Dashboard: React.FC<DashboardProps> = () => {
                     <TouchableOpacity
                       style={[
                         styles.filterModalOption,
-                        selectedCategory === item && styles.filterModalOptionSelected,
+                        selectedCategory === item &&
+                          styles.filterModalOptionSelected,
                       ]}
                       onPress={() => setSelectedCategory(item)}
                       accessibilityLabel={`Filter by ${item}`}
                     >
                       <Ionicons
-                        name={selectedCategory === item ? "checkbox-outline" : "ellipse-outline"}
+                        name={
+                          selectedCategory === item
+                            ? "checkbox-outline"
+                            : "ellipse-outline"
+                        }
                         size={20}
-                        color={selectedCategory === item ? "#BB86FC" : "#FFFFFF"}
+                        color={
+                          selectedCategory === item ? "#BB86FC" : "#FFFFFF"
+                        }
                         style={{ marginRight: 10 }}
                       />
                       <Text
                         style={[
                           styles.filterModalOptionText,
-                          selectedCategory === item && styles.filterModalOptionTextSelected,
+                          selectedCategory === item &&
+                            styles.filterModalOptionTextSelected,
                         ]}
                       >
                         {item === "#Everything" ? "All" : item.replace("#", "")}
@@ -1050,21 +1096,29 @@ const Dashboard: React.FC<DashboardProps> = () => {
                     <TouchableOpacity
                       style={[
                         styles.filterModalOption,
-                        campusMode === item.value && styles.filterModalOptionSelected,
+                        campusMode === item.value &&
+                          styles.filterModalOptionSelected,
                       ]}
                       onPress={() => setCampusMode(item.value)}
                       accessibilityLabel={`Filter by ${item.label}`}
                     >
                       <Ionicons
-                        name={campusMode === item.value ? "checkbox-outline" : "ellipse-outline"}
+                        name={
+                          campusMode === item.value
+                            ? "checkbox-outline"
+                            : "ellipse-outline"
+                        }
                         size={20}
-                        color={campusMode === item.value ? "#BB86FC" : "#FFFFFF"}
+                        color={
+                          campusMode === item.value ? "#BB86FC" : "#FFFFFF"
+                        }
                         style={{ marginRight: 10 }}
                       />
                       <Text
                         style={[
                           styles.filterModalOptionText,
-                          campusMode === item.value && styles.filterModalOptionTextSelected,
+                          campusMode === item.value &&
+                            styles.filterModalOptionTextSelected,
                         ]}
                       >
                         {item.label}
@@ -1094,7 +1148,12 @@ const Dashboard: React.FC<DashboardProps> = () => {
           </Modal>
           {/* Success Toast repositioned underneath the image indicators */}
           {successMessage !== "" && (
-            <Animated.View style={[styles.successToastContainer, { opacity: successOpacity }]}>
+            <Animated.View
+              style={[
+                styles.successToastContainer,
+                { opacity: successOpacity },
+              ]}
+            >
               <Text style={styles.toastText}>{successMessage}</Text>
             </Animated.View>
           )}
