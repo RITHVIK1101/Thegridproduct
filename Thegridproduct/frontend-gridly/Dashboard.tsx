@@ -567,8 +567,8 @@ const Dashboard: React.FC<DashboardProps> = () => {
     if (allProducts.length > 0) {
       let finalFiltered = allProducts;
       if (selectedCategory !== "#Everything") {
-        finalFiltered = finalFiltered.filter(
-          (p) => p.selectedTags?.includes(selectedCategory) // ✅ Correct tag filtering
+        finalFiltered = finalFiltered.filter((p) =>
+          p.selectedTags?.includes(selectedCategory)
         );
       }
       setFilteredProducts(finalFiltered);
