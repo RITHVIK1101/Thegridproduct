@@ -19,7 +19,8 @@ export default {
       "**/*"
     ],
     ios: {
-      supportsTablet: true
+      supportsTablet: true,
+      bundleIdentifier: "com.gridly.mobile"  // ✅ Update this
     },
     android: {
       adaptiveIcon: {
@@ -32,6 +33,9 @@ export default {
     },
     extra: {
       NGROK_URL: process.env.NGROK_URL,
+      eas: {
+        projectId: "0f8792ae-5411-4193-898e-8a69005c50e7"
+      }
     },
   },
 };
