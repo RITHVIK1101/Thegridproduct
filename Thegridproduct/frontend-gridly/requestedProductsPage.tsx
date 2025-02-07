@@ -11,7 +11,6 @@ import {
   ActivityIndicator,
   StyleSheet,
   ScrollView,
-  Alert,
 } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -20,7 +19,6 @@ import { UserContext } from "./UserContext";
 
 const { width, height } = Dimensions.get("window");
 
-// Update your type to include an id and sellerId
 type RequestedProduct = {
   id: string;
   productName: string;
@@ -30,15 +28,12 @@ type RequestedProduct = {
 
 const RequestedProductsPage: React.FC = () => {
   const { token, userId } = useContext(UserContext);
-  const [requestedProducts, setRequestedProducts] = useState<
-    RequestedProduct[]
-  >([]);
+  const [requestedProducts, setRequestedProducts] = useState<RequestedProduct[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [isSearchActive, setIsSearchActive] = useState<boolean>(false);
-  const [selectedProduct, setSelectedProduct] =
-    useState<RequestedProduct | null>(null);
+  const [selectedProduct, setSelectedProduct] = useState<RequestedProduct | null>(null);
   const [modalVisible, setModalVisible] = useState<boolean>(false);
 
   // States for chat request modals
@@ -71,10 +66,10 @@ const RequestedProductsPage: React.FC = () => {
       }
       const data = await response.json();
 
-      // ✅ Ensure sellerId is set from userId
-      const processedData = data.map((product) => ({
+      // Ensure sellerId is set from userId
+      const processedData = data.map((product: any) => ({
         ...product,
-        sellerId: product.userId, // ✅ Fixing the missing sellerId
+        sellerId: product.userId, // Fixing the missing sellerId
       }));
 
       setRequestedProducts(shuffleArray(processedData));
@@ -114,24 +109,17 @@ const RequestedProductsPage: React.FC = () => {
   };
 
   const renderProductItem = ({ item }: { item: RequestedProduct }) => (
-    <TouchableOpacity
-      style={styles.productItem}
-      onPress={() => openModal(item)}
-    >
+    <TouchableOpacity style={styles.productItem} onPress={() => openModal(item)}>
       <View style={styles.productInfo}>
         <Text style={styles.productName}>{item.productName}</Text>
-        <Text style={styles.productDescription}>
-          {truncate(item.description, 60)}
-        </Text>
+        <Text style={styles.productDescription}>{truncate(item.description, 60)}</Text>
       </View>
       <Ionicons name="chevron-forward" size={20} color="#BB86FC" />
     </TouchableOpacity>
   );
 
   const onMessageButtonPress = () => {
-    console.log(
-      "Message button pressed, closing product modal and opening confirmation"
-    );
+    console.log("Message button pressed, closing product modal and opening confirmation");
     setModalVisible(false); // dismiss product details
     setShowConfirmModal(true); // then show confirmation
   };
@@ -144,15 +132,14 @@ const RequestedProductsPage: React.FC = () => {
     }
 
     const payload = {
-      referenceId: selectedProduct.id, // ✅ Should be non-empty
-      referenceType: "product_request", // ✅ Must match backend
-      buyerId: userId, // ✅ Should be non-empty
-      sellerId: selectedProduct.sellerId, // ✅ Should be non-empty
+      referenceId: selectedProduct.id,
+      referenceType: "product_request",
+      buyerId: userId,
+      sellerId: selectedProduct.sellerId,
     };
 
     console.log("📤 Sending Product Request Chat:", payload);
 
-    // Ensure no empty values before proceeding
     if (
       !payload.referenceId ||
       !payload.referenceType ||
@@ -184,9 +171,7 @@ const RequestedProductsPage: React.FC = () => {
       }
     } catch (error: any) {
       console.error("🚨 Error sending chat request:", error);
-      setRequestError(
-        error.message || "Failed to send request. Please try again."
-      );
+      setRequestError(error.message || "Failed to send request. Please try again.");
     }
   };
 
@@ -211,10 +196,7 @@ const RequestedProductsPage: React.FC = () => {
             onChangeText={setSearchQuery}
           />
           {searchQuery.length > 0 && (
-            <TouchableOpacity
-              onPress={() => setSearchQuery("")}
-              style={styles.clearButton}
-            >
+            <TouchableOpacity onPress={() => setSearchQuery("")} style={styles.clearButton}>
               <Ionicons name="close" size={20} color="#888" />
             </TouchableOpacity>
           )}
@@ -238,31 +220,14 @@ const RequestedProductsPage: React.FC = () => {
       {/* Modal for Product Details */}
       <Modal visible={modalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <LinearGradient
-            colors={["#000000", "#1F0033"]}
-            style={styles.modalContainer}
-          >
+          <LinearGradient colors={["#000000", "#1F0033"]} style={styles.modalContainer}>
             <ScrollView contentContainerStyle={styles.modalContent}>
               {selectedProduct && (
                 <>
-                  <Text style={styles.modalTitle}>
-                    {selectedProduct.productName}
-                  </Text>
-                  <Text style={styles.modalText}>
-                    {selectedProduct.description}
-                  </Text>
-                  <TouchableOpacity
-                    style={styles.modalButton}
-                    onPress={() => {
-                      console.log("Message button pressed");
-                      onMessageButtonPress();
-                    }}
-                  >
-                    <Ionicons
-                      name="chatbubble-ellipses-outline"
-                      size={20}
-                      color="#000"
-                    />
+                  <Text style={styles.modalTitle}>{selectedProduct.productName}</Text>
+                  <Text style={styles.modalText}>{selectedProduct.description}</Text>
+                  <TouchableOpacity style={styles.modalButton} onPress={onMessageButtonPress}>
+                    <Ionicons name="chatbubble-ellipses-outline" size={20} color="#000" />
                     <Text style={styles.modalButtonText}>Message</Text>
                   </TouchableOpacity>
                 </>
@@ -286,8 +251,7 @@ const RequestedProductsPage: React.FC = () => {
           <View style={styles.popupContent}>
             <Text style={styles.popupTitle}>Confirm Chat Request</Text>
             <Text style={styles.popupMessage}>
-              Are you sure you want to send a chat request? Once sent, please
-              wait until the other person accepts it.
+              Are you sure you want to send a chat request? Once sent, please wait until the other person accepts it.
             </Text>
             <View style={styles.popupButtons}>
               <TouchableOpacity
@@ -312,18 +276,35 @@ const RequestedProductsPage: React.FC = () => {
         visible={showSuccessModal}
         transparent
         animationType="fade"
-        onRequestClose={() => setShowSuccessModal(false)}
+        onRequestClose={() => {
+          // When the modal is closed, remove the product from the list.
+          if (selectedProduct) {
+            setRequestedProducts((prevProducts) =>
+              prevProducts.filter((product) => product.id !== selectedProduct.id)
+            );
+          }
+          setShowSuccessModal(false);
+          setSelectedProduct(null);
+        }}
       >
         <View style={styles.popupContainer}>
           <View style={styles.popupContent}>
             <Text style={styles.popupTitle}>Chat Request Sent</Text>
             <Text style={styles.popupMessage}>
-              Your chat request has been sent. Please wait until the other
-              person accepts it.
+              Your chat request has been sent. Please wait until the other person accepts it.
             </Text>
             <TouchableOpacity
               style={styles.bubbleButton}
-              onPress={() => setShowSuccessModal(false)}
+              onPress={() => {
+                // Remove the product from the list upon closing the success modal.
+                if (selectedProduct) {
+                  setRequestedProducts((prevProducts) =>
+                    prevProducts.filter((product) => product.id !== selectedProduct.id)
+                  );
+                }
+                setShowSuccessModal(false);
+                setSelectedProduct(null);
+              }}
             >
               <Text style={styles.bubbleButtonText}>Close</Text>
             </TouchableOpacity>
