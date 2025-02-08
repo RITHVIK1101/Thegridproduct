@@ -999,10 +999,9 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
               {referenceTypeLabel} {item.referenceTitle || "Unnamed Item"}
             </Text>
             <Text style={styles.requestSender}>
-              From:{" "}
               {selectedRequestsTab === "incoming"
-                ? `${item.buyerFirstName} ${item.buyerLastName}`
-                : `${item.sellerFirstName} ${item.sellerLastName}`}
+                ? `From: ${item.buyerFirstName} ${item.buyerLastName}`
+                : `To: ${item.sellerFirstName} ${item.sellerLastName}`}
             </Text>
             <Text style={styles.requestDate}>
               Created on: {new Date(item.createdAt).toLocaleDateString()}
