@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math/rand"
 	"net/http"
 	"net/smtp"
 	"os"
@@ -16,6 +17,7 @@ import (
 	"Thegridproduct/backend/models"
 
 	"github.com/golang-jwt/jwt/v4"
+
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -153,51 +155,41 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-// Generate a random token for email verification
-func generateVerificationToken(userID primitive.ObjectID) string {
-	expirationTime := time.Now().Add(24 * time.Hour).Unix()
-	claims := jwt.MapClaims{
-		"userID": userID.Hex(),
-		"exp":    expirationTime,
-	}
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	jwtKey := []byte(os.Getenv("JWT_SECRET_KEY"))
-	tokenString, _ := token.SignedString(jwtKey)
-	return tokenString
+// Generates a random 6-digit code
+func generateVerificationCode() string {
+	rand.Seed(time.Now().UnixNano())
+	return fmt.Sprintf("%06d", rand.Intn(1000000))
 }
 
-// Send verification email
-func sendVerificationEmail(email string, token string) error {
-	verificationLink := fmt.Sprintf("https://yourdomain.com/verify-email?token=%s", token)
+// Send email with a verification code
+func sendVerificationEmail(email string, code string) error {
+	smtpHost := os.Getenv("SMTP_HOST")
+	smtpPort := os.Getenv("SMTP_PORT")
+	senderEmail := os.Getenv("SMTP_USER")
+	senderPassword := os.Getenv("SMTP_PASS")
 
-	// SMTP server credentials
-	smtpServer := "smtp.gmail.com"
-	smtpPort := "587"
-	senderEmail := os.Getenv("SMTP_EMAIL")
-	senderPassword := os.Getenv("SMTP_PASSWORD")
+	auth := smtp.PlainAuth("", senderEmail, senderPassword, smtpHost)
 
-	auth := smtp.PlainAuth("", senderEmail, senderPassword, smtpServer)
+	// Email content
+	subject := "Your Gridly Verification Code"
+	body := fmt.Sprintf("Your verification code is: %s", code)
+	message := []byte("Subject: " + subject + "\r\n" +
+		"From: " + senderEmail + "\r\n" +
+		"To: " + email + "\r\n" +
+		"Content-Type: text/plain; charset=UTF-8\r\n\r\n" +
+		body)
 
-	msg := []byte(
-		"Subject: Verify Your Email\n" +
-			"From: " + senderEmail + "\n" +
-			"To: " + email + "\n" +
-			"Content-Type: text/html; charset=UTF-8\n\n" +
-			"<h2>Welcome to Gridly!</h2>" +
-			"<p>Please verify your email by clicking the link below:</p>" +
-			"<a href='" + verificationLink + "'>Verify Email</a>",
-	)
-
-	// Send the email
-	err := smtp.SendMail(smtpServer+":"+smtpPort, auth, senderEmail, []string{email}, msg)
+	// Send email
+	err := smtp.SendMail(smtpHost+":"+smtpPort, auth, senderEmail, []string{email}, message)
 	if err != nil {
-		log.Printf("Error sending verification email: %v", err)
+		log.Printf("Error sending email: %v", err)
 		return err
 	}
+
+	log.Println("Verification email sent to:", email)
 	return nil
 }
 
-// Update SignupHandler to Send Verification Email
 func SignupHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -209,11 +201,6 @@ func SignupHandler(w http.ResponseWriter, r *http.Request) {
 	var req SignupRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		WriteJSONError(w, "Invalid input", http.StatusBadRequest)
-		return
-	}
-
-	if req.StudentType != StudentTypeHighSchool && req.StudentType != StudentTypeUniversity {
-		WriteJSONError(w, "Invalid student type", http.StatusBadRequest)
 		return
 	}
 
@@ -241,6 +228,7 @@ func SignupHandler(w http.ResponseWriter, r *http.Request) {
 		UpdatedAt:   time.Now(),
 	}
 
+	// Determine the collection based on StudentType
 	collectionName := "highschool_users"
 	if req.StudentType == StudentTypeUniversity {
 		collectionName = "university_users"
@@ -250,6 +238,7 @@ func SignupHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
+	// Check if the user already exists
 	count, err := collection.CountDocuments(ctx, bson.M{"email": req.Email})
 	if err != nil {
 		WriteJSONError(w, "Error checking existing user", http.StatusInternalServerError)
@@ -266,23 +255,13 @@ func SignupHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Generate and send verification email
-	verificationToken := generateVerificationToken(newUser.ID)
-	go sendVerificationEmail(req.Email, verificationToken) // Asynchronous email sending
+	// Generate and send verification code
+	verificationCode := generateVerificationCode()
+	go sendVerificationEmail(req.Email, verificationCode) // Send email asynchronously
 
-	// Generate JWT Token
-	tokenString, err := generateToken(newUser.ID, newUser.Institution, newUser.StudentType)
-	if err != nil {
-		WriteJSONError(w, "Could not generate token", http.StatusInternalServerError)
-		return
-	}
-
+	// Respond with success message
 	response := map[string]interface{}{
-		"token":       tokenString,
-		"userId":      newUser.ID.Hex(),
-		"institution": newUser.Institution,
-		"studentType": newUser.StudentType,
-		"message":     "Signup successful! A verification email has been sent.",
+		"message": "Signup successful! A verification email has been sent.",
 	}
 
 	w.WriteHeader(http.StatusCreated)
