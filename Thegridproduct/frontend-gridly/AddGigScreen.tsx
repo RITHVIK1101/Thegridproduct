@@ -42,6 +42,7 @@ interface FormData {
   images: string[];
   expirationDate: string;
   campusPresence: "inCampus" | "flexible";
+  isAnonymous: boolean; // New field for anonymous posting
 }
 
 const CLOUDINARY_URL = "https://api.cloudinary.com/v1_1/ds0zpfht9/image/upload";
@@ -81,6 +82,7 @@ const AddGig: React.FC = () => {
     images: [],
     expirationDate: "",
     campusPresence: "inCampus",
+    isAnonymous: false, // default is not anonymous
   });
 
   // Toggles for optional fields
@@ -224,6 +226,7 @@ const AddGig: React.FC = () => {
       description: formData.description.trim(),
       images: formData.images,
       campusPresence: formData.campusPresence,
+      isAnonymous: formData.isAnonymous, // include anonymous flag in payload
     };
 
     if (!noExpiration && formData.expirationDate) {
@@ -258,6 +261,7 @@ const AddGig: React.FC = () => {
           images: [],
           expirationDate: "",
           campusPresence: "inCampus",
+          isAnonymous: false,
         });
         setNoDeliveryRequired(false);
         setNoExpiration(false);
@@ -409,6 +413,38 @@ const AddGig: React.FC = () => {
             </Text>
             <Ionicons name="chevron-down-outline" size={20} color="#ccc" />
           </TouchableOpacity>
+          <View style={styles.toggleRow}>
+            <TouchableOpacity
+              style={styles.toggleButton}
+              onPress={() =>
+                setFormData((prev) => ({
+                  ...prev,
+                  isAnonymous: !prev.isAnonymous,
+                }))
+              }
+            >
+              <Ionicons
+                name={formData.isAnonymous ? "checkmark-circle" : "ellipse-outline"}
+                size={24}
+                color={formData.isAnonymous ? "#BB86FC" : "#ccc"}
+              />
+              <Text style={styles.toggleText}>Post Anonymously</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() =>
+                openInfoModal(
+                  "Making your gig anonymous means that people won't see your name associated with the post."
+                )
+              }
+            >
+              <Ionicons
+                name="information-circle-outline"
+                size={22}
+                color="#BB86FC"
+                style={{ marginLeft: 10, marginTop: -13 }}
+              />
+            </TouchableOpacity>
+          </View>
         </>
       ),
     },
@@ -885,6 +921,11 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     marginLeft: 10,
+  },
+  toggleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 15,
   },
   uploadButton: {
     flexDirection: "row",
