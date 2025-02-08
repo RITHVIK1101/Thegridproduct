@@ -834,6 +834,7 @@ func GetChatRequestsHandler(w http.ResponseWriter, r *http.Request) {
 	for _, req := range chatRequests {
 		var referenceTitle string
 		var referenceType string
+		var isAnonymous bool = false
 
 		// ✅ Fetch the correct reference title based on type (product or gig)
 		if req.ReferenceType == "product" {
@@ -852,6 +853,7 @@ func GetChatRequestsHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			referenceTitle = gig.Title
 			referenceType = "gig"
+			isAnonymous = gig.IsAnonymous // ✅ Check if gig is anonymous
 		} else if req.ReferenceType == "product_request" {
 			productRequest, err := db.GetProductRequestByID(req.ReferenceID.Hex())
 			if err != nil {
@@ -862,32 +864,41 @@ func GetChatRequestsHandler(w http.ResponseWriter, r *http.Request) {
 			referenceType = "product_request"
 		}
 
-		// ✅ Fetch buyer and seller details
-		buyer, err := db.GetUserByID(req.BuyerID.Hex())
-		if err != nil {
-			log.Printf("Failed to fetch buyer details for buyerID %s: %v", req.BuyerID.Hex(), err)
-			continue
-		}
-		seller, err := db.GetUserByID(req.SellerID.Hex())
-		if err != nil {
-			log.Printf("Failed to fetch seller details for sellerID %s: %v", req.SellerID.Hex(), err)
-			continue
+		// ✅ Fetch buyer and seller details (or set to "Anonymous User" if the gig is anonymous)
+		var buyerFirstName, buyerLastName, sellerFirstName, sellerLastName string
+		if isAnonymous {
+			buyerFirstName, buyerLastName = "Anonymous", "User"
+			sellerFirstName, sellerLastName = "Anonymous", "User"
+		} else {
+			buyer, err := db.GetUserByID(req.BuyerID.Hex())
+			if err != nil {
+				log.Printf("Failed to fetch buyer details for buyerID %s: %v", req.BuyerID.Hex(), err)
+				continue
+			}
+			seller, err := db.GetUserByID(req.SellerID.Hex())
+			if err != nil {
+				log.Printf("Failed to fetch seller details for sellerID %s: %v", req.SellerID.Hex(), err)
+				continue
+			}
+
+			buyerFirstName, buyerLastName = buyer.FirstName, buyer.LastName
+			sellerFirstName, sellerLastName = seller.FirstName, seller.LastName
 		}
 
 		// ✅ Create the enriched chat request object
 		enrichedReq := EnrichedChatRequest{
 			RequestID:       req.ID.Hex(),
 			ReferenceID:     req.ReferenceID.Hex(),
-			ReferenceTitle:  referenceTitle, // ✅ Fix: Now assigned correctly
-			ReferenceType:   referenceType,  // ✅ Fix: Now assigned correctly
+			ReferenceTitle:  referenceTitle,
+			ReferenceType:   referenceType,
 			BuyerID:         req.BuyerID.Hex(),
 			SellerID:        req.SellerID.Hex(),
 			Status:          req.Status,
 			CreatedAt:       req.CreatedAt.Format(time.RFC3339),
-			BuyerFirstName:  buyer.FirstName,
-			BuyerLastName:   buyer.LastName,
-			SellerFirstName: seller.FirstName,
-			SellerLastName:  seller.LastName,
+			BuyerFirstName:  buyerFirstName, // ✅ Correctly assigns Anonymous User if needed
+			BuyerLastName:   buyerLastName,
+			SellerFirstName: sellerFirstName, // ✅ Correctly assigns Anonymous User if needed
+			SellerLastName:  sellerLastName,
 		}
 
 		// ✅ Separate into incoming or outgoing requests

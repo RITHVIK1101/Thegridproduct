@@ -28,7 +28,12 @@ import { useNavigation } from "@react-navigation/native";
 import { UserContext } from "./UserContext";
 import axios from "axios";
 
-const AVAILABLE_CATEGORIES = ["Tutoring", "Design", "Delivering", "Other"] as const;
+const AVAILABLE_CATEGORIES = [
+  "Tutoring",
+  "Design",
+  "Delivering",
+  "Other",
+] as const;
 
 type Step = 1 | 2 | 3 | 4 | 5 | 6;
 
@@ -57,7 +62,10 @@ const AddGig: React.FC = () => {
     navigation.setOptions({
       headerTitle: "",
       headerLeft: () => (
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerBackButton}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.headerBackButton}
+        >
           <Ionicons name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
       ),
@@ -182,7 +190,9 @@ const AddGig: React.FC = () => {
         return true;
       case 2:
         if (!formData.isPriceOpenToComm && !formData.price.trim()) {
-          showError("Please specify a price or choose 'Open to Communication'.");
+          showError(
+            "Please specify a price or choose 'Open to Communication'."
+          );
           return false;
         }
         return true;
@@ -221,8 +231,12 @@ const AddGig: React.FC = () => {
     const payload: any = {
       title: formData.title.trim(),
       category: formData.category,
-      price: formData.isPriceOpenToComm ? "Open to Communication" : formData.price.trim(),
-      deliveryTime: noDeliveryRequired ? "Not Required" : formData.deliveryTime.trim(),
+      price: formData.isPriceOpenToComm
+        ? "Open to Communication"
+        : formData.price.trim(),
+      deliveryTime: noDeliveryRequired
+        ? "Not Required"
+        : formData.deliveryTime.trim(),
       description: formData.description.trim(),
       images: formData.images,
       campusPresence: formData.campusPresence,
@@ -248,7 +262,9 @@ const AddGig: React.FC = () => {
       if (contentType && contentType.includes("application/json")) {
         const data = await response.json();
         if (!response.ok) {
-          throw new Error(data.message || `HTTP error! status: ${response.status}`);
+          throw new Error(
+            data.message || `HTTP error! status: ${response.status}`
+          );
         }
         // Reset the form after successful submission
         setFormData({
@@ -280,7 +296,9 @@ const AddGig: React.FC = () => {
       }
     } catch (error: unknown) {
       console.error("Error:", error);
-      showError(error instanceof Error ? error.message : "An unknown error occurred.");
+      showError(
+        error instanceof Error ? error.message : "An unknown error occurred."
+      );
     } finally {
       setIsLoading(false);
     }
@@ -305,7 +323,10 @@ const AddGig: React.FC = () => {
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         setIsUploadingImage(true);
-        const selectedAssets = result.assets.slice(0, 5 - formData.images.length);
+        const selectedAssets = result.assets.slice(
+          0,
+          5 - formData.images.length
+        );
         const uploadedImages: string[] = [];
 
         for (const asset of selectedAssets) {
@@ -313,7 +334,11 @@ const AddGig: React.FC = () => {
           const manipulatedImage = await ImageManipulator.manipulateAsync(
             uri,
             [{ resize: { width: 800 } }],
-            { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+            {
+              compress: 0.7,
+              format: ImageManipulator.SaveFormat.JPEG,
+              base64: true,
+            }
           );
 
           const formDataImage = new FormData();
@@ -419,17 +444,20 @@ const AddGig: React.FC = () => {
               onPress={() =>
                 setFormData((prev) => ({
                   ...prev,
-                  isAnonymous: !prev.isAnonymous,
+                  isAnonymous: !prev.isAnonymous, // ✅ Toggle isAnonymous correctly
                 }))
               }
             >
               <Ionicons
-                name={formData.isAnonymous ? "checkmark-circle" : "ellipse-outline"}
+                name={
+                  formData.isAnonymous ? "checkmark-circle" : "ellipse-outline"
+                }
                 size={24}
                 color={formData.isAnonymous ? "#BB86FC" : "#ccc"}
               />
               <Text style={styles.toggleText}>Post Anonymously</Text>
             </TouchableOpacity>
+
             <TouchableOpacity
               onPress={() =>
                 openInfoModal(
@@ -479,7 +507,11 @@ const AddGig: React.FC = () => {
             }
           >
             <Ionicons
-              name={formData.isPriceOpenToComm ? "checkmark-circle" : "ellipse-outline"}
+              name={
+                formData.isPriceOpenToComm
+                  ? "checkmark-circle"
+                  : "ellipse-outline"
+              }
               size={24}
               color={formData.isPriceOpenToComm ? "#BB86FC" : "#ccc"}
             />
@@ -502,7 +534,9 @@ const AddGig: React.FC = () => {
             placeholder="e.g., 2 days"
             placeholderTextColor="#888"
             value={formData.deliveryTime}
-            onChangeText={(text) => setFormData({ ...formData, deliveryTime: text })}
+            onChangeText={(text) =>
+              setFormData({ ...formData, deliveryTime: text })
+            }
             editable={!noDeliveryRequired}
           />
           <TouchableOpacity
@@ -519,32 +553,54 @@ const AddGig: React.FC = () => {
               size={24}
               color={noDeliveryRequired ? "#BB86FC" : "#ccc"}
             />
-            <Text style={styles.toggleText}>My gig does not require a delivery time</Text>
+            <Text style={styles.toggleText}>
+              My gig does not require a delivery time
+            </Text>
           </TouchableOpacity>
           <View style={styles.campusPresenceSection}>
             <Text style={styles.label}>Campus Presence</Text>
             <View style={styles.campusPresenceContainer}>
               <TouchableOpacity
                 style={styles.presenceOption}
-                onPress={() => setFormData({ ...formData, campusPresence: "inCampus" })}
+                onPress={() =>
+                  setFormData({ ...formData, campusPresence: "inCampus" })
+                }
               >
                 <Ionicons
-                  name={formData.campusPresence === "inCampus" ? "checkmark-circle" : "ellipse-outline"}
+                  name={
+                    formData.campusPresence === "inCampus"
+                      ? "checkmark-circle"
+                      : "ellipse-outline"
+                  }
                   size={24}
-                  color={formData.campusPresence === "inCampus" ? "#BB86FC" : "#ccc"}
+                  color={
+                    formData.campusPresence === "inCampus" ? "#BB86FC" : "#ccc"
+                  }
                 />
-                <Text style={styles.presenceOptionText}>In Campus Presence Required</Text>
+                <Text style={styles.presenceOptionText}>
+                  In Campus Presence Required
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.presenceOption}
-                onPress={() => setFormData({ ...formData, campusPresence: "flexible" })}
+                onPress={() =>
+                  setFormData({ ...formData, campusPresence: "flexible" })
+                }
               >
                 <Ionicons
-                  name={formData.campusPresence === "flexible" ? "checkmark-circle" : "ellipse-outline"}
+                  name={
+                    formData.campusPresence === "flexible"
+                      ? "checkmark-circle"
+                      : "ellipse-outline"
+                  }
                   size={24}
-                  color={formData.campusPresence === "flexible" ? "#BB86FC" : "#ccc"}
+                  color={
+                    formData.campusPresence === "flexible" ? "#BB86FC" : "#ccc"
+                  }
                 />
-                <Text style={styles.presenceOptionText}>In and Out of Campus is Fine</Text>
+                <Text style={styles.presenceOptionText}>
+                  In and Out of Campus is Fine
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -563,7 +619,9 @@ const AddGig: React.FC = () => {
             multiline
             numberOfLines={6}
             value={formData.description}
-            onChangeText={(text) => setFormData({ ...formData, description: text })}
+            onChangeText={(text) =>
+              setFormData({ ...formData, description: text })
+            }
           />
         </>
       ),
@@ -581,7 +639,11 @@ const AddGig: React.FC = () => {
                 )
               }
             >
-              <Ionicons name="information-circle-outline" size={20} color="#BB86FC" />
+              <Ionicons
+                name="information-circle-outline"
+                size={20}
+                color="#BB86FC"
+              />
             </TouchableOpacity>
           </View>
           <TouchableOpacity
@@ -599,12 +661,17 @@ const AddGig: React.FC = () => {
               color={noExpiration ? "#BB86FC" : "#ccc"}
             />
             <Text style={styles.toggleText}>
-              {noExpiration ? "No Expiration (30-day default)" : "Use No Expiration Date"}
+              {noExpiration
+                ? "No Expiration (30-day default)"
+                : "Use No Expiration Date"}
             </Text>
           </TouchableOpacity>
           {!noExpiration && (
             <>
-              <TouchableOpacity style={styles.datePickerButton} onPress={showDatePicker}>
+              <TouchableOpacity
+                style={styles.datePickerButton}
+                onPress={showDatePicker}
+              >
                 <Text style={styles.datePickerText}>
                   {formData.expirationDate
                     ? new Date(formData.expirationDate).toLocaleString()
@@ -615,7 +682,9 @@ const AddGig: React.FC = () => {
               {formData.expirationDate ? (
                 <TouchableOpacity
                   style={styles.clearDateButton}
-                  onPress={() => setFormData((prev) => ({ ...prev, expirationDate: "" }))}
+                  onPress={() =>
+                    setFormData((prev) => ({ ...prev, expirationDate: "" }))
+                  }
                 >
                   <Ionicons name="trash-outline" size={20} color="#BB86FC" />
                   <Text style={styles.clearDateButtonText}>Clear Date</Text>
@@ -624,7 +693,8 @@ const AddGig: React.FC = () => {
             </>
           )}
           <Text style={styles.optionalText}>
-            If no expiration date is set, your gig will be inactive after 30 days.
+            If no expiration date is set, your gig will be inactive after 30
+            days.
           </Text>
           <DateTimePickerModal
             isVisible={isDatePickerVisible}
@@ -649,9 +719,15 @@ const AddGig: React.FC = () => {
               <ActivityIndicator size="small" color="#fff" />
             ) : (
               <>
-                <Ionicons name="cloud-upload-outline" size={24} color="#BB86FC" />
+                <Ionicons
+                  name="cloud-upload-outline"
+                  size={24}
+                  color="#BB86FC"
+                />
                 <Text style={styles.uploadButtonText}>
-                  {formData.images.length > 0 ? "Add More Images" : "Upload Images"}
+                  {formData.images.length > 0
+                    ? "Add More Images"
+                    : "Upload Images"}
                 </Text>
               </>
             )}
@@ -660,13 +736,22 @@ const AddGig: React.FC = () => {
             {formData.images.map((image, index) => (
               <View key={index} style={styles.imageContainer}>
                 <Image source={{ uri: image }} style={styles.image} />
-                <TouchableOpacity style={styles.removeButton} onPress={() => removeImage(index)}>
-                  <Ionicons name="close-circle-outline" size={24} color="#BB86FC" />
+                <TouchableOpacity
+                  style={styles.removeButton}
+                  onPress={() => removeImage(index)}
+                >
+                  <Ionicons
+                    name="close-circle-outline"
+                    size={24}
+                    color="#BB86FC"
+                  />
                 </TouchableOpacity>
               </View>
             ))}
           </View>
-          <Text style={styles.optionalText}>You can upload up to 5 images.</Text>
+          <Text style={styles.optionalText}>
+            You can upload up to 5 images.
+          </Text>
         </>
       ),
     },
@@ -698,7 +783,10 @@ const AddGig: React.FC = () => {
         </Animated.View>
       ) : null}
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
+        <ScrollView
+          style={styles.container}
+          contentContainerStyle={{ paddingBottom: 40 }}
+        >
           <View style={styles.progressContainer}>
             {[1, 2, 3, 4, 5, 6].map((stepNumber) => (
               <View
@@ -731,7 +819,9 @@ const AddGig: React.FC = () => {
           <View
             style={[
               styles.buttonContainer,
-              { justifyContent: currentStep > 1 ? "space-between" : "flex-end" },
+              {
+                justifyContent: currentStep > 1 ? "space-between" : "flex-end",
+              },
             ]}
           >
             {currentStep > 1 && (
@@ -740,18 +830,30 @@ const AddGig: React.FC = () => {
                 <Text style={styles.backButtonText}>Back</Text>
               </TouchableOpacity>
             )}
-            <TouchableOpacity style={styles.nextButton} onPress={handleNext} disabled={isLoading}>
+            <TouchableOpacity
+              style={styles.nextButton}
+              onPress={handleNext}
+              disabled={isLoading}
+            >
               {isLoading && currentStep === 6 ? (
                 <ActivityIndicator size="small" color="#fff" />
               ) : (
                 <>
-                  <Text style={styles.nextButtonText}>{currentStep === 6 ? "Post Gig" : "Next"}</Text>
-                  {currentStep < 6 && <Ionicons name="arrow-forward" size={24} color="#fff" />}
+                  <Text style={styles.nextButtonText}>
+                    {currentStep === 6 ? "Post Gig" : "Next"}
+                  </Text>
+                  {currentStep < 6 && (
+                    <Ionicons name="arrow-forward" size={24} color="#fff" />
+                  )}
                 </>
               )}
             </TouchableOpacity>
           </View>
-          <Modal transparent visible={isSuccessModalVisible} animationType="fade">
+          <Modal
+            transparent
+            visible={isSuccessModalVisible}
+            animationType="fade"
+          >
             <View style={styles.modalOverlay}>
               <View style={styles.modalContent}>
                 <Ionicons name="checkmark-circle" size={60} color="#9C27B0" />
@@ -760,10 +862,17 @@ const AddGig: React.FC = () => {
             </View>
           </Modal>
           <Modal transparent visible={infoModalVisible} animationType="fade">
-            <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPressOut={closeInfoModal}>
+            <TouchableOpacity
+              style={styles.modalOverlay}
+              activeOpacity={1}
+              onPressOut={closeInfoModal}
+            >
               <View style={styles.infoModalContent}>
                 <Text style={styles.infoModalText}>{infoModalText}</Text>
-                <TouchableOpacity style={styles.closeInfoButton} onPress={closeInfoModal}>
+                <TouchableOpacity
+                  style={styles.closeInfoButton}
+                  onPress={closeInfoModal}
+                >
                   <Text style={styles.closeInfoButtonText}>Close</Text>
                 </TouchableOpacity>
               </View>
@@ -775,7 +884,11 @@ const AddGig: React.FC = () => {
             animationType="fade"
             onRequestClose={() => setShowCategoriesModal(false)}
           >
-            <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPressOut={() => setShowCategoriesModal(false)}>
+            <TouchableOpacity
+              style={styles.modalOverlay}
+              activeOpacity={1}
+              onPressOut={() => setShowCategoriesModal(false)}
+            >
               <View style={styles.modalPickerContent}>
                 <Text style={styles.modalTitle}>Select a Category</Text>
                 {AVAILABLE_CATEGORIES.map((cat) => (
