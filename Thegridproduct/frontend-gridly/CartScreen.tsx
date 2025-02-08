@@ -20,6 +20,7 @@ import { CommonActions, useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "./navigationTypes";
 import { NGROK_URL } from "@env";
+
 import { LinearGradient } from "expo-linear-gradient";
 
 type CartItem = {
@@ -72,6 +73,8 @@ const CartScreen: React.FC = () => {
 
   // State for delete confirmation
   const [itemToDelete, setItemToDelete] = useState<CartProduct | null>(null);
+  const [isTransitioning, setIsTransitioning] = useState<boolean>(false);
+
   const [isDeleteModalVisible, setIsDeleteModalVisible] =
     useState<boolean>(false);
 
@@ -313,16 +316,14 @@ const CartScreen: React.FC = () => {
     }
 
     setIsMessaging(true);
+    setIsTransitioning(true); // Set transitioning state
 
-    // Define the payload
     const payload = {
-      referenceId: product.id, // Send productId as referenceId
-      referenceType: "product", // Specify it's a product message
-      buyerId: userId, // Buyer is the logged-in user
-      sellerId: product.sellerId, // Seller is the product owner
+      referenceId: product.id,
+      referenceType: "product",
+      buyerId: userId,
+      sellerId: product.sellerId,
     };
-
-    console.log("📤 Sending Chat Request:", payload); // Debug log
 
     try {
       const response = await fetch(`${NGROK_URL}/chat/request`, {
@@ -335,24 +336,28 @@ const CartScreen: React.FC = () => {
       });
 
       const data = await response.json();
-      console.log("🚀 API Response:", data);
 
       if (response.ok) {
-        // Show confirmation popup
+        // Show popup first
         setMessagePopupVisible(true);
+
+        // Remove product after a short delay
+        setTimeout(() => {
+          setCartProducts((prev) => prev.filter((p) => p.id !== product.id));
+        }, 100);
+
+        // Hide popup after showing for 2 seconds
         setTimeout(() => {
           setMessagePopupVisible(false);
+          setIsTransitioning(false); // Reset transitioning state
         }, 2000);
-
-        // Remove successfully messaged product from cart
-        setCartProducts((prev) => prev.filter((p) => p.id !== product.id));
       } else {
-        console.error("⚠️ Chat Request Error:", data);
         throw new Error(data.message || "Failed to send chat request.");
       }
     } catch (error: any) {
       console.error("🚨 Error sending chat request:", error);
       Alert.alert("Error", error.message || "Failed to send request.");
+      setIsTransitioning(false); // Reset transitioning state on error
     } finally {
       setIsMessaging(false);
     }
@@ -537,7 +542,7 @@ const CartScreen: React.FC = () => {
           style={styles.retryButton}
           onPress={() => {
             setError(null);
-            setCartProducts([]); // Reset to empty array to trigger re-fetch
+            setCartProducts([]);
             fetchCart();
           }}
           accessibilityLabel="Retry Fetching Cart"
@@ -549,51 +554,54 @@ const CartScreen: React.FC = () => {
     );
   }
 
-  if (cartProducts.length === 0) {
-    return (
-      <View style={styles.emptyContainer}>
-        <Ionicons name="bag-outline" size={100} color="#bbb" />
-        <Text style={styles.emptyText}>Your shopping bag is empty.</Text>
-      </View>
-    );
-  }
-
   // Otherwise, we have cart items
   return (
     <View style={styles.container}>
-      <FlatList
-        data={cartProducts}
-        keyExtractor={(item) => item.id}
-        renderItem={renderCartItem}
-        ItemSeparatorComponent={renderSeparator}
-        contentContainerStyle={styles.listContainer}
-        showsVerticalScrollIndicator={false}
-      />
-      <View style={styles.footer}>
-        <View style={styles.totalContainer}>
-          <Text style={styles.totalText}>Total</Text>
-          <Text style={styles.totalAmount}>${calculateTotal().toFixed(2)}</Text>
+      {/* Show cart content or empty state */}
+      {cartProducts.length > 0 ? (
+        <>
+          <FlatList
+            data={cartProducts}
+            keyExtractor={(item) => item.id}
+            renderItem={renderCartItem}
+            ItemSeparatorComponent={renderSeparator}
+            contentContainerStyle={styles.listContainer}
+            showsVerticalScrollIndicator={false}
+          />
+          <View style={styles.footer}>
+            <View style={styles.totalContainer}>
+              <Text style={styles.totalText}>Total</Text>
+              <Text style={styles.totalAmount}>
+                ${calculateTotal().toFixed(2)}
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={styles.messageAllButton}
+              onPress={messageAllProducts}
+              accessibilityLabel="Message All Sellers"
+              disabled={isMessaging}
+            >
+              {isMessaging ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <Text style={styles.messageAllButtonText}>Message All</Text>
+                  <Ionicons
+                    name="chatbubble-ellipses-outline"
+                    size={20}
+                    color="#fff"
+                  />
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        </>
+      ) : !isTransitioning ? (
+        <View style={styles.emptyContainer}>
+          <Ionicons name="bag-outline" size={100} color="#bbb" />
+          <Text style={styles.emptyText}>Your shopping bag is empty.</Text>
         </View>
-        <TouchableOpacity
-          style={styles.messageAllButton}
-          onPress={messageAllProducts}
-          accessibilityLabel="Message All Sellers"
-          disabled={isMessaging} // Disable during messaging
-        >
-          {isMessaging ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <>
-              <Text style={styles.messageAllButtonText}>Message All</Text>
-              <Ionicons
-                name="chatbubble-ellipses-outline"
-                size={20}
-                color="#fff"
-              />
-            </>
-          )}
-        </TouchableOpacity>
-      </View>
+      ) : null}
 
       {/* Delete Confirmation Modal */}
       <Modal
@@ -659,7 +667,7 @@ const CartScreen: React.FC = () => {
                 size={30}
                 color="#4CD964"
               />
-              <Text style={styles.buyPopupText}>Message sent!</Text>
+              <Text style={styles.buyPopupText}>Request sent!</Text>
             </View>
           </View>
         </TouchableWithoutFeedback>
