@@ -39,6 +39,7 @@ type CreateGigRequest struct {
 	Images         []string `json:"images"`
 	ExpirationDate string   `json:"expirationDate,omitempty"` // Optional
 	CampusPresence string   `json:"campusPresence"`           // "inCampus" or "flexible"
+	IsAnonymous    *bool    `json:"isAnonymous,omitempty"`    // Optional
 }
 
 // UpdateGigRequest defines the expected payload for updating a gig
@@ -149,6 +150,13 @@ func AddGigHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Prepare Gig model
+	// Set `isAnonymous` to false if it's not provided in the request
+	isAnonymous := false
+	if gigReq.IsAnonymous != nil {
+		isAnonymous = *gigReq.IsAnonymous
+	}
+
+	// Prepare Gig model
 	gig := models.Gig{
 		UserID:         userObjID,
 		University:     university,
@@ -165,6 +173,7 @@ func AddGigHandler(w http.ResponseWriter, r *http.Request) {
 		Status:         "active",
 		LikeCount:      0,
 		CampusPresence: campusPresence,
+		IsAnonymous:    isAnonymous,
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

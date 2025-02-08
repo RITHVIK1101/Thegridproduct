@@ -6,7 +6,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-// Gig represents a service gig posted by a user
+// Add the new field `IsAnonymous` to the Gig struct
 type Gig struct {
 	ID             primitive.ObjectID `bson:"_id,omitempty" json:"id,omitempty"`
 	UserID         primitive.ObjectID `bson:"userId" json:"userId"`
@@ -20,11 +20,14 @@ type Gig struct {
 	Images         []string           `bson:"images" json:"images"`
 	ExpirationDate time.Time          `bson:"expirationDate,omitempty" json:"expirationDate,omitempty"`
 	PostedDate     time.Time          `bson:"postedDate" json:"postedDate"`
-	Expired        bool               `bson:"expired" json:"expired,omitempty" default:"false"`
+	Expired        bool               `bson:"expired" json:"expired,omitempty"`
 
 	Status         string               `bson:"status" json:"status"` // e.g., "active", "completed"
 	LikeCount      int                  `bson:"likeCount" json:"likeCount"`
 	CampusPresence string               `bson:"campusPresence" json:"campusPresence"` // "inCampus" or "flexible"
 	Embeddings     []float32            `bson:"embeddings,omitempty" json:"embeddings,omitempty"`
 	RequestedBy    []primitive.ObjectID `bson:"requestedBy,omitempty"`
+
+	// ✅ New field for anonymous gigs, defaults to false
+	IsAnonymous bool `bson:"isAnonymous" json:"isAnonymous"`
 }

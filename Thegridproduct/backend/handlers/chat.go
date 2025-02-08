@@ -155,6 +155,7 @@ func GetChatsByUserHandler(w http.ResponseWriter, r *http.Request) {
 		var referenceTitle string
 		var referenceType string
 		var otherUserID primitive.ObjectID
+		var isAnonymous bool = false // Default false
 
 		if c.ReferenceType == "product" {
 			product, err := db.GetProductByID(c.ReferenceID.Hex())
@@ -172,6 +173,7 @@ func GetChatsByUserHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			referenceTitle = gig.Title
 			referenceType = "gig"
+			isAnonymous = gig.IsAnonymous // Check if gig is anonymous
 		} else if c.ReferenceType == "product_request" {
 			productRequest, err := db.GetProductRequestByID(c.ReferenceID.Hex())
 			if err != nil {
@@ -189,10 +191,18 @@ func GetChatsByUserHandler(w http.ResponseWriter, r *http.Request) {
 			otherUserID = c.BuyerID
 		}
 
-		otherUser, err := db.GetUserByID(otherUserID.Hex())
-		if err != nil {
-			log.Printf("❌ Failed to fetch user details for userID %s: %v", otherUserID.Hex(), err)
-			continue
+		var otherUser User
+		if isAnonymous {
+			// ✅ If gig is anonymous, set name to "Anonymous User"
+			otherUser = User{FirstName: "Anonymous", LastName: "User"}
+		} else {
+			// Fetch actual user details
+			userData, err := db.GetUserByID(otherUserID.Hex())
+			if err != nil {
+				log.Printf("❌ Failed to fetch user details for userID %s: %v", otherUserID.Hex(), err)
+				continue
+			}
+			otherUser = User{FirstName: userData.FirstName, LastName: userData.LastName}
 		}
 
 		// Fetch messages from Firestore
@@ -256,7 +266,7 @@ func GetChatsByUserHandler(w http.ResponseWriter, r *http.Request) {
 			ReferenceID:     c.ReferenceID.Hex(),
 			ReferenceTitle:  referenceTitle,
 			ReferenceType:   referenceType,
-			User:            User{FirstName: otherUser.FirstName, LastName: otherUser.LastName},
+			User:            otherUser, // ✅ Now handles anonymous case
 			LatestMessage:   latestMessage,
 			LatestTimestamp: latestTimestamp,
 		}
@@ -368,7 +378,6 @@ func GetMessagesHandler(w http.ResponseWriter, r *http.Request) {
 	// Return messages as JSON response
 	WriteJSON(w, messages, http.StatusOK)
 }
-
 func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -424,6 +433,7 @@ func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 	callback := func(sessCtx mongo.SessionContext) (interface{}, error) {
 		chatRequests := db.GetCollection("gridlyapp", "chat_requests")
 		var referenceTitle string
+		isAnonymous := false
 
 		// Fetch the reference title from the correct collection
 		switch req.ReferenceType {
@@ -435,6 +445,7 @@ func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 				return nil, &AppError{Message: "Gig not found", StatusCode: http.StatusNotFound}
 			}
 			referenceTitle = gig.Title
+			isAnonymous = gig.IsAnonymous // Check if the gig is anonymous
 
 		case "product":
 			productsCol := db.GetCollection("gridlyapp", "products")
@@ -444,18 +455,6 @@ func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 				return nil, &AppError{Message: "Product not found", StatusCode: http.StatusNotFound}
 			}
 			referenceTitle = product.Title
-
-			// Remove the product from the cart if the reference type is "product"
-			cartCollection := db.GetCollection("gridlyapp", "carts")
-			filter := bson.M{"userId": buyerObjectID}
-			update := bson.M{
-				"$pull": bson.M{"items": bson.M{"productId": referenceObjectID}},
-				"$set":  bson.M{"updatedAt": time.Now()},
-			}
-			_, err = cartCollection.UpdateOne(sessCtx, filter, update)
-			if err != nil {
-				return nil, fmt.Errorf("failed to remove product from cart: %v", err)
-			}
 
 		case "product_request":
 			requestsCol := db.GetCollection("gridlyapp", "product_requests")
@@ -481,15 +480,38 @@ func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 			return nil, findErr
 		}
 
+		var buyerFirstName, buyerLastName, sellerFirstName, sellerLastName string
+
+		if isAnonymous {
+			buyerFirstName, buyerLastName = "Anonymous", "User"
+			sellerFirstName, sellerLastName = "Anonymous", "User"
+		} else {
+			// ✅ Otherwise, fetch real names
+			buyer, err := db.GetUserByID(req.BuyerID)
+			if err != nil {
+				return nil, &AppError{Message: "Buyer not found", StatusCode: http.StatusNotFound}
+			}
+			buyerFirstName, buyerLastName = buyer.FirstName, buyer.LastName
+
+			seller, err := db.GetUserByID(req.SellerID)
+			if err != nil {
+				return nil, &AppError{Message: "Seller not found", StatusCode: http.StatusNotFound}
+			}
+			sellerFirstName, sellerLastName = seller.FirstName, seller.LastName
+		}
+
 		// Create the chat request with the reference title
-		chatRequest := models.NewChatRequest(referenceObjectID, req.ReferenceType, referenceTitle, buyerObjectID, sellerObjectID)
+		chatRequest := models.NewChatRequest(
+			referenceObjectID, req.ReferenceType, referenceTitle,
+			buyerObjectID, sellerObjectID,
+		)
 
 		_, err = chatRequests.InsertOne(sessCtx, chatRequest)
 		if err != nil {
 			return nil, err
 		}
 
-		// Update "requestedBy" field for all types
+		// ✅ Update "requestedBy" field for all types
 		switch req.ReferenceType {
 		case "gig":
 			gigsCol := db.GetCollection("gridlyapp", "gigs")
@@ -525,10 +547,16 @@ func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		return nil, nil
+		return map[string]interface{}{
+			"message":         "Chat request sent successfully",
+			"buyerFirstName":  buyerFirstName,
+			"buyerLastName":   buyerLastName,
+			"sellerFirstName": sellerFirstName,
+			"sellerLastName":  sellerLastName,
+		}, nil
 	}
 
-	_, err = session.WithTransaction(context.Background(), callback)
+	res, err := session.WithTransaction(context.Background(), callback)
 	if err != nil {
 		if appErr, ok := err.(*AppError); ok {
 			WriteJSONError(w, appErr.Message, appErr.StatusCode)
@@ -540,9 +568,7 @@ func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{
-		"message": "Chat request sent successfully",
-	})
+	json.NewEncoder(w).Encode(res)
 }
 
 func AcceptChatRequestHandler(w http.ResponseWriter, r *http.Request) {
