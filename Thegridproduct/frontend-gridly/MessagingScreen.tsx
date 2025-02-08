@@ -37,7 +37,7 @@ import {
   where,
   documentId,
 } from "firebase/firestore";
-import { CLOUDINARY_URL, UPLOAD_PRESET, NGROK_URL } from "@env";
+import { NGROK_URL } from "@env";
 import { Conversation, Message } from "./types";
 import { UserContext } from "./UserContext";
 import * as ImagePicker from "expo-image-picker";
@@ -78,7 +78,9 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
   const preFetchedChats: Chat[] = route.params?.preFetchedChats || [];
   const [chats, setChats] = useState<Chat[]>(preFetchedChats);
   const [filteredChats, setFilteredChats] = useState<Chat[]>([]);
-  const [filter, setFilter] = useState<"all" | "products" | "gigs" | "product_request">("all");
+  const [filter, setFilter] = useState<
+    "all" | "products" | "gigs" | "product_request"
+  >("all");
   const [isChatModalVisible, setChatModalVisible] = useState<boolean>(false);
   const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
   const [newMessage, setNewMessage] = useState<string>("");
@@ -122,7 +124,8 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
   >("incoming");
 
   // New state for the custom popup on accept/reject
-  const [requestPopupVisible, setRequestPopupVisible] = useState<boolean>(false);
+  const [requestPopupVisible, setRequestPopupVisible] =
+    useState<boolean>(false);
   const [requestPopupMessage, setRequestPopupMessage] = useState<string>("");
 
   // User & Token from Context
@@ -150,6 +153,9 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     "Other",
   ];
 
+  const CLOUDINARY_URL =
+    "https://api.cloudinary.com/v1_1/ds0zpfht9/image/upload";
+  const UPLOAD_PRESET = "gridly_preset";
   const applyFilter = (
     chatsToFilter: Chat[],
     f: "all" | "products" | "gigs" | "product_request"
@@ -235,7 +241,9 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       const chatDocRef = doc(firestoreDB, "chatRooms", selectedChat.chatID);
       unsubscribe = onSnapshot(chatDocRef, (docSnap) => {
         if (!docSnap.exists()) {
-          console.warn("🚨 Chat room does not exist in Firestore! Check chatID.");
+          console.warn(
+            "🚨 Chat room does not exist in Firestore! Check chatID."
+          );
         } else {
           const data = docSnap.data();
           if (data.messages) {
@@ -322,7 +330,11 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                   )
                 );
               } catch (e) {
-                console.error("Error computing unread count for chat", docSnap.id, e);
+                console.error(
+                  "Error computing unread count for chat",
+                  docSnap.id,
+                  e
+                );
               }
             })();
           }
@@ -462,10 +474,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       const { status } =
         await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== "granted") {
-        Alert.alert(
-          "Permission Required",
-          "Permission to access the camera roll is required!"
-        );
+        Alert.alert("Permission Required", "We need camera roll permission!");
         return;
       }
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -473,25 +482,75 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         allowsMultipleSelection: false,
         quality: 0.7,
       });
+      console.log("ImagePicker result:", result);
+
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const asset = result.assets[0];
-        setSelectedImageUri(asset.uri);
-        setIsImagePreviewModalVisible(true);
+        // 1. Immediately upload to Cloudinary
+        const uploadedImageUrl = await uploadImageToCloudinary(asset.uri);
+        // 2. Immediately send to Firestore as a message
+        await sendImageMessage(uploadedImageUrl);
       }
     } catch (error) {
       console.error("Error picking image:", error);
-      Alert.alert("Error", "An error occurred while selecting the image.");
+      Alert.alert("Error", "An error occurred while selecting an image.");
     }
+  };
+  const pickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: false,
+      quality: 0.7,
+    });
+
+    // If user canceled or assets array is empty, just return
+    if (result.canceled || !result.assets || result.assets.length < 1) {
+      console.log("User canceled or no image selected.");
+      return;
+    }
+
+    // Otherwise, we have a valid image
+    const selectedUri = result.assets[0].uri;
+    console.log("Selected image URI:", selectedUri);
+    // ...
+  };
+
+  const sendImageMessage = async (imageUrl: string) => {
+    if (!selectedChat) return;
+    const messageData = {
+      _id: Date.now().toString(),
+      senderId: userId,
+      content: `[Image] ${imageUrl}`,
+      timestamp: new Date().toISOString(),
+    };
+    const chatDocRef = doc(firestoreDB, "chatRooms", selectedChat.chatID);
+    await setDoc(
+      chatDocRef,
+      { messages: arrayUnion(messageData) },
+      { merge: true }
+    );
   };
 
   const uploadImageToCloudinary = async (uri: string): Promise<string> => {
+    if (!uri) {
+      // If no URI is passed, throw an error immediately
+      throw new Error("Cannot upload an empty URL");
+    }
+
     setIsUploadingImage(true);
     try {
+      // Log the original URI for debugging
+      console.log("Original image URI:", uri);
+
+      // Manipulate the image (resize/compress)
       const manipulatedImage = await ImageManipulator.manipulateAsync(
         uri,
         [{ resize: { width: 800 } }],
         { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
       );
+      console.log("Manipulated image URI:", manipulatedImage.uri);
+
+      // Prepare the FormData for the upload
       const formDataImage = new FormData();
       formDataImage.append("file", {
         uri: manipulatedImage.uri,
@@ -499,9 +558,14 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         name: `upload_${Date.now()}.jpg`,
       } as any);
       formDataImage.append("upload_preset", UPLOAD_PRESET);
+
+      // Upload to Cloudinary
       const response = await axios.post(CLOUDINARY_URL, formDataImage, {
         headers: { "Content-Type": "multipart/form-data" },
       });
+      console.log("Cloudinary upload response:", response.data);
+
+      // Return the secure_url from Cloudinary
       return response.data.secure_url;
     } catch (error) {
       console.error("Error uploading image to Cloudinary:", error);
@@ -727,8 +791,11 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                       : styles.greyDot
                   }
                 />
+                {/* Create a small helper that checks if it's an image */}
                 <Text style={styles.lastMessage} numberOfLines={1}>
-                  {latestMessage.content || ""}
+                  {latestMessage.content.startsWith("[Image] ")
+                    ? "Image"
+                    : latestMessage.content}
                 </Text>
               </View>
             )}
@@ -1198,7 +1265,8 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                   accessibilityLabel={`Navigate to ${item.type} titled ${item.title}`}
                 >
                   <Text style={styles.productGigItemText}>
-                    {item.type === "product" ? "Product: " : "Gig: "} {item.title}
+                    {item.type === "product" ? "Product: " : "Gig: "}{" "}
+                    {item.title}
                   </Text>
                 </Pressable>
               ))}
@@ -1262,7 +1330,9 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                         </Text>
                         <Text style={styles.chatHeaderSubTitle}>
                           {selectedChat?.referenceType
-                            ? selectedChat.referenceType.charAt(0).toUpperCase() +
+                            ? selectedChat.referenceType
+                                .charAt(0)
+                                .toUpperCase() +
                               selectedChat.referenceType.slice(1)
                             : ""}
                           {selectedChat?.referenceTitle
