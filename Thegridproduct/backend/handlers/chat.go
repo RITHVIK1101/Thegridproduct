@@ -445,6 +445,18 @@ func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			referenceTitle = product.Title
 
+			// Remove the product from the cart if the reference type is "product"
+			cartCollection := db.GetCollection("gridlyapp", "carts")
+			filter := bson.M{"userId": buyerObjectID}
+			update := bson.M{
+				"$pull": bson.M{"items": bson.M{"productId": referenceObjectID}},
+				"$set":  bson.M{"updatedAt": time.Now()},
+			}
+			_, err = cartCollection.UpdateOne(sessCtx, filter, update)
+			if err != nil {
+				return nil, fmt.Errorf("failed to remove product from cart: %v", err)
+			}
+
 		case "product_request":
 			requestsCol := db.GetCollection("gridlyapp", "product_requests")
 			var productRequest models.ProductRequest
@@ -452,7 +464,7 @@ func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				return nil, &AppError{Message: "Product request not found", StatusCode: http.StatusNotFound}
 			}
-			referenceTitle = productRequest.ProductName // ✅ Use "productName" field from product_requests
+			referenceTitle = productRequest.ProductName
 		}
 
 		// Check if there's already a pending chat request for this reference by the buyer
@@ -477,14 +489,14 @@ func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 			return nil, err
 		}
 
-		// ✅ Update "requestedBy" field for all types
+		// Update "requestedBy" field for all types
 		switch req.ReferenceType {
 		case "gig":
 			gigsCol := db.GetCollection("gridlyapp", "gigs")
 			_, err = gigsCol.UpdateOne(
 				sessCtx,
 				bson.M{"_id": referenceObjectID},
-				bson.M{"$addToSet": bson.M{"requestedBy": buyerObjectID}}, // Adds buyer to requestedBy array
+				bson.M{"$addToSet": bson.M{"requestedBy": buyerObjectID}},
 			)
 			if err != nil {
 				return nil, err
@@ -495,7 +507,7 @@ func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 			_, err = productsCol.UpdateOne(
 				sessCtx,
 				bson.M{"_id": referenceObjectID},
-				bson.M{"$addToSet": bson.M{"requestedBy": buyerObjectID}}, // ✅ Adds buyer to requestedBy for products
+				bson.M{"$addToSet": bson.M{"requestedBy": buyerObjectID}},
 			)
 			if err != nil {
 				return nil, err
@@ -506,7 +518,7 @@ func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 			_, err = requestsCol.UpdateOne(
 				sessCtx,
 				bson.M{"_id": referenceObjectID},
-				bson.M{"$addToSet": bson.M{"requestedBy": buyerObjectID}}, // ✅ Adds buyer to requestedBy for product requests
+				bson.M{"$addToSet": bson.M{"requestedBy": buyerObjectID}},
 			)
 			if err != nil {
 				return nil, err
