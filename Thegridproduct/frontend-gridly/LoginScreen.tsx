@@ -21,6 +21,7 @@ import {
   TouchableWithoutFeedback,
   Easing,
   ScrollView,
+  Alert,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -222,7 +223,6 @@ const LoginScreen: React.FC = () => {
       setError("Please enter a valid email address.");
       return;
     }
-    // Password must be greater than 6 characters
     if (password.length <= 6) {
       setError("Password must be longer than 6 characters.");
       return;
@@ -231,16 +231,8 @@ const LoginScreen: React.FC = () => {
       setError("Passwords do not match.");
       return;
     }
-    if (!studentType) {
-      setError("Please select your student type.");
-      return;
-    }
-    if (!selectedInstitution) {
-      setError(
-        `Please select your ${
-          studentType === "university" ? "university" : "high school"
-        }.`
-      );
+    if (!studentType || !selectedInstitution) {
+      setError("Please select your student type and institution.");
       return;
     }
 
@@ -255,39 +247,10 @@ const LoginScreen: React.FC = () => {
     const data = await handleApiRequest("/signup", payload);
 
     if (data) {
-      const {
-        token,
-        userId,
-        institution,
-        studentType: responseStudentType,
-      } = data;
-
-      if (!institution) {
-        setError("Institution information is missing.");
-        return;
-      }
-      if (!responseStudentType) {
-        setError("Student type information is missing.");
-        return;
-      }
-
-      if (
-        responseStudentType !== "highschool" &&
-        responseStudentType !== "university"
-      ) {
-        setError("Invalid student type from server.");
-        return;
-      }
-
-      const mappedStudentType =
-        responseStudentType === "highschool"
-          ? StudentType.HighSchool
-          : StudentType.University;
-
-      await SecureStore.setItemAsync("userToken", token);
-      await SecureStore.setItemAsync("userId", userId.toString());
-
-      await saveUserData(token, userId, institution, mappedStudentType);
+      Alert.alert(
+        "Signup Successful!",
+        "A verification email has been sent. Please check your inbox."
+      );
     }
   };
 

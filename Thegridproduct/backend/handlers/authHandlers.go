@@ -5,8 +5,10 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
+	"net/smtp"
 	"os"
 	"time"
 
@@ -151,7 +153,51 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-// SignupHandler handles user registration.
+// Generate a random token for email verification
+func generateVerificationToken(userID primitive.ObjectID) string {
+	expirationTime := time.Now().Add(24 * time.Hour).Unix()
+	claims := jwt.MapClaims{
+		"userID": userID.Hex(),
+		"exp":    expirationTime,
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	jwtKey := []byte(os.Getenv("JWT_SECRET_KEY"))
+	tokenString, _ := token.SignedString(jwtKey)
+	return tokenString
+}
+
+// Send verification email
+func sendVerificationEmail(email string, token string) error {
+	verificationLink := fmt.Sprintf("https://yourdomain.com/verify-email?token=%s", token)
+
+	// SMTP server credentials
+	smtpServer := "smtp.gmail.com"
+	smtpPort := "587"
+	senderEmail := os.Getenv("SMTP_EMAIL")
+	senderPassword := os.Getenv("SMTP_PASSWORD")
+
+	auth := smtp.PlainAuth("", senderEmail, senderPassword, smtpServer)
+
+	msg := []byte(
+		"Subject: Verify Your Email\n" +
+			"From: " + senderEmail + "\n" +
+			"To: " + email + "\n" +
+			"Content-Type: text/html; charset=UTF-8\n\n" +
+			"<h2>Welcome to Gridly!</h2>" +
+			"<p>Please verify your email by clicking the link below:</p>" +
+			"<a href='" + verificationLink + "'>Verify Email</a>",
+	)
+
+	// Send the email
+	err := smtp.SendMail(smtpServer+":"+smtpPort, auth, senderEmail, []string{email}, msg)
+	if err != nil {
+		log.Printf("Error sending verification email: %v", err)
+		return err
+	}
+	return nil
+}
+
+// Update SignupHandler to Send Verification Email
 func SignupHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -166,26 +212,23 @@ func SignupHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate StudentType
 	if req.StudentType != StudentTypeHighSchool && req.StudentType != StudentTypeUniversity {
 		WriteJSONError(w, "Invalid student type", http.StatusBadRequest)
 		return
 	}
 
-	// Validate required fields
 	if req.Email == "" || req.Password == "" || req.FirstName == "" || req.LastName == "" || req.Institution == "" {
 		WriteJSONError(w, "All fields are required", http.StatusBadRequest)
 		return
 	}
 
-	// Hash the password
+	// Hash password
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		WriteJSONError(w, "Error processing password", http.StatusInternalServerError)
 		return
 	}
 
-	// Create a new User instance
 	newUser := models.User{
 		ID:          primitive.NewObjectID(),
 		Email:       req.Email,
@@ -196,26 +239,20 @@ func SignupHandler(w http.ResponseWriter, r *http.Request) {
 		Institution: req.Institution,
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
-		// Initialize other fields as necessary
 	}
 
-	// Determine the collection based on StudentType
-	var collectionName string
+	collectionName := "highschool_users"
 	if req.StudentType == StudentTypeUniversity {
 		collectionName = "university_users"
-	} else {
-		collectionName = "highschool_users"
 	}
 
 	collection := db.GetCollection("gridlyapp", collectionName)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	// Check if the user already exists
 	count, err := collection.CountDocuments(ctx, bson.M{"email": req.Email})
 	if err != nil {
-		log.Printf("Error checking existing user: %v", err)
-		WriteJSONError(w, "Error processing request", http.StatusInternalServerError)
+		WriteJSONError(w, "Error checking existing user", http.StatusInternalServerError)
 		return
 	}
 	if count > 0 {
@@ -223,28 +260,29 @@ func SignupHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Insert the new user into the appropriate collection
 	_, err = collection.InsertOne(ctx, newUser)
 	if err != nil {
-		log.Printf("Error inserting user: %v", err)
 		WriteJSONError(w, "Error creating user", http.StatusInternalServerError)
 		return
 	}
 
-	// Generate JWT Token, now including studentType
+	// Generate and send verification email
+	verificationToken := generateVerificationToken(newUser.ID)
+	go sendVerificationEmail(req.Email, verificationToken) // Asynchronous email sending
+
+	// Generate JWT Token
 	tokenString, err := generateToken(newUser.ID, newUser.Institution, newUser.StudentType)
 	if err != nil {
-		log.Printf("Error generating token: %v", err)
 		WriteJSONError(w, "Could not generate token", http.StatusInternalServerError)
 		return
 	}
 
-	// Respond with the token and user information
 	response := map[string]interface{}{
 		"token":       tokenString,
 		"userId":      newUser.ID.Hex(),
 		"institution": newUser.Institution,
 		"studentType": newUser.StudentType,
+		"message":     "Signup successful! A verification email has been sent.",
 	}
 
 	w.WriteHeader(http.StatusCreated)

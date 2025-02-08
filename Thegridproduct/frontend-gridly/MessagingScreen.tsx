@@ -86,6 +86,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
   const [newMessage, setNewMessage] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
   const [sending, setSending] = useState<boolean>(false);
+  const [isDelivered, setIsDelivered] = useState(false); // Track button press state
 
   // Image Upload states
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
@@ -1316,6 +1317,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                     >
                       <Ionicons name="arrow-back" size={24} color="#BB86FC" />
                     </Pressable>
+
                     <View style={styles.chatHeaderInfo}>
                       <View style={styles.headerProfilePicPlaceholder}>
                         <Text style={styles.headerProfilePicInitials}>
@@ -1341,16 +1343,43 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                         </Text>
                       </View>
                     </View>
-                    <Pressable
-                      onPress={handleReportPress}
-                      style={styles.reportButton}
-                      accessibilityLabel="Report User"
-                    >
-                      <Ionicons name="flag" size={24} color="#F08080" />
-                    </Pressable>
+
+                    {/* Delivered Button & Flag together */}
+                    <View style={styles.deliveredReportContainer}>
+                      <Pressable
+                        onPress={() => setIsDelivered(true)}
+                        style={[
+                          styles.deliveredFloatingButton,
+                          isDelivered && {
+                            backgroundColor: "#5cb85c",
+                            borderColor: "#5cb85c",
+                          }, // Green when clicked
+                        ]}
+                        accessibilityLabel="Mark Product as Delivered"
+                      >
+                        <Ionicons
+                          name="checkmark-done"
+                          size={20}
+                          color="#fff"
+                        />
+                        <Text style={styles.deliveredFloatingText}>
+                          Delivered
+                        </Text>
+                      </Pressable>
+
+                      <Pressable
+                        onPress={handleReportPress}
+                        style={styles.reportButton}
+                        accessibilityLabel="Report User"
+                      >
+                        <Ionicons name="flag" size={24} color="#F08080" />
+                      </Pressable>
+                    </View>
+
                     <View style={styles.chatHeaderBottomLine} />
                   </View>
                 )}
+
                 <FlatList
                   ref={flatListRef}
                   data={selectedChat?.messages || []}
@@ -1819,6 +1848,38 @@ const styles = StyleSheet.create({
     backgroundColor: "#888888",
     marginRight: 5,
   },
+  deliveredReportContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10, // Adds spacing between the two buttons
+  },
+  deliveredFloatingButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    borderRadius: 25,
+    borderWidth: 2,
+    borderColor: "#FFFFFF", // White outline
+    backgroundColor: "#000", // Black background initially
+  },
+
+  deliveredFloatingText: {
+    color: "#fff",
+    fontSize: 14,
+    marginLeft: 6,
+    fontWeight: "bold",
+  },
+  reportButton: {
+    backgroundColor: "#222",
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
   lastMessage: {
     fontSize: 14,
     color: "#CCCCCC",
