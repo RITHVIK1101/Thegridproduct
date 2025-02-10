@@ -1,14 +1,13 @@
 // navigationTypes.ts
-
 export type CartProduct = {
   id: string;
   title: string;
   price: number;
   images: string[];
   quantity: number;
-  description?: string; 
-  category?: string; 
-  university?: string; 
+  description?: string;
+  category?: string;
+  university?: string;
   sellerId: string;
   postedDate: string;
   rating?: number;
@@ -16,6 +15,7 @@ export type CartProduct = {
 };
 
 export type RootStackParamList = {
+  Demo: undefined;
   Login: undefined;
   Dashboard: undefined;
   AddProduct: undefined;
@@ -34,6 +34,5 @@ export type RootStackParamList = {
   LikedItems: undefined;
   ProductDetails: { productId: string };
   RequestProduct: undefined;
-  // NEW: Add new route for the requested products page
   RequestedProductsPage: undefined;
 };

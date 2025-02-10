@@ -1,5 +1,4 @@
 // App.tsx
-
 import React, { useState, useContext } from "react";
 import {
   TouchableOpacity,
@@ -13,11 +12,8 @@ import {
 import LikedProductScreen from "./LikedProductScreen";
 import Icon from "react-native-vector-icons/MaterialIcons";
 import Ionicons from "react-native-vector-icons/Ionicons";
-import { NavigationContainer, CommonActions } from "@react-navigation/native";
-import {
-  createStackNavigator,
-  StackNavigationOptions,
-} from "@react-navigation/stack";
+import { NavigationContainer } from "@react-navigation/native";
+import { createStackNavigator, StackNavigationOptions } from "@react-navigation/stack";
 import { StripeProvider } from "@stripe/stripe-react-native";
 import { UserProvider, UserContext } from "./UserContext";
 import PaymentScreen from "./PaymentScreen";
@@ -34,8 +30,8 @@ import CartScreen from "./CartScreen";
 import AccountScreen from "./AccountScreen";
 import JobDetails from "./JobDetails";
 import RequestProduct from "./RequestProduct";
-// NEW: Import the new requested products page
 import RequestedProductsPage from "./requestedProductsPage";
+import DemoScreen from "./DemoScreen"; // New demo screen
 import { RootStackParamList } from "./navigationTypes";
 import TermsOfServiceContent from "./TermsOfServiceContent";
 
@@ -76,12 +72,8 @@ const UserMenuScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const handleLogout = async () => {
     try {
       await clearUser();
-      navigation.dispatch(
-        CommonActions.reset({
-          index: 0,
-          routes: [{ name: "Login" }],
-        })
-      );
+      // When logging out, we replace the current screen with "Login"
+      navigation.replace("Login");
     } catch (error) {
       console.error("Logout Error:", error);
     }
@@ -249,8 +241,12 @@ const getHeaderOptions = (
   animationEnabled: enableAnimation,
 });
 
-const AppNavigator: React.FC = () => {
-  const { token, isLoading, firstName, lastName } = useContext(UserContext);
+interface AppNavigatorProps {
+  firstRender: boolean;
+}
+
+const AppNavigator: React.FC<AppNavigatorProps> = ({ firstRender }) => {
+  const { token, firstName, lastName, isLoading } = useContext(UserContext);
 
   if (isLoading) {
     return (
@@ -386,7 +382,6 @@ const AppNavigator: React.FC = () => {
               getHeaderOptions(navigation, firstName, lastName, true, true)
             }
           />
-          {/* NEW: Add RequestedProductsPage route */}
           <Stack.Screen
             name="RequestedProductsPage"
             component={RequestedProductsPage}
@@ -396,11 +391,30 @@ const AppNavigator: React.FC = () => {
           />
         </>
       ) : (
-        <Stack.Screen
-          name="Login"
-          component={LoginScreen}
-          options={{ headerShown: false }}
-        />
+        <>
+          {/* When not authenticated, if this is not the first render (i.e. after logout),
+              show the Login screen immediately. On first launch show the Demo screen first. */}
+          {!firstRender ? (
+            <Stack.Screen
+              name="Login"
+              component={LoginScreen}
+              options={{ headerShown: false }}
+            />
+          ) : (
+            <>
+              <Stack.Screen
+                name="Demo"
+                component={DemoScreen}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen
+                name="Login"
+                component={LoginScreen}
+                options={{ headerShown: false }}
+              />
+            </>
+          )}
+        </>
       )}
     </Stack.Navigator>
   );
@@ -408,6 +422,7 @@ const AppNavigator: React.FC = () => {
 
 const App: React.FC = () => {
   const [showSplash, setShowSplash] = useState(true);
+  const [firstRender, setFirstRender] = useState(true);
 
   const handleSplashEnd = () => {
     setShowSplash(false);
@@ -422,8 +437,15 @@ const App: React.FC = () => {
           publishableKey="pk_test_51QQZb9Fg2PIykDNlba9E7bVR9EFKxmaS9F1mjlOXFb0meJuXTG5nWy1vYHBIIlWPwiheNa37T1snKDN2Urzs2Jwx00ywvbvMGE"
           merchantIdentifier="merchant.com.yourapp"
         >
-          <NavigationContainer ref={navigationRef as any}>
-            <AppNavigator />
+          <NavigationContainer
+            ref={navigationRef as any}
+            onStateChange={() => {
+              if (firstRender) {
+                setFirstRender(false);
+              }
+            }}
+          >
+            <AppNavigator firstRender={firstRender} />
           </NavigationContainer>
         </StripeProvider>
       )}

@@ -15,7 +15,9 @@ interface SplashScreenProps {
   onAnimationEnd: () => void;
 }
 
-const SPLASH_TEXT_COLOR = "#E0F7FA"; // Cool white color for a distinct and modern look
+const ACCENT_COLOR = "#A78BFA"; // Purple accent (same as in LoginScreen)
+const TEXT_COLOR = "#fff";        // White text (for the logo)
+const BG_COLOR = "#0D0D0D";         // Dark background (matches LoginScreen)
 
 const { width, height } = Dimensions.get("window");
 const SPEED_MULTIPLIER = 0.65; // Slightly faster animation
@@ -82,7 +84,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onAnimationEnd }) => {
     Animated.sequence([
       logoAnimation,
       linesAnimation,
-      Animated.delay(1200 * SPEED_MULTIPLIER), // Hold the splash screen for a shorter duration
+      Animated.delay(1200 * SPEED_MULTIPLIER), // Hold the splash screen briefly
       // Fade out animations
       Animated.parallel([
         Animated.timing(logoOpacity, {
@@ -104,7 +106,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onAnimationEnd }) => {
     ]).start(() => {
       // Stop the pulse animation when done
       pulseAnimation.stop();
-      // Callback after animation ends
+      // Notify parent that the animation has finished
       onAnimationEnd();
     });
   }, [
@@ -131,7 +133,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onAnimationEnd }) => {
           },
         ]}
       >
-        <Ionicons name="grid-outline" size={60} color={SPLASH_TEXT_COLOR} />
+        <Ionicons name="grid-outline" size={60} color={ACCENT_COLOR} />
         <Text style={styles.logoText}>Gridly</Text>
       </Animated.View>
 
@@ -182,7 +184,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onAnimationEnd }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#121212", // Dark background to match the app's theme
+    backgroundColor: BG_COLOR,
     justifyContent: "center",
     alignItems: "center",
     position: "relative",
@@ -195,7 +197,7 @@ const styles = StyleSheet.create({
   logoText: {
     fontSize: 32,
     fontWeight: "700",
-    color: SPLASH_TEXT_COLOR,
+    color: TEXT_COLOR,
     marginLeft: 10, // Space between icon and text
     fontFamily: Platform.OS === "ios" ? "HelveticaNeue-Bold" : "Roboto",
   },
@@ -203,8 +205,8 @@ const styles = StyleSheet.create({
     position: "absolute",
     width: width * 0.6,
     height: 3,
-    backgroundColor: SPLASH_TEXT_COLOR,
-    top: height / 2 + 50, // Position below the logo
+    backgroundColor: ACCENT_COLOR,
+    top: height / 2 + 50, // Positioned below the logo
     borderRadius: 2,
   },
   lineSecond: {
