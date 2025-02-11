@@ -46,6 +46,7 @@ type SignupRequest struct {
 	Institution string `json:"institution"` // Name of high school or university
 }
 
+// generateToken creates a JWT token for the authenticated user.
 func generateToken(userID primitive.ObjectID, institution string, studentType string) (string, error) {
 	expirationTime := time.Now().Add(24 * time.Hour)
 	claims := &Claims{
@@ -155,13 +156,13 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-// Generates a random 6-digit code
+// generateVerificationCode creates a random 6-digit code.
 func generateVerificationCode() string {
 	rand.Seed(time.Now().UnixNano())
 	return fmt.Sprintf("%06d", rand.Intn(1000000))
 }
 
-// Send email with a verification code
+// sendVerificationEmail sends an email with the verification code.
 func sendVerificationEmail(email string, code string) error {
 	smtpHost := os.Getenv("SMTP_HOST")
 	smtpPort := os.Getenv("SMTP_PORT")
@@ -190,6 +191,32 @@ func sendVerificationEmail(email string, code string) error {
 	return nil
 }
 
+// ----- New Types for Pending Signup and Verification -----
+
+// PendingUser holds the signup data until the email is verified.
+type PendingUser struct {
+	ID               primitive.ObjectID `bson:"_id"`
+	Email            string             `bson:"email"`
+	Password         string             `bson:"password"`
+	FirstName        string             `bson:"firstName"`
+	LastName         string             `bson:"lastName"`
+	StudentType      string             `bson:"studentType"`
+	Institution      string             `bson:"institution"`
+	VerificationCode string             `bson:"verificationCode"`
+	ExpiresAt        time.Time          `bson:"expiresAt"`
+	CreatedAt        time.Time          `bson:"createdAt"`
+}
+
+// VerifyRequest represents the payload for email verification.
+type VerifyRequest struct {
+	Email string `json:"email"`
+	Code  string `json:"code"`
+}
+
+// ----- Modified SignupHandler -----
+
+// SignupHandler now creates a pending user record and sends a verification email.
+// The actual user record is not created until the email is verified.
 func SignupHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -216,54 +243,172 @@ func SignupHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	newUser := models.User{
-		ID:          primitive.NewObjectID(),
-		Email:       req.Email,
-		Password:    string(hashedPassword),
-		FirstName:   req.FirstName,
-		LastName:    req.LastName,
-		StudentType: req.StudentType,
-		Institution: req.Institution,
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
-	}
-
-	// Determine the collection based on StudentType
-	collectionName := "highschool_users"
-	if req.StudentType == StudentTypeUniversity {
-		collectionName = "university_users"
-	}
-
-	collection := db.GetCollection("gridlyapp", collectionName)
+	// Check if the user already exists in the actual user collections.
+	highSchoolCollection := db.GetCollection("gridlyapp", "highschool_users")
+	universityCollection := db.GetCollection("gridlyapp", "university_users")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	// Check if the user already exists
-	count, err := collection.CountDocuments(ctx, bson.M{"email": req.Email})
+	countHS, err := highSchoolCollection.CountDocuments(ctx, bson.M{"email": req.Email})
 	if err != nil {
 		WriteJSONError(w, "Error checking existing user", http.StatusInternalServerError)
 		return
 	}
-	if count > 0 {
+	countUni, err := universityCollection.CountDocuments(ctx, bson.M{"email": req.Email})
+	if err != nil {
+		WriteJSONError(w, "Error checking existing user", http.StatusInternalServerError)
+		return
+	}
+	if countHS > 0 || countUni > 0 {
 		WriteJSONError(w, "User already exists", http.StatusConflict)
 		return
 	}
 
-	_, err = collection.InsertOne(ctx, newUser)
+	// Generate a verification code and create a pending user record.
+	verificationCode := generateVerificationCode()
+	// Set the verification code to expire in 15 minutes.
+	expiresAt := time.Now().Add(15 * time.Minute)
+
+	pendingUser := PendingUser{
+		ID:               primitive.NewObjectID(),
+		Email:            req.Email,
+		Password:         string(hashedPassword),
+		FirstName:        req.FirstName,
+		LastName:         req.LastName,
+		StudentType:      req.StudentType,
+		Institution:      req.Institution,
+		VerificationCode: verificationCode,
+		ExpiresAt:        expiresAt,
+		CreatedAt:        time.Now(),
+	}
+
+	pendingCollection := db.GetCollection("gridlyapp", "pending_users")
+
+	// Remove any existing pending record for this email (optional).
+	_, _ = pendingCollection.DeleteOne(ctx, bson.M{"email": req.Email})
+
+	_, err = pendingCollection.InsertOne(ctx, pendingUser)
 	if err != nil {
-		WriteJSONError(w, "Error creating user", http.StatusInternalServerError)
+		WriteJSONError(w, "Error creating pending user", http.StatusInternalServerError)
 		return
 	}
 
-	// Generate and send verification code
-	verificationCode := generateVerificationCode()
-	go sendVerificationEmail(req.Email, verificationCode) // Send email asynchronously
+	// Send the verification email asynchronously.
+	go sendVerificationEmail(req.Email, verificationCode)
 
-	// Respond with success message
+	// Respond to the client.
 	response := map[string]interface{}{
-		"message": "Signup successful! A verification email has been sent.",
+		"message": "Signup initiated! A verification email has been sent. Please verify your email to activate your account.",
 	}
 
 	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(response)
+}
+
+// ----- New VerifyEmailHandler Endpoint -----
+
+// VerifyEmailHandler accepts the email and verification code,
+// and if the code is valid (and not expired), it creates the actual user record
+// in the correct collection and removes the pending record.
+func VerifyEmailHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method != http.MethodPost {
+		WriteJSONError(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req VerifyRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		WriteJSONError(w, "Invalid input", http.StatusBadRequest)
+		return
+	}
+
+	if req.Email == "" || req.Code == "" {
+		WriteJSONError(w, "Email and verification code are required", http.StatusBadRequest)
+		return
+	}
+
+	pendingCollection := db.GetCollection("gridlyapp", "pending_users")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var pendingUser PendingUser
+	err := pendingCollection.FindOne(ctx, bson.M{"email": req.Email}).Decode(&pendingUser)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			WriteJSONError(w, "No pending signup found for this email", http.StatusNotFound)
+		} else {
+			log.Printf("Error finding pending user: %v", err)
+			WriteJSONError(w, "Internal server error", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	// Validate the verification code.
+	if pendingUser.VerificationCode != req.Code {
+		WriteJSONError(w, "Invalid verification code", http.StatusUnauthorized)
+		return
+	}
+
+	// Check if the verification code has expired.
+	if time.Now().After(pendingUser.ExpiresAt) {
+		// Optionally delete the expired pending record.
+		_, _ = pendingCollection.DeleteOne(ctx, bson.M{"email": req.Email})
+		WriteJSONError(w, "Verification code expired. Please sign up again.", http.StatusUnauthorized)
+		return
+	}
+
+	newUser := models.User{
+		ID:          pendingUser.ID,
+		Email:       pendingUser.Email,
+		Password:    pendingUser.Password,
+		FirstName:   pendingUser.FirstName,
+		LastName:    pendingUser.LastName,
+		StudentType: pendingUser.StudentType,
+		Institution: pendingUser.Institution,
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+	}
+
+	var collectionName string
+	if pendingUser.StudentType == StudentTypeUniversity {
+		collectionName = "university_users"
+	} else {
+		collectionName = "highschool_users"
+	}
+	userCollection := db.GetCollection("gridlyapp", collectionName)
+
+	_, err = userCollection.InsertOne(ctx, newUser)
+	if err != nil {
+		log.Printf("Error creating user: %v", err)
+		WriteJSONError(w, "Error creating user account", http.StatusInternalServerError)
+		return
+	}
+
+	// Delete the pending user record.
+	_, err = pendingCollection.DeleteOne(ctx, bson.M{"email": req.Email})
+	if err != nil {
+		log.Printf("Error deleting pending user record: %v", err)
+		// Not a critical error; we continue.
+	}
+
+	// Optionally, generate a token upon successful verification.
+	tokenString, err := generateToken(newUser.ID, newUser.Institution, newUser.StudentType)
+	if err != nil {
+		log.Printf("Error generating token: %v", err)
+		WriteJSONError(w, "Error generating token", http.StatusInternalServerError)
+		return
+	}
+
+	response := map[string]interface{}{
+		"message":     "Email verified successfully. Your account is now active.",
+		"token":       tokenString,
+		"userId":      newUser.ID.Hex(),
+		"institution": newUser.Institution,
+		"studentType": newUser.StudentType,
+	}
+
+	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(response)
 }
