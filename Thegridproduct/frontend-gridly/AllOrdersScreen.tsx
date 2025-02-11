@@ -11,11 +11,9 @@ import {
   TouchableOpacity,
   Alert,
 } from "react-native";
-import { UserContext } from "./UserContext"; // Adjust the path as necessary
-import { NGROK_URL } from "@env"; // Ensure NGROK_URL is correctly set in your environment variables
-import { useNavigation } from "@react-navigation/native"; // If using React Navigation
-
-// Define the structure of an order item based on the backend response
+import { UserContext } from "./UserContext";
+import { NGROK_URL } from "@env";
+import { useNavigation } from "@react-navigation/native";
 interface Order {
   productId: string;
   title: string;

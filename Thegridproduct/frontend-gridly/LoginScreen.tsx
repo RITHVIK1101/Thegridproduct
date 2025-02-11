@@ -176,6 +176,21 @@ const LoginScreen: React.FC = () => {
     const data = await handleApiRequest("/login", payload);
 
     if (data) {
+      if (data.unverified) {
+        Alert.alert(
+          "Email Not Verified",
+          "Please verify your email before logging in.",
+          [
+            {
+              text: "Verify Now",
+              onPress: () => navigation.navigate("Verification", { email }),
+            },
+            { text: "Cancel", style: "cancel" },
+          ]
+        );
+        return;
+      }
+
       const {
         token,
         userId,
@@ -209,6 +224,7 @@ const LoginScreen: React.FC = () => {
       await SecureStore.setItemAsync("userId", userId.toString());
 
       await saveUserData(token, userId, institution, mappedStudentType);
+      navigation.navigate("Dashboard"); // Navigate to the main screen
     }
   };
 
@@ -247,10 +263,8 @@ const LoginScreen: React.FC = () => {
     const data = await handleApiRequest("/signup", payload);
 
     if (data) {
-      Alert.alert(
-        "Signup Successful!",
-        "A verification email has been sent. Please check your inbox."
-      );
+      // Navigate to the verification screen and pass the email for reference
+      navigation.navigate("Verification", { email });
     }
   };
 

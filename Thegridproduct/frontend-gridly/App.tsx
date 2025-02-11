@@ -13,7 +13,10 @@ import LikedProductScreen from "./LikedProductScreen";
 import Icon from "react-native-vector-icons/MaterialIcons";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { NavigationContainer } from "@react-navigation/native";
-import { createStackNavigator, StackNavigationOptions } from "@react-navigation/stack";
+import {
+  createStackNavigator,
+  StackNavigationOptions,
+} from "@react-navigation/stack";
 import { StripeProvider } from "@stripe/stripe-react-native";
 import { UserProvider, UserContext } from "./UserContext";
 import PaymentScreen from "./PaymentScreen";
@@ -34,6 +37,7 @@ import RequestedProductsPage from "./requestedProductsPage";
 import DemoScreen from "./DemoScreen"; // New demo screen
 import { RootStackParamList } from "./navigationTypes";
 import TermsOfServiceContent from "./TermsOfServiceContent";
+import VerificationScreen from "./VerificationScreen";
 
 const TermsOfServiceScreen: React.FC = () => <TermsOfServiceContent />;
 
@@ -116,7 +120,10 @@ const UserMenuScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         </View>
 
         <View style={styles.bottomSheetOptions}>
-          <TouchableOpacity style={styles.bottomSheetOption} onPress={handleLogout}>
+          <TouchableOpacity
+            style={styles.bottomSheetOption}
+            onPress={handleLogout}
+          >
             <Ionicons
               name="log-out-outline"
               size={20}
@@ -392,14 +399,21 @@ const AppNavigator: React.FC<AppNavigatorProps> = ({ firstRender }) => {
         </>
       ) : (
         <>
-          {/* When not authenticated, if this is not the first render (i.e. after logout),
-              show the Login screen immediately. On first launch show the Demo screen first. */}
+          {/* When not authenticated, on first launch show Demo, then Login & Verification.
+          Otherwise (after logout) show Login and Verification screens immediately. */}
           {!firstRender ? (
-            <Stack.Screen
-              name="Login"
-              component={LoginScreen}
-              options={{ headerShown: false }}
-            />
+            <>
+              <Stack.Screen
+                name="Login"
+                component={LoginScreen}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen
+                name="Verification"
+                component={VerificationScreen}
+                options={{ headerShown: false }}
+              />
+            </>
           ) : (
             <>
               <Stack.Screen
@@ -410,6 +424,11 @@ const AppNavigator: React.FC<AppNavigatorProps> = ({ firstRender }) => {
               <Stack.Screen
                 name="Login"
                 component={LoginScreen}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen
+                name="Verification"
+                component={VerificationScreen}
                 options={{ headerShown: false }}
               />
             </>
