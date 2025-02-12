@@ -1001,10 +1001,11 @@ const Dashboard: React.FC<DashboardProps> = () => {
             >
               <View style={styles.descriptionModalContent}>
                 {selectedProduct && (
-                  <ScrollView>
-                    <Text style={styles.modalTitle}>
-                      {selectedProduct.title}
-                    </Text>
+                  <ScrollView
+                    showsVerticalScrollIndicator={false}
+                    contentContainerStyle={styles.modalScrollContent}
+                  >
+                    <Text style={styles.modalTitle}>{selectedProduct.title}</Text>
                     <Text style={styles.detailText}>
                       Price: ${selectedProduct.price.toFixed(2)}
                     </Text>
@@ -1012,10 +1013,9 @@ const Dashboard: React.FC<DashboardProps> = () => {
                       Condition: {selectedProduct.quality || "New"}
                     </Text>
                     <Text style={styles.detailText}>
-                      Rating:{" "}
-                      {selectedProduct.rating ? selectedProduct.rating : "N/A"}
+                      Rating: {selectedProduct.rating ? selectedProduct.rating : "N/A"}
                     </Text>
-                    <Text style={styles.detailText}>Description:</Text>
+                    <Text style={styles.sectionHeader}>Description</Text>
                     <Text style={styles.descriptionText}>
                       {selectedProduct.description}
                     </Text>
@@ -1186,7 +1186,7 @@ const styles = StyleSheet.create({
   },
   centerModalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.3)",
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -1424,6 +1424,9 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 10,
     right: 10,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    borderRadius: 15,
+    padding: 6,
   },
   detailsModalContent: {
     width: "90%",
@@ -1435,30 +1438,44 @@ const styles = StyleSheet.create({
     position: "relative",
   },
   modalTitle: {
-    fontSize: 20,
-    fontWeight: "700",
+    fontSize: 24,
+    fontWeight: "bold",
     color: "#FFFFFF",
-    marginBottom: 15,
     textAlign: "center",
+    marginBottom: 12,
   },
   descriptionModalContent: {
-    width: "85%",
-    backgroundColor: "#1E1E1E",
+    width: "90%",
+    maxHeight: "80%",
+    backgroundColor: "#2C2C2E",
+    borderRadius: 20,
     padding: 20,
-    borderRadius: 15,
-    alignItems: "center",
-    maxHeight: "70%",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
+    position: "relative",
   },
-  descriptionText: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    lineHeight: 20,
-    textAlign: "center",
+  modalScrollContent: {
+    paddingRight: 10,
+  },
+  sectionHeader: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#F2F2F7",
+    marginTop: 15,
+    marginBottom: 5,
   },
   detailText: {
-    color: "#FFFFFF",
+    fontSize: 16,
+    color: "#E5E5EA",
+    marginBottom: 8,
+  },
+  descriptionText: {
     fontSize: 14,
-    marginBottom: 4,
+    color: "#D1D1D6",
+    lineHeight: 20,
   },
   requestedStoriesContainer: {
     position: "absolute",
