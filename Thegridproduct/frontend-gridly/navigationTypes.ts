@@ -17,7 +17,6 @@ export type CartProduct = {
 export type RootStackParamList = {
   Demo: undefined;
   Login: undefined;
-  Verification: { email: string }; // <-- Added verification route with email param
   Dashboard: undefined;
   AddProduct: undefined;
   AllOrders: undefined;

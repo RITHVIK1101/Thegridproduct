@@ -96,18 +96,7 @@ const VerificationScreen: React.FC = () => {
         lastName: data.lastName,
       });
 
-      // Alert the user and then reset the navigation state so that the Dashboard is loaded.
-      Alert.alert("Success", "Email verified successfully.", [
-        {
-          text: "OK",
-          onPress: () => {
-            navigation.reset({
-              index: 0,
-              routes: [{ name: "Dashboard" }],
-            });
-          },
-        },
-      ]);
+
     } catch (err) {
       setError("An error occurred. Please try again.");
     }

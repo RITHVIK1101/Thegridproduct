@@ -1,5 +1,3 @@
-// Dashboard.tsx
-
 import React, { useState, useEffect, useContext, useRef } from "react";
 import {
   View,
@@ -36,6 +34,13 @@ import BottomNavBar from "./components/BottomNavbar";
 import { NGROK_URL } from "@env";
 import { UserContext } from "./UserContext";
 import { RootStackParamList } from "./navigationTypes";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import TutorialOverlay from "./TutorialOverlay";
+
+const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
+
+const PRODUCT_HEIGHT = SCREEN_HEIGHT - 80; // 60 is the nav bar height
+const NAV_BAR_HEIGHT = 90;
 
 type DashboardProps = {
   route: RouteProp<RootStackParamList, "Dashboard">;
@@ -70,19 +75,10 @@ type CartItem = {
   quantity: number;
 };
 
-// NEW: Type for other people's requested products (backend fields: productName and description)
 type RequestedProduct = {
   productName: string;
   description: string;
 };
-
-const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
-
-// -------------------------------------------------------------------
-// PRODUCT_HEIGHT controls how tall the product image container is.
-// -------------------------------------------------------------------
-const PRODUCT_HEIGHT = SCREEN_HEIGHT - 80; // 60 is the nav bar height
-const NAV_BAR_HEIGHT = 90;
 
 const Dashboard: React.FC<DashboardProps> = () => {
   const {
@@ -94,9 +90,40 @@ const Dashboard: React.FC<DashboardProps> = () => {
     setLikedProducts,
   } = useContext(UserContext);
 
+  // NEW: State to control showing the tutorial overlay.
+  const [showTutorial, setShowTutorial] = useState(false);
+
+  // When userId is available, check a key specific to that user.
+  useEffect(() => {
+    if (userId) {
+      const checkTutorial = async () => {
+        try {
+          const flag = await AsyncStorage.getItem(`tutorialCompleted_${userId}`);
+          if (!flag) {
+            setShowTutorial(true);
+          }
+        } catch (error) {
+          console.error("Error reading tutorial flag:", error);
+        }
+      };
+      checkTutorial();
+    }
+  }, [userId]);
+
+  // When tutorial finishes, set a flag for this user.
+  const handleTutorialFinish = async () => {
+    setShowTutorial(false);
+    try {
+      if (userId) {
+        await AsyncStorage.setItem(`tutorialCompleted_${userId}`, "true");
+      }
+    } catch (error) {
+      console.error("Error saving tutorial flag:", error);
+    }
+  };
+
   // Filters for the filter modal
   const [campusMode, setCampusMode] = useState<"In Campus" | "Both">("Both");
-  // Updated categories with Tickets integrated between MaleClothing and Other.
   const categories = [
     "#Everything",
     "#FemaleClothing",
@@ -379,7 +406,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
       return;
     }
     await fetchCart();
-    // If already in cart, still show success message but don't add again.
     if (cartItems.some((item) => item.productId === product.id)) {
       showSuccess("Added to cart!");
       return;
@@ -502,11 +528,10 @@ const Dashboard: React.FC<DashboardProps> = () => {
         rating: product.rating,
         quality: product.quality,
         availability: product.availability,
-        selectedTags: product.selectedTags || [], // Ensure selectedTags is always an array
+        selectedTags: product.selectedTags || [],
       }));
 
       console.log("Mapped products:", mappedData);
-
       console.log("Current filters - Campus Mode:", campusMode);
       console.log("Current filters - Selected Category:", selectedCategory);
       let filtered = mappedData;
@@ -520,8 +545,8 @@ const Dashboard: React.FC<DashboardProps> = () => {
       }
       let finalFiltered = filtered;
       if (selectedCategory !== "#Everything") {
-        finalFiltered = finalFiltered.filter(
-          (p) => p.selectedTags?.includes(selectedCategory) // ✅ Compare directly
+        finalFiltered = finalFiltered.filter((p) =>
+          p.selectedTags?.includes(selectedCategory)
         );
       }
 
@@ -535,7 +560,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
     }
   };
 
-  // NEW: Fetch other people's requested products from /requests/all and randomly select up to 10
+  // NEW: Fetch requested products from /requests/all
   const fetchRequestedProducts = async () => {
     if (!token) return;
     try {
@@ -552,7 +577,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
       }
       const data: RequestedProduct[] = await response.json();
       if (data && data.length > 0) {
-        // Randomize and pick up to 10 items
         const shuffled = data.sort(() => 0.5 - Math.random());
         const selected = shuffled.slice(0, 10);
         setRequestedProducts(selected);
@@ -562,7 +586,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
     }
   };
 
-  // Reset current product index when products or category changes.
   useEffect(() => {
     if (allProducts.length > 0) {
       let finalFiltered = allProducts;
@@ -584,7 +607,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
     fetchUserInfo();
     setCurrentIndex(0);
     setCurrentImageIndex(0);
-    fetchRequestedProducts(); // NEW: fetch other people's requested products on load
+    fetchRequestedProducts();
   }, [campusMode]);
 
   useFocusEffect(
@@ -596,10 +619,8 @@ const Dashboard: React.FC<DashboardProps> = () => {
   const toggleFilterModal = () =>
     setIsFilterModalVisible(!isFilterModalVisible);
 
-  // Simplified “next product” function.
   const goToNextProduct = () => {
     setIsDescriptionModalVisible(false);
-    // Increment swipe up count and every 3 swipes, re-fetch requested products.
     setSwipeUpCount((prev) => {
       const newCount = prev + 1;
       if (newCount === 3) {
@@ -621,14 +642,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
 
   // ----------------------------------------------------------------
   // ProductItem component using react-native-gesture-handler.
-  // Gestures:
-  // • Pan (swipe):
-  //    - Left: next image (if available)
-  //    - Right: previous image (if available)
-  //    - Up: next product
-  //    - Down: show description (full details)
-  // • Single tap: show description
-  // • Double tap: toggle favorite
   // ----------------------------------------------------------------
   type ProductItemProps = {
     product: Product;
@@ -657,33 +670,24 @@ const Dashboard: React.FC<DashboardProps> = () => {
     currentImageIndex,
     setCurrentImageIndex,
   }) => {
-    // Local state to control inline expansion of the title.
     const [titleExpanded, setTitleExpanded] = useState(false);
-
-    // Reference for double-tap handler.
     const doubleTapRef = useRef<any>(null);
-    // Reduced swipe threshold for more sensitive swipe actions.
     const SWIPE_THRESHOLD = 20;
 
-    // Pan gesture handler.
     const onPanHandlerStateChange = (event: any) => {
       if (event.nativeEvent.state === GestureState.END) {
         const { translationX, translationY } = event.nativeEvent;
         if (Math.abs(translationX) > Math.abs(translationY)) {
-          // Horizontal swipe:
           if (translationX < -SWIPE_THRESHOLD) {
-            // Swipe left: go to next image only if not on the last image.
             if (currentImageIndex < product.images.length - 1) {
               setCurrentImageIndex(currentImageIndex + 1);
             }
           } else if (translationX > SWIPE_THRESHOLD) {
-            // Swipe right: go back to the previous image if available.
             if (currentImageIndex > 0) {
               setCurrentImageIndex(currentImageIndex - 1);
             }
           }
         } else {
-          // Vertical swipe:
           if (translationY < -SWIPE_THRESHOLD) {
             onNextProduct();
           } else if (translationY > SWIPE_THRESHOLD) {
@@ -693,7 +697,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
       }
     };
 
-    // Tap handlers.
     const onSingleTap = () => {
       onShowDescription(product);
     };
@@ -753,7 +756,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
                   backgroundColor: "#000",
                 }}
               >
-                {/* Swipeable image container */}
                 <View
                   style={{
                     flexDirection: "row",
@@ -795,7 +797,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
                     />
                   </View>
                 </View>
-                {/* Mid-screen image indicators */}
                 <View style={styles.midImageIndicatorsContainer}>
                   {product.images.map((_, idx) => (
                     <View
@@ -905,7 +906,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
           colors={["#000000", "#000000"]}
           style={styles.gradientBackground}
         >
-          {/* Top Bar with filter button */}
           <View style={styles.topBar}>
             <TouchableOpacity
               style={styles.topBarIconContainer}
@@ -916,7 +916,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
             </TouchableOpacity>
           </View>
 
-          {/* Requested Products Stories Section */}
           {requestedProducts.length > 0 && (
             <View style={styles.requestedStoriesContainer}>
               <View style={styles.requestedHeader}>
@@ -988,7 +987,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
                 ))}
             </View>
           )}
-          {/* Description Modal with full product details */}
+
           <Modal
             visible={isDescriptionModalVisible}
             animationType="slide"
@@ -1032,7 +1031,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
               </View>
             </TouchableOpacity>
           </Modal>
-          {/* Filter Modal */}
+
           <Modal
             visible={isFilterModalVisible}
             animationType="slide"
@@ -1146,7 +1145,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
               </View>
             </TouchableOpacity>
           </Modal>
-          {/* Success Toast repositioned underneath the image indicators */}
+
           {successMessage !== "" && (
             <Animated.View
               style={[
@@ -1157,9 +1156,13 @@ const Dashboard: React.FC<DashboardProps> = () => {
               <Text style={styles.toastText}>{successMessage}</Text>
             </Animated.View>
           )}
+
           <BottomNavBar />
         </LinearGradient>
       </TouchableWithoutFeedback>
+
+      {/* Tutorial Overlay: Shown only if no tutorial flag exists for this user */}
+      {showTutorial && <TutorialOverlay onFinish={handleTutorialFinish} />}
     </View>
   );
 };
@@ -1457,10 +1460,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginBottom: 4,
   },
-  // Styles for the requested products "stories" section
   requestedStoriesContainer: {
     position: "absolute",
-    top: PRODUCT_HEIGHT / 2 - 280, // shifted up slightly more
+    top: PRODUCT_HEIGHT / 2 - 280,
     left: 0,
     right: 0,
     paddingHorizontal: 10,
