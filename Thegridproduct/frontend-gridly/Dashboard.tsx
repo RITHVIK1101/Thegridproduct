@@ -1027,10 +1027,25 @@ const Dashboard: React.FC<DashboardProps> = () => {
                     <Text style={styles.detailText}>
                       Condition: {selectedProduct.quality || "New"}
                     </Text>
-                    <Text style={styles.detailText}>
-                      Rating:{" "}
-                      {selectedProduct.rating ? selectedProduct.rating : "N/A"}
-                    </Text>
+                    {selectedProduct.rating && selectedProduct.rating > 0 && (
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          marginBottom: 8,
+                        }}
+                      >
+                        <Text style={styles.detailText}>Rating: </Text>
+                        {[...Array(selectedProduct.rating)].map((_, i) => (
+                          <Ionicons
+                            key={i}
+                            name="star"
+                            size={16}
+                            color="#FFD700"
+                          />
+                        ))}
+                      </View>
+                    )}
                     <Text style={styles.sectionHeader}>Description</Text>
                     <Text style={styles.descriptionText}>
                       {selectedProduct.description}
@@ -1202,10 +1217,11 @@ const styles = StyleSheet.create({
   },
   centerModalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    backgroundColor: "transparent", // changed from "rgba(0, 0, 0, 0.7)"
     justifyContent: "center",
     alignItems: "center",
   },
+
   smallToastContainer: {
     position: "absolute",
     top: 10,
