@@ -79,7 +79,7 @@ const fetchFullUserProfile = async (
   const studentType =
     data.studentType && Object.values(StudentType).includes(data.studentType)
       ? (data.studentType as StudentType)
-      : StudentType.University; // Default to "university"
+      : StudentType.University;
 
   return { firstName, lastName, institution, studentType };
 };
@@ -92,7 +92,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   const [lastName, setLastName] = useState<string>("");
   const [institution, setInstitution] = useState<string>("");
   const [studentType, setStudentType] = useState<StudentType | null>(null);
-  const [likedProducts, setLikedProducts] = useState<string[]>([]); // Initialize likedProducts
+  const [likedProducts, setLikedProducts] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   /** Load user data from SecureStore and fetch full profile */
@@ -129,14 +129,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
             "studentType",
             userProfile.studentType
           );
-
-          // Optionally, fetch likedProducts here or elsewhere
-          // Example:
-          // const fetchedLikedProducts = await fetchLikedProductsFromBackend(storedUserId, storedToken);
-          // setLikedProducts(fetchedLikedProducts);
         }
-      } catch (error) {
-        console.error("Error loading user data:", error);
       } finally {
         setIsLoading(false);
       }

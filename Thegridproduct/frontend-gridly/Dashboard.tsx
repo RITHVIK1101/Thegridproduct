@@ -50,6 +50,7 @@ type Product = {
   id: string;
   title: string;
   price: number;
+  outOfCampusPrice?: number;
   description: string;
   category?: string;
   images: string[];
@@ -60,6 +61,8 @@ type Product = {
   quality?: string;
   availability: string;
   selectedTags?: string[];
+  rentPrice?: number;
+  rentDuration?: string;
 };
 
 type User = {
@@ -98,7 +101,9 @@ const Dashboard: React.FC<DashboardProps> = () => {
     if (userId) {
       const checkTutorial = async () => {
         try {
-          const flag = await AsyncStorage.getItem(`tutorialCompleted_${userId}`);
+          const flag = await AsyncStorage.getItem(
+            `tutorialCompleted_${userId}`
+          );
           if (!flag) {
             setShowTutorial(true);
           }
@@ -389,7 +394,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
       if (Array.isArray(data)) {
         const likedProductIds = data.map((product: Product) => product.id);
         setLikedProducts(likedProductIds);
-        console.log("Fetched Liked Products IDs:", likedProductIds);
       } else {
         setLikedProducts([]);
         console.log("No liked products data available");
@@ -515,25 +519,40 @@ const Dashboard: React.FC<DashboardProps> = () => {
         setError(null);
         return;
       }
-      const mappedData: Product[] = data.map((product) => ({
-        id: product._id || product.id || `product-${Math.random()}`,
-        title: product.title,
-        price: product.price,
-        description: product.description,
-        category: product.category,
-        images: product.images,
-        university: product.university,
-        userId: product.userId,
-        postedDate: product.postedDate,
-        rating: product.rating,
-        quality: product.quality,
-        availability: product.availability,
-        selectedTags: product.selectedTags || [],
-      }));
+      const mappedData: Product[] = data.map((product) => {
+        // Log for debugging
+        console.log(
+          "Fetched product:",
+          product.title,
+          "in-campus price:",
+          product.price,
+          "outOfCampusPrice:",
+          product.outOfCampusPrice,
+          "rentPrice:",
+          product.rentPrice,
+          "rentDuration:",
+          product.rentDuration
+        );
+        return {
+          id: product._id || product.id || `product-${Math.random()}`,
+          title: product.title,
+          price: product.price,
+          outOfCampusPrice: product.outOfCampusPrice, // <-- NEW
+          description: product.description,
+          category: product.category,
+          images: product.images,
+          university: product.university,
+          userId: product.userId,
+          postedDate: product.postedDate,
+          rating: product.rating,
+          quality: product.condition, // using condition from backend as quality
+          availability: product.availability,
+          selectedTags: product.selectedTags || [],
+          rentPrice: product.rentPrice,
+          rentDuration: product.rentDuration,
+        };
+      });
 
-      console.log("Mapped products:", mappedData);
-      console.log("Current filters - Campus Mode:", campusMode);
-      console.log("Current filters - Selected Category:", selectedCategory);
       let filtered = mappedData;
       if (campusMode === "In Campus") {
         filtered = mappedData.filter(
@@ -550,7 +569,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
         );
       }
 
-      console.log("Final filtered products (category):", finalFiltered);
       setFilteredProducts(finalFiltered);
       setAllProducts(filtered);
       setError(null);
@@ -723,6 +741,14 @@ const Dashboard: React.FC<DashboardProps> = () => {
         ? actualNextProduct.images[0]
         : "https://via.placeholder.com/150";
 
+    // Determine which price to display:
+    // If the logged-in user's institution (from context) matches the product's university (ignoring case),
+    // use the in-campus price (product.price). Otherwise, use product.outOfCampusPrice if available.
+    const displayPrice =
+      institution.toLowerCase() === product.university.toLowerCase()
+        ? product.price
+        : product.outOfCampusPrice ?? product.price;
+
     return (
       <View
         style={[
@@ -829,7 +855,12 @@ const Dashboard: React.FC<DashboardProps> = () => {
                   </Text>
                 </TouchableOpacity>
                 <Text style={styles.productInfoPrice}>
-                  ${product.price.toFixed(2)}
+                  ${displayPrice.toFixed(2)} /{" "}
+                  {product.rentPrice && product.rentPrice > 0
+                    ? `Renting Price: $${product.rentPrice.toFixed(2)} (${
+                        product.rentDuration || "N/A"
+                      })`
+                    : "Renting Unavailable"}
                 </Text>
               </View>
               <View style={styles.productInfoActions}>
@@ -840,20 +871,9 @@ const Dashboard: React.FC<DashboardProps> = () => {
                 >
                   <Ionicons
                     name={isFavorite ? "heart" : "heart-outline"}
-                    size={20}
+                    size={25}
                     color={isFavorite ? "#FF3B30" : "#FFFFFF"}
                   />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.iconButton}
-                  onPress={() => {
-                    if (currentImageIndex < product.images.length - 1) {
-                      setCurrentImageIndex(currentImageIndex + 1);
-                    }
-                  }}
-                  accessibilityLabel="Next Image"
-                >
-                  <Ionicons name="arrow-forward" size={20} color="#FF3B6F" />
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.iconButton}
@@ -862,7 +882,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
                 >
                   <Ionicons
                     name="information-circle"
-                    size={20}
+                    size={25}
                     color="#FFFFFF"
                   />
                 </TouchableOpacity>
@@ -871,14 +891,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
                   onPress={() => onAddToCart(product)}
                   accessibilityLabel="Add to Cart"
                 >
-                  <Ionicons name="cart" size={20} color="#34C759" />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.iconButton}
-                  onPress={onNextProduct}
-                  accessibilityLabel="Next Product"
-                >
-                  <Ionicons name="close" size={20} color="#FFFFFF" />
+                  <Ionicons name="cart" size={25} color="#34C759" />
                 </TouchableOpacity>
               </View>
             </View>
@@ -1005,7 +1018,9 @@ const Dashboard: React.FC<DashboardProps> = () => {
                     showsVerticalScrollIndicator={false}
                     contentContainerStyle={styles.modalScrollContent}
                   >
-                    <Text style={styles.modalTitle}>{selectedProduct.title}</Text>
+                    <Text style={styles.modalTitle}>
+                      {selectedProduct.title}
+                    </Text>
                     <Text style={styles.detailText}>
                       Price: ${selectedProduct.price.toFixed(2)}
                     </Text>
@@ -1013,7 +1028,8 @@ const Dashboard: React.FC<DashboardProps> = () => {
                       Condition: {selectedProduct.quality || "New"}
                     </Text>
                     <Text style={styles.detailText}>
-                      Rating: {selectedProduct.rating ? selectedProduct.rating : "N/A"}
+                      Rating:{" "}
+                      {selectedProduct.rating ? selectedProduct.rating : "N/A"}
                     </Text>
                     <Text style={styles.sectionHeader}>Description</Text>
                     <Text style={styles.descriptionText}>
