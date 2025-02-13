@@ -9,10 +9,10 @@ import {
   ScrollView,
   Dimensions,
 } from "react-native";
-import LikedProductScreen from "./LikedProductScreen";
 import Icon from "react-native-vector-icons/MaterialIcons";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { NavigationContainer } from "@react-navigation/native";
+import { Image } from "react-native";
 import {
   createStackNavigator,
   StackNavigationOptions,
@@ -180,7 +180,11 @@ const Stack = createStackNavigator<RootStackParamList>();
 
 const HeaderTitleWithLogo: React.FC<{ title: string }> = ({ title }) => (
   <View style={styles.headerTitleContainer}>
-    <Ionicons name="grid-outline" size={20} color="#FFFFFF" />
+    <Image
+      source={require("./assets/logo'no bg.png")} // Logo file
+      style={{ width: 40, height: 40, marginRight: 8 }} // Logo size
+      resizeMode="contain"
+    />
     <Text style={styles.headerTitleText}>{title}</Text>
   </View>
 );
@@ -286,12 +290,7 @@ const AppNavigator: React.FC<AppNavigatorProps> = ({ firstRender }) => {
             component={Dashboard}
             options={({ navigation }) => ({
               headerTransparent: true,
-              headerTitle: () => (
-                <View style={styles.headerTitleContainer}>
-                  <Ionicons name="grid-outline" size={20} color="#FFFFFF" />
-                  <Text style={styles.headerTitleText}>Gridly</Text>
-                </View>
-              ),
+              headerTitle: () => <HeaderTitleWithLogo title="Gridly" />, // Logo here
               headerRight: () =>
                 HeaderRightComponent(navigation, firstName, lastName),
             })}
