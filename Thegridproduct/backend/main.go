@@ -114,6 +114,8 @@ func main() {
 	protected.HandleFunc("/services/{id}", handlers.GetSingleGigHandler).Methods("GET")
 	protected.HandleFunc("/services/{id}", handlers.UpdateGigHandler).Methods("PUT")
 	protected.HandleFunc("/services/{id}", handlers.DeleteGigHandler).Methods("DELETE")
+	protected.HandleFunc("/services/search", handlers.SearchGigsHandler).Methods("POST")
+
 	protected.HandleFunc("/report", handlers.ReportChatHandler).Methods("POST")
 
 	// AI Processing
