@@ -156,6 +156,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
   const CLOUDINARY_URL =
     "https://api.cloudinary.com/v1_1/ds0zpfht9/image/upload";
   const UPLOAD_PRESET = "gridly_preset";
+
   const applyFilter = (
     chatsToFilter: Chat[],
     f: "all" | "products" | "gigs" | "product_request"
@@ -496,6 +497,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       Alert.alert("Error", "An error occurred while selecting an image.");
     }
   };
+
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -862,6 +864,93 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     );
   };
 
+  // Function to delete a chat (triggered by the "X" button)
+  const handleDeleteChat = async () => {
+    if (!selectedChat) return;
+    Alert.alert(
+      "Confirm Delete",
+      "Are you sure you want to delete this chat?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              // Make a DELETE request to your backend endpoint
+              const response = await axios.delete(
+                `https://thegridproduct-production.up.railway.app/chats/${selectedChat.chatID}`,
+                {
+                  headers: {
+                    Authorization: `Bearer ${token}`,
+                  },
+                }
+              );
+              if (response.status === 200) {
+                // Remove the chat from the local state
+                setChats((prevChats) =>
+                  prevChats.filter(
+                    (chat) => chat.chatID !== selectedChat.chatID
+                  )
+                );
+                setChatModalVisible(false);
+                setSelectedChat(null);
+                Alert.alert("Success", "Chat deleted successfully.");
+              }
+            } catch (error: any) {
+              console.error("Error deleting chat:", error);
+              Alert.alert(
+                "Error",
+                error.response?.data?.message || "Failed to delete chat."
+              );
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  // Function to mark a product as sold (or gig as done) when check is tapped
+  const handleMarkAsSold = async () => {
+    if (!selectedChat) return;
+    Alert.alert(
+      "Confirm",
+      "Have you sold the product? It will be removed from the marketplace.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "OK",
+          onPress: async () => {
+            try {
+              // Make a PUT request to update the status
+              const response = await axios.put(
+                `https://thegridproduct-production.up.railway.app/chats/${selectedChat.chatID}/complete`,
+                {},
+                {
+                  headers: {
+                    Authorization: `Bearer ${token}`,
+                    "Content-Type": "application/json",
+                  },
+                }
+              );
+              if (response.status === 200) {
+                Alert.alert("Success", response.data.message);
+                // Optionally, refresh your chat list or update UI to reflect changes
+              }
+            } catch (error: any) {
+              console.error("Error marking as sold/done:", error);
+              Alert.alert(
+                "Error",
+                error.response?.data?.message ||
+                  "Failed to update status of the item."
+              );
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const productsOrGigs = chats.map((c) => ({
     chatID: c.chatID,
     title: c.referenceTitle || "Unnamed Item",
@@ -903,6 +992,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
   const handleFilterPillPress = () => {
     setFilterMenuVisible(true);
   };
+
   const handleReportPress = () => {
     setChatModalVisible(false);
     setTimeout(() => {
@@ -1355,41 +1445,31 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                     {selectedChat?.referenceType === "product" && (
                       <View style={styles.productActionButtons}>
                         <Pressable
-                          onPress={() =>
-                            Alert.alert(
-                              "Confirm",
-                              "Do you want to close the chat with this person?",
-                              [
-                                { text: "Cancel", style: "cancel" },
-                                { text: "OK", onPress: () => {} },
-                              ]
-                            )
-                          }
-                          style={styles.smallActionButton}
+                          onPress={handleDeleteChat}
+                          style={[
+                            styles.smallActionButton,
+                            styles.smallActionButtonClose,
+                          ]}
                           accessibilityLabel="Close Chat"
                         >
                           <Ionicons name="close" size={16} color="#FFFFFF" />
                         </Pressable>
                         <Pressable
-                          onPress={() =>
-                            Alert.alert(
-                              "Confirm",
-                              "Have you sold the product? It will be off the marketplace.",
-                              [
-                                { text: "Cancel", style: "cancel" },
-                                { text: "OK", onPress: () => {} },
-                              ]
-                            )
-                          }
-                          style={styles.smallActionButton}
+                          onPress={handleMarkAsSold}
+                          style={[
+                            styles.smallActionButton,
+                            styles.smallActionButtonCheck,
+                          ]}
                           accessibilityLabel="Mark as Sold"
                         >
-                          <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                          <Ionicons
+                            name="checkmark"
+                            size={16}
+                            color="#FFFFFF"
+                          />
                         </Pressable>
                       </View>
                     )}
-
-                    <View style={styles.chatHeaderBottomLine} />
                   </View>
                 )}
 
@@ -1413,6 +1493,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                     </View>
                   }
                 />
+
                 <View style={styles.inputBarContainer}>
                   <View style={styles.inputBarLine} />
                   <View style={styles.inputContainer}>

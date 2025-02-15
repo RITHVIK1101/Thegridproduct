@@ -24,7 +24,7 @@ import (
 type EnrichedChat struct {
 	ChatID          string `json:"chatID"`
 	ReferenceID     string `json:"referenceId"`
-	ReferenceTitle  string `json:"referenceTitle"` // ✅ Correct field for both products & gigs
+	ReferenceTitle  string `json:"referenceTitle"`
 	ReferenceType   string `json:"referenceType"`
 	User            User   `json:"user"`
 	LatestMessage   string `json:"latestMessage,omitempty"`
@@ -1014,4 +1014,180 @@ func TestSendMessageHandler(w http.ResponseWriter, r *http.Request) {
 		"status": "success",
 	})
 
+}
+
+// DeleteChatHandler deletes a chat room and decrements the chatCount for the referenced item.
+func DeleteChatHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method != http.MethodDelete {
+		WriteJSONError(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Extract chatID from URL parameters.
+	vars := mux.Vars(r)
+	chatIDStr := vars["chatId"]
+	if chatIDStr == "" {
+		WriteJSONError(w, "Chat ID is required", http.StatusBadRequest)
+		return
+	}
+
+	// Convert chatID to ObjectID.
+	chatObjID, err := primitive.ObjectIDFromHex(chatIDStr)
+	if err != nil {
+		WriteJSONError(w, "Invalid Chat ID format", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// --- Step 1: Delete the chat from MongoDB ---
+
+	// Assume chats are stored in the "chats" collection.
+	chatsCol := db.GetCollection("gridlyapp", "chats")
+
+	// Retrieve the chat to get its reference information.
+	var chat models.Chat
+	err = chatsCol.FindOne(ctx, bson.M{"_id": chatObjID}).Decode(&chat)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			WriteJSONError(w, "Chat not found", http.StatusNotFound)
+			return
+		}
+		log.Printf("Error fetching chat: %v", err)
+		WriteJSONError(w, "Error fetching chat", http.StatusInternalServerError)
+		return
+	}
+
+	// Delete the chat document from MongoDB.
+	_, err = chatsCol.DeleteOne(ctx, bson.M{"_id": chatObjID})
+	if err != nil {
+		log.Printf("Error deleting chat from MongoDB: %v", err)
+		WriteJSONError(w, "Error deleting chat", http.StatusInternalServerError)
+		return
+	}
+
+	// --- Step 2: Delete the Firestore chat room ---
+	fsCtx := context.Background()
+	fsClient, err := firestore.NewClient(fsCtx, "gridlychat", option.WithCredentialsJSON(serviceAccountJSON))
+	if err != nil {
+		log.Printf("Failed to create Firestore client: %v", err)
+		WriteJSONError(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	defer fsClient.Close()
+
+	chatDocRef := fsClient.Collection("chatRooms").Doc(chatIDStr)
+	_, err = chatDocRef.Delete(fsCtx)
+	if err != nil {
+		log.Printf("Error deleting Firestore chat room: %v", err)
+		// Not returning error here because the main deletion (MongoDB) succeeded.
+	}
+
+	// --- Step 3: Decrement chatCount for the referenced item ---
+	// The chat document should have ReferenceType and ReferenceID fields.
+	// We update the corresponding collection (products, gigs, or product_requests).
+	var refCollection *mongo.Collection
+	switch chat.ReferenceType {
+	case "product":
+		refCollection = db.GetCollection("gridlyapp", "products")
+	case "gig":
+		refCollection = db.GetCollection("gridlyapp", "gigs")
+	case "product_request":
+		refCollection = db.GetCollection("gridlyapp", "product_requests")
+	default:
+		log.Printf("Unknown referenceType: %s", chat.ReferenceType)
+		// You can choose to continue or return an error; here we simply log.
+	}
+
+	if refCollection != nil {
+		// Decrement chatCount by 1.
+		_, err = refCollection.UpdateOne(ctx,
+			bson.M{"_id": chat.ReferenceID},
+			bson.M{"$inc": bson.M{"chatCount": -1}},
+		)
+		if err != nil {
+			log.Printf("Error updating chatCount for referenceID %s: %v", chat.ReferenceID.Hex(), err)
+			// Not returning error; you might want to notify admin/log for later review.
+		}
+	}
+
+	// Return success response.
+	WriteJSON(w, map[string]string{
+		"message": "Chat deleted successfully",
+	}, http.StatusOK)
+}
+
+// MarkChatCompletedHandler updates the status of the referenced item (product or gig)
+// when the user marks the chat as completed (e.g., by clicking a check button).
+func MarkChatCompletedHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method != http.MethodPut {
+		WriteJSONError(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Extract chat ID from URL parameters.
+	vars := mux.Vars(r)
+	chatIDStr := vars["chatId"]
+	if chatIDStr == "" {
+		WriteJSONError(w, "Chat ID is required", http.StatusBadRequest)
+		return
+	}
+
+	// Convert chatID string to ObjectID.
+	chatObjID, err := primitive.ObjectIDFromHex(chatIDStr)
+	if err != nil {
+		WriteJSONError(w, "Invalid Chat ID format", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Retrieve the chat from the MongoDB "chats" collection.
+	chatsCol := db.GetCollection("gridlyapp", "chats")
+	var chat models.Chat
+	err = chatsCol.FindOne(ctx, bson.M{"_id": chatObjID}).Decode(&chat)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			WriteJSONError(w, "Chat not found", http.StatusNotFound)
+			return
+		}
+		log.Printf("Error retrieving chat: %v", err)
+		WriteJSONError(w, "Error retrieving chat", http.StatusInternalServerError)
+		return
+	}
+
+	// Based on the chat's reference type, select the appropriate collection and new status.
+	var refCollection *mongo.Collection
+	var newStatus string
+
+	switch chat.ReferenceType {
+	case "product":
+		refCollection = db.GetCollection("gridlyapp", "products")
+		newStatus = "sold"
+	case "gig":
+		refCollection = db.GetCollection("gridlyapp", "gigs")
+		newStatus = "done"
+	default:
+		WriteJSONError(w, "Invalid reference type for chat", http.StatusBadRequest)
+		return
+	}
+
+	// Update the status of the referenced item.
+	update := bson.M{"$set": bson.M{"status": newStatus}}
+	_, err = refCollection.UpdateOne(ctx, bson.M{"_id": chat.ReferenceID}, update)
+	if err != nil {
+		log.Printf("Error updating status for reference ID %s: %v", chat.ReferenceID.Hex(), err)
+		WriteJSONError(w, "Error updating status", http.StatusInternalServerError)
+		return
+	}
+
+	WriteJSON(w, map[string]string{
+		"message": fmt.Sprintf("Reference status updated to '%s' successfully", newStatus),
+	}, http.StatusOK)
 }
