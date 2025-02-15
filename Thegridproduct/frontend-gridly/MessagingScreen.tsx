@@ -86,7 +86,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
   const [newMessage, setNewMessage] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
   const [sending, setSending] = useState<boolean>(false);
-  const [isDelivered, setIsDelivered] = useState(false); // Track button press state
 
   // Image Upload states
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
@@ -1343,37 +1342,52 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                       </View>
                     </View>
 
-                    {/* Delivered Button & Flag together */}
-                    <View style={styles.deliveredReportContainer}>
-                      <Pressable
-                        onPress={() => setIsDelivered(true)}
-                        style={[
-                          styles.deliveredFloatingButton,
-                          isDelivered && {
-                            backgroundColor: "#5cb85c",
-                            borderColor: "#5cb85c",
-                          }, // Green when clicked
-                        ]}
-                        accessibilityLabel="Mark Product as Delivered"
-                      >
-                        <Ionicons
-                          name="checkmark-done"
-                          size={20}
-                          color="#fff"
-                        />
-                        <Text style={styles.deliveredFloatingText}>
-                          Delivered
-                        </Text>
-                      </Pressable>
+                    {/* Report Button */}
+                    <Pressable
+                      onPress={handleReportPress}
+                      style={styles.reportButton}
+                      accessibilityLabel="Report User"
+                    >
+                      <Ionicons name="flag" size={24} color="#F08080" />
+                    </Pressable>
 
-                      <Pressable
-                        onPress={handleReportPress}
-                        style={styles.reportButton}
-                        accessibilityLabel="Report User"
-                      >
-                        <Ionicons name="flag" size={24} color="#F08080" />
-                      </Pressable>
-                    </View>
+                    {/* Product Chat Action Buttons (only for product chat rooms) */}
+                    {selectedChat?.referenceType === "product" && (
+                      <View style={styles.productActionButtons}>
+                        <Pressable
+                          onPress={() =>
+                            Alert.alert(
+                              "Confirm",
+                              "Do you want to close the chat with this person?",
+                              [
+                                { text: "Cancel", style: "cancel" },
+                                { text: "OK", onPress: () => {} },
+                              ]
+                            )
+                          }
+                          style={styles.smallActionButton}
+                          accessibilityLabel="Close Chat"
+                        >
+                          <Ionicons name="close" size={16} color="#FFFFFF" />
+                        </Pressable>
+                        <Pressable
+                          onPress={() =>
+                            Alert.alert(
+                              "Confirm",
+                              "Have you sold the product? It will be off the marketplace.",
+                              [
+                                { text: "Cancel", style: "cancel" },
+                                { text: "OK", onPress: () => {} },
+                              ]
+                            )
+                          }
+                          style={styles.smallActionButton}
+                          accessibilityLabel="Mark as Sold"
+                        >
+                          <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                        </Pressable>
+                      </View>
+                    )}
 
                     <View style={styles.chatHeaderBottomLine} />
                   </View>
@@ -1847,29 +1861,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#888888",
     marginRight: 5,
   },
-  deliveredReportContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10, // Adds spacing between the two buttons
-  },
-  deliveredFloatingButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-    borderRadius: 25,
-    borderWidth: 2,
-    borderColor: "#FFFFFF", // White outline
-    backgroundColor: "#000", // Black background initially
-  },
-
-  deliveredFloatingText: {
-    color: "#fff",
-    fontSize: 14,
-    marginLeft: 6,
-    fontWeight: "bold",
-  },
   reportButton: {
     backgroundColor: "#222",
     paddingVertical: 10,
@@ -1878,7 +1869,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-
   lastMessage: {
     fontSize: 14,
     color: "#CCCCCC",
@@ -2118,7 +2108,6 @@ const styles = StyleSheet.create({
     marginBottom: 3,
   },
   requestDate: { fontSize: 12, color: "#AAAAAA", fontFamily: "HelveticaNeue" },
-  reportButton: { marginLeft: 10 },
   reportContent: { flex: 1, padding: 20, backgroundColor: "#000" },
   dropdownContainer: {
     backgroundColor: "#1E1E1E",
@@ -2231,5 +2220,24 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "bold",
     textAlign: "center",
+  },
+  productActionButtons: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginLeft: 10,
+  },
+  smallActionButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 6,
+    justifyContent: "center",
+    alignItems: "center",
+    marginHorizontal: 4,
+  },
+  smallActionButtonClose: {
+    backgroundColor: "#E74C3C", // red for X button
+  },
+  smallActionButtonCheck: {
+    backgroundColor: "#27AE60", // green for check mark button
   },
 });
