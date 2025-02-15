@@ -3,21 +3,19 @@
 import React, { useEffect, useRef } from "react";
 import {
   View,
-  Text,
   Animated,
   StyleSheet,
   Dimensions,
   Platform,
+  Image,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
 
 interface SplashScreenProps {
   onAnimationEnd: () => void;
 }
 
 const ACCENT_COLOR = "#A78BFA"; // Purple accent (same as in LoginScreen)
-const TEXT_COLOR = "#fff";        // White text (for the logo)
-const BG_COLOR = "#0D0D0D";         // Dark background (matches LoginScreen)
+const BG_COLOR = "#0D0D0D";       // Dark background (matches LoginScreen)
 
 const { width, height } = Dimensions.get("window");
 const SPEED_MULTIPLIER = 0.65; // Slightly faster animation
@@ -126,15 +124,15 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onAnimationEnd }) => {
           styles.logoContainer,
           {
             opacity: logoOpacity,
-            transform: [
-              { scale: logoScale },
-              { scale: logoPulse }, // Apply pulsing effect
-            ],
+            transform: [{ scale: logoScale }, { scale: logoPulse }],
           },
         ]}
       >
-        <Ionicons name="grid-outline" size={60} color={ACCENT_COLOR} />
-        <Text style={styles.logoText}>Gridly</Text>
+        <Image
+          source={require("/Users/dhruvreddy/gridly/Thegridproduct/Thegridproduct/frontend-gridly/assets/logo'no bg.png")}
+          style={styles.logoImage}
+          resizeMode="contain"
+        />
       </Animated.View>
 
       {/* Animated Lines */}
@@ -190,16 +188,12 @@ const styles = StyleSheet.create({
     position: "relative",
   },
   logoContainer: {
-    flexDirection: "row",
-    alignItems: "center",
     marginBottom: 40,
   },
-  logoText: {
-    fontSize: 32,
-    fontWeight: "700",
-    color: TEXT_COLOR,
-    marginLeft: 10, // Space between icon and text
-    fontFamily: Platform.OS === "ios" ? "HelveticaNeue-Bold" : "Roboto",
+  // Increased image size for a larger display
+  logoImage: {
+    width: 100,
+    height: 100,
   },
   line: {
     position: "absolute",
