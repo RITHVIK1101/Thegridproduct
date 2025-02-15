@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import {
   View,
   Text,
@@ -6,14 +6,11 @@ import {
   TextInput,
   TouchableOpacity,
   ScrollView,
-  Animated,
-  Easing,
   Modal,
   KeyboardAvoidingView,
   Platform,
   Dimensions,
   Alert,
-  PanResponder,
 } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -43,26 +40,6 @@ interface GigMatch {
   price: string;
   similarity: number;
 }
-
-interface TextMessage {
-  id: string;
-  text: string;
-  role: "user" | "assistant";
-  type: "text";
-}
-
-interface GigMessage {
-  id: string;
-  text: string; // Gig title
-  role: "assistant";
-  type: "gig";
-  gig: GigMatch;
-}
-
-type Message = TextMessage | GigMessage;
-
-// Extend Jobs route params to include preFetchedGigs (optional)
-type JobsScreenRouteProp = RouteProp<RootStackParamList, "Jobs">;
 
 const suggestionPhrases = [
   "I need a logo designer",
@@ -121,7 +98,7 @@ function seededShuffle<T>(array: T[], seed: number): T[] {
   return copy;
 }
 
-// Get today's seed based on the current date (e.g. "2025-02-05")
+// Get today's seed based on the current date (e.g. "20250214")
 function getTodaySeed(): number {
   const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
   return parseInt(today, 10);
@@ -134,21 +111,6 @@ function getFeaturedGigs(gigs: Gig[]): Gig[] {
   const shuffled = seededShuffle(gigs, seed);
   return shuffled.slice(0, Math.min(3, gigs.length));
 }
-
-// Check for greetings in user text.
-const isGreeting = (text: string): boolean => {
-  const greetings = [
-    "hello",
-    "hi",
-    "hey",
-    "good morning",
-    "good afternoon",
-    "good evening",
-    "greetings",
-    "salutations",
-  ];
-  return greetings.some((greet) => text.toLowerCase().includes(greet));
-};
 
 const setValidatedGigs = (
   data: any,
@@ -164,6 +126,7 @@ const setValidatedGigs = (
   }
 };
 
+type JobsScreenRouteProp = RouteProp<RootStackParamList, "Jobs">;
 type JobsScreenNavigationProp = StackNavigationProp<RootStackParamList, "Jobs">;
 
 const JobsScreen: React.FC = () => {
@@ -180,22 +143,9 @@ const JobsScreen: React.FC = () => {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearchBar, setShowSearchBar] = useState(false);
-  const [showAssistant, setShowAssistant] = useState(false);
-  const [hasUserMessaged, setHasUserMessaged] = useState(false);
-  const assistantAnim = useRef(new Animated.Value(0)).current;
   const [currentFilter, setCurrentFilter] = useState("All");
   const [filterMenuVisible, setFilterMenuVisible] = useState<boolean>(false);
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "init1",
-      text: "Hey there! 👋 How can I assist you today?",
-      role: "assistant",
-      type: "text",
-    },
-  ]);
-  const [userInput, setUserInput] = useState("");
 
-  // Only fetch gigs if they were not pre-fetched
   useEffect(() => {
     if (gigs === null) {
       fetchGigs();
@@ -245,166 +195,6 @@ const JobsScreen: React.FC = () => {
     return matchSearch && matchCategory;
   });
 
-  const panResponder = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (evt, gestureState) => {
-        return Math.abs(gestureState.dy) > 10 && Math.abs(gestureState.dx) < 50;
-      },
-      onPanResponderMove: (evt, gestureState) => {},
-      onPanResponderRelease: (evt, gestureState) => {
-        if (gestureState.dy > 100) {
-          toggleAssistant();
-        }
-      },
-    })
-  ).current;
-
-  const toggleAssistant = (callback?: () => void) => {
-    if (showAssistant) {
-      Animated.timing(assistantAnim, {
-        toValue: 0,
-        duration: 300,
-        easing: Easing.ease,
-        useNativeDriver: true,
-      }).start(() => {
-        setShowAssistant(false);
-        if (callback) callback();
-      });
-    } else {
-      setShowAssistant(true);
-      Animated.timing(assistantAnim, {
-        toValue: 1,
-        duration: 300,
-        easing: Easing.ease,
-        useNativeDriver: true,
-      }).start();
-    }
-  };
-
-  const sendMessage = async () => {
-    if (userInput.trim() === "") return;
-    const newUserMessage: TextMessage = {
-      id: Math.random().toString(),
-      text: userInput,
-      role: "user",
-      type: "text",
-    };
-    setMessages((prev) => [...prev, newUserMessage]);
-    setUserInput("");
-    if (isGreeting(userInput)) {
-      const assistantMessage: TextMessage = {
-        id: Math.random().toString(),
-        text: "Hello! 👋 How can I assist you today?",
-        role: "assistant",
-        type: "text",
-      };
-      setMessages((prev) => [...prev, assistantMessage]);
-      return;
-    }
-    try {
-      const aiResponse = await fetch(`${NGROK_URL}/services/search`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ query: userInput }),
-      });
-      if (!aiResponse.ok) {
-        throw new Error(`Failed to process AI request: ${aiResponse.status}`);
-      }
-      const aiData = await aiResponse.json();
-      console.log("AI Response:", aiData);
-      if (Array.isArray(aiData)) {
-        if (aiData.length > 0 && "message" in aiData[0]) {
-          const assistantMessage: TextMessage = {
-            id: Math.random().toString(),
-            text: aiData[0].message,
-            role: "assistant",
-            type: "text",
-          };
-          setMessages((prev) => [...prev, assistantMessage]);
-        } else if (aiData.length > 0 && "id" in aiData[0]) {
-          const gigMessages: GigMessage[] = aiData.map((gig: GigMatch) => ({
-            id: gig.id,
-            text: gig.title,
-            role: "assistant",
-            type: "gig",
-            gig,
-          }));
-          setMessages((prev) => [...prev, ...gigMessages]);
-        } else {
-          const assistantMessage: TextMessage = {
-            id: Math.random().toString(),
-            text: "I encountered an unexpected response. Please try again.",
-            role: "assistant",
-            type: "text",
-          };
-          setMessages((prev) => [...prev, assistantMessage]);
-        }
-      } else {
-        const assistantMessage: TextMessage = {
-          id: Math.random().toString(),
-          text: "I encountered an unexpected response. Please try again.",
-          role: "assistant",
-          type: "text",
-        };
-        setMessages((prev) => [...prev, assistantMessage]);
-      }
-    } catch (error) {
-      console.error(error);
-      const assistantMessage: TextMessage = {
-        id: Math.random().toString(),
-        text: "Something went wrong. Please try again later.",
-        role: "assistant",
-        type: "text",
-      };
-      setMessages((prev) => [...prev, assistantMessage]);
-    }
-  };
-
-  const sendMessageWithSuggestion = (suggestion: string) => {
-    const newUserMessage: TextMessage = {
-      id: Math.random().toString(),
-      text: suggestion,
-      role: "user",
-      type: "text",
-    };
-    setMessages((prev) => [...prev, newUserMessage]);
-    setUserInput("");
-    if (!hasUserMessaged) {
-      setHasUserMessaged(true);
-    }
-    setTimeout(() => {
-      const assistantReplies = [
-        "Awesome! Could you tell me more about the category or field you're interested in?",
-        "Great. Any specific deadline or timeframe?",
-        "Got it. What's your budget range?",
-        "Perfect! I'll find some gigs that match your needs.",
-      ];
-      const userMessagesCount =
-        messages.filter((m) => m.role === "user").length + 1;
-      let responseText = "Let me think...";
-      if (userMessagesCount <= assistantReplies.length) {
-        responseText = assistantReplies[userMessagesCount - 1];
-      } else {
-        responseText = "Alright! Let me find some matches for you. One sec...";
-      }
-      const newAssistantMessage: TextMessage = {
-        id: Math.random().toString(),
-        text: responseText,
-        role: "assistant",
-        type: "text",
-      };
-      setMessages((prev) => [...prev, newAssistantMessage]);
-    }, 1000);
-  };
-
-  const handleSuggestionPress = (suggestion: string) => {
-    setUserInput(suggestion);
-    sendMessageWithSuggestion(suggestion);
-  };
-
   const toggleSearchBar = () => {
     setShowSearchBar(!showSearchBar);
   };
@@ -418,39 +208,39 @@ const JobsScreen: React.FC = () => {
     return desc.slice(0, length) + "...";
   };
 
-  const opacity = assistantAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 1],
-  });
-  const translateY = assistantAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [50, 0],
-  });
-
   return (
     <View style={styles.container}>
-      {/* Header Section */}
+      {/* Header with Title, Search & Filter Icons */}
       <View style={styles.headerContainer}>
         <Text style={styles.headerTitle}>Explore Services</Text>
-        <TouchableOpacity
-          style={styles.filterButton}
-          onPress={() => setFilterMenuVisible(true)}
-          accessibilityLabel="Filter Options"
-        >
-          <Ionicons
-            name="filter-outline"
-            size={20}
-            color="#BB86FC"
-            style={{ marginRight: 5 }}
-          />
-          <Text style={styles.filterButtonText}>{currentFilter}</Text>
-          {currentFilter !== "All" && (
-            <Ionicons name="close-circle" size={18} color="#BB86FC" />
-          )}
-        </TouchableOpacity>
+        <View style={styles.headerIcons}>
+          <TouchableOpacity onPress={toggleSearchBar} style={styles.headerIconButton}>
+            <Ionicons
+              name={showSearchBar ? "close" : "search-outline"}
+              size={24}
+              color="#BB86FC"
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.filterButton}
+            onPress={() => setFilterMenuVisible(true)}
+            accessibilityLabel="Filter Options"
+          >
+            <Ionicons
+              name="filter-outline"
+              size={20}
+              color="#BB86FC"
+              style={{ marginRight: 5 }}
+            />
+            <Text style={styles.filterButtonText}>{currentFilter}</Text>
+            {currentFilter !== "All" && (
+              <Ionicons name="close-circle" size={18} color="#BB86FC" />
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
 
-      {/* Search Bar */}
+      {/* Expanded Search Bar */}
       {showSearchBar && (
         <View style={styles.searchBarContainer}>
           <Ionicons
@@ -510,7 +300,6 @@ const JobsScreen: React.FC = () => {
         </TouchableOpacity>
       </Modal>
 
-      {/* Main Content Scroll */}
       <ScrollView
         contentContainerStyle={styles.scrollContainer}
         showsVerticalScrollIndicator={false}
@@ -557,17 +346,10 @@ const JobsScreen: React.FC = () => {
         {/* All Services */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>All Services</Text>
-          <TouchableOpacity onPress={toggleSearchBar}>
-            <Ionicons
-              name={showSearchBar ? "close" : "search-outline"}
-              size={24}
-              color="#BB86FC"
-            />
-          </TouchableOpacity>
         </View>
 
-        {randomGigs.length > 0 ? (
-          randomGigs.map((gig) => {
+        {filteredGigs.length > 0 ? (
+          filteredGigs.map((gig) => {
             const displayedPrice = getDisplayedPrice(gig.price);
             return (
               <TouchableOpacity
@@ -594,11 +376,7 @@ const JobsScreen: React.FC = () => {
                     </Text>
                     <Text style={styles.gigPrice}>${displayedPrice}</Text>
                   </View>
-                  <Ionicons
-                    name="chevron-forward"
-                    size={20}
-                    color="#BB86FC"
-                  />
+                  <Ionicons name="chevron-forward" size={20} color="#BB86FC" />
                 </View>
               </TouchableOpacity>
             );
@@ -612,158 +390,6 @@ const JobsScreen: React.FC = () => {
 
       {/* Bottom Navbar */}
       <BottomNavBar />
-
-      {/* Floating "Find a Job" Button */}
-      <TouchableOpacity
-        activeOpacity={0.9}
-        style={styles.fab}
-        onPress={toggleAssistant}
-      >
-        <LinearGradient
-          colors={["rgb(168, 237, 234)", "rgb(254, 214, 227)"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.fabGradient}
-        >
-          <Text style={styles.fabText}>Find a Job</Text>
-        </LinearGradient>
-      </TouchableOpacity>
-
-      {/* AI Assistant Modal */}
-      <Modal visible={showAssistant} transparent animationType="fade">
-        <KeyboardAvoidingView
-          style={styles.modalContainer}
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-        >
-          <Animated.View style={[styles.assistantModalOverlay, { opacity }]} />
-          <Animated.View
-            {...panResponder.panHandlers}
-            style={[
-              styles.assistantModal,
-              { transform: [{ translateY }], opacity },
-            ]}
-          >
-            <View style={styles.assistantHeader}>
-              <Text style={styles.assistantHeaderText}>AI Assistant</Text>
-              <TouchableOpacity onPress={() => toggleAssistant()}>
-                <Ionicons
-                  name="close"
-                  size={28}
-                  color="#FFFFFF"
-                  style={{ paddingLeft: 10 }}
-                />
-              </TouchableOpacity>
-            </View>
-            <View style={styles.chatContainer}>
-              <ScrollView
-                contentContainerStyle={styles.chatContent}
-                showsVerticalScrollIndicator={false}
-              >
-                {!hasUserMessaged && (
-                  <View style={styles.initialSuggestionsContainer}>
-                    <ScrollView
-                      horizontal
-                      showsHorizontalScrollIndicator={false}
-                      contentContainerStyle={styles.initialSuggestionsScroll}
-                    >
-                      {suggestionPhrases.map((phrase) => (
-                        <TouchableOpacity
-                          key={phrase}
-                          style={styles.initialSuggestionCard}
-                          onPress={() => handleSuggestionPress(phrase)}
-                          activeOpacity={0.8}
-                        >
-                          <Text style={styles.initialSuggestionText}>
-                            {phrase}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </ScrollView>
-                  </View>
-                )}
-                {messages.map((msg) => (
-                  <View
-                    key={msg.id}
-                    style={[
-                      styles.messageBubble,
-                      msg.role === "assistant"
-                        ? styles.assistantBubble
-                        : styles.userBubble,
-                    ]}
-                  >
-                    {msg.type === "gig" && (msg as GigMessage).gig ? (
-                      <TouchableOpacity
-                        style={styles.chatGigCard}
-                        onPress={() => {
-                          toggleAssistant(() => {
-                            navigation.navigate("JobDetail", {
-                              jobId: (msg as GigMessage).gig.id,
-                            });
-                          });
-                        }}
-                        activeOpacity={0.8}
-                      >
-                        <Text style={styles.gigTitle}>
-                          {(msg as GigMessage).gig.title}
-                        </Text>
-                        <View style={styles.gigCategoryRow}>
-                          <Ionicons
-                            name={
-                              categoryIcons[(msg as GigMessage).gig.category] ||
-                              "grid-outline"
-                            }
-                            size={16}
-                            color="#BB86FC"
-                            style={{ marginRight: 6 }}
-                          />
-                          <Text style={styles.gigCategory}>
-                            {(msg as GigMessage).gig.category}
-                          </Text>
-                        </View>
-                        <Text style={styles.gigDescription}>
-                          {truncateDescription(
-                            (msg as GigMessage).gig.description,
-                            60
-                          )}
-                        </Text>
-                        <Text style={styles.gigPrice}>
-                          ${getDisplayedPrice((msg as GigMessage).gig.price)}
-                        </Text>
-                      </TouchableOpacity>
-                    ) : (
-                      <Text
-                        style={[
-                          styles.messageText,
-                          msg.role === "assistant"
-                            ? styles.assistantText
-                            : styles.userText,
-                        ]}
-                      >
-                        {msg.text}
-                      </Text>
-                    )}
-                  </View>
-                ))}
-              </ScrollView>
-              <View style={styles.inputArea}>
-                <TextInput
-                  style={styles.chatInput}
-                  placeholder="How can I help you?"
-                  placeholderTextColor="#888"
-                  value={userInput}
-                  onChangeText={setUserInput}
-                />
-                <TouchableOpacity
-                  style={styles.sendButton}
-                  onPress={sendMessage}
-                >
-                  <Ionicons name="send" size={20} color="#FFFFFF" />
-                </TouchableOpacity>
-              </View>
-            </View>
-          </Animated.View>
-        </KeyboardAvoidingView>
-      </Modal>
     </View>
   );
 };
@@ -792,6 +418,13 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#FFFFFF",
   },
+  headerIcons: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  headerIconButton: {
+    marginRight: 12,
+  },
   filterButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -810,7 +443,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#0B0B0B",
     marginHorizontal: 16,
-    marginTop: 6,
+    marginVertical: 8,
     borderRadius: 25,
     paddingHorizontal: 15,
     paddingVertical: 8,
@@ -917,131 +550,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 40,
   },
-  fab: {
-    position: "absolute",
-    bottom: 110,
-    right: 20,
-    width: 120,
-    height: 48,
-    borderRadius: 24,
-    overflow: "hidden",
-    elevation: 5,
-    shadowColor: "#000",
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-  },
-  fabGradient: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 10,
-  },
-  fabText: {
-    color: "#000",
-    fontSize: 15,
-    fontWeight: "600",
-  },
-  modalContainer: {
-    flex: 1,
-    justifyContent: "flex-end",
-  },
-  assistantModalOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "#000000AA",
-  },
-  assistantModal: {
-    backgroundColor: "#0B0B0B",
-    height: "85%",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    overflow: "hidden",
-  },
-  assistantHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingTop: Platform.OS === "ios" ? 36 : 10,
-    paddingBottom: 6,
-    paddingHorizontal: 16,
-    backgroundColor: "#BB86FC",
-  },
-  assistantHeaderText: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#FFFFFF",
-  },
-  chatContainer: {
-    flex: 1,
-    paddingHorizontal: 12,
-    paddingTop: 10,
-  },
-  chatContent: {
-    paddingBottom: 80,
-  },
-  initialSuggestionsContainer: {
-    marginBottom: 16,
-    alignItems: "center",
-  },
-  initialSuggestionsScroll: {
-    paddingHorizontal: 10,
-  },
-  initialSuggestionCard: {
-    backgroundColor: "#BB86FC",
-    borderRadius: 20,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    marginRight: 10,
-  },
-  initialSuggestionText: {
-    color: "#FFFFFF",
-    fontSize: 13,
-  },
-  messageBubble: {
-    padding: 10,
-    borderRadius: 16,
-    marginBottom: 10,
-    maxWidth: "80%",
-  },
-  assistantBubble: {
-    backgroundColor: "#1A1A1A",
-    alignSelf: "flex-start",
-  },
-  userBubble: {
-    backgroundColor: "#BB86FC",
-    alignSelf: "flex-end",
-  },
-  messageText: {
-    fontSize: 14,
-  },
-  assistantText: {
-    color: "#FFFFFF",
-  },
-  userText: {
-    color: "#FFFFFF",
-  },
-  inputArea: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#1A1A1A",
-    borderRadius: 25,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    position: "absolute",
-    bottom: 20,
-    left: 12,
-    right: 12,
-  },
-  chatInput: {
-    flex: 1,
-    color: "#FFFFFF",
-    fontSize: 14,
-  },
-  sendButton: {
-    backgroundColor: "#BB86FC",
-    borderRadius: 20,
-    padding: 8,
-    marginLeft: 8,
-  },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.3)",
@@ -1067,16 +575,5 @@ const styles = StyleSheet.create({
   filterModalOptionText: {
     fontSize: 14,
     color: "#FFFFFF",
-  },
-  chatGigCard: {
-    backgroundColor: "#1A1A1A",
-    borderRadius: 12,
-    padding: 12,
-    marginVertical: 5,
-    width: width * 0.7,
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
   },
 });
