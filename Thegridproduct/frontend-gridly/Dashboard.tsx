@@ -915,17 +915,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
                 </TouchableOpacity>
               </View>
             </View>
-            <View style={styles.imageIndicatorsContainer}>
-              {product.images.map((_, idx) => (
-                <View
-                  key={idx}
-                  style={[
-                    styles.imageIndicatorDot,
-                    idx === currentImageIndex && styles.imageIndicatorDotActive,
-                  ]}
-                />
-              ))}
-            </View>
+
           </>
         )}
       </View>
