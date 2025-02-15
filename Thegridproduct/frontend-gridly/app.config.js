@@ -6,7 +6,7 @@ export default {
     slug: "your-app-slug",
     version: "1.0.0",
     orientation: "portrait",
-    icon: "./assets/icon.png",
+    icon: "./assets/icon.jpg",
     splash: {
       image: "./assets/splash.png",
       resizeMode: "contain",
