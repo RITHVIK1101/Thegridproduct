@@ -33,6 +33,7 @@ import DropDownPicker from "react-native-dropdown-picker";
 import { collegeList, College } from "./data/collegeList";
 import { highSchoolList, HighSchool } from "./data/highschoolList";
 import { Ionicons } from "@expo/vector-icons";
+
 console.log("Backend URL:", NGROK_URL);
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, "Login">;
@@ -68,7 +69,8 @@ const LoginScreen: React.FC = () => {
   // Animations
   const formOpacity = useRef(new Animated.Value(0)).current;
   const headerScale = useRef(new Animated.Value(0.8)).current;
-  const spinAnim = useRef(new Animated.Value(0)).current;
+  // Removed spinAnim and replace with headerBounceAnim
+  const headerBounceAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     // Reset form fields when toggling between login and signup
@@ -101,21 +103,24 @@ const LoginScreen: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    // Animate the icon spinning indefinitely
+    // Animate the header logo bouncing indefinitely
     Animated.loop(
-      Animated.timing(spinAnim, {
-        toValue: 1,
-        duration: 10000,
-        useNativeDriver: true,
-        easing: Easing.linear,
-      })
+      Animated.sequence([
+        Animated.timing(headerBounceAnim, {
+          toValue: 1.3,
+          duration: 500,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(headerBounceAnim, {
+          toValue: 1,
+          duration: 500,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ])
     ).start();
-  }, [spinAnim]);
-
-  const spin = spinAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["0deg", "360deg"],
-  });
+  }, [headerBounceAnim]);
 
   const toggleForm = () => {
     setIsLogin(!isLogin);
@@ -141,12 +146,10 @@ const LoginScreen: React.FC = () => {
       const contentType = response.headers.get("content-type");
 
       if (!response.ok) {
-        // If it's a login request and fails, show a generic incorrect credentials message
         if (url === "/login") {
           setError("Incorrect email or password.");
           return null;
         } else {
-          // For signup or other requests, show the error from the server if available
           const errorText = await response.text();
           setError(errorText || "An error occurred. Please try again.");
           return null;
@@ -224,7 +227,7 @@ const LoginScreen: React.FC = () => {
       await SecureStore.setItemAsync("userId", userId.toString());
 
       await saveUserData(token, userId, institution, mappedStudentType);
-      navigation.navigate("Dashboard"); // Navigate to the main screen
+      navigation.navigate("Dashboard");
     }
   };
 
@@ -263,7 +266,6 @@ const LoginScreen: React.FC = () => {
     const data = await handleApiRequest("/signup", payload);
 
     if (data) {
-      // Navigate to the verification screen and pass the email for reference
       navigation.navigate("Verification", { email });
     }
   };
@@ -495,16 +497,18 @@ const LoginScreen: React.FC = () => {
             keyboardShouldPersistTaps="handled"
           >
             <View style={styles.innerContainer}>
-              {/* Animated Header */}
+              {/* Animated Header with bouncing logo */}
               <Animated.View
                 style={[
                   styles.headerContainer,
                   { transform: [{ scale: headerScale }] },
                 ]}
               >
-                <Animated.View style={{ transform: [{ rotate: spin }] }}>
-                  <Ionicons name="grid-outline" size={42} color="#A78BFA" />
-                </Animated.View>
+                <Animated.Image
+                  source={require("/Users/dhruvreddy/gridly/Thegridproduct/Thegridproduct/frontend-gridly/assets/logo'no bg.png")}
+                  style={[styles.logoIcon, { transform: [{ scale: headerBounceAnim }] }]}
+                  resizeMode="contain"
+                />
                 <Text style={styles.title}>Gridly</Text>
               </Animated.View>
               <Text style={styles.slogan}>
@@ -601,6 +605,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginBottom: 10,
+  },
+  // Updated style for the bouncing logo image.
+  logoIcon: {
+    width: 42, // Increase these values to manually enlarge the logo
+    height: 42,
   },
   title: {
     fontSize: 34,
