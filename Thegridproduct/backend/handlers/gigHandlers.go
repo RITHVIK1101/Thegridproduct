@@ -223,7 +223,26 @@ func SearchGigsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse user query
+	// 1️⃣ Retrieve authenticated user details
+	userID, ok := r.Context().Value(userIDKey).(string)
+	if !ok || userID == "" {
+		WriteJSONError(w, "User not authenticated", http.StatusUnauthorized)
+		return
+	}
+
+	userObjID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		WriteJSONError(w, "Invalid user ID", http.StatusBadRequest)
+		return
+	}
+
+	university, ok := r.Context().Value(userInstitution).(string)
+	if !ok || university == "" {
+		WriteJSONError(w, "User university information missing", http.StatusUnauthorized)
+		return
+	}
+
+	// 2️⃣ Parse user query
 	var req struct {
 		Query string `json:"query"`
 	}
@@ -232,7 +251,6 @@ func SearchGigsHandler(w http.ResponseWriter, r *http.Request) {
 		WriteJSONError(w, "Invalid input format", http.StatusBadRequest)
 		return
 	}
-
 	cleanedQuery := strings.TrimSpace(req.Query)
 	if cleanedQuery == "" {
 		WriteJSONError(w, "Query is required", http.StatusBadRequest)
@@ -241,57 +259,55 @@ func SearchGigsHandler(w http.ResponseWriter, r *http.Request) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+
 	refinedQuery, err := RefineQueryWithPrompt(cleanedQuery)
 	if err != nil {
 		log.Printf("Error refining query with GPT: %v", err)
 		WriteJSONError(w, "Error processing query", http.StatusInternalServerError)
 		return
 	}
+	log.Printf("🔍 Refined Query from GPT: %s", refinedQuery)
 
-	log.Printf("Refined Query from GPT: %s", refinedQuery)
-	filter := bson.M{"embeddings": bson.M{"$exists": true}}
-
-	lowerRefined := strings.ToLower(refinedQuery)
-
-	if strings.Contains(lowerRefined, "open to communication") ||
-		strings.Contains(lowerRefined, "negotiable") ||
-		strings.Contains(lowerRefined, "discuss price") {
-		// Case-insensitive regex
-		filter["price"] = bson.M{"$regex": "open to communication|negotiable", "$options": "i"}
+	// 3️⃣ Apply the filter to restrict gigs to those visible to the user
+	filter := bson.M{
+		"status":  "active",
+		"expired": false,
+		"userId":  bson.M{"$ne": userObjID}, // Exclude user's own gigs
+		"requestedBy": bson.M{
+			"$nin": []primitive.ObjectID{userObjID}, // Exclude gigs already requested by user
+		},
+		"$or": []bson.M{
+			{"campusPresence": "flexible"},                           // Include all "flexible" gigs
+			{"campusPresence": "inCampus", "university": university}, // Include "inCampus" gigs from the same university
+		},
+		"embeddings": bson.M{"$exists": true}, // Ensure embeddings exist
 	}
 
-	if strings.Contains(lowerRefined, "30 dollars an hour") ||
-		strings.Contains(lowerRefined, "$30/hour") {
-		filter["price"] = "30 dollars an hour"
-	}
-
-	// EXCLUDE "academic" gigs if user specifically said "non-academic"
-	if strings.Contains(lowerRefined, "non academic") ||
-		strings.Contains(lowerRefined, "non-academic") {
-		filter["category"] = bson.M{"$ne": "Academic"}
-	}
+	// 4️⃣ Get the query embedding
 	queryEmbedding, err := embeddings.GetEmbeddingForText(ctx, refinedQuery)
 	if err != nil {
-		log.Printf("Error generating query embedding: %v", err)
+		log.Printf("❌ Error generating query embedding: %v", err)
 		WriteJSONError(w, "Error generating query embedding", http.StatusInternalServerError)
 		return
 	}
+
+	// 5️⃣ Fetch only the gigs that match the filter
 	collection := db.GetCollection("gridlyapp", "gigs")
 	cursor, err := collection.Find(
 		ctx,
 		filter,
 		options.Find().SetProjection(bson.M{
 			"_id":         1,
+			"userId":      1, // ✅ Keep userId in response
 			"title":       1,
 			"description": 1,
 			"embeddings":  1,
 			"price":       1,
 			"category":    1,
-			// add any other fields you want to return
 		}),
 	)
 	if err != nil {
-		log.Printf("Error fetching gigs: %v", err)
+		log.Printf("❌ Error fetching gigs: %v", err)
 		WriteJSONError(w, "Error fetching gigs", http.StatusInternalServerError)
 		return
 	}
@@ -299,6 +315,7 @@ func SearchGigsHandler(w http.ResponseWriter, r *http.Request) {
 
 	type GigMinimal struct {
 		ID          primitive.ObjectID `bson:"_id" json:"id"`
+		UserID      primitive.ObjectID `bson:"userId" json:"userId"`
 		Title       string             `bson:"title" json:"title"`
 		Description string             `bson:"description" json:"description"`
 		Embeddings  []float32          `bson:"embeddings"`
@@ -308,13 +325,17 @@ func SearchGigsHandler(w http.ResponseWriter, r *http.Request) {
 
 	var gigs []GigMinimal
 	if err := cursor.All(ctx, &gigs); err != nil {
-		log.Printf("Error decoding gigs: %v", err)
+		log.Printf("❌ Error decoding gigs: %v", err)
 		WriteJSONError(w, "Error decoding gigs", http.StatusInternalServerError)
 		return
 	}
 
+	// ✅ Debugging: Log how many gigs were retrieved after applying the filter
+	log.Printf("📊 Retrieved %d gigs matching the visibility filter", len(gigs))
+
 	type GigMatch struct {
 		ID          primitive.ObjectID `json:"id"`
+		UserID      primitive.ObjectID `json:"userId"`
 		Title       string             `json:"title"`
 		Description string             `json:"description"`
 		Price       string             `json:"price"`
@@ -326,9 +347,13 @@ func SearchGigsHandler(w http.ResponseWriter, r *http.Request) {
 	for _, gig := range gigs {
 		similarity := computeCosineSimilarity(queryEmbedding, gig.Embeddings)
 
-		if similarity >= 0.8 {
+		// ✅ Debugging: Log similarity scores
+		log.Printf("🔍 Gig: %s | Similarity: %f", gig.Title, similarity)
+
+		if similarity >= 0.6 { // Adjusted similarity threshold for debugging
 			matches = append(matches, GigMatch{
 				ID:          gig.ID,
+				UserID:      gig.UserID,
 				Title:       gig.Title,
 				Description: gig.Description,
 				Price:       gig.Price,
@@ -338,23 +363,18 @@ func SearchGigsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Sort by similarity descending
+	// Sort by similarity
 	sort.Slice(matches, func(i, j int) bool {
 		return matches[i].Similarity > matches[j].Similarity
 	})
 
-	// Limit to top 5 results (adjust as needed)
+	// Limit to top 5 results
 	if len(matches) > 5 {
 		matches = matches[:5]
 	}
 
-	// --------------------------------------------------------------------------
-	// 6) Handle no matches scenario
-	// --------------------------------------------------------------------------
 	if len(matches) == 0 {
-		// Instead of just returning a “no gigs found” message,
-		// you could optionally use GPT again to ask the user clarifying questions.
-		// For simplicity, we’re returning a prompt here:
+		log.Println("⚠️ No gigs matched the query after similarity check.")
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode([]map[string]interface{}{
 			{
@@ -367,6 +387,7 @@ func SearchGigsHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(matches)
 }
+
 func RefineQueryWithPrompt(userQuery string) (string, error) {
 	client := openai.NewClient(os.Getenv("OPENAI_API_KEY"))
 

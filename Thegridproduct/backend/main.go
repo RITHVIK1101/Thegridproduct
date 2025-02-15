@@ -117,16 +117,12 @@ func main() {
 	protected.HandleFunc("/services/search", handlers.SearchGigsHandler).Methods("POST")
 
 	protected.HandleFunc("/report", handlers.ReportChatHandler).Methods("POST")
-
-	// AI Processing
 	protected.HandleFunc("/ai/process", handlers.ProcessAIInput).Methods("POST")
 
-	// Not Found Handler
 	router.NotFoundHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		handlers.WriteJSONError(w, "Endpoint not found", http.StatusNotFound)
 	})
 
-	// Start the server with graceful shutdown
 	port := getEnv("PORT", "8080")
 	server := &http.Server{
 		Addr:    fmt.Sprintf(":%s", port),
