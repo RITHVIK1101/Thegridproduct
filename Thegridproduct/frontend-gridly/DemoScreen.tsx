@@ -18,6 +18,7 @@ import {
   ScrollView,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import { BlurView } from "expo-blur";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "./navigationTypes";
 
@@ -96,7 +97,7 @@ interface SlideItemProps {
 
 /**
  * SlideItem component with parallax effect and an animated custom image.
- * When the slide is active, the image now bounces (pops) between scale 1 and 1.3.
+ * When the slide is active, the image bounces (pops) between scale 1 and 1.3.
  */
 const SlideItem: FC<SlideItemProps> = memo(
   ({ slide, index, scrollX, slideWidth, active, trigger }) => {
@@ -192,6 +193,7 @@ interface DemoScreenProps {
  */
 const DemoScreen: FC<DemoScreenProps> = ({ navigation }) => {
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [showFounders, setShowFounders] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const scrollX = useRef(new Animated.Value(0)).current;
 
@@ -223,6 +225,14 @@ const DemoScreen: FC<DemoScreenProps> = ({ navigation }) => {
           { transform: [{ scale: bgScale }, { rotate: bgRotate }] },
         ]}
       />
+
+      {/* Founders Button (no background container) */}
+      <TouchableOpacity
+        style={styles.foundersButton}
+        onPress={() => setShowFounders(true)}
+      >
+        <Text style={styles.foundersButtonText}>Founders</Text>
+      </TouchableOpacity>
 
       {/* Skip Button */}
       <TouchableOpacity
@@ -276,6 +286,21 @@ const DemoScreen: FC<DemoScreenProps> = ({ navigation }) => {
           </Text>
         </TouchableOpacity>
       </View>
+
+      {/* Founders Popup with background blur */}
+      {showFounders && (
+        <View style={styles.foundersModal}>
+          <BlurView intensity={120} tint="dark" style={StyleSheet.absoluteFill} />
+          <View style={styles.foundersContent}>
+            <Text style={styles.foundersTitle}>Founders</Text>
+            <Text style={styles.foundersEmail}>dhruvreddy05@gmail.com</Text>
+            <Text style={styles.foundersEmail}>rithviksaba@gmail.com</Text>
+            <TouchableOpacity onPress={() => setShowFounders(false)}>
+              <Text style={styles.closeButtonText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
     </LinearGradient>
   );
 };
@@ -308,6 +333,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
   },
+  foundersButton: {
+    position: "absolute",
+    top: 50,
+    left: 20,
+    zIndex: 10,
+    padding: 10,
+    // Removed backgroundColor and borderRadius for a transparent look
+  },
+  foundersButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
+  },
   sliderContainer: {
     flex: 8,
   },
@@ -320,7 +358,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 20,
   },
-  // Adjusted iconWrapper for the custom image
   iconWrapper: {
     marginBottom: 20,
     width: 48,
@@ -378,5 +415,40 @@ const styles = StyleSheet.create({
     color: "#000000",
     fontSize: 16,
     fontWeight: "600",
+  },
+  // Founders Popup styles
+  foundersModal: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    // The BlurView (with a dark tint) covers the background
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 20,
+    paddingHorizontal: 20,
+  },
+  foundersContent: {
+    alignItems: "center",
+  },
+  foundersTitle: {
+    fontSize: 28,
+    fontWeight: "700",
+    color: "#FFFFFF",
+    marginBottom: 10,
+    textAlign: "center",
+  },
+  foundersEmail: {
+    fontSize: 18,
+    color: "#FFFFFF",
+    marginVertical: 5,
+    textAlign: "center",
+  },
+  closeButtonText: {
+    fontSize: 16,
+    color: "#BB86FC",
+    marginTop: 20,
+    textAlign: "center",
   },
 });
