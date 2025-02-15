@@ -14,6 +14,7 @@ import {
   TouchableWithoutFeedback,
   Keyboard,
   Platform,
+  ScrollView as RNScrollView,
 } from "react-native";
 import {
   ScrollView,
@@ -38,9 +39,18 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import TutorialOverlay from "./TutorialOverlay";
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
-
-const PRODUCT_HEIGHT = SCREEN_HEIGHT - 80; // 60 is the nav bar height
+const PRODUCT_HEIGHT = SCREEN_HEIGHT - 80; // minus nav bar height
 const NAV_BAR_HEIGHT = 90;
+
+/* ---------- Helper: Fisher–Yates Shuffle ---------- */
+function shuffleArray<T>(array: T[]): T[] {
+  const copy = array.slice();
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
 
 type DashboardProps = {
   route: RouteProp<RootStackParamList, "Dashboard">;
@@ -93,41 +103,32 @@ const Dashboard: React.FC<DashboardProps> = () => {
     setLikedProducts,
   } = useContext(UserContext);
 
-  // NEW: State to control showing the tutorial overlay.
+  // --- Tutorial Overlay State ---
   const [showTutorial, setShowTutorial] = useState(false);
-
-  // When userId is available, check a key specific to that user.
   useEffect(() => {
     if (userId) {
-      const checkTutorial = async () => {
-        try {
-          const flag = await AsyncStorage.getItem(
-            `tutorialCompleted_${userId}`
-          );
+      AsyncStorage.getItem(`tutorialCompleted_${userId}`)
+        .then((flag) => {
           if (!flag) {
             setShowTutorial(true);
           }
-        } catch (error) {
-          console.error("Error reading tutorial flag:", error);
-        }
-      };
-      checkTutorial();
+        })
+        .catch((error) => console.error("Error reading tutorial flag:", error));
     }
   }, [userId]);
 
-  // When tutorial finishes, set a flag for this user.
   const handleTutorialFinish = async () => {
     setShowTutorial(false);
-    try {
-      if (userId) {
+    if (userId) {
+      try {
         await AsyncStorage.setItem(`tutorialCompleted_${userId}`, "true");
+      } catch (error) {
+        console.error("Error saving tutorial flag:", error);
       }
-    } catch (error) {
-      console.error("Error saving tutorial flag:", error);
     }
   };
 
-  // Filters for the filter modal
+  // --- Filter Modal States ---
   const [campusMode, setCampusMode] = useState<"In Campus" | "Both">("Both");
   const categories = [
     "#Everything",
@@ -136,19 +137,15 @@ const Dashboard: React.FC<DashboardProps> = () => {
     "#Tickets",
     "#Other",
   ];
-  const [selectedCategory, setSelectedCategory] =
-    useState<string>("#Everything");
+  const [selectedCategory, setSelectedCategory] = useState<string>("#Everything");
   const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
 
-  // For product details displayed in the description modal
+  // --- Description Modal ---
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [isDescriptionModalVisible, setIsDescriptionModalVisible] =
-    useState(false);
+  const [isDescriptionModalVisible, setIsDescriptionModalVisible] = useState(false);
 
-  // NEW: State for requested products from other users
-  const [requestedProducts, setRequestedProducts] = useState<
-    RequestedProduct[]
-  >([]);
+  // --- Requested Products ---
+  const [requestedProducts, setRequestedProducts] = useState<RequestedProduct[]>([]);
 
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
 
@@ -157,25 +154,62 @@ const Dashboard: React.FC<DashboardProps> = () => {
     { label: "In Campus", value: "In Campus" },
   ];
 
+  // --- Products & Cart States ---
+  // allProducts contains raw products after campus filtering.
   const [allProducts, setAllProducts] = useState<Product[]>([]);
+  // filteredProducts is our final ordered list (only unseen products)
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
   const [error, setError] = useState<string | null>(null);
-
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [cartUpdated, setCartUpdated] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-
-  // NEW: State to count swipe up gestures
   const [swipeUpCount, setSwipeUpCount] = useState(0);
 
-  // Toast Animations for errors and success (added-to-cart)
+  // --- Toast Animations ---
   const [errorMessage, setErrorMessage] = useState("");
   const errorOpacity = useState(new Animated.Value(0))[0];
   const [successMessage, setSuccessMessage] = useState("");
   const successOpacity = useState(new Animated.Value(0))[0];
 
   const [userInfo, setUserInfo] = useState<User | null>(null);
+
+  // --- Seen Products (Persistent) ---
+  // Contains product IDs that have been viewed.
+  const [seenProducts, setSeenProducts] = useState<string[]>([]);
+  useEffect(() => {
+    if (userId) {
+      AsyncStorage.getItem(`seenProducts_${userId}`)
+        .then((value) => {
+          if (value) {
+            try {
+              const parsed = JSON.parse(value);
+              if (Array.isArray(parsed)) {
+                setSeenProducts(parsed);
+              } else {
+                setSeenProducts([]);
+              }
+            } catch (e) {
+              setSeenProducts([]);
+            }
+          }
+        })
+        .catch((err) => console.error("Error loading seen products:", err));
+    }
+  }, [userId]);
+
+  // Mark a product as seen if not already.
+  const markProductAsSeen = (productId: string) => {
+    if (!seenProducts.includes(productId)) {
+      const updated = [...seenProducts, productId];
+      setSeenProducts(updated);
+      if (userId) {
+        AsyncStorage.setItem(`seenProducts_${userId}`, JSON.stringify(updated)).catch((err) =>
+          console.error("Error saving seen products:", err)
+        );
+      }
+    }
+  };
 
   const showError = (msg: string) => {
     setErrorMessage(msg);
@@ -467,6 +501,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
     }
   }, [cartUpdated]);
 
+  // ----- Fetch Products (Campus Mode Filtering) -----
   const fetchProducts = async () => {
     if (!userId || !token || !institution) {
       showError("Complete your profile.");
@@ -515,12 +550,10 @@ const Dashboard: React.FC<DashboardProps> = () => {
       const data: any[] = await response.json();
       if (!data || data.length === 0) {
         setAllProducts([]);
-        setFilteredProducts([]);
         setError(null);
         return;
       }
       const mappedData: Product[] = data.map((product) => {
-        // Log for debugging
         console.log(
           "Fetched product:",
           product.title,
@@ -537,7 +570,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
           id: product._id || product.id || `product-${Math.random()}`,
           title: product.title,
           price: product.price,
-          outOfCampusPrice: product.outOfCampusPrice, // <-- NEW
+          outOfCampusPrice: product.outOfCampusPrice,
           description: product.description,
           category: product.category,
           images: product.images,
@@ -545,32 +578,23 @@ const Dashboard: React.FC<DashboardProps> = () => {
           userId: product.userId,
           postedDate: product.postedDate,
           rating: product.rating,
-          quality: product.condition, // using condition from backend as quality
+          quality: product.condition,
           availability: product.availability,
           selectedTags: product.selectedTags || [],
           rentPrice: product.rentPrice,
           rentDuration: product.rentDuration,
         };
       });
-
-      let filtered = mappedData;
+      let filteredByCampus = mappedData;
       if (campusMode === "In Campus") {
-        filtered = mappedData.filter(
+        filteredByCampus = mappedData.filter(
           (product) =>
             product.userId !== userId &&
             product.university.toLowerCase() === institution.toLowerCase() &&
             product.availability === "In Campus Only"
         );
       }
-      let finalFiltered = filtered;
-      if (selectedCategory !== "#Everything") {
-        finalFiltered = finalFiltered.filter((p) =>
-          p.selectedTags?.includes(selectedCategory)
-        );
-      }
-
-      setFilteredProducts(finalFiltered);
-      setAllProducts(filtered);
+      setAllProducts(filteredByCampus);
       setError(null);
     } catch (err) {
       console.error("Fetch Products Error:", err);
@@ -578,7 +602,33 @@ const Dashboard: React.FC<DashboardProps> = () => {
     }
   };
 
-  // NEW: Fetch requested products from /requests/all
+  // ----- Recalculate Product Ordering: Unseen Products Only -----
+  useEffect(() => {
+    // Filter by category first.
+    let filtered = allProducts;
+    if (selectedCategory !== "#Everything") {
+      filtered = filtered.filter((p) => p.selectedTags?.includes(selectedCategory));
+    }
+    // Calculate unseen: products not in seenProducts.
+    let unseen = filtered.filter((p) => !seenProducts.includes(p.id));
+    // If there are no unseen products (but some exist in filtered), then reset seenProducts.
+    if (filtered.length > 0 && unseen.length === 0) {
+      setSeenProducts([]);
+      AsyncStorage.setItem(`seenProducts_${userId}`, JSON.stringify([])).catch((err) =>
+        console.error("Error resetting seen products:", err)
+      );
+      unseen = filtered;
+    }
+    const ordered = shuffleArray(unseen);
+    setFilteredProducts(ordered);
+    // Try to preserve current product if possible.
+    const currentProductId = filteredProducts[currentIndex]?.id;
+    const newIndex = ordered.findIndex((p) => p.id === currentProductId);
+    setCurrentIndex(newIndex >= 0 ? newIndex : 0);
+    setCurrentImageIndex(0);
+  }, [allProducts, seenProducts, selectedCategory]);
+
+  // ----- Requested Products -----
   const fetchRequestedProducts = async () => {
     if (!token) return;
     try {
@@ -605,20 +655,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
   };
 
   useEffect(() => {
-    if (allProducts.length > 0) {
-      let finalFiltered = allProducts;
-      if (selectedCategory !== "#Everything") {
-        finalFiltered = finalFiltered.filter((p) =>
-          p.selectedTags?.includes(selectedCategory)
-        );
-      }
-      setFilteredProducts(finalFiltered);
-      setCurrentIndex(0);
-      setCurrentImageIndex(0);
-    }
-  }, [allProducts, selectedCategory]);
-
-  useEffect(() => {
     setError(null);
     fetchProducts();
     fetchCart();
@@ -634,10 +670,14 @@ const Dashboard: React.FC<DashboardProps> = () => {
     }, [token])
   );
 
-  const toggleFilterModal = () =>
-    setIsFilterModalVisible(!isFilterModalVisible);
+  const toggleFilterModal = () => setIsFilterModalVisible(!isFilterModalVisible);
 
+  // ----- When Swiping to Next Product -----
   const goToNextProduct = () => {
+    if (filteredProducts.length > 0 && currentIndex < filteredProducts.length) {
+      const currentProduct = filteredProducts[currentIndex];
+      markProductAsSeen(currentProduct.id);
+    }
     setIsDescriptionModalVisible(false);
     setSwipeUpCount((prev) => {
       const newCount = prev + 1;
@@ -647,7 +687,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
       }
       return newCount;
     });
-
     if (currentIndex < filteredProducts.length - 1) {
       setCurrentIndex(currentIndex + 1);
       setCurrentImageIndex(0);
@@ -658,9 +697,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
     }
   };
 
-  // ----------------------------------------------------------------
-  // ProductItem component using react-native-gesture-handler.
-  // ----------------------------------------------------------------
+  // ----- ProductItem Component -----
   type ProductItemProps = {
     product: Product;
     nextProduct: Product | null;
@@ -741,9 +778,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
         ? actualNextProduct.images[0]
         : "https://via.placeholder.com/150";
 
-    // Determine which price to display:
-    // If the logged-in user's institution (from context) matches the product's university (ignoring case),
-    // use the in-campus price (product.price). Otherwise, use product.outOfCampusPrice if available.
+    // Determine which price to display.
     const displayPrice =
       institution.toLowerCase() === product.university.toLowerCase()
         ? product.price
@@ -775,13 +810,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
                 }
               }}
             >
-              <View
-                style={{
-                  width: SCREEN_WIDTH,
-                  height: PRODUCT_HEIGHT,
-                  backgroundColor: "#000",
-                }}
-              >
+              <View style={{ width: SCREEN_WIDTH, height: PRODUCT_HEIGHT, backgroundColor: "#000" }}>
                 <View
                   style={{
                     flexDirection: "row",
@@ -829,8 +858,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
                       key={idx}
                       style={[
                         styles.imageIndicatorDot,
-                        idx === currentImageIndex &&
-                          styles.imageIndicatorDotActive,
+                        idx === currentImageIndex && styles.imageIndicatorDotActive,
                       ]}
                     />
                   ))}
@@ -843,9 +871,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
           <>
             <View style={styles.productInfoBubble}>
               <View style={styles.productInfoTextContainer}>
-                <TouchableOpacity
-                  onPress={() => setTitleExpanded(!titleExpanded)}
-                >
+                <TouchableOpacity onPress={() => setTitleExpanded(!titleExpanded)}>
                   <Text
                     style={styles.productInfoTitle}
                     numberOfLines={titleExpanded ? undefined : 1}
@@ -857,9 +883,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
                 <Text style={styles.productInfoPrice}>
                   ${displayPrice.toFixed(2)} /{" "}
                   {product.rentPrice && product.rentPrice > 0
-                    ? `Renting Price: $${product.rentPrice.toFixed(2)} (${
-                        product.rentDuration || "N/A"
-                      })`
+                    ? `Renting Price: $${product.rentPrice.toFixed(2)} (${product.rentDuration || "N/A"})`
                     : "Renting Unavailable"}
                 </Text>
               </View>
@@ -880,11 +904,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
                   onPress={() => onShowDescription(product)}
                   accessibilityLabel="Show Details"
                 >
-                  <Ionicons
-                    name="information-circle"
-                    size={25}
-                    color="#FFFFFF"
-                  />
+                  <Ionicons name="information-circle" size={25} color="#FFFFFF" />
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.iconButton}
@@ -915,10 +935,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
   return (
     <View style={styles.rootContainer}>
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <LinearGradient
-          colors={["#000000", "#000000"]}
-          style={styles.gradientBackground}
-        >
+        <LinearGradient colors={["#000000", "#000000"]} style={styles.gradientBackground}>
           <View style={styles.topBar}>
             <TouchableOpacity
               style={styles.topBarIconContainer}
@@ -977,27 +994,25 @@ const Dashboard: React.FC<DashboardProps> = () => {
             <View style={{ flex: 1, backgroundColor: "#000000" }} />
           ) : (
             <View style={styles.productStack}>
-              {filteredProducts
-                .slice(currentIndex, currentIndex + 1)
-                .map((product, idx) => (
-                  <ProductItem
-                    key={product.id}
-                    product={product}
-                    nextProduct={filteredProducts[currentIndex + 1] || null}
-                    index={currentIndex + idx}
-                    currentIndex={currentIndex}
-                    onAddToCart={addToCart}
-                    onToggleFavorite={toggleFavorite}
-                    onShowDescription={(prod) => {
-                      setSelectedProduct(prod);
-                      setIsDescriptionModalVisible(true);
-                    }}
-                    onNextProduct={goToNextProduct}
-                    isFavorite={likedProducts.includes(product.id)}
-                    currentImageIndex={currentImageIndex}
-                    setCurrentImageIndex={setCurrentImageIndex}
-                  />
-                ))}
+              {filteredProducts.slice(currentIndex, currentIndex + 1).map((product, idx) => (
+                <ProductItem
+                  key={product.id}
+                  product={product}
+                  nextProduct={filteredProducts[currentIndex + 1] || null}
+                  index={currentIndex + idx}
+                  currentIndex={currentIndex}
+                  onAddToCart={addToCart}
+                  onToggleFavorite={toggleFavorite}
+                  onShowDescription={(prod) => {
+                    setSelectedProduct(prod);
+                    setIsDescriptionModalVisible(true);
+                  }}
+                  onNextProduct={goToNextProduct}
+                  isFavorite={likedProducts.includes(product.id)}
+                  currentImageIndex={currentImageIndex}
+                  setCurrentImageIndex={setCurrentImageIndex}
+                />
+              ))}
             </View>
           )}
 
@@ -1014,13 +1029,11 @@ const Dashboard: React.FC<DashboardProps> = () => {
             >
               <View style={styles.descriptionModalContent}>
                 {selectedProduct && (
-                  <ScrollView
+                  <RNScrollView
                     showsVerticalScrollIndicator={false}
                     contentContainerStyle={styles.modalScrollContent}
                   >
-                    <Text style={styles.modalTitle}>
-                      {selectedProduct.title}
-                    </Text>
+                    <Text style={styles.modalTitle}>{selectedProduct.title}</Text>
                     <Text style={styles.detailText}>
                       Price: ${selectedProduct.price.toFixed(2)}
                     </Text>
@@ -1028,29 +1041,16 @@ const Dashboard: React.FC<DashboardProps> = () => {
                       Condition: {selectedProduct.quality || "New"}
                     </Text>
                     {selectedProduct.rating && selectedProduct.rating > 0 && (
-                      <View
-                        style={{
-                          flexDirection: "row",
-                          alignItems: "center",
-                          marginBottom: 8,
-                        }}
-                      >
+                      <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
                         <Text style={styles.detailText}>Rating: </Text>
                         {[...Array(selectedProduct.rating)].map((_, i) => (
-                          <Ionicons
-                            key={i}
-                            name="star"
-                            size={16}
-                            color="#FFD700"
-                          />
+                          <Ionicons key={i} name="star" size={16} color="#FFD700" />
                         ))}
                       </View>
                     )}
                     <Text style={styles.sectionHeader}>Description</Text>
-                    <Text style={styles.descriptionText}>
-                      {selectedProduct.description}
-                    </Text>
-                  </ScrollView>
+                    <Text style={styles.descriptionText}>{selectedProduct.description}</Text>
+                  </RNScrollView>
                 )}
                 <TouchableOpacity
                   onPress={() => setIsDescriptionModalVisible(false)}
@@ -1086,29 +1086,21 @@ const Dashboard: React.FC<DashboardProps> = () => {
                     <TouchableOpacity
                       style={[
                         styles.filterModalOption,
-                        selectedCategory === item &&
-                          styles.filterModalOptionSelected,
+                        selectedCategory === item && styles.filterModalOptionSelected,
                       ]}
                       onPress={() => setSelectedCategory(item)}
                       accessibilityLabel={`Filter by ${item}`}
                     >
                       <Ionicons
-                        name={
-                          selectedCategory === item
-                            ? "checkbox-outline"
-                            : "ellipse-outline"
-                        }
+                        name={selectedCategory === item ? "checkbox-outline" : "ellipse-outline"}
                         size={20}
-                        color={
-                          selectedCategory === item ? "#BB86FC" : "#FFFFFF"
-                        }
+                        color={selectedCategory === item ? "#BB86FC" : "#FFFFFF"}
                         style={{ marginRight: 10 }}
                       />
                       <Text
                         style={[
                           styles.filterModalOptionText,
-                          selectedCategory === item &&
-                            styles.filterModalOptionTextSelected,
+                          selectedCategory === item && styles.filterModalOptionTextSelected,
                         ]}
                       >
                         {item === "#Everything" ? "All" : item.replace("#", "")}
@@ -1126,29 +1118,21 @@ const Dashboard: React.FC<DashboardProps> = () => {
                     <TouchableOpacity
                       style={[
                         styles.filterModalOption,
-                        campusMode === item.value &&
-                          styles.filterModalOptionSelected,
+                        campusMode === item.value && styles.filterModalOptionSelected,
                       ]}
                       onPress={() => setCampusMode(item.value)}
                       accessibilityLabel={`Filter by ${item.label}`}
                     >
                       <Ionicons
-                        name={
-                          campusMode === item.value
-                            ? "checkbox-outline"
-                            : "ellipse-outline"
-                        }
+                        name={campusMode === item.value ? "checkbox-outline" : "ellipse-outline"}
                         size={20}
-                        color={
-                          campusMode === item.value ? "#BB86FC" : "#FFFFFF"
-                        }
+                        color={campusMode === item.value ? "#BB86FC" : "#FFFFFF"}
                         style={{ marginRight: 10 }}
                       />
                       <Text
                         style={[
                           styles.filterModalOptionText,
-                          campusMode === item.value &&
-                            styles.filterModalOptionTextSelected,
+                          campusMode === item.value && styles.filterModalOptionTextSelected,
                         ]}
                       >
                         {item.label}
@@ -1178,12 +1162,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
           </Modal>
 
           {successMessage !== "" && (
-            <Animated.View
-              style={[
-                styles.successToastContainer,
-                { opacity: successOpacity },
-              ]}
-            >
+            <Animated.View style={[styles.successToastContainer, { opacity: successOpacity }]}>
               <Text style={styles.toastText}>{successMessage}</Text>
             </Animated.View>
           )}
@@ -1192,7 +1171,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
         </LinearGradient>
       </TouchableWithoutFeedback>
 
-      {/* Tutorial Overlay: Shown only if no tutorial flag exists for this user */}
       {showTutorial && <TutorialOverlay onFinish={handleTutorialFinish} />}
     </View>
   );
@@ -1217,11 +1195,10 @@ const styles = StyleSheet.create({
   },
   centerModalOverlay: {
     flex: 1,
-    backgroundColor: "transparent", // changed from "rgba(0, 0, 0, 0.7)"
+    backgroundColor: "transparent",
     justifyContent: "center",
     alignItems: "center",
   },
-
   smallToastContainer: {
     position: "absolute",
     top: 10,
