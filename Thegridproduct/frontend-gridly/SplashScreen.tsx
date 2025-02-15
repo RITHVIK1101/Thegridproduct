@@ -15,7 +15,7 @@ interface SplashScreenProps {
 }
 
 const ACCENT_COLOR = "#A78BFA"; // Purple accent (same as in LoginScreen)
-const BG_COLOR = "#0D0D0D";       // Dark background (matches LoginScreen)
+const BG_COLOR = "#0D0D0D"; // Dark background (matches LoginScreen)
 
 const { width, height } = Dimensions.get("window");
 const SPEED_MULTIPLIER = 0.65; // Slightly faster animation
@@ -129,7 +129,7 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onAnimationEnd }) => {
         ]}
       >
         <Image
-          source={require("/Users/dhruvreddy/gridly/Thegridproduct/Thegridproduct/frontend-gridly/assets/logo'no bg.png")}
+          source={require("./assets/logonobg.png")}
           style={styles.logoImage}
           resizeMode="contain"
         />

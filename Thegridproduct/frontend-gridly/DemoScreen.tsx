@@ -48,8 +48,7 @@ const slides: Slide[] = [
   },
   {
     title: "Find & Post Gigs",
-    description:
-      "Showcase your skills, discover gigs, or hire talented peers.",
+    description: "Showcase your skills, discover gigs, or hire talented peers.",
     image: "https://via.placeholder.com/300x200.png?text=Find+Post+Gigs",
   },
   {
@@ -164,11 +163,9 @@ const SlideItem: FC<SlideItemProps> = memo(
         >
           {/* Custom image with bounce (pop) effect */}
           <Animated.Image
-            source={require("/Users/dhruvreddy/gridly/Thegridproduct/Thegridproduct/frontend-gridly/assets/logo'no bg.png")}
-            style={[
-              styles.iconWrapper,
-              { transform: [{ scale: bounceAnim }] },
-            ]}
+            // Updated image source to a relative path.
+            source={require("./assets/logonobg.png")}
+            style={[styles.iconWrapper, { transform: [{ scale: bounceAnim }] }]}
             resizeMode="contain"
           />
           <Text style={styles.title}>{slide.title}</Text>
@@ -290,7 +287,11 @@ const DemoScreen: FC<DemoScreenProps> = ({ navigation }) => {
       {/* Founders Popup with background blur */}
       {showFounders && (
         <View style={styles.foundersModal}>
-          <BlurView intensity={120} tint="dark" style={StyleSheet.absoluteFill} />
+          <BlurView
+            intensity={120}
+            tint="dark"
+            style={StyleSheet.absoluteFill}
+          />
           <View style={styles.foundersContent}>
             <Text style={styles.foundersTitle}>Founders</Text>
             <Text style={styles.foundersEmail}>dhruvreddy05@gmail.com</Text>
@@ -339,7 +340,6 @@ const styles = StyleSheet.create({
     left: 20,
     zIndex: 10,
     padding: 10,
-    // Removed backgroundColor and borderRadius for a transparent look
   },
   foundersButtonText: {
     color: "#FFFFFF",
@@ -423,7 +423,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    // The BlurView (with a dark tint) covers the background
     justifyContent: "center",
     alignItems: "center",
     zIndex: 20,

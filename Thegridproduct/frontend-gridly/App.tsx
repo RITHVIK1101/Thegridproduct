@@ -181,7 +181,7 @@ const Stack = createStackNavigator<RootStackParamList>();
 const HeaderTitleWithLogo: React.FC<{ title: string }> = ({ title }) => (
   <View style={styles.headerTitleContainer}>
     <Image
-      source={require("./assets/logo'no bg.png")} // Logo file
+      source={require("./assets/logonobg.png")} // Logo file
       style={{ width: 35, height: 35, marginRight: 8 }} // Logo size
       resizeMode="contain"
     />

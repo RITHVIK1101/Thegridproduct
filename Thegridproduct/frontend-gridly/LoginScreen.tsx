@@ -1,5 +1,3 @@
-// LoginScreen.tsx
-
 import React, {
   useState,
   useContext,
@@ -69,7 +67,6 @@ const LoginScreen: React.FC = () => {
   // Animations
   const formOpacity = useRef(new Animated.Value(0)).current;
   const headerScale = useRef(new Animated.Value(0.8)).current;
-  // Removed spinAnim and replace with headerBounceAnim
   const headerBounceAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -505,8 +502,12 @@ const LoginScreen: React.FC = () => {
                 ]}
               >
                 <Animated.Image
-                  source={require("/Users/dhruvreddy/gridly/Thegridproduct/Thegridproduct/frontend-gridly/assets/logo'no bg.png")}
-                  style={[styles.logoIcon, { transform: [{ scale: headerBounceAnim }] }]}
+                  // Updated the image source to a relative path.
+                  source={require("./assets/logonobg.png")}
+                  style={[
+                    styles.logoIcon,
+                    { transform: [{ scale: headerBounceAnim }] },
+                  ]}
                   resizeMode="contain"
                 />
                 <Text style={styles.title}>Gridly</Text>
@@ -606,9 +607,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 10,
   },
-  // Updated style for the bouncing logo image.
   logoIcon: {
-    width: 42, // Increase these values to manually enlarge the logo
+    width: 42,
     height: 42,
   },
   title: {
