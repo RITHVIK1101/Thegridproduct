@@ -182,7 +182,7 @@ const HeaderTitleWithLogo: React.FC<{ title: string }> = ({ title }) => (
   <View style={styles.headerTitleContainer}>
     <Image
       source={require("./assets/logo'no bg.png")} // Logo file
-      style={{ width: 40, height: 40, marginRight: 8 }} // Logo size
+      style={{ width: 35, height: 35, marginRight: 8 }} // Logo size
       resizeMode="contain"
     />
     <Text style={styles.headerTitleText}>{title}</Text>
