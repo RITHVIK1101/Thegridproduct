@@ -1212,76 +1212,79 @@ func GetUnreadMessagesCountHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer client.Close()
 
-	// Fetch all chat rooms where user is a participant
+	// Fetch all chat rooms where user is a participant (as buyer or seller)
 	chatRooms := client.Collection("chatRooms")
-	query := chatRooms.Where("buyerID", "==", userID).Documents(ctx)
-	query2 := chatRooms.Where("sellerID", "==", userID).Documents(ctx)
+	buyerQuery := chatRooms.Where("buyerID", "==", userID).Documents(ctx)
+	sellerQuery := chatRooms.Where("sellerID", "==", userID).Documents(ctx)
 
 	unreadCount := 0
 
-	// Process first query (chats where user is the buyer)
-	docs, err := query.GetAll()
+	// Get documents for buyer and seller queries
+	docs, err := buyerQuery.GetAll()
 	if err != nil {
 		log.Printf("❌ Error fetching chats for user %s: %v", userID, err)
 		WriteJSONError(w, "Error retrieving chats", http.StatusInternalServerError)
 		return
 	}
-
-	// Process second query (chats where user is the seller)
-	docs2, err := query2.GetAll()
+	docs2, err := sellerQuery.GetAll()
 	if err != nil {
 		log.Printf("❌ Error fetching chats for user %s: %v", userID, err)
 		WriteJSONError(w, "Error retrieving chats", http.StatusInternalServerError)
 		return
 	}
-
-	// Combine the results
 	allDocs := append(docs, docs2...)
 
+	// Loop through each chat document
 	for _, doc := range allDocs {
 		chatData := doc.Data()
 
-		// Get last read timestamp for this user
-		lastReadKey := fmt.Sprintf("last_read_%s", userID)
-		lastReadTimeStr, ok := chatData[lastReadKey].(string)
-		var lastReadTime time.Time
-		if ok {
-			lastReadTime, _ = time.Parse(time.RFC3339, lastReadTimeStr)
-		} else {
-			lastReadTime = time.Time{} // Default to 0 if no last read time
+		// Here we expect that each chat document has a "lastRead" field,
+		// which is a map where keys are user IDs and values are RFC3339 timestamps.
+		lastReadTime := time.Time{} // default value (zero time)
+		if lrMap, ok := chatData["lastRead"].(map[string]interface{}); ok {
+			if lrVal, exists := lrMap[userID]; exists {
+				if lrStr, ok := lrVal.(string); ok && lrStr != "" {
+					parsed, err := time.Parse(time.RFC3339, lrStr)
+					if err == nil {
+						lastReadTime = parsed
+					} else {
+						log.Printf("⚠️ Error parsing last read time for user %s: %v", userID, err)
+					}
+				}
+			}
+		}
+		// If lastReadTime is zero (i.e. not set), assume the user has read all messages.
+		// (You can choose an alternate default if desired.)
+		if lastReadTime.IsZero() {
+			continue
 		}
 
-		// Count unread messages
+		// Count unread messages in this chat
 		messages, exists := chatData["messages"].([]interface{})
 		if exists {
-			for _, msg := range messages {
-				msgMap, ok := msg.(map[string]interface{})
+			for _, m := range messages {
+				msgMap, ok := m.(map[string]interface{})
 				if !ok {
 					continue
 				}
-
-				timestampStr, tsExists := msgMap["timestamp"].(string)
+				tsStr, tsExists := msgMap["timestamp"].(string)
 				if !tsExists {
 					continue
 				}
-
-				msgTimestamp, err := time.Parse(time.RFC3339, timestampStr)
+				msgTime, err := time.Parse(time.RFC3339, tsStr)
 				if err != nil {
 					continue
 				}
-
 				senderId, senderExists := msgMap["senderId"].(string)
 				if !senderExists || senderId == userID {
-					continue
+					continue // Skip messages sent by the user
 				}
-
-				if msgTimestamp.After(lastReadTime) {
+				if msgTime.After(lastReadTime) {
 					unreadCount++
 				}
 			}
 		}
 	}
 
-	// Send response
 	WriteJSON(w, map[string]int{"unreadCount": unreadCount}, http.StatusOK)
 }

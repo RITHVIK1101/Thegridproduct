@@ -110,8 +110,29 @@ const BottomNavBar: React.FC = () => {
   };
 
   useEffect(() => {
+    const fetchUnreadMessagesCount = async () => {
+      try {
+        const response = await fetch(
+          `${NGROK_URL}/messages/unread-count/${userId}`,
+          {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+        if (!response.ok)
+          throw new Error("Failed to fetch unread messages count");
+        const data = await response.json();
+        setTotalUnread(data.unreadCount || 0);
+      } catch (error) {
+        console.error("Error fetching unread messages count:", error);
+      }
+    };
+
     fetchUnreadMessagesCount();
-    const intervalId = setInterval(fetchUnreadMessagesCount, 10000); // Refresh every 10s
+    const intervalId = setInterval(fetchUnreadMessagesCount, 10000); // Refresh every 10 seconds
     return () => clearInterval(intervalId);
   }, [userId, token]);
 
