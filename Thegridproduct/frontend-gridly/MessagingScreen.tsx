@@ -1,5 +1,3 @@
-// MessagingScreen.tsx
-
 import React, { useState, useEffect, useContext, useRef } from "react";
 import {
   SafeAreaView,
@@ -128,6 +126,10 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     useState<boolean>(false);
   const [requestPopupMessage, setRequestPopupMessage] = useState<string>("");
 
+  // NEW: State for showing an exclamation badge if new incoming requests exist
+  const [hasNewIncomingRequests, setHasNewIncomingRequests] =
+    useState<boolean>(false);
+
   // User & Token from Context
   const { userId, token } = useContext(UserContext);
 
@@ -198,6 +200,16 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       }
     }, [userId, token])
   );
+
+  // NEW: Poll for new incoming requests every 10 seconds
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      if (userId && token) {
+        fetchUserRequests();
+      }
+    }, 10000); // 10 seconds (adjust as needed)
+    return () => clearInterval(intervalId);
+  }, [userId, token]);
 
   const fetchUserChats = async () => {
     if (!userId || !token) return;
@@ -323,7 +335,9 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                   ? new Date(lastReadStr).getTime()
                   : 0;
                 const unreadCount = data.messages.filter(
-                  (msg: Message) => new Date(msg.timestamp).getTime() > lastRead
+                  (msg: Message) =>
+                    new Date(msg.timestamp).getTime() > lastRead &&
+                    msg.senderId !== userId
                 ).length;
                 setChats((prevChats) =>
                   prevChats.map((chat) =>
@@ -484,12 +498,9 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         quality: 0.7,
       });
       console.log("ImagePicker result:", result);
-
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const asset = result.assets[0];
-        // 1. Immediately upload to Cloudinary
         const uploadedImageUrl = await uploadImageToCloudinary(asset.uri);
-        // 2. Immediately send to Firestore as a message
         await sendImageMessage(uploadedImageUrl);
       }
     } catch (error) {
@@ -504,17 +515,12 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       allowsMultipleSelection: false,
       quality: 0.7,
     });
-
-    // If user canceled or assets array is empty, just return
     if (result.canceled || !result.assets || result.assets.length < 1) {
       console.log("User canceled or no image selected.");
       return;
     }
-
-    // Otherwise, we have a valid image
     const selectedUri = result.assets[0].uri;
     console.log("Selected image URI:", selectedUri);
-    // ...
   };
 
   const sendImageMessage = async (imageUrl: string) => {
@@ -535,24 +541,17 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
 
   const uploadImageToCloudinary = async (uri: string): Promise<string> => {
     if (!uri) {
-      // If no URI is passed, throw an error immediately
       throw new Error("Cannot upload an empty URL");
     }
-
     setIsUploadingImage(true);
     try {
-      // Log the original URI for debugging
       console.log("Original image URI:", uri);
-
-      // Manipulate the image (resize/compress)
       const manipulatedImage = await ImageManipulator.manipulateAsync(
         uri,
         [{ resize: { width: 800 } }],
         { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
       );
       console.log("Manipulated image URI:", manipulatedImage.uri);
-
-      // Prepare the FormData for the upload
       const formDataImage = new FormData();
       formDataImage.append("file", {
         uri: manipulatedImage.uri,
@@ -560,14 +559,10 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         name: `upload_${Date.now()}.jpg`,
       } as any);
       formDataImage.append("upload_preset", UPLOAD_PRESET);
-
-      // Upload to Cloudinary
       const response = await axios.post(CLOUDINARY_URL, formDataImage, {
         headers: { "Content-Type": "multipart/form-data" },
       });
       console.log("Cloudinary upload response:", response.data);
-
-      // Return the secure_url from Cloudinary
       return response.data.secure_url;
     } catch (error) {
       console.error("Error uploading image to Cloudinary:", error);
@@ -629,6 +624,10 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         const { incomingRequests, outgoingRequests } = response.data;
         setIncomingRequests(incomingRequests as Request[]);
         setOutgoingRequests(outgoingRequests as Request[]);
+        // Immediately update the badge state if there are incoming requests
+        setHasNewIncomingRequests(
+          incomingRequests && incomingRequests.length > 0
+        );
       } else {
         setErrorRequests("Failed to fetch chat requests.");
       }
@@ -657,7 +656,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         }
       );
       if (response.status === 200) {
-        // Instead of Alert, show a custom popup
         setRequestPopupMessage("Chat request accepted.");
         setRequestPopupVisible(true);
         setIncomingRequests((prev) =>
@@ -700,7 +698,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         }
       );
       if (response.status === 200) {
-        // Instead of Alert, show a custom popup
         setRequestPopupMessage("Chat request rejected.");
         setRequestPopupVisible(true);
         setIncomingRequests((prev) =>
@@ -725,7 +722,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       console.warn(`Chat with chatID ${item.chatID} is missing user data.`);
       return null;
     }
-
     const latestMessage = item.latestMessage
       ? {
           content: item.latestMessage,
@@ -733,14 +729,12 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
           senderId: item.latestSenderId,
         }
       : null;
-
     const formattedTimestamp = latestMessage
       ? new Date(latestMessage.timestamp).toLocaleTimeString([], {
           hour: "2-digit",
           minute: "2-digit",
         })
       : "";
-
     const chatTypeLabel =
       item.referenceType === "product"
         ? "Product Name: "
@@ -749,7 +743,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         : item.referenceType === "product_request"
         ? "Product Request Name: "
         : "Unnamed Item";
-
     return (
       <Pressable
         style={styles.chatItemContainer}
@@ -793,7 +786,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                       : styles.greyDot
                   }
                 />
-                {/* Create a small helper that checks if it's an image */}
                 <Text style={styles.lastMessage} numberOfLines={1}>
                   {latestMessage.content.startsWith("[Image] ")
                     ? "Image"
@@ -877,17 +869,11 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
           style: "destructive",
           onPress: async () => {
             try {
-              // Make a DELETE request to your backend endpoint
               const response = await axios.delete(
                 `https://thegridproduct-production.up.railway.app/chats/${selectedChat.chatID}`,
-                {
-                  headers: {
-                    Authorization: `Bearer ${token}`,
-                  },
-                }
+                { headers: { Authorization: `Bearer ${token}` } }
               );
               if (response.status === 200) {
-                // Remove the chat from the local state
                 setChats((prevChats) =>
                   prevChats.filter(
                     (chat) => chat.chatID !== selectedChat.chatID
@@ -922,7 +908,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
           text: "OK",
           onPress: async () => {
             try {
-              // Make a PUT request to update the status
               const response = await axios.put(
                 `https://thegridproduct-production.up.railway.app/chats/${selectedChat.chatID}/complete`,
                 {},
@@ -935,7 +920,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
               );
               if (response.status === 200) {
                 Alert.alert("Success", response.data.message);
-                // Optionally, refresh your chat list or update UI to reflect changes
               }
             } catch (error: any) {
               console.error("Error marking as sold/done:", error);
@@ -956,6 +940,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     title: c.referenceTitle || "Unnamed Item",
     type: c.referenceType || "product",
   }));
+
   const handleNavigateFromProductOrGig = (item: {
     chatID: string;
     title: string;
@@ -1070,7 +1055,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         useNativeDriver: true,
       }).start();
     }
-
     const renderRequestItem = ({ item }: { item: Request }) => {
       const referenceTypeLabel =
         item.referenceType === "product"
@@ -1080,7 +1064,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
           : item.referenceType === "product_request"
           ? "Product Request Name: "
           : "Unnamed Item";
-
       return (
         <View style={styles.requestCard}>
           <View style={styles.requestInfo}>
@@ -1137,10 +1120,8 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         </View>
       );
     };
-
     const dataToShow =
       selectedRequestsTab === "incoming" ? incomingRequests : outgoingRequests;
-
     return (
       <Modal
         visible={isRequestsModalVisible}
@@ -1254,13 +1235,26 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
             <Pressable
               style={styles.requestsButton}
               onPress={() => {
+                // When opening requests, clear the badge
+                setHasNewIncomingRequests(false);
                 setRequestsModalVisible(true);
                 setSelectedRequestsTab("incoming");
                 fetchUserRequests();
               }}
               accessibilityLabel="View Requests"
             >
-              <Ionicons name="list-circle-outline" size={24} color="#BB86FC" />
+              <View style={{ position: "relative" }}>
+                <Ionicons
+                  name="list-circle-outline"
+                  size={24}
+                  color="#BB86FC"
+                />
+                {hasNewIncomingRequests && (
+                  <View style={styles.exclamationBadge}>
+                    <Ionicons name="alert" size={12} color="#fff" />
+                  </View>
+                )}
+              </View>
               <Text style={styles.requestsButtonText}>Requests</Text>
             </Pressable>
             <Pressable
@@ -1405,7 +1399,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                     >
                       <Ionicons name="arrow-back" size={24} color="#BB86FC" />
                     </Pressable>
-
                     <View style={styles.chatHeaderInfo}>
                       <View style={styles.headerProfilePicPlaceholder}>
                         <Text style={styles.headerProfilePicInitials}>
@@ -1431,7 +1424,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                         </Text>
                       </View>
                     </View>
-
                     {/* Report Button */}
                     <Pressable
                       onPress={handleReportPress}
@@ -1440,7 +1432,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                     >
                       <Ionicons name="flag" size={24} color="#F08080" />
                     </Pressable>
-
                     {/* Product Chat Action Buttons (only for product chat rooms) */}
                     {selectedChat?.referenceType === "product" && (
                       <View style={styles.productActionButtons}>
@@ -1472,7 +1463,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                     )}
                   </View>
                 )}
-
                 <FlatList
                   ref={flatListRef}
                   data={selectedChat?.messages || []}
@@ -1493,7 +1483,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                     </View>
                   }
                 />
-
                 <View style={styles.inputBarContainer}>
                   <View style={styles.inputBarLine} />
                   <View style={styles.inputContainer}>

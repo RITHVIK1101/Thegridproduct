@@ -1191,3 +1191,97 @@ func MarkChatCompletedHandler(w http.ResponseWriter, r *http.Request) {
 		"message": fmt.Sprintf("Reference status updated to '%s' successfully", newStatus),
 	}, http.StatusOK)
 }
+func GetUnreadMessagesCountHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Extract userId from URL parameters
+	vars := mux.Vars(r)
+	userID := vars["userId"]
+	if userID == "" {
+		WriteJSONError(w, "User ID is required", http.StatusBadRequest)
+		return
+	}
+
+	// Initialize Firestore client
+	ctx := context.Background()
+	client, err := firestore.NewClient(ctx, "gridlychat", option.WithCredentialsJSON(serviceAccountJSON))
+	if err != nil {
+		log.Printf("❌ Failed to create Firestore client: %v", err)
+		WriteJSONError(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	defer client.Close()
+
+	// Fetch all chat rooms where user is a participant
+	chatRooms := client.Collection("chatRooms")
+	query := chatRooms.Where("buyerID", "==", userID).Documents(ctx)
+	query2 := chatRooms.Where("sellerID", "==", userID).Documents(ctx)
+
+	unreadCount := 0
+
+	// Process first query (chats where user is the buyer)
+	docs, err := query.GetAll()
+	if err != nil {
+		log.Printf("❌ Error fetching chats for user %s: %v", userID, err)
+		WriteJSONError(w, "Error retrieving chats", http.StatusInternalServerError)
+		return
+	}
+
+	// Process second query (chats where user is the seller)
+	docs2, err := query2.GetAll()
+	if err != nil {
+		log.Printf("❌ Error fetching chats for user %s: %v", userID, err)
+		WriteJSONError(w, "Error retrieving chats", http.StatusInternalServerError)
+		return
+	}
+
+	// Combine the results
+	allDocs := append(docs, docs2...)
+
+	for _, doc := range allDocs {
+		chatData := doc.Data()
+
+		// Get last read timestamp for this user
+		lastReadKey := fmt.Sprintf("last_read_%s", userID)
+		lastReadTimeStr, ok := chatData[lastReadKey].(string)
+		var lastReadTime time.Time
+		if ok {
+			lastReadTime, _ = time.Parse(time.RFC3339, lastReadTimeStr)
+		} else {
+			lastReadTime = time.Time{} // Default to 0 if no last read time
+		}
+
+		// Count unread messages
+		messages, exists := chatData["messages"].([]interface{})
+		if exists {
+			for _, msg := range messages {
+				msgMap, ok := msg.(map[string]interface{})
+				if !ok {
+					continue
+				}
+
+				timestampStr, tsExists := msgMap["timestamp"].(string)
+				if !tsExists {
+					continue
+				}
+
+				msgTimestamp, err := time.Parse(time.RFC3339, timestampStr)
+				if err != nil {
+					continue
+				}
+
+				senderId, senderExists := msgMap["senderId"].(string)
+				if !senderExists || senderId == userID {
+					continue
+				}
+
+				if msgTimestamp.After(lastReadTime) {
+					unreadCount++
+				}
+			}
+		}
+	}
+
+	// Send response
+	WriteJSON(w, map[string]int{"unreadCount": unreadCount}, http.StatusOK)
+}

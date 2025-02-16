@@ -117,6 +117,7 @@ func main() {
 	protected.HandleFunc("/services/search", handlers.SearchGigsHandler).Methods("POST")
 	protected.HandleFunc("/chats/{chatId}", handlers.DeleteChatHandler).Methods("DELETE")
 	protected.HandleFunc("/chats/{chatId}/complete", handlers.MarkChatCompletedHandler).Methods("PUT")
+	protected.HandleFunc("/messages/unread-count/{userId}", handlers.GetUnreadMessagesCountHandler).Methods("GET")
 
 	protected.HandleFunc("/report", handlers.ReportChatHandler).Methods("POST")
 	protected.HandleFunc("/ai/process", handlers.ProcessAIInput).Methods("POST")
