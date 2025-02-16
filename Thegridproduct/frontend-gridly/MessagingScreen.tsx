@@ -362,6 +362,15 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     firestoreDB,
     chats.map((chat) => chat.chatID).join(","),
   ]);
+  useEffect(() => {
+    const totalUnread = chats.reduce(
+      (acc, chat) => acc + (chat.unreadCount ? chat.unreadCount : 0),
+      0
+    );
+    AsyncStorage.setItem("totalUnread", totalUnread.toString()).catch((error) =>
+      console.error("Error setting totalUnread:", error)
+    );
+  }, [chats]);
 
   const fetchSpecificChat = async (chatId: string) => {
     setLoading(true);

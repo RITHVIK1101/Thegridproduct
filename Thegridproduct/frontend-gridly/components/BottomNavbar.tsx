@@ -1,3 +1,4 @@
+// BottomNavBar.tsx
 import React, { useState, useRef, useEffect, useContext } from "react";
 import {
   View,
@@ -9,6 +10,7 @@ import {
   Easing,
 } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   useNavigation,
   useRoute,
@@ -86,53 +88,20 @@ const BottomNavBar: React.FC = () => {
     );
   };
 
-  const fetchUnreadMessagesCount = async () => {
-    try {
-      const response = await fetch(
-        `${NGROK_URL}/messages/unread-count/${userId}`,
-        {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      if (!response.ok)
-        throw new Error("Failed to fetch unread messages count");
-
-      const data = await response.json();
-      setTotalUnread(data.unreadCount || 0);
-    } catch (error) {
-      console.error("Error fetching unread messages count:", error);
-    }
-  };
-
+  // Read the total unread count from AsyncStorage
   useEffect(() => {
-    const fetchUnreadMessagesCount = async () => {
+    const getTotalUnreadFromStorage = async () => {
       try {
-        const response = await fetch(
-          `${NGROK_URL}/messages/unread-count/${userId}`,
-          {
-            method: "GET",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
-        if (!response.ok)
-          throw new Error("Failed to fetch unread messages count");
-        const data = await response.json();
-        setTotalUnread(data.unreadCount || 0);
+        const countStr = await AsyncStorage.getItem("totalUnread");
+        const count = countStr ? parseInt(countStr, 10) : 0;
+        setTotalUnread(count);
       } catch (error) {
-        console.error("Error fetching unread messages count:", error);
+        console.error("Error getting total unread from storage:", error);
       }
     };
 
-    fetchUnreadMessagesCount();
-    const intervalId = setInterval(fetchUnreadMessagesCount, 10000); // Refresh every 10 seconds
+    getTotalUnreadFromStorage();
+    const intervalId = setInterval(getTotalUnreadFromStorage, 10000); // Refresh every 10 seconds
     return () => clearInterval(intervalId);
   }, [userId, token]);
 
@@ -235,6 +204,63 @@ const BottomNavBar: React.FC = () => {
           Activity
         </Text>
       </TouchableOpacity>
+
+      {/* Modal for Add Options */}
+      <Modal
+        visible={isModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={toggleModal}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPressOut={toggleModal}
+        >
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Add Options</Text>
+            <View style={styles.modalButtonsContainer}>
+              <TouchableOpacity
+                style={styles.modalButton}
+                onPress={() => {
+                  toggleModal();
+                  navigation.navigate("AddProduct");
+                }}
+                accessibilityLabel="Add Product"
+              >
+                <Text style={styles.modalButtonText}>Add Product</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalButton}
+                onPress={() => {
+                  toggleModal();
+                  navigation.navigate("AddGig");
+                }}
+                accessibilityLabel="Add Job"
+              >
+                <Text style={styles.modalButtonText}>Add Job</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalButton}
+                onPress={() => {
+                  toggleModal();
+                  navigation.navigate("RequestProduct");
+                }}
+                accessibilityLabel="Request Product"
+              >
+                <Text style={styles.modalButtonText}>Request Product</Text>
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity
+              onPress={toggleModal}
+              style={styles.modalClose}
+              accessibilityLabel="Close Add Options Modal"
+            >
+              <Ionicons name="close-outline" size={24} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 };
@@ -301,5 +327,59 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 10,
     fontWeight: "bold",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.8)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContent: {
+    width: "80%",
+    backgroundColor: "#1A1A1A",
+    padding: 25,
+    borderRadius: 20,
+    alignItems: "center",
+    position: "relative",
+    shadowColor: "#FFFFFF",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.6,
+    shadowRadius: 6,
+    elevation: 10,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#FFFFFF",
+    marginBottom: 20,
+  },
+  modalButtonsContainer: {
+    width: "100%",
+    flexDirection: "column",
+    justifyContent: "space-between",
+    marginTop: 10,
+  },
+  modalButton: {
+    backgroundColor: "#FFFFFF",
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginVertical: 8,
+    width: "100%",
+    alignItems: "center",
+    shadowColor: "#FFFFFF",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  modalButtonText: {
+    color: "#000000",
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  modalClose: {
+    position: "absolute",
+    top: 15,
+    right: 15,
   },
 });
