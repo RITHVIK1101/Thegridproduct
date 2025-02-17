@@ -10,7 +10,6 @@ import {
   Easing,
 } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   useNavigation,
   useRoute,
@@ -33,9 +32,9 @@ interface Gig {
 const BottomNavBar: React.FC = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const route = useRoute();
-  const { token, userId } = useContext(UserContext);
+  const { token, userId, unreadCount } = useContext(UserContext);
+
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const [totalUnread, setTotalUnread] = useState<number>(0);
 
   // Animation for spinning the add button
   const spinValue = useRef(new Animated.Value(0)).current;
@@ -88,23 +87,6 @@ const BottomNavBar: React.FC = () => {
     );
   };
 
-  // Read the total unread count from AsyncStorage
-  useEffect(() => {
-    const getTotalUnreadFromStorage = async () => {
-      try {
-        const countStr = await AsyncStorage.getItem("totalUnread");
-        const count = countStr ? parseInt(countStr, 10) : 0;
-        setTotalUnread(count);
-      } catch (error) {
-        console.error("Error getting total unread from storage:", error);
-      }
-    };
-
-    getTotalUnreadFromStorage();
-    const intervalId = setInterval(getTotalUnreadFromStorage, 10000); // Refresh every 10 seconds
-    return () => clearInterval(intervalId);
-  }, [userId, token]);
-
   return (
     <View style={styles.container}>
       {/* Home Tab */}
@@ -142,7 +124,7 @@ const BottomNavBar: React.FC = () => {
         <Text
           style={[styles.navText, isActive("Jobs") && styles.navTextActive]}
         >
-          Jobs
+          Gigs
         </Text>
       </TouchableOpacity>
 
@@ -171,9 +153,9 @@ const BottomNavBar: React.FC = () => {
             size={24}
             color="#FFFFFF"
           />
-          {totalUnread > 0 && (
+          {unreadCount > 0 && (
             <View style={styles.unreadBadge}>
-              <Text style={styles.unreadBadgeText}>{totalUnread}</Text>
+              <Text style={styles.unreadBadgeText}>{unreadCount}</Text>
             </View>
           )}
         </View>

@@ -99,7 +99,6 @@ func main() {
 	protected.HandleFunc("/chats/{chatId}/messages", handlers.AddMessageHandler).Methods("POST")
 	protected.HandleFunc("/chats/{chatId}/messages", handlers.GetMessagesHandler).Methods("GET")
 	protected.HandleFunc("/chat/test-send-message", handlers.TestSendMessageHandler).Methods("POST")
-	// User Routes
 	protected.HandleFunc("/users/{id}", handlers.GetUserHandler).Methods("GET")
 
 	protected.HandleFunc("/requests", handlers.CreateProductRequestHandler).Methods("POST")
@@ -107,7 +106,6 @@ func main() {
 	protected.HandleFunc("/requests/all", handlers.GetAllOtherProductRequestsHandler).Methods("GET")
 	protected.HandleFunc("/requests/{id}", handlers.DeleteProductRequestHandler).Methods("DELETE")
 
-	// AI Processing
 	protected.HandleFunc("/services", handlers.AddGigHandler).Methods("POST")
 	protected.HandleFunc("/services", handlers.GetAllGigsHandler).Methods("GET")
 	protected.HandleFunc("/services/user", handlers.GetUserGigsHandler).Methods("GET")
@@ -117,8 +115,7 @@ func main() {
 	protected.HandleFunc("/services/search", handlers.SearchGigsHandler).Methods("POST")
 	protected.HandleFunc("/chats/{chatId}", handlers.DeleteChatHandler).Methods("DELETE")
 	protected.HandleFunc("/chats/{chatId}/complete", handlers.MarkChatCompletedHandler).Methods("PUT")
-	protected.HandleFunc("/messages/unread-count/{userId}", handlers.GetUnreadMessagesCountHandler).Methods("GET")
-
+	protected.HandleFunc("/chats/{chatId}/{userId}/unread", handlers.GetUnreadMessagesCountHandler).Methods("GET")
 	protected.HandleFunc("/report", handlers.ReportChatHandler).Methods("POST")
 	protected.HandleFunc("/ai/process", handlers.ProcessAIInput).Methods("POST")
 

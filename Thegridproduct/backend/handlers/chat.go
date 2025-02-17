@@ -85,17 +85,10 @@ func GetChatHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Fetch messages from Firestore
+	// Use global Firestore client
 	ctx := context.Background()
-	client, err := firestore.NewClient(ctx, "gridlychat")
-	if err != nil {
-		log.Printf("Failed to create Firestore client: %v", err)
-		WriteJSONError(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-	defer client.Close()
+	chatDocRef := fsClient.Collection("chatRooms").Doc(chat.ID.Hex())
 
-	chatDocRef := client.Collection("chatRooms").Doc(chat.ID.Hex())
 	docSnap, err := chatDocRef.Get(ctx)
 	if err != nil {
 		log.Printf("Firestore chat not found: %v", err)
@@ -126,6 +119,7 @@ func GetChatHandler(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, enrichedChat, http.StatusOK)
 }
 
+// GetChatsByUserHandler fetches all chat conversations for a given user.
 func GetChatsByUserHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	userIDStr := vars["userId"]
@@ -142,15 +136,8 @@ func GetChatsByUserHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := context.Background()
-	client, err := firestore.NewClient(ctx, "gridlychat", option.WithCredentialsJSON(serviceAccountJSON))
-	if err != nil {
-		log.Printf("Failed to create Firestore client: %v", err)
-		WriteJSONError(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-	defer client.Close()
-
 	var enrichedChats []EnrichedChat
+
 	for _, c := range chats {
 		var referenceTitle string
 		var referenceType string
@@ -205,8 +192,8 @@ func GetChatsByUserHandler(w http.ResponseWriter, r *http.Request) {
 			otherUser = User{FirstName: userData.FirstName, LastName: userData.LastName}
 		}
 
-		// Fetch messages from Firestore
-		chatDocRef := client.Collection("chatRooms").Doc(c.ID.Hex())
+		// Fetch messages from Firestore using the global Firestore client
+		chatDocRef := fsClient.Collection("chatRooms").Doc(c.ID.Hex())
 		docSnap, err := chatDocRef.Get(ctx)
 		if err != nil {
 			log.Printf("⚠️ No Firestore chat found for chatID %s: %v", c.ID.Hex(), err)
@@ -279,65 +266,63 @@ func GetChatsByUserHandler(w http.ResponseWriter, r *http.Request) {
 	}, http.StatusOK)
 }
 
-// AddMessageHandler adds a new message to a chat.
+// 🔹 Global Firestore Client (Singleton)
+var fsClient *firestore.Client
+
+func init() {
+	ctx := context.Background()
+	var err error
+	fsClient, err = firestore.NewClient(ctx, "gridlychat", option.WithCredentialsJSON(serviceAccountJSON))
+	if err != nil {
+		log.Fatalf("🔥 Failed to initialize Firestore client: %v", err)
+	}
+	log.Println("✅ Firestore client initialized successfully")
+}
+
+// 🔹 Add Message to Firestore Chat Room
 func AddMessageHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	chatIDStr, ok := vars["chatId"]
-	if !ok || chatIDStr == "" {
+	chatID := vars["chatId"]
+	if chatID == "" {
 		WriteJSONError(w, "Chat ID is required", http.StatusBadRequest)
 		return
 	}
 
-	// Decode request body
 	var message models.Message
 	if err := json.NewDecoder(r.Body).Decode(&message); err != nil {
 		WriteJSONError(w, "Invalid request payload", http.StatusBadRequest)
 		return
 	}
 
-	// Validate message fields
+	// ✅ Ensure required fields exist
 	if message.SenderID == "" || message.Content == "" {
 		WriteJSONError(w, "Sender ID and content are required", http.StatusBadRequest)
 		return
 	}
+
 	message.Timestamp = time.Now().UTC()
 
-	// Firestore setup
 	ctx := context.Background()
-	client, err := firestore.NewClient(ctx, "gridlychat", option.WithCredentialsJSON(serviceAccountJSON))
-	if err != nil {
-		log.Printf("Failed to create Firestore client: %v", err)
-		WriteJSONError(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-	defer client.Close()
+	chatDocRef := fsClient.Collection("chatRooms").Doc(chatID)
 
-	chatDocRef := client.Collection("chatRooms").Doc(chatIDStr)
-	_, err = chatDocRef.Get(ctx)
-	if err != nil {
-		log.Printf("Chat room not found in Firestore: %s", chatIDStr)
-		http.Error(w, "Chat room does not exist", http.StatusNotFound)
-		return
-	}
-
-	// Prepare message data
+	// 🔹 Ensure `_id` is unique
 	messageData := map[string]interface{}{
-		"_id":       primitive.NewObjectID().Hex(),
+		"_id":       primitive.NewObjectID().Hex(), // ✅ Generates a unique ID
 		"senderId":  message.SenderID,
 		"content":   message.Content,
 		"timestamp": message.Timestamp.Format(time.RFC3339),
 	}
 
-	// Append message to Firestore chat room
-	_, err = chatDocRef.Update(ctx, []firestore.Update{
+	_, err := chatDocRef.Update(ctx, []firestore.Update{
 		{Path: "messages", Value: firestore.ArrayUnion(messageData)},
 	})
 	if err != nil {
-		log.Printf("Failed to add message to Firestore: %v", err)
+		log.Printf("❌ Failed to add message to Firestore: %v", err)
 		WriteJSONError(w, "Failed to send message", http.StatusInternalServerError)
 		return
 	}
 
+	log.Printf("✅ Message added to chat room: %s", chatID)
 	WriteJSON(w, map[string]string{"message": "Message sent successfully"}, http.StatusOK)
 }
 
@@ -349,18 +334,9 @@ func GetMessagesHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Initialize Firestore client with credentials
+	// Use global Firestore client
 	ctx := context.Background()
-	client, err := firestore.NewClient(ctx, "gridlychat", option.WithCredentialsJSON(serviceAccountJSON)) // Add credentials here
-	if err != nil {
-		log.Printf("Failed to create Firestore client: %v", err)
-		WriteJSONError(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-	defer client.Close()
-
-	// Fetch chat room document from Firestore
-	chatDocRef := client.Collection("chatRooms").Doc(chatIDStr)
+	chatDocRef := fsClient.Collection("chatRooms").Doc(chatIDStr)
 	docSnap, err := chatDocRef.Get(ctx)
 	if err != nil {
 		log.Printf("Chat room not found in Firestore: %v", err)
@@ -378,6 +354,7 @@ func GetMessagesHandler(w http.ResponseWriter, r *http.Request) {
 	// Return messages as JSON response
 	WriteJSON(w, messages, http.StatusOK)
 }
+
 func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -933,29 +910,23 @@ var serviceAccountJSON = []byte(`{
 // createFirestoreChatRoom creates a new chat room in Firestore for both products and gigs.
 func createFirestoreChatRoom(chatID, buyerID, sellerID, referenceID, referenceType string) error {
 	ctx := context.Background()
-	client, err := firestore.NewClient(ctx, "gridlychat", option.WithCredentialsJSON(serviceAccountJSON))
-	if err != nil {
-		return fmt.Errorf("failed to create Firestore client: %v", err)
-	}
-	defer client.Close()
 
-	docRef := client.Collection("chatRooms").Doc(chatID)
+	docRef := fsClient.Collection("chatRooms").Doc(chatID)
 	data := map[string]interface{}{
 		"chatID":        chatID,
 		"referenceID":   referenceID,   // ✅ Can be either a ProductID or a GigID
 		"referenceType": referenceType, // ✅ "product", "gig", or "product_request"
-
-		"buyerID":   buyerID,
-		"sellerID":  sellerID,
-		"createdAt": time.Now().Format(time.RFC3339),
-		"messages":  []interface{}{},
+		"buyerID":       buyerID,
+		"sellerID":      sellerID,
+		"createdAt":     time.Now().Format(time.RFC3339),
+		"messages":      []interface{}{},
 	}
 
-	_, err = docRef.Set(ctx, data)
+	_, err := docRef.Set(ctx, data)
 	if err != nil {
 		return fmt.Errorf("failed to create Firestore chat room: %v", err)
 	}
-	log.Printf("Firestore chat room created: %s (Type: %s)", chatID, referenceType)
+	log.Printf("✅ Firestore chat room created: %s (Type: %s)", chatID, referenceType)
 	return nil
 }
 
@@ -979,15 +950,8 @@ func TestSendMessageHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := context.Background()
-	client, err := firestore.NewClient(ctx, "gridlychat", option.WithCredentialsJSON(serviceAccountJSON))
-	if err != nil {
-		http.Error(w, "Failed to create Firestore client", http.StatusInternalServerError)
-		return
-	}
-	defer client.Close()
-
-	docRef := client.Collection("chatRooms").Doc(req.ChatID)
-	_, err = docRef.Get(ctx)
+	docRef := fsClient.Collection("chatRooms").Doc(req.ChatID)
+	_, err := docRef.Get(ctx)
 	if err != nil {
 		log.Printf("Chat room not found in Firestore: %s", req.ChatID)
 		http.Error(w, "Chat room does not exist", http.StatusNotFound)
@@ -1013,7 +977,6 @@ func TestSendMessageHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{
 		"status": "success",
 	})
-
 }
 
 // DeleteChatHandler deletes a chat room and decrements the chatCount for the referenced item.
@@ -1085,10 +1048,6 @@ func DeleteChatHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Error deleting Firestore chat room: %v", err)
 		// Not returning error here because the main deletion (MongoDB) succeeded.
 	}
-
-	// --- Step 3: Decrement chatCount for the referenced item ---
-	// The chat document should have ReferenceType and ReferenceID fields.
-	// We update the corresponding collection (products, gigs, or product_requests).
 	var refCollection *mongo.Collection
 	switch chat.ReferenceType {
 	case "product":
@@ -1103,14 +1062,12 @@ func DeleteChatHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if refCollection != nil {
-		// Decrement chatCount by 1.
 		_, err = refCollection.UpdateOne(ctx,
 			bson.M{"_id": chat.ReferenceID},
 			bson.M{"$inc": bson.M{"chatCount": -1}},
 		)
 		if err != nil {
 			log.Printf("Error updating chatCount for referenceID %s: %v", chat.ReferenceID.Hex(), err)
-			// Not returning error; you might want to notify admin/log for later review.
 		}
 	}
 
@@ -1120,8 +1077,6 @@ func DeleteChatHandler(w http.ResponseWriter, r *http.Request) {
 	}, http.StatusOK)
 }
 
-// MarkChatCompletedHandler updates the status of the referenced item (product or gig)
-// when the user marks the chat as completed (e.g., by clicking a check button).
 func MarkChatCompletedHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -1138,7 +1093,6 @@ func MarkChatCompletedHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Convert chatID string to ObjectID.
 	chatObjID, err := primitive.ObjectIDFromHex(chatIDStr)
 	if err != nil {
 		WriteJSONError(w, "Invalid Chat ID format", http.StatusBadRequest)
@@ -1148,7 +1102,6 @@ func MarkChatCompletedHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Retrieve the chat from the MongoDB "chats" collection.
 	chatsCol := db.GetCollection("gridlyapp", "chats")
 	var chat models.Chat
 	err = chatsCol.FindOne(ctx, bson.M{"_id": chatObjID}).Decode(&chat)
@@ -1162,7 +1115,6 @@ func MarkChatCompletedHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Based on the chat's reference type, select the appropriate collection and new status.
 	var refCollection *mongo.Collection
 	var newStatus string
 
@@ -1194,97 +1146,79 @@ func MarkChatCompletedHandler(w http.ResponseWriter, r *http.Request) {
 func GetUnreadMessagesCountHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	// Extract userId from URL parameters
 	vars := mux.Vars(r)
 	userID := vars["userId"]
-	if userID == "" {
-		WriteJSONError(w, "User ID is required", http.StatusBadRequest)
+	chatID := vars["chatId"] // Now we take chatId to focus on a single chat room.
+
+	if userID == "" || chatID == "" {
+		WriteJSONError(w, "User ID and Chat ID are required", http.StatusBadRequest)
 		return
 	}
 
-	// Initialize Firestore client
 	ctx := context.Background()
-	client, err := firestore.NewClient(ctx, "gridlychat", option.WithCredentialsJSON(serviceAccountJSON))
+
+	// Fetch the specific chat room
+	chatDocRef := fsClient.Collection("chatRooms").Doc(chatID)
+	docSnap, err := chatDocRef.Get(ctx)
 	if err != nil {
-		log.Printf("❌ Failed to create Firestore client: %v", err)
-		WriteJSONError(w, "Internal server error", http.StatusInternalServerError)
+		log.Printf("❌ Chat room %s not found in Firestore: %v", chatID, err)
+		WriteJSONError(w, "Chat room not found", http.StatusNotFound)
 		return
 	}
-	defer client.Close()
 
-	// Fetch all chat rooms where user is a participant (as buyer or seller)
-	chatRooms := client.Collection("chatRooms")
-	buyerQuery := chatRooms.Where("buyerID", "==", userID).Documents(ctx)
-	sellerQuery := chatRooms.Where("sellerID", "==", userID).Documents(ctx)
+	chatData := docSnap.Data()
+	lastReadTime := time.Time{} // default zero time
 
+	// Extract user's last read timestamp
+	if lrMap, ok := chatData["lastRead"].(map[string]interface{}); ok {
+		if lrVal, exists := lrMap[userID]; exists {
+			if lrStr, ok := lrVal.(string); ok && lrStr != "" {
+				parsed, err := time.Parse(time.RFC3339, lrStr)
+				if err == nil {
+					lastReadTime = parsed
+				} else {
+					log.Printf("⚠️ Error parsing last read time for user %s: %v", userID, err)
+				}
+			}
+		}
+	}
+
+	// If there's no last read timestamp, assume all messages are unread.
+	if lastReadTime.IsZero() {
+		lastReadTime = time.Time{} // Start from zero time (all messages are unread)
+	}
+
+	// Count unread messages for the user in this chat room
 	unreadCount := 0
-
-	// Get documents for buyer and seller queries
-	docs, err := buyerQuery.GetAll()
-	if err != nil {
-		log.Printf("❌ Error fetching chats for user %s: %v", userID, err)
-		WriteJSONError(w, "Error retrieving chats", http.StatusInternalServerError)
-		return
-	}
-	docs2, err := sellerQuery.GetAll()
-	if err != nil {
-		log.Printf("❌ Error fetching chats for user %s: %v", userID, err)
-		WriteJSONError(w, "Error retrieving chats", http.StatusInternalServerError)
-		return
-	}
-	allDocs := append(docs, docs2...)
-
-	// Loop through each chat document
-	for _, doc := range allDocs {
-		chatData := doc.Data()
-
-		// Here we expect that each chat document has a "lastRead" field,
-		// which is a map where keys are user IDs and values are RFC3339 timestamps.
-		lastReadTime := time.Time{} // default value (zero time)
-		if lrMap, ok := chatData["lastRead"].(map[string]interface{}); ok {
-			if lrVal, exists := lrMap[userID]; exists {
-				if lrStr, ok := lrVal.(string); ok && lrStr != "" {
-					parsed, err := time.Parse(time.RFC3339, lrStr)
-					if err == nil {
-						lastReadTime = parsed
-					} else {
-						log.Printf("⚠️ Error parsing last read time for user %s: %v", userID, err)
-					}
-				}
+	messages, exists := chatData["messages"].([]interface{})
+	if exists {
+		for _, m := range messages {
+			msgMap, ok := m.(map[string]interface{})
+			if !ok {
+				continue
 			}
-		}
-		// If lastReadTime is zero (i.e. not set), assume the user has read all messages.
-		// (You can choose an alternate default if desired.)
-		if lastReadTime.IsZero() {
-			continue
-		}
 
-		// Count unread messages in this chat
-		messages, exists := chatData["messages"].([]interface{})
-		if exists {
-			for _, m := range messages {
-				msgMap, ok := m.(map[string]interface{})
-				if !ok {
-					continue
-				}
-				tsStr, tsExists := msgMap["timestamp"].(string)
-				if !tsExists {
-					continue
-				}
-				msgTime, err := time.Parse(time.RFC3339, tsStr)
-				if err != nil {
-					continue
-				}
-				senderId, senderExists := msgMap["senderId"].(string)
-				if !senderExists || senderId == userID {
-					continue // Skip messages sent by the user
-				}
-				if msgTime.After(lastReadTime) {
-					unreadCount++
-				}
+			tsStr, tsExists := msgMap["timestamp"].(string)
+			if !tsExists {
+				continue
+			}
+
+			msgTime, err := time.Parse(time.RFC3339, tsStr)
+			if err != nil {
+				continue
+			}
+
+			senderId, senderExists := msgMap["senderId"].(string)
+			if !senderExists || senderId == userID {
+				continue // Skip messages sent by the user
+			}
+
+			if msgTime.After(lastReadTime) {
+				unreadCount++
 			}
 		}
 	}
 
+	// Return the unread count for this specific chat room
 	WriteJSON(w, map[string]int{"unreadCount": unreadCount}, http.StatusOK)
 }

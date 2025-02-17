@@ -17,6 +17,7 @@ import {
   createStackNavigator,
   StackNavigationOptions,
 } from "@react-navigation/stack";
+import useChatListener from "./useChatListener";
 import { StripeProvider } from "@stripe/stripe-react-native";
 import { UserProvider, UserContext } from "./UserContext";
 import PaymentScreen from "./PaymentScreen";
@@ -439,6 +440,7 @@ const AppNavigator: React.FC<AppNavigatorProps> = ({ firstRender }) => {
 };
 
 const App: React.FC = () => {
+  useChatListener();
   const [showSplash, setShowSplash] = useState(true);
   const [firstRender, setFirstRender] = useState(true);
 
