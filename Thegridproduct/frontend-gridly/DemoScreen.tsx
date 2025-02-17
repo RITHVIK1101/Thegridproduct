@@ -21,6 +21,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "./navigationTypes";
+import Ionicons from "react-native-vector-icons/Ionicons";
 
 const { width, height } = Dimensions.get("window");
 
@@ -48,7 +49,8 @@ const slides: Slide[] = [
   },
   {
     title: "Find & Post Gigs",
-    description: "Showcase your skills, discover gigs, or hire talented peers.",
+    description:
+      "Showcase your skills, discover gigs, or hire talented peers.",
     image: "https://via.placeholder.com/300x200.png?text=Find+Post+Gigs",
   },
   {
@@ -56,6 +58,12 @@ const slides: Slide[] = [
     description:
       "Need something special? Post your request and connect instantly.",
     image: "https://via.placeholder.com/300x200.png?text=Request+Discover",
+  },
+  {
+    title: "Navigation Overview",
+    description:
+      "Learn how to navigate the app: Home, Gigs, Add, Messages, and Activity.",
+    image: "", // No image needed for this custom slide
   },
 ];
 
@@ -100,7 +108,6 @@ interface SlideItemProps {
  */
 const SlideItem: FC<SlideItemProps> = memo(
   ({ slide, index, scrollX, slideWidth, active, trigger }) => {
-    // Define the input range based on the slide index
     const inputRange = [
       (index - 1) * slideWidth,
       index * slideWidth,
@@ -123,7 +130,7 @@ const SlideItem: FC<SlideItemProps> = memo(
       extrapolate: "clamp",
     });
 
-    // Animated value for the bounce (pop) effect on the active slide
+    // Bounce (pop) animation for the active slide
     const bounceAnim = useRef(new Animated.Value(1)).current;
     useEffect(() => {
       let bounceAnimation: Animated.CompositeAnimation;
@@ -161,9 +168,8 @@ const SlideItem: FC<SlideItemProps> = memo(
             { opacity, transform: [{ translateY }, { scale }] },
           ]}
         >
-          {/* Custom image with bounce (pop) effect */}
+          {/* Custom image with bounce effect */}
           <Animated.Image
-            // Updated image source to a relative path.
             source={require("./assets/logonobg.png")}
             style={[styles.iconWrapper, { transform: [{ scale: bounceAnim }] }]}
             resizeMode="contain"
@@ -175,6 +181,111 @@ const SlideItem: FC<SlideItemProps> = memo(
             style={[styles.image, { transform: [{ scale }] }]}
             resizeMode="contain"
           />
+        </Animated.View>
+      </View>
+    );
+  }
+);
+
+/**
+ * NavigationOverviewSlide component for the custom navigation overview slide.
+ * It shows the icons and bubbles explaining what each navigation option does.
+ */
+interface NavigationOverviewSlideProps {
+  index: number;
+  scrollX: Animated.Value;
+  slideWidth: number;
+  active: boolean;
+  trigger: number;
+}
+
+const NavigationOverviewSlide: FC<NavigationOverviewSlideProps> = memo(
+  ({ index, scrollX, slideWidth, active, trigger }) => {
+    const inputRange = [
+      (index - 1) * slideWidth,
+      index * slideWidth,
+      (index + 1) * slideWidth,
+    ];
+
+    const translateY = scrollX.interpolate({
+      inputRange,
+      outputRange: [30, 0, -30],
+      extrapolate: "clamp",
+    });
+    const scale = scrollX.interpolate({
+      inputRange,
+      outputRange: [0.85, 1, 0.85],
+      extrapolate: "clamp",
+    });
+    const opacity = scrollX.interpolate({
+      inputRange,
+      outputRange: [0.5, 1, 0.5],
+      extrapolate: "clamp",
+    });
+
+    return (
+      <View style={[styles.slide, { width: slideWidth }]}>
+        <Animated.View
+          style={[
+            styles.navSlideContent,
+            { opacity, transform: [{ translateY }, { scale }] },
+          ]}
+        >
+          <Text style={styles.title}>Navigation Overview</Text>
+          <Text style={styles.description}>
+            Learn how to navigate the app. 
+          </Text>
+          {/* First Row: Home & Jobs */}
+          <View style={styles.navigationOverviewContainer}>
+            <View style={styles.navOverviewItem}>
+              <Ionicons name="home-outline" size={35} color="#BB86FC" />
+              <Text style={styles.navOverviewText}>Home</Text>
+              <View style={styles.bubble}>
+                <Text style={styles.navOverviewSubText}>
+                  Dashboard &amp; main feed
+                </Text>
+              </View>
+            </View>
+            <View style={styles.navOverviewItem}>
+              <Ionicons name="briefcase-outline" size={35} color="#BB86FC" />
+              <Text style={styles.navOverviewText}>Gigs</Text>
+              <View style={styles.bubble}>
+                <Text style={styles.navOverviewSubText}>
+                  Browse Gig listings
+                </Text>
+              </View>
+            </View>
+          </View>
+          {/* Second Row: Add, Messages & Activity */}
+          <View style={styles.navigationOverviewContainer}>
+            <View style={styles.navOverviewItem}>
+              <Ionicons name="add-outline" size={35} color="#BB86FC" />
+              <Text style={styles.navOverviewText}>Add</Text>
+              <View style={styles.bubble}>
+                <Text style={styles.navOverviewSubText}>
+                  Post products or gigs
+                </Text>
+              </View>
+            </View>
+            <View style={styles.navOverviewItem}>
+              <Ionicons name="chatbubble-outline" size={35} color="#BB86FC" />
+              <Text style={styles.navOverviewText}>Messages</Text>
+              <View style={styles.bubble}>
+                <Text style={styles.navOverviewSubText}>
+                  Chat with others
+                </Text>
+              </View>
+            </View>
+            <View style={styles.navOverviewItem}>
+              <Ionicons name="stats-chart-outline" size={35} color="#BB86FC" />
+              <Text style={styles.navOverviewText}>Activity</Text>
+              <View style={styles.bubble}>
+                <Text style={styles.navOverviewSubText}>
+                  View and manage your posts
+                </Text>
+              </View>
+            </View>
+          </View>
         </Animated.View>
       </View>
     );
@@ -194,7 +305,7 @@ const DemoScreen: FC<DemoScreenProps> = ({ navigation }) => {
   const scrollRef = useRef<ScrollView>(null);
   const scrollX = useRef(new Animated.Value(0)).current;
 
-  // Global background animations from custom hook
+  // Global background animation
   const { scale: bgScale, rotate: bgRotate } = usePulseAnimation(15000);
 
   const handleNext = useCallback(() => {
@@ -223,7 +334,7 @@ const DemoScreen: FC<DemoScreenProps> = ({ navigation }) => {
         ]}
       />
 
-      {/* Founders Button (no background container) */}
+      {/* Founders Button */}
       <TouchableOpacity
         style={styles.foundersButton}
         onPress={() => setShowFounders(true)}
@@ -231,15 +342,7 @@ const DemoScreen: FC<DemoScreenProps> = ({ navigation }) => {
         <Text style={styles.foundersButtonText}>Founders</Text>
       </TouchableOpacity>
 
-      {/* Skip Button */}
-      <TouchableOpacity
-        style={styles.skipButton}
-        onPress={() => navigation.replace("Login")}
-      >
-        <Text style={styles.skipText}>Skip</Text>
-      </TouchableOpacity>
-
-      {/* Animated Horizontal ScrollView with Parallax */}
+      {/* Horizontal ScrollView with slides */}
       <View style={styles.sliderContainer}>
         <Animated.ScrollView
           ref={scrollRef}
@@ -253,17 +356,32 @@ const DemoScreen: FC<DemoScreenProps> = ({ navigation }) => {
             { useNativeDriver: false }
           )}
         >
-          {slides.map((slide, index) => (
-            <SlideItem
-              key={index}
-              slide={slide}
-              index={index}
-              slideWidth={width}
-              scrollX={scrollX}
-              active={currentSlide === index}
-              trigger={currentSlide} // triggers the bounce effect when currentSlide changes
-            />
-          ))}
+          {slides.map((slide, index) => {
+            if (slide.title === "Navigation Overview") {
+              return (
+                <NavigationOverviewSlide
+                  key={index}
+                  index={index}
+                  slideWidth={width}
+                  scrollX={scrollX}
+                  active={currentSlide === index}
+                  trigger={currentSlide}
+                />
+              );
+            } else {
+              return (
+                <SlideItem
+                  key={index}
+                  slide={slide}
+                  index={index}
+                  slideWidth={width}
+                  scrollX={scrollX}
+                  active={currentSlide === index}
+                  trigger={currentSlide}
+                />
+              );
+            }
+          })}
         </Animated.ScrollView>
       </View>
 
@@ -284,7 +402,7 @@ const DemoScreen: FC<DemoScreenProps> = ({ navigation }) => {
         </TouchableOpacity>
       </View>
 
-      {/* Founders Popup with background blur */}
+      {/* Founders Popup */}
       {showFounders && (
         <View style={styles.foundersModal}>
           <BlurView
@@ -353,8 +471,15 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
+  // For regular slides
   slideContent: {
     marginTop: height * 0.3,
+    alignItems: "center",
+    paddingHorizontal: 20,
+  },
+  // For the Navigation Overview slide (shifted upward)
+  navSlideContent: {
+    marginTop: height * 0.2,
     alignItems: "center",
     paddingHorizontal: 20,
   },
@@ -449,5 +574,38 @@ const styles = StyleSheet.create({
     color: "#BB86FC",
     marginTop: 20,
     textAlign: "center",
+  },
+  // Navigation Overview Slide styles
+  navigationOverviewContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    marginVertical: 15,
+    width: "100%",
+  },
+  navOverviewItem: {
+    alignItems: "center",
+    marginHorizontal: 15,
+    marginVertical: 10,
+  },
+  navOverviewText: {
+    marginTop: 8,
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#FFFFFF",
+    textAlign: "center",
+  },
+  navOverviewSubText: {
+    fontSize: 12,
+    color: "#CCCCCC",
+    textAlign: "center",
+    width: 120,
+  },
+  bubble: {
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginTop: 4,
   },
 });
