@@ -36,7 +36,6 @@ import { NGROK_URL } from "@env";
 import { UserContext } from "./UserContext";
 import { RootStackParamList } from "./navigationTypes";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import TutorialOverlay from "./TutorialOverlay";
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
 const PRODUCT_HEIGHT = SCREEN_HEIGHT - 80; // minus nav bar height
@@ -102,31 +101,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
     likedProducts,
     setLikedProducts,
   } = useContext(UserContext);
-
-  // --- Tutorial Overlay State ---
-  const [showTutorial, setShowTutorial] = useState(false);
-  useEffect(() => {
-    if (userId) {
-      AsyncStorage.getItem(`tutorialCompleted_${userId}`)
-        .then((flag) => {
-          if (!flag) {
-            setShowTutorial(true);
-          }
-        })
-        .catch((error) => console.error("Error reading tutorial flag:", error));
-    }
-  }, [userId]);
-
-  const handleTutorialFinish = async () => {
-    setShowTutorial(false);
-    if (userId) {
-      try {
-        await AsyncStorage.setItem(`tutorialCompleted_${userId}`, "true");
-      } catch (error) {
-        console.error("Error saving tutorial flag:", error);
-      }
-    }
-  };
 
   // --- Filter Modal States ---
   const [campusMode, setCampusMode] = useState<"In Campus" | "Both">("Both");
@@ -915,7 +889,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
                 </TouchableOpacity>
               </View>
             </View>
-
           </>
         )}
       </View>
@@ -1160,8 +1133,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
           <BottomNavBar />
         </LinearGradient>
       </TouchableWithoutFeedback>
-
-      {showTutorial && <TutorialOverlay onFinish={handleTutorialFinish} />}
     </View>
   );
 };
