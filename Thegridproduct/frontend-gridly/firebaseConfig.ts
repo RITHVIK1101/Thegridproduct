@@ -6,12 +6,13 @@ import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/
 
 // Firebase Configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyATf4Ts4_hJyLKn9AZSxtF8vpVpQqQftz4",
-  authDomain: "the-gridly.firebaseapp.com",
-  projectId: "the-gridly",
-  storageBucket: "the-gridly.appspot.com", // Ensure this is correct
-  messagingSenderId: "803581911146",
-  appId: "1:803581911146:web:90619eaffd400024ea2a13"
+  apiKey: "AIzaSyD6MIu16wDmbOT37Fk01hi3Vt05ZyYJ-Z8",
+  authDomain: "gridlychat.firebaseapp.com",
+  projectId: "gridlychat",
+  storageBucket: "gridlychat.firebasestorage.app",
+  messagingSenderId: "597486867743",
+  appId: "1:597486867743:web:9a0072c064973d56dacc2a",
+  measurementId: "G-L0HLBZY1PP"
 };
 
 // Initialize Firebase

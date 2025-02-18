@@ -1,4 +1,3 @@
-// BottomNavBar.tsx
 import React, { useState, useRef, useEffect, useContext } from "react";
 import {
   View,
@@ -19,6 +18,16 @@ import {
 import { RootStackParamList } from "../navigationTypes";
 import { UserContext } from "../UserContext";
 import { NGROK_URL } from "@env";
+import { fetchConversations } from "../api";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import {
+  getFirestore,
+  collection,
+  query,
+  where,
+  documentId,
+  onSnapshot,
+} from "firebase/firestore";
 
 interface Gig {
   id: string;
@@ -32,9 +41,11 @@ interface Gig {
 const BottomNavBar: React.FC = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
   const route = useRoute();
-  const { token, userId, unreadCount } = useContext(UserContext);
-
+  const { token, userId } = useContext(UserContext);
   const [isModalVisible, setIsModalVisible] = useState(false);
+  
+  // NEW: State for total unread messages across all chats
+  const [totalUnread, setTotalUnread] = useState<number>(0);
 
   // Animation for spinning the add button
   const spinValue = useRef(new Animated.Value(0)).current;
@@ -71,14 +82,12 @@ const BottomNavBar: React.FC = () => {
   };
 
   const currentRouteName = route.name as keyof RootStackParamList;
+
   const isActive = (routeName: keyof RootStackParamList) => {
     return currentRouteName === routeName;
   };
 
-  const switchScreen = (
-    targetRoute: keyof RootStackParamList,
-    params?: object
-  ) => {
+  const switchScreen = (targetRoute: keyof RootStackParamList, params?: object) => {
     navigation.dispatch(
       CommonActions.reset({
         index: 0,
@@ -87,45 +96,134 @@ const BottomNavBar: React.FC = () => {
     );
   };
 
+  const hitSlopValue = { top: 10, bottom: 10, left: 10, right: 10 };
+
+  // Prefetch chats for Messaging tab
+  const prefetchChats = async (): Promise<any[]> => {
+    try {
+      const chats = await fetchConversations(userId, token);
+      return chats;
+    } catch (error) {
+      console.error("Error prefetching chats:", error);
+      return [];
+    }
+  };
+
+  // --- Prefetch function for Jobs ---
+  const prefetchJobs = async (): Promise<Gig[]> => {
+    try {
+      const response = await fetch(`${NGROK_URL}/services`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to fetch gigs: ${response.status}`);
+      }
+      const data = await response.json();
+      if (data && Array.isArray(data.gigs)) {
+        return data.gigs;
+      } else if (Array.isArray(data)) {
+        return data;
+      } else {
+        console.error("Invalid gigs data format:", data);
+        return [];
+      }
+    } catch (error) {
+      console.error(error);
+      return [];
+    }
+  };
+
+  // --- NEW: Setup a realtime listener to calculate total unread messages ---
+  const firestoreDB = getFirestore();
+  useEffect(() => {
+    let unsubscribeFunc: (() => void) | undefined;
+    const subscribeToUnread = async () => {
+      try {
+        // Fetch user's chats first
+        const chats = await fetchConversations(userId, token);
+        const chatIDs = chats.map((chat: any) => chat.chatID);
+        if (chatIDs.length === 0) {
+          setTotalUnread(0);
+          return;
+        }
+        // Create a query to get chatRooms with the matching document IDs
+        const q = query(
+          collection(firestoreDB, "chatRooms"),
+          where(documentId(), "in", chatIDs)
+        );
+        unsubscribeFunc = onSnapshot(q, async (snapshot) => {
+          let total = 0;
+          // For each chat document, compute the unread messages
+          await Promise.all(
+            snapshot.docs.map(async (docSnap) => {
+              const data = docSnap.data();
+              const messages = data.messages || [];
+              // Get last read timestamp from AsyncStorage (if any)
+              const lastReadStr = await AsyncStorage.getItem(`last_read_${docSnap.id}`);
+              const lastRead = lastReadStr ? new Date(lastReadStr) : new Date(0);
+              const unread = messages.filter((msg: any) => {
+                if (!msg.timestamp) return false;
+                const msgTime = new Date(msg.timestamp);
+                return msgTime > lastRead && msg.senderId !== userId;
+              }).length;
+              total += unread;
+            })
+          );
+          setTotalUnread(total);
+        });
+      } catch (error) {
+        console.error("Error setting up unread count listener:", error);
+      }
+    };
+
+    if (userId && token) {
+      subscribeToUnread();
+    }
+
+    return () => {
+      if (unsubscribeFunc) unsubscribeFunc();
+    };
+  }, [userId, token, firestoreDB]);
+
   return (
     <View style={styles.container}>
       {/* Home Tab */}
       <TouchableOpacity
         style={styles.navItem}
-        onPress={() => !isActive("Dashboard") && switchScreen("Dashboard")}
+        onPress={() => {
+          if (!isActive("Dashboard")) {
+            setTimeout(() => {
+              switchScreen("Dashboard");
+            }, 50);
+          }
+        }}
         accessibilityLabel="Navigate to Home"
+        hitSlop={hitSlopValue}
       >
-        <Ionicons
-          name={isActive("Dashboard") ? "home" : "home-outline"}
-          size={24}
-          color="#FFFFFF"
-        />
-        <Text
-          style={[
-            styles.navText,
-            isActive("Dashboard") && styles.navTextActive,
-          ]}
-        >
-          Home
-        </Text>
+        <Ionicons name={isActive("Dashboard") ? "home" : "home-outline"} size={24} color="#FFFFFF" />
+        <Text style={[styles.navText, isActive("Dashboard") && styles.navTextActive]}>Home</Text>
       </TouchableOpacity>
 
       {/* Jobs Tab */}
       <TouchableOpacity
         style={styles.navItem}
-        onPress={() => !isActive("Jobs") && switchScreen("Jobs")}
+        onPress={async () => {
+          if (!isActive("Jobs")) {
+            const gigs = await prefetchJobs();
+            setTimeout(() => {
+              switchScreen("Jobs", { preFetchedGigs: gigs });
+            }, 10);
+          }
+        }}
         accessibilityLabel="Navigate to Jobs"
+        hitSlop={hitSlopValue}
       >
-        <Ionicons
-          name={isActive("Jobs") ? "briefcase" : "briefcase-outline"}
-          size={24}
-          color="#FFFFFF"
-        />
-        <Text
-          style={[styles.navText, isActive("Jobs") && styles.navTextActive]}
-        >
-          Gigs
-        </Text>
+        <Ionicons name={isActive("Jobs") ? "briefcase" : "briefcase-outline"} size={24} color="#FFFFFF" />
+        <Text style={[styles.navText, isActive("Jobs") && styles.navTextActive]}>Jobs</Text>
       </TouchableOpacity>
 
       {/* Add Button */}
@@ -133,19 +231,26 @@ const BottomNavBar: React.FC = () => {
         style={styles.navItem}
         onPress={toggleModal}
         accessibilityLabel="Add or Request Product"
+        hitSlop={hitSlopValue}
       >
-        <Animated.View
-          style={[styles.addButton, { transform: [{ rotate: spin }] }]}
-        >
-          <Ionicons name="add-outline" size={30} color="#FFFFFF" />
+        <Animated.View style={[styles.addButton, { transform: [{ rotate: spin }] }]}>
+          <Ionicons name="arrow-up-outline" size={30} color="#FFFFFF" />
         </Animated.View>
       </TouchableOpacity>
 
-      {/* Messaging Tab with Unread Badge */}
+      {/* Messaging Tab – prefetch chats before switching */}
       <TouchableOpacity
         style={styles.navItem}
-        onPress={() => !isActive("Messaging") && switchScreen("Messaging")}
+        onPress={async () => {
+          if (!isActive("Messaging")) {
+            const preFetchedChats = await prefetchChats();
+            setTimeout(() => {
+              switchScreen("Messaging", { preFetchedChats });
+            }, 10);
+          }
+        }}
         accessibilityLabel="Navigate to Messaging"
+        hitSlop={hitSlopValue}
       >
         <View style={{ position: "relative" }}>
           <Ionicons
@@ -153,18 +258,13 @@ const BottomNavBar: React.FC = () => {
             size={24}
             color="#FFFFFF"
           />
-          {unreadCount > 0 && (
+          {totalUnread > 0 && (
             <View style={styles.unreadBadge}>
-              <Text style={styles.unreadBadgeText}>{unreadCount}</Text>
+              <Text style={styles.unreadBadgeText}>{totalUnread}</Text>
             </View>
           )}
         </View>
-        <Text
-          style={[
-            styles.navText,
-            isActive("Messaging") && styles.navTextActive,
-          ]}
-        >
+        <Text style={[styles.navText, isActive("Messaging") && styles.navTextActive]}>
           Messages
         </Text>
       </TouchableOpacity>
@@ -172,33 +272,23 @@ const BottomNavBar: React.FC = () => {
       {/* Activity Tab */}
       <TouchableOpacity
         style={styles.navItem}
-        onPress={() => !isActive("Activity") && switchScreen("Activity")}
+        onPress={() => {
+          if (!isActive("Activity")) {
+            setTimeout(() => {
+              switchScreen("Activity");
+            }, 50);
+          }
+        }}
         accessibilityLabel="Navigate to Activity"
+        hitSlop={hitSlopValue}
       >
-        <Ionicons
-          name={isActive("Activity") ? "stats-chart" : "stats-chart-outline"}
-          size={24}
-          color="#FFFFFF"
-        />
-        <Text
-          style={[styles.navText, isActive("Activity") && styles.navTextActive]}
-        >
-          Activity
-        </Text>
+        <Ionicons name={isActive("Activity") ? "stats-chart" : "stats-chart-outline"} size={24} color="#FFFFFF" />
+        <Text style={[styles.navText, isActive("Activity") && styles.navTextActive]}>Activity</Text>
       </TouchableOpacity>
 
       {/* Modal for Add Options */}
-      <Modal
-        visible={isModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={toggleModal}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPressOut={toggleModal}
-        >
+      <Modal visible={isModalVisible} transparent animationType="fade" onRequestClose={toggleModal}>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPressOut={toggleModal}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Add Options</Text>
             <View style={styles.modalButtonsContainer}>
@@ -233,11 +323,7 @@ const BottomNavBar: React.FC = () => {
                 <Text style={styles.modalButtonText}>Request Product</Text>
               </TouchableOpacity>
             </View>
-            <TouchableOpacity
-              onPress={toggleModal}
-              style={styles.modalClose}
-              accessibilityLabel="Close Add Options Modal"
-            >
+            <TouchableOpacity onPress={toggleModal} style={styles.modalClose} accessibilityLabel="Close Add Options Modal">
               <Ionicons name="close-outline" size={24} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
@@ -270,6 +356,7 @@ const styles = StyleSheet.create({
   },
   navItem: {
     alignItems: "center",
+    justifyContent: "flex-end",
     flex: 1,
     paddingBottom: 6,
   },
@@ -277,6 +364,8 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: "#CCCCCC",
     marginTop: 2,
+    fontFamily: "System",
+    marginBottom: 15,
   },
   navTextActive: {
     fontWeight: "600",
@@ -292,23 +381,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.5,
     shadowRadius: 6,
     elevation: 10,
-  },
-  unreadBadge: {
-    position: "absolute",
-    top: -5,
-    right: -8,
-    backgroundColor: "red",
-    borderRadius: 12,
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    minWidth: 18,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  unreadBadgeText: {
-    color: "#fff",
-    fontSize: 10,
-    fontWeight: "bold",
+    marginBottom: 18.5,
   },
   modalOverlay: {
     flex: 1,
@@ -363,5 +436,23 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 15,
     right: 15,
+  },
+  // Badge styles for unread count on Messaging icon:
+  unreadBadge: {
+    position: "absolute",
+    top: -4,
+    right: -10,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  unreadBadgeText: {
+    color: "#000000",
+    fontSize: 10,
+    fontWeight: "bold",
+    textAlign: "center",
   },
 });

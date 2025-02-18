@@ -35,6 +35,7 @@ import {
   doc,
   onSnapshot,
   setDoc,
+  updateDoc, // <-- NEW: Import updateDoc to update Firestore fields
   arrayUnion,
   collection,
   query,
@@ -56,7 +57,6 @@ import { RootStackParamList } from "./navigationTypes";
 
 type Chat = Conversation & {
   latestSenderId?: string;
-  // NOTE: We'll remove local unreadCount usage, since the global hook manages it
 };
 
 type Request = {
@@ -113,7 +113,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
 
   const [reportModalVisible, setReportModalVisible] = useState<boolean>(false);
   const [reportReason, setReportReason] = useState<string>("Select a Reason");
-  const [customReason, setCustomReason] = useState<string>(""); // For "Other"
+  const [customReason, setCustomReason] = useState<string>("");
   const [reportDescription, setReportDescription] = useState<string>("");
 
   const [isReasonDropdownVisible, setIsReasonDropdownVisible] =
@@ -136,14 +136,15 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
   const [hasNewIncomingRequests, setHasNewIncomingRequests] =
     useState<boolean>(false);
 
-  // From Context
+  // Unread Counts state
+  const [unreadCounts, setUnreadCounts] = useState<{ [key: string]: number }>(
+    {}
+  );
+
   const { userId, token } = useContext(UserContext);
 
-  // Firestore instance
   const firestoreDB = getFirestore();
   const flatListRef = useRef<FlatList<Message> | null>(null);
-
-  // Navigation & Route
   const navigation = useNavigation();
   const { chatId: routeChatId } = route.params || {};
 
@@ -165,7 +166,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     "https://api.cloudinary.com/v1_1/ds0zpfht9/image/upload";
   const UPLOAD_PRESET = "gridly_preset";
 
-  // 1) Filter logic
+  // Filter logic
   const applyFilter = (
     chatsToFilter: Chat[],
     f: "all" | "products" | "gigs" | "product_request"
@@ -180,7 +181,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     return chatsToFilter.filter((c) => c.referenceType === f);
   };
 
-  // 2) Sort + filter whenever `chats` or `filter` changes
   useEffect(() => {
     const filtered = applyFilter(chats, filter);
     const sorted = filtered.sort((a, b) => {
@@ -195,14 +195,14 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     setFilteredChats(sorted);
   }, [chats, filter]);
 
-  // 3) If no chats loaded yet, fetch them once user is logged in
+  // Fetch user chats if none are loaded
   useEffect(() => {
     if (chats.length === 0 && userId && token) {
       fetchUserChats();
     }
   }, [userId, token]);
 
-  // 4) Also fetch user chats whenever we focus on this screen
+  // Refresh user chats whenever this screen is focused
   useFocusEffect(
     React.useCallback(() => {
       if (userId && token) {
@@ -211,15 +211,51 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }, [userId, token])
   );
 
-  // 5) Poll for new incoming requests every 10s
+  // Poll for new incoming requests every 10s
   useEffect(() => {
     const intervalId = setInterval(() => {
       if (userId && token) {
         fetchUserRequests();
       }
-    }, 10000); // 10 seconds
+    }, 10000);
     return () => clearInterval(intervalId);
   }, [userId, token]);
+
+  // Helper to fetch unread count for a specific chat
+  const fetchUnreadCount = async (chatID: string): Promise<number> => {
+    try {
+      const response = await axios.get(
+        `https://thegridproduct-production.up.railway.app/chats/${chatID}/${userId}/unread`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      return response.data.unreadCount;
+    } catch (error) {
+      console.error(`Error fetching unread count for chat ${chatID}:`, error);
+      return 0;
+    }
+  };
+
+  // Once we have chats, fetch unread counts for each chat
+  useEffect(() => {
+    const fetchAllUnreadCounts = async () => {
+      const counts: { [key: string]: number } = {};
+      await Promise.all(
+        chats.map(async (chat) => {
+          const count = await fetchUnreadCount(chat.chatID);
+          counts[chat.chatID] = count;
+        })
+      );
+      setUnreadCounts(counts);
+    };
+
+    if (chats.length > 0 && userId && token) {
+      fetchAllUnreadCounts();
+    }
+  }, [chats, userId, token]);
 
   const fetchUserChats = async () => {
     if (!userId || !token) return;
@@ -246,7 +282,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         })
       );
       setChats(mergedChats);
-      // If we came in via a route param "chatId", open that chat immediately
+      // If we came in via "chatId", open that chat immediately
       if (routeChatId) {
         const chat = mergedChats.find((c) => c.chatID === routeChatId);
         if (chat) openChat(chat);
@@ -259,7 +295,21 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }
   };
 
-  // 6) Listen to the SINGLE selected chat for real-time new messages
+  // Update lastRead timestamp in Firestore for the current chat and user
+  const updateLastRead = async (chatId: string) => {
+    const currentTime = new Date().toISOString();
+    const chatDocRef = doc(firestoreDB, "chatRooms", chatId);
+    try {
+      await updateDoc(chatDocRef, {
+        [`lastRead.${userId}`]: currentTime,
+      });
+      console.log(`Updated lastRead for chat ${chatId}`);
+    } catch (error) {
+      console.error("Failed to update lastRead: ", error);
+    }
+  };
+
+  // Listen for real-time updates to the selected chat
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
     if (selectedChat) {
@@ -275,13 +325,11 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
               if (!prev.messages || !Array.isArray(data.messages)) {
                 return prev;
               }
-              // Basic check to avoid overwriting with older data
               if (data.messages.length <= prev.messages.length) {
                 return prev;
               }
               return { ...prev, messages: data.messages };
             });
-
             // Scroll to end
             setTimeout(() => {
               flatListRef.current?.scrollToEnd({ animated: true });
@@ -295,8 +343,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     };
   }, [selectedChat, firestoreDB]);
 
-  // 7) If we want to keep local `latestMessage` in sync for the chat list UI, do so
-  //    BUT do NOT recalculate unread counts here. The global hook does that.
+  // Listen to all chat documents to keep "latestMessage" in sync
   useEffect(() => {
     if (chats.length > 0) {
       const chatIDs = chats.map((chat) => chat.chatID);
@@ -311,18 +358,17 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
             const lastMessage = data.messages[data.messages.length - 1];
             setChats((prevChats) =>
               prevChats
-                .map((chat) => {
-                  if (chat.chatID === docSnap.id) {
+                .map((c) => {
+                  if (c.chatID === docSnap.id) {
                     return {
-                      ...chat,
+                      ...c,
                       latestMessage: lastMessage?.content || "",
                       latestTimestamp: lastMessage?.timestamp || "",
                       latestSenderId: lastMessage?.senderId || "",
                     };
                   }
-                  return chat;
+                  return c;
                 })
-                // Sort by newest last message
                 .sort((a, b) => {
                   const aTime = a.latestTimestamp
                     ? new Date(a.latestTimestamp).getTime()
@@ -333,7 +379,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                   return bTime - aTime;
                 })
             );
-            // ***We do NOT do unread count logic here***
           }
         });
       });
@@ -341,16 +386,16 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }
   }, [chats.map((c) => c.chatID).join(","), firestoreDB]);
 
-  // 8) openChat fetches the messages for that chat
   const openChat = async (chat: Chat) => {
     setLoading(true);
     try {
-      // If we do not have messages, load them
       setSelectedChat((prev) =>
         prev && prev.chatID === chat.chatID ? prev : { ...chat, messages: [] }
       );
       const messages = await getMessages(chat.chatID, token);
       setSelectedChat({ ...chat, messages });
+      // Optionally, update lastRead when the chat is opened
+      await updateLastRead(chat.chatID);
       setChatModalVisible(true);
       setNewMessage("");
       setTimeout(() => {
@@ -364,7 +409,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }
   };
 
-  // 9) Once user closes a chat, store last read
+  // When leaving the chat, update the lastRead timestamp so that unread count resets
   const handleBackFromChat = async () => {
     if (selectedChat) {
       const messages = selectedChat.messages;
@@ -390,10 +435,12 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
             lastMsg.timestamp
           );
         }
+        // <-- NEW: Update lastRead in Firestore so unread count resets
+        await updateLastRead(selectedChat.chatID);
       } catch (e) {
         console.error("Error saving last message or read time:", e);
       }
-      // Update local `chats` with the newly sorted info
+      // Update local chats with the new info
       setChats((prevChats) =>
         prevChats
           .map((c) => (c.chatID === updatedChat.chatID ? updatedChat : c))
@@ -412,7 +459,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     setSelectedChat(null);
   };
 
-  // 10) Sending a message
   const sendMessage = async () => {
     if (!newMessage.trim() || !selectedChat) {
       Alert.alert("Error", "Please enter a message.");
@@ -425,7 +471,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       content: messageContent,
       timestamp: new Date().toISOString(),
     };
-    // Locally add it
+    // Add message locally
     setSelectedChat((prev) =>
       prev
         ? { ...prev, messages: [...(prev.messages || []), newMessageObj] }
@@ -436,7 +482,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       flatListRef.current?.scrollToEnd({ animated: true });
     }, 100);
 
-    // Firestore
+    // Send message to Firestore
     try {
       const chatDocRef = doc(firestoreDB, "chatRooms", selectedChat.chatID);
       await setDoc(
@@ -450,7 +496,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }
   };
 
-  // 11) Handling images
   const handleImagePress = async () => {
     try {
       const { status } =
@@ -548,7 +593,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }
   };
 
-  // 12) fetchUserRequests, accept/reject requests, etc.
   const fetchUserRequests = async () => {
     if (!userId || !token) {
       setErrorRequests("User not authenticated.");
@@ -571,7 +615,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         const { incomingRequests, outgoingRequests } = response.data;
         setIncomingRequests(incomingRequests as Request[]);
         setOutgoingRequests(outgoingRequests as Request[]);
-        // If we have new incoming requests, show an exclamation badge
         setHasNewIncomingRequests(
           incomingRequests && incomingRequests.length > 0
         );
@@ -605,7 +648,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       if (response.status === 200) {
         setRequestPopupMessage("Chat request accepted.");
         setRequestPopupVisible(true);
-        // Remove from local incoming
         setIncomingRequests((prev) =>
           prev.filter((req) => req.requestId !== requestId)
         );
@@ -665,7 +707,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }
   };
 
-  // 13) Render Chat list items
+  // Render chat list item with unread badge
   const renderChat = ({ item }: { item: Chat }) => {
     if (!item.user) {
       console.warn(`Chat with chatID ${item.chatID} is missing user data.`);
@@ -684,6 +726,10 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
           minute: "2-digit",
         })
       : "";
+
+    // Get unread count from state
+    const unreadCount = unreadCounts[item.chatID] || 0;
+
     const chatTypeLabel =
       item.referenceType === "product"
         ? "Product Name: "
@@ -715,7 +761,11 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
               </Text>
               <View style={styles.timeContainer}>
                 <Text style={styles.chatTime}>{formattedTimestamp}</Text>
-                {/* We do NOT show local `item.unreadCount` since the global hook handles the badge. */}
+                {unreadCount > 0 && (
+                  <View style={styles.unreadBadge}>
+                    <Text style={styles.unreadBadgeText}>{unreadCount}</Text>
+                  </View>
+                )}
               </View>
             </View>
             <Text style={styles.chatProductName} numberOfLines={1}>
@@ -743,13 +793,11 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     );
   };
 
-  // 14) Render each individual message
   const renderMessage = ({ item }: { item: Message }) => {
     const isImageMessage = item.content.startsWith("[Image] ");
-    const imageUri = isImageMessage
-      ? item.content.replace("[Image] ", "")
-      : null;
+    const imageUri = isImageMessage ? item.content.replace("[Image] ", "") : null;
     const isCurrentUser = item.senderId === userId;
+
     return (
       <View
         style={[
@@ -801,7 +849,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     );
   };
 
-  // 15) Deleting a chat
   const handleDeleteChat = async () => {
     if (!selectedChat) return;
     Alert.alert(
@@ -839,7 +886,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     );
   };
 
-  // 16) Marking product as sold
   const handleMarkAsSold = async () => {
     if (!selectedChat) return;
     Alert.alert(
@@ -878,7 +924,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     );
   };
 
-  // 17) A tiny horizontal listing of user’s “Purchases” or “Gigs”
   const productsOrGigs = chats.map((c) => ({
     chatID: c.chatID,
     title: c.referenceTitle || "Unnamed Item",
@@ -896,7 +941,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }
   };
 
-  // 18) Filter Pill Label
   const currentHeaderTitle =
     filter === "all"
       ? "All Chats"
@@ -919,12 +963,10 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       ? "Product Requests ×"
       : "All ×";
 
-  // 19) Functions to handle filter pill
   const handleFilterPillPress = () => {
     setFilterMenuVisible(true);
   };
 
-  // 20) Reporting
   const handleReportPress = () => {
     setChatModalVisible(false);
     setTimeout(() => {
@@ -986,7 +1028,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }
   };
 
-  // 21) Render requests modal
   const renderRequestsModal = () => {
     if (isRequestsModalVisible) {
       Animated.timing(slideAnim, {
@@ -1003,6 +1044,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         useNativeDriver: true,
       }).start();
     }
+
     const renderRequestItem = ({ item }: { item: Request }) => {
       const referenceTypeLabel =
         item.referenceType === "product"
@@ -1063,13 +1105,15 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
               </TouchableOpacity>
             </View>
           ) : (
-            <View style={styles.requestActions}></View>
+            <View style={styles.requestActions} />
           )}
         </View>
       );
     };
+
     const dataToShow =
       selectedRequestsTab === "incoming" ? incomingRequests : outgoingRequests;
+
     return (
       <Modal
         visible={isRequestsModalVisible}
@@ -1173,7 +1217,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     );
   };
 
-  // The UI
   return (
     <View style={styles.container}>
       <SafeAreaView style={{ flex: 1 }}>
@@ -1382,7 +1425,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                     >
                       <Ionicons name="flag" size={24} color="#F08080" />
                     </Pressable>
-                    {/* Product Chat Action Buttons (only for product chat rooms) */}
+                    {/* Product Chat Action Buttons (only for product chat) */}
                     {selectedChat?.referenceType === "product" && (
                       <View style={styles.productActionButtons}>
                         <Pressable
@@ -1849,9 +1892,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     color: "#FFFFFF",
-    fontFamily: "HelveticaNeue-Medium",
-    flex: 1,
-    marginRight: 10,
+    fontFamily: "Helvetica"
   },
   timeContainer: {
     position: "relative",
@@ -2070,6 +2111,22 @@ const styles = StyleSheet.create({
     shadowRadius: 5,
     elevation: 10,
   },
+  unreadBadge: {
+    position: "absolute",
+    top: 22,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    alignSelf: "center",
+  },
+  unreadBadgeText: {
+    color: "#000000",
+    fontSize: 10,
+    fontWeight: "bold",
+    textAlign: "center",
+  },
+  
   requestsSafeArea: { flex: 1 },
   requestsHeader: {
     flexDirection: "row",
