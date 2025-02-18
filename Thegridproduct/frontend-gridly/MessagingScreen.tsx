@@ -142,6 +142,12 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
   );
 
   const { userId, token } = useContext(UserContext);
+  useEffect(() => {
+    if (userId && token) {
+      fetchUserRequests();
+    }
+  }, [userId, token]);
+  
 
   const firestoreDB = getFirestore();
   const flatListRef = useRef<FlatList<Message> | null>(null);
@@ -1228,7 +1234,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
             <Pressable
               style={styles.requestsButton}
               onPress={() => {
-                setHasNewIncomingRequests(false);
+                // Optionally delay clearing or let polling decide when to clear
                 setRequestsModalVisible(true);
                 setSelectedRequestsTab("incoming");
                 fetchUserRequests();

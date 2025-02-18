@@ -20,6 +20,7 @@ import { UserContext } from "../UserContext";
 import { NGROK_URL } from "@env";
 import { fetchConversations } from "../api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+
 import {
   getFirestore,
   collection,
@@ -49,6 +50,8 @@ const BottomNavBar: React.FC = () => {
 
   // Animation for spinning the add button
   const spinValue = useRef(new Animated.Value(0)).current;
+  const [hasNewIncomingRequests, setHasNewIncomingRequests] = useState<boolean>(false);
+
   const spinAnimation = useRef(
     Animated.loop(
       Animated.timing(spinValue, {
@@ -252,18 +255,26 @@ const BottomNavBar: React.FC = () => {
         accessibilityLabel="Navigate to Messaging"
         hitSlop={hitSlopValue}
       >
-        <View style={{ position: "relative" }}>
-          <Ionicons
-            name={isActive("Messaging") ? "chatbubble" : "chatbubble-outline"}
-            size={24}
-            color="#FFFFFF"
-          />
-          {totalUnread > 0 && (
-            <View style={styles.unreadBadge}>
-              <Text style={styles.unreadBadgeText}>{totalUnread}</Text>
-            </View>
-          )}
-        </View>
+       <View style={{ position: "relative" }}>
+  <Ionicons
+    name={isActive("Messaging") ? "chatbubble" : "chatbubble-outline"}
+    size={24}
+    color="#FFFFFF"
+  />
+  {totalUnread > 0 ? (
+    <View style={styles.unreadBadge}>
+      <Text style={styles.unreadBadgeText}>{totalUnread}</Text>
+    </View>
+  ) : (
+    hasNewIncomingRequests && (
+      <View style={styles.exclamationBadge}>
+        <Ionicons name="alert" size={12} color="#fff" />
+      </View>
+    )
+  )}
+</View>
+
+
         <Text style={[styles.navText, isActive("Messaging") && styles.navTextActive]}>
           Messages
         </Text>
@@ -438,21 +449,34 @@ const styles = StyleSheet.create({
     right: 15,
   },
   // Badge styles for unread count on Messaging icon:
-  unreadBadge: {
-    position: "absolute",
-    top: -4,
-    right: -10,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 10,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  unreadBadgeText: {
-    color: "#000000",
-    fontSize: 10,
-    fontWeight: "bold",
-    textAlign: "center",
-  },
+
+unreadBadge: {
+  position: "absolute",
+  top: -4,
+  right: -10,
+  backgroundColor: "#FFFFFF",
+  borderRadius: 10,
+  paddingHorizontal: 6,
+  paddingVertical: 2,
+  alignItems: "center",
+  justifyContent: "center",
+},
+unreadBadgeText: {
+  color: "#000000",
+  fontSize: 10,
+  fontWeight: "bold",
+  textAlign: "center",
+},
+exclamationBadge: {
+  position: "absolute",
+  top: -4,
+  right: -10,
+  backgroundColor: "#FF3B30",
+  borderRadius: 10,
+  paddingHorizontal: 6,
+  paddingVertical: 2,
+  alignItems: "center",
+  justifyContent: "center",
+},
+
 });
