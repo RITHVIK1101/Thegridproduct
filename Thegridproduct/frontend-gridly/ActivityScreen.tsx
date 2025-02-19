@@ -53,6 +53,7 @@ type Gig = {
   expired: boolean;
   status: string;
   likeCount: number;
+  expirationDate?: string;
 };
 
 type ProductRequest = {
@@ -464,6 +465,8 @@ const ActivityScreen: React.FC = () => {
     const [expanded, setExpanded] = useState(false);
     const maxDescriptionLength = 100;
 
+    // When tapping a gig, if it belongs to the current user do nothing.
+    // (This screen only displays your own gigs so tapping won’t route anywhere.)
     const description =
       item.description.length > maxDescriptionLength && !expanded
         ? item.description.substring(0, maxDescriptionLength) + "..."
@@ -486,7 +489,12 @@ const ActivityScreen: React.FC = () => {
     return (
       <View style={styles.itemContainer}>
         <TouchableOpacity
-          onPress={() => navigation.navigate("JobDetail", { jobId: item.id })}
+          onPress={() => {
+            // Only navigate if the gig is NOT your own.
+            if (item.userId !== userId) {
+              navigation.navigate("JobDetail", { jobId: item.id });
+            }
+          }}
           style={styles.itemTouchArea}
           activeOpacity={0.7}
         >
@@ -508,7 +516,6 @@ const ActivityScreen: React.FC = () => {
               </Text>
             </TouchableOpacity>
           )}
-
           {/* ✅ Show Expiration Date Here */}
           <Text style={styles.itemDate}>Expires on: {formattedExpiration}</Text>
         </TouchableOpacity>
