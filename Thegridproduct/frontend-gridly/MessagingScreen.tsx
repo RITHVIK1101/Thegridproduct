@@ -224,7 +224,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       if (userId && token) {
         fetchUserRequests();
       }
-    }, 10000);
+    }, 20000);
     return () => clearInterval(intervalId);
   }, [userId, token]);
 
@@ -1816,6 +1816,14 @@ const styles = StyleSheet.create({
   reportContent: { flex: 1, padding: 20, backgroundColor: "#000" },
   dropdownContainer: { backgroundColor: "#1E1E1E", borderWidth: 1, borderColor: "#555", borderRadius: 6, height: 40, justifyContent: "center", paddingHorizontal: 10, marginBottom: 8, flexDirection: "row", alignItems: "center" },
   dropdownPlaceholderText: { color: "#888", fontSize: 14 },
+  requestSender: {
+    fontSize: 14,
+    fontWeight: "bold",  // Makes it stand out more
+    color: "#FFFFFF",    // Change this to white
+    fontFamily: "HelveticaNeue",
+    marginBottom: 5,
+  },
+  
   dropdownSelectedText: { color: "#FFFFFF", fontSize: 14, fontWeight: "bold" },
   dropdownIcon: { marginLeft: "auto" },
   dropdownAbsoluteOverlay: { position: "absolute", top: 60, left: 0, right: 0, backgroundColor: "transparent", zIndex: 10 },
