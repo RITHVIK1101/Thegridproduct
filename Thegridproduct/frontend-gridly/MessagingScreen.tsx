@@ -1,3 +1,4 @@
+// MessagingScreen.tsx
 import React, {
   useState,
   useEffect,
@@ -35,7 +36,7 @@ import {
   doc,
   onSnapshot,
   setDoc,
-  updateDoc, // <-- NEW: Import updateDoc to update Firestore fields
+  updateDoc,
   arrayUnion,
   collection,
   query,
@@ -79,8 +80,8 @@ type MessagingScreenRouteProp = RouteProp<RootStackParamList, "Messaging">;
 type MessagingScreenProps = { route: MessagingScreenRouteProp };
 
 const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
-  const preFetchedChats: Chat[] = route.params?.preFetchedChats || [];
-  const [chats, setChats] = useState<Chat[]>(preFetchedChats);
+  // Instead of using pre-fetched chats from route.params, we load cached chats
+  const [chats, setChats] = useState<Chat[]>([]);
   const [filteredChats, setFilteredChats] = useState<Chat[]>([]);
   const [filter, setFilter] = useState<
     "all" | "products" | "gigs" | "product_request"
@@ -91,16 +92,14 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
   const [loading, setLoading] = useState<boolean>(false);
   const [sending, setSending] = useState<boolean>(false);
 
-  // Image Upload states
+  // Image Upload and other modal states…
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
   const [isImagePreviewModalVisible, setIsImagePreviewModalVisible] =
     useState<boolean>(false);
   const [isUploadingImage, setIsUploadingImage] = useState<boolean>(false);
 
-  // Filter Modal
   const [filterMenuVisible, setFilterMenuVisible] = useState<boolean>(false);
 
-  // Requests Modal State
   const [isRequestsModalVisible, setRequestsModalVisible] =
     useState<boolean>(false);
   const [incomingRequests, setIncomingRequests] = useState<Request[]>([]);
@@ -127,28 +126,18 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     "incoming" | "outgoing"
   >("incoming");
 
-  // New state for the custom popup on accept/reject
   const [requestPopupVisible, setRequestPopupVisible] =
     useState<boolean>(false);
   const [requestPopupMessage, setRequestPopupMessage] = useState<string>("");
 
-  // NEW: State for showing an exclamation badge if new incoming requests exist
   const [hasNewIncomingRequests, setHasNewIncomingRequests] =
     useState<boolean>(false);
 
-  // Unread Counts state
   const [unreadCounts, setUnreadCounts] = useState<{ [key: string]: number }>(
     {}
   );
 
   const { userId, token } = useContext(UserContext);
-  useEffect(() => {
-    if (userId && token) {
-      fetchUserRequests();
-    }
-  }, [userId, token]);
-  
-
   const firestoreDB = getFirestore();
   const flatListRef = useRef<FlatList<Message> | null>(null);
   const navigation = useNavigation();
@@ -172,7 +161,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     "https://api.cloudinary.com/v1_1/ds0zpfht9/image/upload";
   const UPLOAD_PRESET = "gridly_preset";
 
-  // Filter logic
+  // Filtering logic – use a copy of the filtered array for sorting
   const applyFilter = (
     chatsToFilter: Chat[],
     f: "all" | "products" | "gigs" | "product_request"
@@ -189,7 +178,8 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
 
   useEffect(() => {
     const filtered = applyFilter(chats, filter);
-    const sorted = filtered.sort((a, b) => {
+    // Create a copy with spread operator before sorting to avoid in-place mutation
+    const sorted = [...filtered].sort((a, b) => {
       const aTime = a.latestTimestamp
         ? new Date(a.latestTimestamp).getTime()
         : 0;
@@ -201,23 +191,34 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     setFilteredChats(sorted);
   }, [chats, filter]);
 
-  // Fetch user chats if none are loaded
+  // Immediately load cached chats then refresh from server
   useEffect(() => {
-    if (chats.length === 0 && userId && token) {
+    const loadCachedChats = async () => {
+      try {
+        const cached = await AsyncStorage.getItem("cachedChats");
+        if (cached) {
+          setChats(JSON.parse(cached));
+        }
+      } catch (error) {
+        console.error("Error loading cached chats:", error);
+      }
+    };
+    loadCachedChats();
+    if (userId && token) {
       fetchUserChats();
     }
   }, [userId, token]);
 
-  // Refresh user chats whenever this screen is focused
+  // Refresh chats on focus
   useFocusEffect(
-    React.useCallback(() => {
+    useCallback(() => {
       if (userId && token) {
         fetchUserChats();
       }
     }, [userId, token])
   );
 
-  // Poll for new incoming requests every 10s
+  // Poll for incoming requests every 10s
   useEffect(() => {
     const intervalId = setInterval(() => {
       if (userId && token) {
@@ -227,7 +228,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     return () => clearInterval(intervalId);
   }, [userId, token]);
 
-  // Helper to fetch unread count for a specific chat
+  // Fetch unread count for a chat remains unchanged
   const fetchUnreadCount = async (chatID: string): Promise<number> => {
     try {
       const response = await axios.get(
@@ -245,7 +246,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }
   };
 
-  // Once we have chats, fetch unread counts for each chat
   useEffect(() => {
     const fetchAllUnreadCounts = async () => {
       const counts: { [key: string]: number } = {};
@@ -269,7 +269,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     try {
       const fetchedChats = await fetchConversations(userId, token);
       const mergedChats = await Promise.all(
-        fetchedChats.map(async (chat) => {
+        fetchedChats.map(async (chat: any) => {
           try {
             const saved = await AsyncStorage.getItem(
               `chat_last_message_${chat.chatID}`
@@ -288,9 +288,9 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         })
       );
       setChats(mergedChats);
-      // If we came in via "chatId", open that chat immediately
-      if (routeChatId) {
-        const chat = mergedChats.find((c) => c.chatID === routeChatId);
+      await AsyncStorage.setItem("cachedChats", JSON.stringify(mergedChats));
+      if (route?.params?.chatId) {
+        const chat = mergedChats.find((c: Chat) => c.chatID === route.params.chatId);
         if (chat) openChat(chat);
       }
     } catch (error) {
@@ -301,7 +301,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }
   };
 
-  // Update lastRead timestamp in Firestore for the current chat and user
+  // Update lastRead timestamp in Firestore (unchanged)
   const updateLastRead = async (chatId: string) => {
     const currentTime = new Date().toISOString();
     const chatDocRef = doc(firestoreDB, "chatRooms", chatId);
@@ -336,7 +336,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
               }
               return { ...prev, messages: data.messages };
             });
-            // Scroll to end
             setTimeout(() => {
               flatListRef.current?.scrollToEnd({ animated: true });
             }, 100);
@@ -349,7 +348,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     };
   }, [selectedChat, firestoreDB]);
 
-  // Listen to all chat documents to keep "latestMessage" in sync
+  // Listen to all chat documents to keep "latestMessage" in sync.
   useEffect(() => {
     if (chats.length > 0) {
       const chatIDs = chats.map((chat) => chat.chatID);
@@ -362,29 +361,29 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
           const data = docSnap.data();
           if (data.messages) {
             const lastMessage = data.messages[data.messages.length - 1];
-            setChats((prevChats) =>
-              prevChats
-                .map((c) => {
-                  if (c.chatID === docSnap.id) {
-                    return {
-                      ...c,
-                      latestMessage: lastMessage?.content || "",
-                      latestTimestamp: lastMessage?.timestamp || "",
-                      latestSenderId: lastMessage?.senderId || "",
-                    };
-                  }
-                  return c;
-                })
-                .sort((a, b) => {
-                  const aTime = a.latestTimestamp
-                    ? new Date(a.latestTimestamp).getTime()
-                    : 0;
-                  const bTime = b.latestTimestamp
-                    ? new Date(b.latestTimestamp).getTime()
-                    : 0;
-                  return bTime - aTime;
-                })
-            );
+            setChats((prevChats) => {
+              const updated = prevChats.map((c) => {
+                if (c.chatID === docSnap.id) {
+                  return {
+                    ...c,
+                    latestMessage: lastMessage?.content || "",
+                    latestTimestamp: lastMessage?.timestamp || "",
+                    latestSenderId: lastMessage?.senderId || "",
+                  };
+                }
+                return c;
+              });
+              // Use a copy of the array to sort so that state isn’t mutated in place
+              return [...updated].sort((a, b) => {
+                const aTime = a.latestTimestamp
+                  ? new Date(a.latestTimestamp).getTime()
+                  : 0;
+                const bTime = b.latestTimestamp
+                  ? new Date(b.latestTimestamp).getTime()
+                  : 0;
+                return bTime - aTime;
+              });
+            });
           }
         });
       });
@@ -400,7 +399,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       );
       const messages = await getMessages(chat.chatID, token);
       setSelectedChat({ ...chat, messages });
-      // Optionally, update lastRead when the chat is opened
       await updateLastRead(chat.chatID);
       setChatModalVisible(true);
       setNewMessage("");
@@ -415,7 +413,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }
   };
 
-  // When leaving the chat, update the lastRead timestamp so that unread count resets
   const handleBackFromChat = async () => {
     if (selectedChat) {
       const messages = selectedChat.messages;
@@ -441,24 +438,22 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
             lastMsg.timestamp
           );
         }
-        // <-- NEW: Update lastRead in Firestore so unread count resets
         await updateLastRead(selectedChat.chatID);
       } catch (e) {
         console.error("Error saving last message or read time:", e);
       }
-      // Update local chats with the new info
       setChats((prevChats) =>
-        prevChats
-          .map((c) => (c.chatID === updatedChat.chatID ? updatedChat : c))
-          .sort((a, b) => {
-            const aTime = a.latestTimestamp
-              ? new Date(a.latestTimestamp).getTime()
-              : 0;
-            const bTime = b.latestTimestamp
-              ? new Date(b.latestTimestamp).getTime()
-              : 0;
-            return bTime - aTime;
-          })
+        [...prevChats.map((c) =>
+          c.chatID === updatedChat.chatID ? updatedChat : c
+        )].sort((a, b) => {
+          const aTime = a.latestTimestamp
+            ? new Date(a.latestTimestamp).getTime()
+            : 0;
+          const bTime = b.latestTimestamp
+            ? new Date(b.latestTimestamp).getTime()
+            : 0;
+          return bTime - aTime;
+        })
       );
     }
     setChatModalVisible(false);
@@ -477,18 +472,13 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       content: messageContent,
       timestamp: new Date().toISOString(),
     };
-    // Add message locally
     setSelectedChat((prev) =>
-      prev
-        ? { ...prev, messages: [...(prev.messages || []), newMessageObj] }
-        : prev
+      prev ? { ...prev, messages: [...(prev.messages || []), newMessageObj] } : prev
     );
     setNewMessage("");
     setTimeout(() => {
       flatListRef.current?.scrollToEnd({ animated: true });
     }, 100);
-
-    // Send message to Firestore
     try {
       const chatDocRef = doc(firestoreDB, "chatRooms", selectedChat.chatID);
       await setDoc(
@@ -504,8 +494,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
 
   const handleImagePress = async () => {
     try {
-      const { status } =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== "granted") {
         Alert.alert("Permission Required", "We need camera roll permission!");
         return;
@@ -657,7 +646,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         setIncomingRequests((prev) =>
           prev.filter((req) => req.requestId !== requestId)
         );
-        await fetchUserChats(); // refresh
+        await fetchUserChats();
         if (response.data.chatID) {
           const newChat = chats.find((c) => c.chatID === response.data.chatID);
           if (newChat) {
@@ -713,7 +702,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }
   };
 
-  // Render chat list item with unread badge
   const renderChat = ({ item }: { item: Chat }) => {
     if (!item.user) {
       console.warn(`Chat with chatID ${item.chatID} is missing user data.`);
@@ -732,10 +720,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
           minute: "2-digit",
         })
       : "";
-
-    // Get unread count from state
     const unreadCount = unreadCounts[item.chatID] || 0;
-
     const chatTypeLabel =
       item.referenceType === "product"
         ? "Product Name: "
@@ -744,7 +729,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         : item.referenceType === "product_request"
         ? "Product Request Name: "
         : "Unnamed Item";
-
     return (
       <Pressable
         style={styles.chatItemContainer}
@@ -803,7 +787,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     const isImageMessage = item.content.startsWith("[Image] ");
     const imageUri = isImageMessage ? item.content.replace("[Image] ", "") : null;
     const isCurrentUser = item.senderId === userId;
-
     return (
       <View
         style={[
@@ -1050,7 +1033,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         useNativeDriver: true,
       }).start();
     }
-
     const renderRequestItem = ({ item }: { item: Request }) => {
       const referenceTypeLabel =
         item.referenceType === "product"
@@ -1116,10 +1098,8 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         </View>
       );
     };
-
     const dataToShow =
       selectedRequestsTab === "incoming" ? incomingRequests : outgoingRequests;
-
     return (
       <Modal
         visible={isRequestsModalVisible}
@@ -1230,11 +1210,9 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         <View style={styles.headerRow}>
           <Text style={styles.mainHeader}>{currentHeaderTitle}</Text>
           <View style={styles.headerButtons}>
-            {/* Requests */}
             <Pressable
               style={styles.requestsButton}
               onPress={() => {
-                // Optionally delay clearing or let polling decide when to clear
                 setRequestsModalVisible(true);
                 setSelectedRequestsTab("incoming");
                 fetchUserRequests();
@@ -1255,8 +1233,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
               </View>
               <Text style={styles.requestsButtonText}>Requests</Text>
             </Pressable>
-
-            {/* Filter Pill */}
             <Pressable
               style={styles.filterLabelButton}
               onPress={handleFilterPillPress}
@@ -1266,7 +1242,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
             </Pressable>
           </View>
         </View>
-
         {/* Filter Modal */}
         <Modal
           visible={filterMenuVisible}
@@ -1327,10 +1302,8 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
             </View>
           </View>
         </Modal>
-
         {/* Requests Modal */}
         {renderRequestsModal()}
-
         {/* Horizontal listing section */}
         {chats.length > 0 && (
           <View style={styles.horizontalListContainer}>
@@ -1348,8 +1321,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                   accessibilityLabel={`Navigate to ${item.type} titled ${item.title}`}
                 >
                   <Text style={styles.productGigItemText}>
-                    {item.type === "product" ? "Product: " : "Gig: "}{" "}
-                    {item.title}
+                    {item.type === "product" ? "Product: " : "Gig: "} {item.title}
                   </Text>
                 </Pressable>
               ))}
@@ -1357,9 +1329,8 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
           </View>
         )}
         <View style={styles.separatorAfterPurchases} />
-
         {/* Main Chats List */}
-        {loading ? (
+        {loading && chats.length === 0 ? (
           <ActivityIndicator size="large" color="#BB86FC" />
         ) : chats.length === 0 ? (
           <View style={styles.emptyContainer}>
@@ -1375,7 +1346,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
             ItemSeparatorComponent={() => <View style={styles.separatorLine} />}
           />
         )}
-
         {/* Chat Modal */}
         <Modal
           visible={isChatModalVisible}
@@ -1412,9 +1382,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                         </Text>
                         <Text style={styles.chatHeaderSubTitle}>
                           {selectedChat?.referenceType
-                            ? selectedChat.referenceType
-                                .charAt(0)
-                                .toUpperCase() +
+                            ? selectedChat.referenceType.charAt(0).toUpperCase() +
                               selectedChat.referenceType.slice(1)
                             : ""}
                           {selectedChat?.referenceTitle
@@ -1423,7 +1391,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                         </Text>
                       </View>
                     </View>
-                    {/* Report Button */}
                     <Pressable
                       onPress={handleReportPress}
                       style={styles.reportButton}
@@ -1431,7 +1398,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                     >
                       <Ionicons name="flag" size={24} color="#F08080" />
                     </Pressable>
-                    {/* Product Chat Action Buttons (only for product chat) */}
                     {selectedChat?.referenceType === "product" && (
                       <View style={styles.productActionButtons}>
                         <Pressable
@@ -1517,7 +1483,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
             </SafeAreaView>
           </View>
         </Modal>
-
         {/* Image Preview Modal */}
         <Modal
           visible={isImagePreviewModalVisible}
@@ -1567,7 +1532,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
             </SafeAreaView>
           </View>
         </Modal>
-
         {/* Report Modal */}
         <Modal
           visible={reportModalVisible}
@@ -1675,7 +1639,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
             </SafeAreaView>
           </KeyboardAvoidingView>
         </Modal>
-
         {/* Report Success Modal */}
         <Modal
           transparent
@@ -1691,8 +1654,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
             </View>
           </View>
         </Modal>
-
-        {/* Custom Incomplete Details Popup */}
+        {/* Incomplete Details Popup */}
         <Modal
           transparent
           visible={isIncompletePopupVisible}
@@ -1711,8 +1673,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
             </View>
           </View>
         </Modal>
-
-        {/* Custom Popup for Accept/Reject Request */}
+        {/* Accept/Reject Request Popup */}
         <Modal
           transparent
           visible={requestPopupVisible}
@@ -1743,380 +1704,89 @@ const { width } = Dimensions.get("window");
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#000" },
-  headerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginHorizontal: 20,
-    marginTop: 20,
-    marginBottom: 5,
-    justifyContent: "space-between",
-  },
-  mainHeader: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#BB86FC",
-    fontFamily: "HelveticaNeue-Bold",
-  },
+  headerRow: { flexDirection: "row", alignItems: "center", marginHorizontal: 20, marginTop: 20, marginBottom: 5, justifyContent: "space-between" },
+  mainHeader: { fontSize: 20, fontWeight: "700", color: "#BB86FC", fontFamily: "HelveticaNeue-Bold" },
   headerButtons: { flexDirection: "row", alignItems: "center" },
-  requestsButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginRight: 15,
-  },
-  requestsButtonText: {
-    color: "#BB86FC",
-    fontSize: 14,
-    fontFamily: "HelveticaNeue-Medium",
-    marginLeft: 5,
-  },
-  filterLabelButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    backgroundColor: "#1E1E1E",
-    borderRadius: 20,
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  filterLabelText: {
-    color: "#BB86FC",
-    fontSize: 14,
-    fontFamily: "HelveticaNeue-Medium",
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.7)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  filterModalContainer: {
-    backgroundColor: "#1E1E1E",
-    borderRadius: 8,
-    padding: 20,
-    width: 200,
-    alignItems: "stretch",
-  },
+  requestsButton: { flexDirection: "row", alignItems: "center", marginRight: 15 },
+  requestsButtonText: { color: "#BB86FC", fontSize: 14, fontFamily: "HelveticaNeue-Medium", marginLeft: 5 },
+  filterLabelButton: { paddingHorizontal: 10, paddingVertical: 5, backgroundColor: "#1E1E1E", borderRadius: 20, flexDirection: "row", alignItems: "center" },
+  filterLabelText: { color: "#BB86FC", fontSize: 14, fontFamily: "HelveticaNeue-Medium" },
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", alignItems: "center" },
+  filterModalContainer: { backgroundColor: "#1E1E1E", borderRadius: 8, padding: 20, width: 200, alignItems: "stretch" },
   filterModalOption: { paddingVertical: 10, alignItems: "center" },
-  filterModalOptionText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontFamily: "HelveticaNeue-Medium",
-  },
-  filterModalClose: {
-    marginTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: "#333333",
-  },
+  filterModalOptionText: { color: "#FFFFFF", fontSize: 16, fontFamily: "HelveticaNeue-Medium" },
+  filterModalClose: { marginTop: 10, borderTopWidth: 1, borderTopColor: "#333333" },
   horizontalListContainer: { marginTop: 10, paddingHorizontal: 20 },
-  sectionTitle: {
-    color: "#BB86FC",
-    fontSize: 16,
-    fontFamily: "HelveticaNeue-Bold",
-    marginBottom: 5,
-  },
+  sectionTitle: { color: "#BB86FC", fontSize: 16, fontFamily: "HelveticaNeue-Bold", marginBottom: 5 },
   horizontalScroll: { flexDirection: "row" },
-  productGigItem: {
-    backgroundColor: "#1E1E1E",
-    paddingHorizontal: 15,
-    paddingVertical: 6,
-    borderRadius: 20,
-    marginRight: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-    elevation: 5,
-  },
+  productGigItem: { backgroundColor: "#1E1E1E", paddingHorizontal: 15, paddingVertical: 6, borderRadius: 20, marginRight: 10, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 3, elevation: 5 },
   productGigItemText: { color: "#FFFFFF", fontFamily: "HelveticaNeue" },
-  separatorAfterPurchases: {
-    height: 1,
-    backgroundColor: "#222",
-    marginTop: 10,
-    marginBottom: 10,
-  },
-  flatListContainer: {
-    flexGrow: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  chatItemContainer: {
-    backgroundColor: "transparent",
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-  },
+  separatorAfterPurchases: { height: 1, backgroundColor: "#222", marginTop: 10, marginBottom: 10 },
+  chatItemContainer: { backgroundColor: "transparent", paddingHorizontal: 20, paddingVertical: 12 },
   chatItem: { flexDirection: "row", alignItems: "center" },
   profilePicWrapper: { marginRight: 12 },
-  profilePicPlaceholder: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: "#BB86FC",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  sectionEmptyContainer: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 20,
-  },
-  sectionEmptyText: {
-    fontSize: 16,
-    color: "#888888",
-    textAlign: "center",
-    fontFamily: "HelveticaNeue",
-  },
-  requestActions: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    alignItems: "center",
-    marginTop: 8,
-  },
-  profilePicInitials: {
-    color: "#000",
-    fontSize: 18,
-    fontWeight: "700",
-    fontFamily: "HelveticaNeue-Bold",
-  },
-  requestsSeparatorLine: {
-    height: 1,
-    backgroundColor: "#333333",
-    marginVertical: 8,
-  },
-  reportLabel: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#FFFFFF",
-    marginBottom: 8,
-    fontFamily: "HelveticaNeue-Medium",
-  },
+  profilePicPlaceholder: { width: 50, height: 50, borderRadius: 25, backgroundColor: "#BB86FC", justifyContent: "center", alignItems: "center" },
+  sectionEmptyContainer: { alignItems: "center", justifyContent: "center", paddingVertical: 20 },
+  sectionEmptyText: { fontSize: 16, color: "#888888", textAlign: "center", fontFamily: "HelveticaNeue" },
+  requestActions: { flexDirection: "row", justifyContent: "flex-end", alignItems: "center", marginTop: 8 },
+  profilePicInitials: { color: "#000", fontSize: 18, fontWeight: "700", fontFamily: "HelveticaNeue-Bold" },
+  requestsSeparatorLine: { height: 1, backgroundColor: "#333333", marginVertical: 8 },
+  reportLabel: { fontSize: 16, fontWeight: "600", color: "#FFFFFF", marginBottom: 8, fontFamily: "HelveticaNeue-Medium" },
   chatDetails: { flex: 1, flexDirection: "column" },
-  chatHeaderRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "baseline",
-  },
-  chatName: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#FFFFFF",
-    fontFamily: "Helvetica"
-  },
-  timeContainer: {
-    position: "relative",
-    alignItems: "flex-end",
-  },
+  chatHeaderRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" },
+  chatName: { fontSize: 16, fontWeight: "600", color: "#FFFFFF", fontFamily: "Helvetica" },
+  timeContainer: { position: "relative", alignItems: "flex-end" },
   chatTime: { fontSize: 12, color: "#AAAAAA", fontFamily: "HelveticaNeue" },
-  chatProductName: {
-    fontSize: 13,
-    color: "#FFFFFF",
-    fontFamily: "HelveticaNeue",
-    marginTop: 2,
-    marginBottom: 3,
-  },
+  chatProductName: { fontSize: 13, color: "#FFFFFF", fontFamily: "HelveticaNeue", marginTop: 2, marginBottom: 3 },
   lastMessageRow: { flexDirection: "row", alignItems: "center", marginTop: 2 },
-  purpleDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#9C27B0",
-    marginRight: 5,
-  },
-  greyDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#888888",
-    marginRight: 5,
-  },
-  reportButton: {
-    backgroundColor: "#222",
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  exclamationBadge: {
-    position: "absolute",
-    top: -3, // Adjust this to fine-tune positioning
-    right: -3, // Adjust this to fine-tune positioning
-    backgroundColor: "#FF3B30", // Red color to indicate urgency
-    width: 14, // Adjust size
-    height: 14, // Adjust size
-    borderRadius: 7, // Circular shape
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 10, // Ensure it appears above the button
-  },
-  lastMessage: {
-    fontSize: 14,
-    color: "#CCCCCC",
-    fontFamily: "HelveticaNeue",
-    flexShrink: 1,
-  },
+  purpleDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#9C27B0", marginRight: 5 },
+  greyDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#888888", marginRight: 5 },
+  reportButton: { backgroundColor: "#222", paddingVertical: 10, paddingHorizontal: 12, borderRadius: 20, alignItems: "center", justifyContent: "center" },
+  exclamationBadge: { position: "absolute", top: -3, right: -3, backgroundColor: "#FF3B30", borderRadius: 7, paddingHorizontal: 6, paddingVertical: 2, justifyContent: "center", alignItems: "center", zIndex: 10 },
+  lastMessage: { fontSize: 14, color: "#CCCCCC", fontFamily: "HelveticaNeue", flexShrink: 1 },
   separatorLine: { height: 0.5, backgroundColor: "#333333", marginLeft: 82 },
   emptyContainer: { marginTop: 50, alignItems: "center" },
   emptyText: { fontSize: 18, color: "#888888", fontFamily: "HelveticaNeue" },
-  acceptButton: {
-    backgroundColor: "#4CAF50",
-    padding: 10,
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-    marginHorizontal: 5,
-  },
-  rejectButton: {
-    backgroundColor: "#F44336",
-    padding: 10,
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-    marginHorizontal: 5,
-  },
+  acceptButton: { backgroundColor: "#4CAF50", padding: 10, borderRadius: 8, alignItems: "center", justifyContent: "center", marginHorizontal: 5 },
+  rejectButton: { backgroundColor: "#F44336", padding: 10, borderRadius: 8, alignItems: "center", justifyContent: "center", marginHorizontal: 5 },
   buttonDisabled: { backgroundColor: "#888888", opacity: 0.5 },
   modalSafeArea: { flex: 1 },
   modalContainer: { flex: 1 },
-  enhancedChatHeader: {
-    backgroundColor: "#1F1F1F",
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: "#333333",
-    flexDirection: "row",
-    alignItems: "center",
-  },
+  enhancedChatHeader: { backgroundColor: "#1F1F1F", paddingHorizontal: 15, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "#333333", flexDirection: "row", alignItems: "center" },
   backButton: { marginRight: 10 },
   chatHeaderInfo: { flexDirection: "row", alignItems: "center", flex: 1 },
-  headerProfilePicPlaceholder: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#BB86FC",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 10,
-  },
-  headerProfilePicInitials: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#000",
-    fontFamily: "HelveticaNeue-Bold",
-  },
+  headerProfilePicPlaceholder: { width: 40, height: 40, borderRadius: 20, backgroundColor: "#BB86FC", justifyContent: "center", alignItems: "center", marginRight: 10 },
+  headerProfilePicInitials: { fontSize: 16, fontWeight: "700", color: "#000", fontFamily: "HelveticaNeue-Bold" },
   chatHeaderTextContainer: { flexDirection: "column", flexShrink: 1 },
-  chatHeaderUserName: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#FFFFFF",
-    fontFamily: "HelveticaNeue-Bold",
-  },
-  requestSender: {
-    fontSize: 14,
-    color: "#FFFFFF",
-    fontFamily: "HelveticaNeue-Medium",
-    marginBottom: 4,
-  },
-  chatHeaderSubTitle: {
-    fontSize: 13,
-    color: "#FFFFFF",
-    fontFamily: "HelveticaNeue",
-    marginTop: 2,
-  },
-  chatHeaderBottomLine: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 1,
-    backgroundColor: "#333333",
-  },
+  chatHeaderUserName: { fontSize: 16, fontWeight: "700", color: "#FFFFFF", fontFamily: "HelveticaNeue-Bold" },
+  chatHeaderSubTitle: { fontSize: 13, color: "#FFFFFF", fontFamily: "HelveticaNeue", marginTop: 2 },
+  chatHeaderBottomLine: { position: "absolute", bottom: 0, left: 0, right: 0, height: 1, backgroundColor: "#333333" },
   messagesList: { flexGrow: 1, paddingVertical: 10, paddingHorizontal: 10 },
   messageContainer: { marginBottom: 10, flexDirection: "row", maxWidth: "80%" },
   myMessageContainer: { alignSelf: "flex-end" },
   theirMessageContainer: { alignSelf: "flex-start" },
-  messageBubble: {
-    borderRadius: 14,
-    padding: 8,
-    maxWidth: "100%",
-    flexDirection: "row",
-    alignItems: "flex-end",
-    flexWrap: "wrap",
-    position: "relative",
-  },
+  messageBubble: { borderRadius: 14, padding: 8, maxWidth: "100%", flexDirection: "row", alignItems: "flex-end", flexWrap: "wrap", position: "relative" },
   myMessage: { backgroundColor: "#BB86FC", borderTopRightRadius: 0 },
   theirMessage: { backgroundColor: "#222", borderTopLeftRadius: 0 },
   myMessageTextColor: { color: "#000000" },
   theirMessageTextColor: { color: "#FFFFFF" },
   messageText: { fontSize: 16, fontFamily: "HelveticaNeue", flexShrink: 1 },
-  messageTimestamp: {
-    fontSize: 11,
-    fontFamily: "HelveticaNeue",
-    marginLeft: 5,
-  },
+  messageTimestamp: { fontSize: 11, fontFamily: "HelveticaNeue", marginLeft: 5 },
   myTimestampColor: { color: "#333333" },
   theirTimestampColor: { color: "#999999" },
   messageImage: { width: 200, height: 200, borderRadius: 10, marginRight: 5 },
   inputBarContainer: { backgroundColor: "#000" },
   inputBarLine: { height: 1, backgroundColor: "#333333" },
-  inputContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#1E1E1E",
-    paddingVertical: 8,
-    paddingHorizontal: 5,
-  },
-  messageInput: {
-    flex: 1,
-    color: "#FFFFFF",
-    paddingHorizontal: 10,
-    fontSize: 16,
-    fontFamily: "HelveticaNeue",
-    maxHeight: 100,
-  },
+  inputContainer: { flexDirection: "row", alignItems: "center", backgroundColor: "#1E1E1E", paddingVertical: 8, paddingHorizontal: 5 },
+  messageInput: { flex: 1, color: "#FFFFFF", paddingHorizontal: 10, fontSize: 16, fontFamily: "HelveticaNeue", maxHeight: 100 },
   iconButton: { marginHorizontal: 5 },
-  sendButton: {
-    backgroundColor: "#BB86FC",
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    justifyContent: "center",
-    alignItems: "center",
-    marginLeft: 5,
-  },
-  emptyMessagesContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: 20,
-  },
-  emptyMessagesText: {
-    fontSize: 16,
-    color: "#888888",
-    textAlign: "center",
-    fontFamily: "HelveticaNeue",
-  },
-  imagePreviewContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#000",
-  },
+  sendButton: { backgroundColor: "#BB86FC", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 8, justifyContent: "center", alignItems: "center", marginLeft: 5 },
+  emptyMessagesContainer: { flex: 1, justifyContent: "center", alignItems: "center", marginTop: 20 },
+  emptyMessagesText: { fontSize: 16, color: "#888888", textAlign: "center", fontFamily: "HelveticaNeue" },
+  imagePreviewContainer: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#000" },
   previewImage: { width, height: undefined, aspectRatio: 1 },
   addImageButton: { marginLeft: "auto" },
-  requestsModalContainer: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: "80%",
-    backgroundColor: "#1E1E1E",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingTop: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 10,
-  },
+  requestsModalContainer: { position: "absolute", bottom: 0, left: 0, right: 0, height: "80%", backgroundColor: "#1E1E1E", borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingTop: 20, shadowColor: "#000", shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.3, shadowRadius: 5, elevation: 10 },
   unreadBadge: {
     position: "absolute",
     top: 22,
@@ -2126,212 +1796,46 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     alignSelf: "center",
   },
-  unreadBadgeText: {
-    color: "#000000",
-    fontSize: 10,
-    fontWeight: "bold",
-    textAlign: "center",
-  },
-  
+  unreadBadgeText: { color: "#000000", fontSize: 10, fontWeight: "bold", textAlign: "center" },
   requestsSafeArea: { flex: 1 },
-  requestsHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    marginBottom: 10,
-  },
+  requestsHeader: { flexDirection: "row", alignItems: "center", paddingHorizontal: 20, marginBottom: 10 },
   closeButton: { padding: 5 },
-  requestsHeaderTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#BB86FC",
-    fontFamily: "HelveticaNeue-Bold",
-    marginLeft: 10,
-  },
-  requestsTabsRow: {
-    flexDirection: "row",
-    justifyContent: "center",
-    marginBottom: 10,
-  },
-  requestsTab: {
-    flex: 1,
-    alignItems: "center",
-    paddingVertical: 10,
-    marginHorizontal: 10,
-    borderRadius: 20,
-    backgroundColor: "#2C2C2C",
-  },
+  requestsHeaderTitle: { fontSize: 20, fontWeight: "700", color: "#BB86FC", fontFamily: "HelveticaNeue-Bold", marginLeft: 10 },
+  requestsTabsRow: { flexDirection: "row", justifyContent: "center", marginBottom: 10 },
+  requestsTab: { flex: 1, alignItems: "center", paddingVertical: 10, marginHorizontal: 10, borderRadius: 20, backgroundColor: "#2C2C2C" },
   activeRequestsTab: { backgroundColor: "#BB86FC" },
-  requestsTabText: {
-    color: "#BBBBBB",
-    fontSize: 14,
-    fontFamily: "HelveticaNeue-Medium",
-  },
+  requestsTabText: { color: "#BBBBBB", fontSize: 14, fontFamily: "HelveticaNeue-Medium" },
   activeRequestsTabText: { color: "#000" },
   requestsContent: { flex: 1, paddingHorizontal: 20, paddingBottom: 20 },
-  requestsErrorContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 20,
-  },
-  requestsErrorText: {
-    color: "#FF3B30",
-    fontSize: 14,
-    textAlign: "center",
-    fontFamily: "HelveticaNeue",
-  },
-  requestCard: {
-    backgroundColor: "#2C2C2C",
-    paddingVertical: 12,
-    paddingHorizontal: 15,
-    borderRadius: 12,
-    marginVertical: 6,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
+  requestsErrorContainer: { flex: 1, justifyContent: "center", alignItems: "center", paddingHorizontal: 20 },
+  requestsErrorText: { color: "#FF3B30", fontSize: 14, textAlign: "center", fontFamily: "HelveticaNeue" },
+  requestCard: { backgroundColor: "#2C2C2C", paddingVertical: 12, paddingHorizontal: 15, borderRadius: 12, marginVertical: 6, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 3.84, elevation: 5 },
   requestInfo: { marginBottom: 8 },
-  requestProductName: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#BB86FC",
-    fontFamily: "HelveticaNeue-Bold",
-    marginBottom: 3,
-  },
+  requestProductName: { fontSize: 16, fontWeight: "700", color: "#BB86FC", fontFamily: "HelveticaNeue-Bold", marginBottom: 3 },
   requestDate: { fontSize: 12, color: "#AAAAAA", fontFamily: "HelveticaNeue" },
   reportContent: { flex: 1, padding: 20, backgroundColor: "#000" },
-  dropdownContainer: {
-    backgroundColor: "#1E1E1E",
-    borderWidth: 1,
-    borderColor: "#555",
-    borderRadius: 6,
-    height: 40,
-    justifyContent: "center",
-    paddingHorizontal: 10,
-    marginBottom: 8,
-    flexDirection: "row",
-    alignItems: "center",
-  },
+  dropdownContainer: { backgroundColor: "#1E1E1E", borderWidth: 1, borderColor: "#555", borderRadius: 6, height: 40, justifyContent: "center", paddingHorizontal: 10, marginBottom: 8, flexDirection: "row", alignItems: "center" },
   dropdownPlaceholderText: { color: "#888", fontSize: 14 },
   dropdownSelectedText: { color: "#FFFFFF", fontSize: 14, fontWeight: "bold" },
   dropdownIcon: { marginLeft: "auto" },
-  dropdownAbsoluteOverlay: {
-    position: "absolute",
-    top: 60,
-    left: 0,
-    right: 0,
-    backgroundColor: "transparent",
-    zIndex: 10,
-  },
-  dropdownAbsoluteContainer: {
-    backgroundColor: "#1E1E1E",
-    marginHorizontal: 20,
-    borderRadius: 8,
-  },
+  dropdownAbsoluteOverlay: { position: "absolute", top: 60, left: 0, right: 0, backgroundColor: "transparent", zIndex: 10 },
+  dropdownAbsoluteContainer: { backgroundColor: "#1E1E1E", marginHorizontal: 20, borderRadius: 8 },
   dropdownOption: { paddingVertical: 12, paddingHorizontal: 15 },
   dropdownOptionText: { color: "#FFFFFF", fontWeight: "bold", fontSize: 16 },
-  otherReasonInput: {
-    backgroundColor: "#333",
-    color: "#fff",
-    borderRadius: 6,
-    paddingHorizontal: 10,
-    height: 40,
-    marginBottom: 10,
-    fontFamily: "HelveticaNeue",
-    fontSize: 14,
-  },
-  reportDescriptionInput: {
-    backgroundColor: "#333",
-    color: "#fff",
-    borderRadius: 6,
-    padding: 15,
-    minHeight: 80,
-    textAlignVertical: "top",
-    marginBottom: 15,
-    fontFamily: "HelveticaNeue",
-    fontSize: 16,
-  },
-  reportInfoText: {
-    fontSize: 12,
-    color: "#AAAAAA",
-    marginBottom: 15,
-    fontFamily: "HelveticaNeue",
-  },
-  reportSubmitButton: {
-    backgroundColor: "#BB86FC",
-    paddingVertical: 10,
-    borderRadius: 6,
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  reportSubmitButtonText: {
-    color: "#000",
-    fontSize: 16,
-    fontFamily: "HelveticaNeue-Bold",
-  },
-  modalContent: {
-    backgroundColor: "#1E1E1E",
-    padding: 30,
-    borderRadius: 15,
-    alignItems: "center",
-    gap: 15,
-  },
+  otherReasonInput: { backgroundColor: "#333", color: "#fff", borderRadius: 6, paddingHorizontal: 10, height: 40, marginBottom: 10, fontFamily: "HelveticaNeue", fontSize: 14 },
+  reportDescriptionInput: { backgroundColor: "#333", color: "#fff", borderRadius: 6, padding: 15, minHeight: 80, textAlignVertical: "top", marginBottom: 15, fontFamily: "HelveticaNeue", fontSize: 16 },
+  reportInfoText: { fontSize: 12, color: "#AAAAAA", marginBottom: 15, fontFamily: "HelveticaNeue" },
+  reportSubmitButton: { backgroundColor: "#BB86FC", paddingVertical: 10, borderRadius: 6, alignItems: "center", marginBottom: 10 },
+  reportSubmitButtonText: { color: "#000", fontSize: 16, fontFamily: "HelveticaNeue-Bold" },
+  modalContent: { backgroundColor: "#1E1E1E", padding: 30, borderRadius: 15, alignItems: "center", gap: 15 },
   modalText: { fontSize: 18, fontWeight: "600", color: "#fff" },
-  popupOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  popupContainer: {
-    backgroundColor: "#1E1E1E",
-    padding: 20,
-    borderRadius: 8,
-    alignItems: "center",
-  },
+  popupOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", alignItems: "center" },
+  popupContainer: { backgroundColor: "#1E1E1E", padding: 20, borderRadius: 8, alignItems: "center" },
   popupText: { color: "#FFFFFF", fontSize: 16, marginBottom: 10 },
-  popupButton: {
-    backgroundColor: "#BB86FC",
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    borderRadius: 6,
-  },
+  popupButton: { backgroundColor: "#BB86FC", paddingHorizontal: 20, paddingVertical: 8, borderRadius: 6 },
   popupButtonText: { color: "#000", fontSize: 16, fontWeight: "bold" },
-  unreadBadge: {
-    position: "absolute",
-    top: 22,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 10,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    alignSelf: "center",
-  },
-  unreadBadgeText: {
-    color: "#000000",
-    fontSize: 10,
-    fontWeight: "bold",
-    textAlign: "center",
-  },
-  productActionButtons: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginLeft: 10,
-  },
-  smallActionButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 6,
-    justifyContent: "center",
-    alignItems: "center",
-    marginHorizontal: 4,
-  },
-  smallActionButtonClose: {
-    backgroundColor: "#E74C3C", // red for X button
-  },
-  smallActionButtonCheck: {
-    backgroundColor: "#27AE60", // green for check mark button
-  },
+  productActionButtons: { flexDirection: "row", alignItems: "center", marginLeft: 10 },
+  smallActionButton: { width: 32, height: 32, borderRadius: 6, justifyContent: "center", alignItems: "center", marginHorizontal: 4 },
+  smallActionButtonClose: { backgroundColor: "#E74C3C" },
+  smallActionButtonCheck: { backgroundColor: "#27AE60" },
 });

@@ -1,3 +1,4 @@
+// BottomNavBar.tsx
 import React, { useState, useRef, useEffect, useContext } from "react";
 import {
   View,
@@ -20,7 +21,6 @@ import { UserContext } from "../UserContext";
 import { NGROK_URL } from "@env";
 import { fetchConversations } from "../api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-
 import {
   getFirestore,
   collection,
@@ -44,13 +44,11 @@ const BottomNavBar: React.FC = () => {
   const route = useRoute();
   const { token, userId } = useContext(UserContext);
   const [isModalVisible, setIsModalVisible] = useState(false);
-  
-  // NEW: State for total unread messages across all chats
   const [totalUnread, setTotalUnread] = useState<number>(0);
-
-  // Animation for spinning the add button
   const spinValue = useRef(new Animated.Value(0)).current;
-  const [hasNewIncomingRequests, setHasNewIncomingRequests] = useState<boolean>(false);
+  const [hasNewIncomingRequests, setHasNewIncomingRequests] = useState<boolean>(
+    false
+  );
 
   const spinAnimation = useRef(
     Animated.loop(
@@ -85,7 +83,6 @@ const BottomNavBar: React.FC = () => {
   };
 
   const currentRouteName = route.name as keyof RootStackParamList;
-
   const isActive = (routeName: keyof RootStackParamList) => {
     return currentRouteName === routeName;
   };
@@ -101,17 +98,8 @@ const BottomNavBar: React.FC = () => {
 
   const hitSlopValue = { top: 10, bottom: 10, left: 10, right: 10 };
 
-  // Prefetch chats for Messaging tab
-  const prefetchChats = async (): Promise<any[]> => {
-    try {
-      const chats = await fetchConversations(userId, token);
-      return chats;
-    } catch (error) {
-      console.error("Error prefetching chats:", error);
-      return [];
-    }
-  };
-
+  // (Optional: You can remove the prefetchChats function now.)
+  // For messaging, we now let MessagingScreen load cached chats on mount.
   // --- Prefetch function for Jobs ---
   const prefetchJobs = async (): Promise<Gig[]> => {
     try {
@@ -140,32 +128,28 @@ const BottomNavBar: React.FC = () => {
     }
   };
 
-  // --- NEW: Setup a realtime listener to calculate total unread messages ---
+  // Realtime listener to calculate total unread messages
   const firestoreDB = getFirestore();
   useEffect(() => {
     let unsubscribeFunc: (() => void) | undefined;
     const subscribeToUnread = async () => {
       try {
-        // Fetch user's chats first
         const chats = await fetchConversations(userId, token);
         const chatIDs = chats.map((chat: any) => chat.chatID);
         if (chatIDs.length === 0) {
           setTotalUnread(0);
           return;
         }
-        // Create a query to get chatRooms with the matching document IDs
         const q = query(
           collection(firestoreDB, "chatRooms"),
           where(documentId(), "in", chatIDs)
         );
         unsubscribeFunc = onSnapshot(q, async (snapshot) => {
           let total = 0;
-          // For each chat document, compute the unread messages
           await Promise.all(
             snapshot.docs.map(async (docSnap) => {
               const data = docSnap.data();
               const messages = data.messages || [];
-              // Get last read timestamp from AsyncStorage (if any)
               const lastReadStr = await AsyncStorage.getItem(`last_read_${docSnap.id}`);
               const lastRead = lastReadStr ? new Date(lastReadStr) : new Date(0);
               const unread = messages.filter((msg: any) => {
@@ -207,10 +191,15 @@ const BottomNavBar: React.FC = () => {
         accessibilityLabel="Navigate to Home"
         hitSlop={hitSlopValue}
       >
-        <Ionicons name={isActive("Dashboard") ? "home" : "home-outline"} size={24} color="#FFFFFF" />
-        <Text style={[styles.navText, isActive("Dashboard") && styles.navTextActive]}>Home</Text>
+        <Ionicons
+          name={isActive("Dashboard") ? "home" : "home-outline"}
+          size={24}
+          color="#FFFFFF"
+        />
+        <Text style={[styles.navText, isActive("Dashboard") && styles.navTextActive]}>
+          Home
+        </Text>
       </TouchableOpacity>
-
       {/* Jobs Tab */}
       <TouchableOpacity
         style={styles.navItem}
@@ -225,10 +214,15 @@ const BottomNavBar: React.FC = () => {
         accessibilityLabel="Navigate to Jobs"
         hitSlop={hitSlopValue}
       >
-        <Ionicons name={isActive("Jobs") ? "briefcase" : "briefcase-outline"} size={24} color="#FFFFFF" />
-        <Text style={[styles.navText, isActive("Jobs") && styles.navTextActive]}>Jobs</Text>
+        <Ionicons
+          name={isActive("Jobs") ? "briefcase" : "briefcase-outline"}
+          size={24}
+          color="#FFFFFF"
+        />
+        <Text style={[styles.navText, isActive("Jobs") && styles.navTextActive]}>
+          Jobs
+        </Text>
       </TouchableOpacity>
-
       {/* Add Button */}
       <TouchableOpacity
         style={styles.navItem}
@@ -240,46 +234,39 @@ const BottomNavBar: React.FC = () => {
           <Ionicons name="arrow-up-outline" size={30} color="#FFFFFF" />
         </Animated.View>
       </TouchableOpacity>
-
-      {/* Messaging Tab – prefetch chats before switching */}
+      {/* Messaging Tab – NOW navigate immediately without prefetching */}
       <TouchableOpacity
         style={styles.navItem}
-        onPress={async () => {
+        onPress={() => {
           if (!isActive("Messaging")) {
-            const preFetchedChats = await prefetchChats();
-            setTimeout(() => {
-              switchScreen("Messaging", { preFetchedChats });
-            }, 10);
+            switchScreen("Messaging");
           }
         }}
         accessibilityLabel="Navigate to Messaging"
         hitSlop={hitSlopValue}
       >
-       <View style={{ position: "relative" }}>
-  <Ionicons
-    name={isActive("Messaging") ? "chatbubble" : "chatbubble-outline"}
-    size={24}
-    color="#FFFFFF"
-  />
-  {totalUnread > 0 ? (
-    <View style={styles.unreadBadge}>
-      <Text style={styles.unreadBadgeText}>{totalUnread}</Text>
-    </View>
-  ) : (
-    hasNewIncomingRequests && (
-      <View style={styles.exclamationBadge}>
-        <Ionicons name="alert" size={12} color="#fff" />
-      </View>
-    )
-  )}
-</View>
-
-
+        <View style={{ position: "relative" }}>
+          <Ionicons
+            name={isActive("Messaging") ? "chatbubble" : "chatbubble-outline"}
+            size={24}
+            color="#FFFFFF"
+          />
+          {totalUnread > 0 ? (
+            <View style={styles.unreadBadge}>
+              <Text style={styles.unreadBadgeText}>{totalUnread}</Text>
+            </View>
+          ) : (
+            hasNewIncomingRequests && (
+              <View style={styles.exclamationBadge}>
+                <Ionicons name="alert" size={12} color="#fff" />
+              </View>
+            )
+          )}
+        </View>
         <Text style={[styles.navText, isActive("Messaging") && styles.navTextActive]}>
           Messages
         </Text>
       </TouchableOpacity>
-
       {/* Activity Tab */}
       <TouchableOpacity
         style={styles.navItem}
@@ -293,13 +280,27 @@ const BottomNavBar: React.FC = () => {
         accessibilityLabel="Navigate to Activity"
         hitSlop={hitSlopValue}
       >
-        <Ionicons name={isActive("Activity") ? "stats-chart" : "stats-chart-outline"} size={24} color="#FFFFFF" />
-        <Text style={[styles.navText, isActive("Activity") && styles.navTextActive]}>Activity</Text>
+        <Ionicons
+          name={isActive("Activity") ? "stats-chart" : "stats-chart-outline"}
+          size={24}
+          color="#FFFFFF"
+        />
+        <Text style={[styles.navText, isActive("Activity") && styles.navTextActive]}>
+          Activity
+        </Text>
       </TouchableOpacity>
-
       {/* Modal for Add Options */}
-      <Modal visible={isModalVisible} transparent animationType="fade" onRequestClose={toggleModal}>
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPressOut={toggleModal}>
+      <Modal
+        visible={isModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={toggleModal}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPressOut={toggleModal}
+        >
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Add Options</Text>
             <View style={styles.modalButtonsContainer}>
@@ -334,7 +335,11 @@ const BottomNavBar: React.FC = () => {
                 <Text style={styles.modalButtonText}>Request Product</Text>
               </TouchableOpacity>
             </View>
-            <TouchableOpacity onPress={toggleModal} style={styles.modalClose} accessibilityLabel="Close Add Options Modal">
+            <TouchableOpacity
+              onPress={toggleModal}
+              style={styles.modalClose}
+              accessibilityLabel="Close Add Options Modal"
+            >
               <Ionicons name="close-outline" size={24} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
@@ -448,35 +453,32 @@ const styles = StyleSheet.create({
     top: 15,
     right: 15,
   },
-  // Badge styles for unread count on Messaging icon:
-
-unreadBadge: {
-  position: "absolute",
-  top: -4,
-  right: -10,
-  backgroundColor: "#FFFFFF",
-  borderRadius: 10,
-  paddingHorizontal: 6,
-  paddingVertical: 2,
-  alignItems: "center",
-  justifyContent: "center",
-},
-unreadBadgeText: {
-  color: "#000000",
-  fontSize: 10,
-  fontWeight: "bold",
-  textAlign: "center",
-},
-exclamationBadge: {
-  position: "absolute",
-  top: -4,
-  right: -10,
-  backgroundColor: "#FF3B30",
-  borderRadius: 10,
-  paddingHorizontal: 6,
-  paddingVertical: 2,
-  alignItems: "center",
-  justifyContent: "center",
-},
-
+  unreadBadge: {
+    position: "absolute",
+    top: -4,
+    right: -10,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  unreadBadgeText: {
+    color: "#000000",
+    fontSize: 10,
+    fontWeight: "bold",
+    textAlign: "center",
+  },
+  exclamationBadge: {
+    position: "absolute",
+    top: -4,
+    right: -10,
+    backgroundColor: "#FF3B30",
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
 });
