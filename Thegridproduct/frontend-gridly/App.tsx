@@ -1,5 +1,5 @@
 // App.tsx
-import React, { useState, useContext } from "react";
+import React, { useState, useContext, useRef, useEffect } from "react";
 import {
   TouchableOpacity,
   View,
@@ -8,6 +8,8 @@ import {
   ActivityIndicator,
   ScrollView,
   Dimensions,
+  Animated,
+  Easing,
 } from "react-native";
 import Icon from "react-native-vector-icons/MaterialIcons";
 import Ionicons from "react-native-vector-icons/Ionicons";
@@ -179,16 +181,42 @@ export const navigationRef = React.createRef();
 
 const Stack = createStackNavigator<RootStackParamList>();
 
-const HeaderTitleWithLogo: React.FC<{ title: string }> = ({ title }) => (
-  <View style={styles.headerTitleContainer}>
-    <Image
-      source={require("./assets/logonobg.png")} // Logo file
-      style={{ width: 35, height: 35, marginRight: 8 }} // Logo size
-      resizeMode="contain"
-    />
-    <Text style={styles.headerTitleText}>{title}</Text>
-  </View>
-);
+// Updated HeaderTitleWithLogo with a bouncing animated logo
+const HeaderTitleWithLogo: React.FC<{ title: string }> = ({ title }) => {
+  const bounceAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(bounceAnim, {
+          toValue: 1.1,
+          duration: 1000,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(bounceAnim, {
+          toValue: 1,
+          duration: 1000,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, [bounceAnim]);
+
+  return (
+    <View style={styles.headerTitleContainer}>
+      <Animated.Image
+        source={require("./assets/logonobg.png")} // Logo file
+        style={[
+          { width: 35, height: 35, marginRight: 8, transform: [{ scale: bounceAnim }] },
+        ]}
+        resizeMode="contain"
+      />
+      <Text style={styles.headerTitleText}>{title}</Text>
+    </View>
+  );
+};
 
 const UserAvatar: React.FC<{
   firstName?: string;
@@ -291,7 +319,7 @@ const AppNavigator: React.FC<AppNavigatorProps> = ({ firstRender }) => {
             component={Dashboard}
             options={({ navigation }) => ({
               headerTransparent: true,
-              headerTitle: () => <HeaderTitleWithLogo title="Gridly" />, // Logo here
+              headerTitle: () => <HeaderTitleWithLogo title="Gridly" />,
               headerRight: () =>
                 HeaderRightComponent(navigation, firstName, lastName),
             })}
@@ -400,7 +428,7 @@ const AppNavigator: React.FC<AppNavigatorProps> = ({ firstRender }) => {
       ) : (
         <>
           {/* When not authenticated, on first launch show Demo, then Login & Verification.
-          Otherwise (after logout) show Login and Verification screens immediately. */}
+              Otherwise (after logout) show Login and Verification screens immediately. */}
           {!firstRender ? (
             <>
               <Stack.Screen
