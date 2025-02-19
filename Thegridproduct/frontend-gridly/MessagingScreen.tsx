@@ -290,7 +290,9 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       setChats(mergedChats);
       await AsyncStorage.setItem("cachedChats", JSON.stringify(mergedChats));
       if (route?.params?.chatId) {
-        const chat = mergedChats.find((c: Chat) => c.chatID === route.params.chatId);
+        const chat = mergedChats.find(
+          (c: Chat) => c.chatID === route.params.chatId
+        );
         if (chat) openChat(chat);
       }
     } catch (error) {
@@ -443,9 +445,11 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         console.error("Error saving last message or read time:", e);
       }
       setChats((prevChats) =>
-        [...prevChats.map((c) =>
-          c.chatID === updatedChat.chatID ? updatedChat : c
-        )].sort((a, b) => {
+        [
+          ...prevChats.map((c) =>
+            c.chatID === updatedChat.chatID ? updatedChat : c
+          ),
+        ].sort((a, b) => {
           const aTime = a.latestTimestamp
             ? new Date(a.latestTimestamp).getTime()
             : 0;
@@ -473,7 +477,9 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       timestamp: new Date().toISOString(),
     };
     setSelectedChat((prev) =>
-      prev ? { ...prev, messages: [...(prev.messages || []), newMessageObj] } : prev
+      prev
+        ? { ...prev, messages: [...(prev.messages || []), newMessageObj] }
+        : prev
     );
     setNewMessage("");
     setTimeout(() => {
@@ -494,7 +500,8 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
 
   const handleImagePress = async () => {
     try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const { status } =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== "granted") {
         Alert.alert("Permission Required", "We need camera roll permission!");
         return;
@@ -785,7 +792,9 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
 
   const renderMessage = ({ item }: { item: Message }) => {
     const isImageMessage = item.content.startsWith("[Image] ");
-    const imageUri = isImageMessage ? item.content.replace("[Image] ", "") : null;
+    const imageUri = isImageMessage
+      ? item.content.replace("[Image] ", "")
+      : null;
     const isCurrentUser = item.senderId === userId;
     return (
       <View
@@ -957,10 +966,8 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
   };
 
   const handleReportPress = () => {
+    setReportModalVisible(true);
     setChatModalVisible(false);
-    setTimeout(() => {
-      setReportModalVisible(true);
-    }, 300);
   };
 
   const handleModifiedReportSubmit = async () => {
@@ -1321,7 +1328,8 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                   accessibilityLabel={`Navigate to ${item.type} titled ${item.title}`}
                 >
                   <Text style={styles.productGigItemText}>
-                    {item.type === "product" ? "Product: " : "Gig: "} {item.title}
+                    {item.type === "product" ? "Product: " : "Gig: "}{" "}
+                    {item.title}
                   </Text>
                 </Pressable>
               ))}
@@ -1382,7 +1390,9 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                         </Text>
                         <Text style={styles.chatHeaderSubTitle}>
                           {selectedChat?.referenceType
-                            ? selectedChat.referenceType.charAt(0).toUpperCase() +
+                            ? selectedChat.referenceType
+                                .charAt(0)
+                                .toUpperCase() +
                               selectedChat.referenceType.slice(1)
                             : ""}
                           {selectedChat?.referenceTitle
@@ -1704,89 +1714,366 @@ const { width } = Dimensions.get("window");
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#000" },
-  headerRow: { flexDirection: "row", alignItems: "center", marginHorizontal: 20, marginTop: 20, marginBottom: 5, justifyContent: "space-between" },
-  mainHeader: { fontSize: 20, fontWeight: "700", color: "#BB86FC", fontFamily: "HelveticaNeue-Bold" },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: 20,
+    marginTop: 20,
+    marginBottom: 5,
+    justifyContent: "space-between",
+  },
+  mainHeader: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#BB86FC",
+    fontFamily: "HelveticaNeue-Bold",
+  },
   headerButtons: { flexDirection: "row", alignItems: "center" },
-  requestsButton: { flexDirection: "row", alignItems: "center", marginRight: 15 },
-  requestsButtonText: { color: "#BB86FC", fontSize: 14, fontFamily: "HelveticaNeue-Medium", marginLeft: 5 },
-  filterLabelButton: { paddingHorizontal: 10, paddingVertical: 5, backgroundColor: "#1E1E1E", borderRadius: 20, flexDirection: "row", alignItems: "center" },
-  filterLabelText: { color: "#BB86FC", fontSize: 14, fontFamily: "HelveticaNeue-Medium" },
-  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.7)", justifyContent: "center", alignItems: "center" },
-  filterModalContainer: { backgroundColor: "#1E1E1E", borderRadius: 8, padding: 20, width: 200, alignItems: "stretch" },
+  requestsButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginRight: 15,
+  },
+  requestsButtonText: {
+    color: "#BB86FC",
+    fontSize: 14,
+    fontFamily: "HelveticaNeue-Medium",
+    marginLeft: 5,
+  },
+  filterLabelButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: "#1E1E1E",
+    borderRadius: 20,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  filterLabelText: {
+    color: "#BB86FC",
+    fontSize: 14,
+    fontFamily: "HelveticaNeue-Medium",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  filterModalContainer: {
+    backgroundColor: "#1E1E1E",
+    borderRadius: 8,
+    padding: 20,
+    width: 200,
+    alignItems: "stretch",
+  },
   filterModalOption: { paddingVertical: 10, alignItems: "center" },
-  filterModalOptionText: { color: "#FFFFFF", fontSize: 16, fontFamily: "HelveticaNeue-Medium" },
-  filterModalClose: { marginTop: 10, borderTopWidth: 1, borderTopColor: "#333333" },
+  filterModalOptionText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontFamily: "HelveticaNeue-Medium",
+  },
+  filterModalClose: {
+    marginTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: "#333333",
+  },
   horizontalListContainer: { marginTop: 10, paddingHorizontal: 20 },
-  sectionTitle: { color: "#BB86FC", fontSize: 16, fontFamily: "HelveticaNeue-Bold", marginBottom: 5 },
+  sectionTitle: {
+    color: "#BB86FC",
+    fontSize: 16,
+    fontFamily: "HelveticaNeue-Bold",
+    marginBottom: 5,
+  },
   horizontalScroll: { flexDirection: "row" },
-  productGigItem: { backgroundColor: "#1E1E1E", paddingHorizontal: 15, paddingVertical: 6, borderRadius: 20, marginRight: 10, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 3, elevation: 5 },
+  productGigItem: {
+    backgroundColor: "#1E1E1E",
+    paddingHorizontal: 15,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginRight: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 5,
+  },
   productGigItemText: { color: "#FFFFFF", fontFamily: "HelveticaNeue" },
-  separatorAfterPurchases: { height: 1, backgroundColor: "#222", marginTop: 10, marginBottom: 10 },
-  chatItemContainer: { backgroundColor: "transparent", paddingHorizontal: 20, paddingVertical: 12 },
+  separatorAfterPurchases: {
+    height: 1,
+    backgroundColor: "#222",
+    marginTop: 10,
+    marginBottom: 10,
+  },
+  chatItemContainer: {
+    backgroundColor: "transparent",
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+  },
   chatItem: { flexDirection: "row", alignItems: "center" },
   profilePicWrapper: { marginRight: 12 },
-  profilePicPlaceholder: { width: 50, height: 50, borderRadius: 25, backgroundColor: "#BB86FC", justifyContent: "center", alignItems: "center" },
-  sectionEmptyContainer: { alignItems: "center", justifyContent: "center", paddingVertical: 20 },
-  sectionEmptyText: { fontSize: 16, color: "#888888", textAlign: "center", fontFamily: "HelveticaNeue" },
-  requestActions: { flexDirection: "row", justifyContent: "flex-end", alignItems: "center", marginTop: 8 },
-  profilePicInitials: { color: "#000", fontSize: 18, fontWeight: "700", fontFamily: "HelveticaNeue-Bold" },
-  requestsSeparatorLine: { height: 1, backgroundColor: "#333333", marginVertical: 8 },
-  reportLabel: { fontSize: 16, fontWeight: "600", color: "#FFFFFF", marginBottom: 8, fontFamily: "HelveticaNeue-Medium" },
+  profilePicPlaceholder: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: "#BB86FC",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  sectionEmptyContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 20,
+  },
+  sectionEmptyText: {
+    fontSize: 16,
+    color: "#888888",
+    textAlign: "center",
+    fontFamily: "HelveticaNeue",
+  },
+  requestActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    alignItems: "center",
+    marginTop: 8,
+  },
+  profilePicInitials: {
+    color: "#000",
+    fontSize: 18,
+    fontWeight: "700",
+    fontFamily: "HelveticaNeue-Bold",
+  },
+  requestsSeparatorLine: {
+    height: 1,
+    backgroundColor: "#333333",
+    marginVertical: 8,
+  },
+  reportLabel: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#FFFFFF",
+    marginBottom: 8,
+    fontFamily: "HelveticaNeue-Medium",
+  },
   chatDetails: { flex: 1, flexDirection: "column" },
-  chatHeaderRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" },
-  chatName: { fontSize: 16, fontWeight: "600", color: "#FFFFFF", fontFamily: "Helvetica" },
+  chatHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "baseline",
+  },
+  chatName: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#FFFFFF",
+    fontFamily: "Helvetica",
+  },
   timeContainer: { position: "relative", alignItems: "flex-end" },
   chatTime: { fontSize: 12, color: "#AAAAAA", fontFamily: "HelveticaNeue" },
-  chatProductName: { fontSize: 13, color: "#FFFFFF", fontFamily: "HelveticaNeue", marginTop: 2, marginBottom: 3 },
+  chatProductName: {
+    fontSize: 13,
+    color: "#FFFFFF",
+    fontFamily: "HelveticaNeue",
+    marginTop: 2,
+    marginBottom: 3,
+  },
   lastMessageRow: { flexDirection: "row", alignItems: "center", marginTop: 2 },
-  purpleDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#9C27B0", marginRight: 5 },
-  greyDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#888888", marginRight: 5 },
-  reportButton: { backgroundColor: "#222", paddingVertical: 10, paddingHorizontal: 12, borderRadius: 20, alignItems: "center", justifyContent: "center" },
-  exclamationBadge: { position: "absolute", top: -3, right: -3, backgroundColor: "#FF3B30", borderRadius: 7, paddingHorizontal: 6, paddingVertical: 2, justifyContent: "center", alignItems: "center", zIndex: 10 },
-  lastMessage: { fontSize: 14, color: "#CCCCCC", fontFamily: "HelveticaNeue", flexShrink: 1 },
+  purpleDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#9C27B0",
+    marginRight: 5,
+  },
+  greyDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#888888",
+    marginRight: 5,
+  },
+  reportButton: {
+    backgroundColor: "#222",
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  exclamationBadge: {
+    position: "absolute",
+    top: -3,
+    right: -3,
+    backgroundColor: "#FF3B30",
+    borderRadius: 7,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 10,
+  },
+  lastMessage: {
+    fontSize: 14,
+    color: "#CCCCCC",
+    fontFamily: "HelveticaNeue",
+    flexShrink: 1,
+  },
   separatorLine: { height: 0.5, backgroundColor: "#333333", marginLeft: 82 },
   emptyContainer: { marginTop: 50, alignItems: "center" },
   emptyText: { fontSize: 18, color: "#888888", fontFamily: "HelveticaNeue" },
-  acceptButton: { backgroundColor: "#4CAF50", padding: 10, borderRadius: 8, alignItems: "center", justifyContent: "center", marginHorizontal: 5 },
-  rejectButton: { backgroundColor: "#F44336", padding: 10, borderRadius: 8, alignItems: "center", justifyContent: "center", marginHorizontal: 5 },
+  acceptButton: {
+    backgroundColor: "#4CAF50",
+    padding: 10,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    marginHorizontal: 5,
+  },
+  rejectButton: {
+    backgroundColor: "#F44336",
+    padding: 10,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    marginHorizontal: 5,
+  },
   buttonDisabled: { backgroundColor: "#888888", opacity: 0.5 },
   modalSafeArea: { flex: 1 },
   modalContainer: { flex: 1 },
-  enhancedChatHeader: { backgroundColor: "#1F1F1F", paddingHorizontal: 15, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "#333333", flexDirection: "row", alignItems: "center" },
+  enhancedChatHeader: {
+    backgroundColor: "#1F1F1F",
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#333333",
+    flexDirection: "row",
+    alignItems: "center",
+  },
   backButton: { marginRight: 10 },
   chatHeaderInfo: { flexDirection: "row", alignItems: "center", flex: 1 },
-  headerProfilePicPlaceholder: { width: 40, height: 40, borderRadius: 20, backgroundColor: "#BB86FC", justifyContent: "center", alignItems: "center", marginRight: 10 },
-  headerProfilePicInitials: { fontSize: 16, fontWeight: "700", color: "#000", fontFamily: "HelveticaNeue-Bold" },
+  headerProfilePicPlaceholder: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#BB86FC",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 10,
+  },
+  headerProfilePicInitials: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#000",
+    fontFamily: "HelveticaNeue-Bold",
+  },
   chatHeaderTextContainer: { flexDirection: "column", flexShrink: 1 },
-  chatHeaderUserName: { fontSize: 16, fontWeight: "700", color: "#FFFFFF", fontFamily: "HelveticaNeue-Bold" },
-  chatHeaderSubTitle: { fontSize: 13, color: "#FFFFFF", fontFamily: "HelveticaNeue", marginTop: 2 },
-  chatHeaderBottomLine: { position: "absolute", bottom: 0, left: 0, right: 0, height: 1, backgroundColor: "#333333" },
+  chatHeaderUserName: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#FFFFFF",
+    fontFamily: "HelveticaNeue-Bold",
+  },
+  chatHeaderSubTitle: {
+    fontSize: 13,
+    color: "#FFFFFF",
+    fontFamily: "HelveticaNeue",
+    marginTop: 2,
+  },
+  chatHeaderBottomLine: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 1,
+    backgroundColor: "#333333",
+  },
   messagesList: { flexGrow: 1, paddingVertical: 10, paddingHorizontal: 10 },
   messageContainer: { marginBottom: 10, flexDirection: "row", maxWidth: "80%" },
   myMessageContainer: { alignSelf: "flex-end" },
   theirMessageContainer: { alignSelf: "flex-start" },
-  messageBubble: { borderRadius: 14, padding: 8, maxWidth: "100%", flexDirection: "row", alignItems: "flex-end", flexWrap: "wrap", position: "relative" },
+  messageBubble: {
+    borderRadius: 14,
+    padding: 8,
+    maxWidth: "100%",
+    flexDirection: "row",
+    alignItems: "flex-end",
+    flexWrap: "wrap",
+    position: "relative",
+  },
   myMessage: { backgroundColor: "#BB86FC", borderTopRightRadius: 0 },
   theirMessage: { backgroundColor: "#222", borderTopLeftRadius: 0 },
   myMessageTextColor: { color: "#000000" },
   theirMessageTextColor: { color: "#FFFFFF" },
   messageText: { fontSize: 16, fontFamily: "HelveticaNeue", flexShrink: 1 },
-  messageTimestamp: { fontSize: 11, fontFamily: "HelveticaNeue", marginLeft: 5 },
+  messageTimestamp: {
+    fontSize: 11,
+    fontFamily: "HelveticaNeue",
+    marginLeft: 5,
+  },
   myTimestampColor: { color: "#333333" },
   theirTimestampColor: { color: "#999999" },
   messageImage: { width: 200, height: 200, borderRadius: 10, marginRight: 5 },
   inputBarContainer: { backgroundColor: "#000" },
   inputBarLine: { height: 1, backgroundColor: "#333333" },
-  inputContainer: { flexDirection: "row", alignItems: "center", backgroundColor: "#1E1E1E", paddingVertical: 8, paddingHorizontal: 5 },
-  messageInput: { flex: 1, color: "#FFFFFF", paddingHorizontal: 10, fontSize: 16, fontFamily: "HelveticaNeue", maxHeight: 100 },
+  inputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#1E1E1E",
+    paddingVertical: 8,
+    paddingHorizontal: 5,
+  },
+  messageInput: {
+    flex: 1,
+    color: "#FFFFFF",
+    paddingHorizontal: 10,
+    fontSize: 16,
+    fontFamily: "HelveticaNeue",
+    maxHeight: 100,
+  },
   iconButton: { marginHorizontal: 5 },
-  sendButton: { backgroundColor: "#BB86FC", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 8, justifyContent: "center", alignItems: "center", marginLeft: 5 },
-  emptyMessagesContainer: { flex: 1, justifyContent: "center", alignItems: "center", marginTop: 20 },
-  emptyMessagesText: { fontSize: 16, color: "#888888", textAlign: "center", fontFamily: "HelveticaNeue" },
-  imagePreviewContainer: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#000" },
+  sendButton: {
+    backgroundColor: "#BB86FC",
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    justifyContent: "center",
+    alignItems: "center",
+    marginLeft: 5,
+  },
+  emptyMessagesContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 20,
+  },
+  emptyMessagesText: {
+    fontSize: 16,
+    color: "#888888",
+    textAlign: "center",
+    fontFamily: "HelveticaNeue",
+  },
+  imagePreviewContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#000",
+  },
   previewImage: { width, height: undefined, aspectRatio: 1 },
   addImageButton: { marginLeft: "auto" },
-  requestsModalContainer: { position: "absolute", bottom: 0, left: 0, right: 0, height: "80%", backgroundColor: "#1E1E1E", borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingTop: 20, shadowColor: "#000", shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.3, shadowRadius: 5, elevation: 10 },
+  requestsModalContainer: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: "80%",
+    backgroundColor: "#1E1E1E",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 10,
+  },
   unreadBadge: {
     position: "absolute",
     top: 22,
@@ -1796,54 +2083,200 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     alignSelf: "center",
   },
-  unreadBadgeText: { color: "#000000", fontSize: 10, fontWeight: "bold", textAlign: "center" },
+  unreadBadgeText: {
+    color: "#000000",
+    fontSize: 10,
+    fontWeight: "bold",
+    textAlign: "center",
+  },
   requestsSafeArea: { flex: 1 },
-  requestsHeader: { flexDirection: "row", alignItems: "center", paddingHorizontal: 20, marginBottom: 10 },
+  requestsHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    marginBottom: 10,
+  },
   closeButton: { padding: 5 },
-  requestsHeaderTitle: { fontSize: 20, fontWeight: "700", color: "#BB86FC", fontFamily: "HelveticaNeue-Bold", marginLeft: 10 },
-  requestsTabsRow: { flexDirection: "row", justifyContent: "center", marginBottom: 10 },
-  requestsTab: { flex: 1, alignItems: "center", paddingVertical: 10, marginHorizontal: 10, borderRadius: 20, backgroundColor: "#2C2C2C" },
+  requestsHeaderTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#BB86FC",
+    fontFamily: "HelveticaNeue-Bold",
+    marginLeft: 10,
+  },
+  requestsTabsRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    marginBottom: 10,
+  },
+  requestsTab: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 10,
+    marginHorizontal: 10,
+    borderRadius: 20,
+    backgroundColor: "#2C2C2C",
+  },
   activeRequestsTab: { backgroundColor: "#BB86FC" },
-  requestsTabText: { color: "#BBBBBB", fontSize: 14, fontFamily: "HelveticaNeue-Medium" },
+  requestsTabText: {
+    color: "#BBBBBB",
+    fontSize: 14,
+    fontFamily: "HelveticaNeue-Medium",
+  },
   activeRequestsTabText: { color: "#000" },
   requestsContent: { flex: 1, paddingHorizontal: 20, paddingBottom: 20 },
-  requestsErrorContainer: { flex: 1, justifyContent: "center", alignItems: "center", paddingHorizontal: 20 },
-  requestsErrorText: { color: "#FF3B30", fontSize: 14, textAlign: "center", fontFamily: "HelveticaNeue" },
-  requestCard: { backgroundColor: "#2C2C2C", paddingVertical: 12, paddingHorizontal: 15, borderRadius: 12, marginVertical: 6, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 3.84, elevation: 5 },
+  requestsErrorContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 20,
+  },
+  requestsErrorText: {
+    color: "#FF3B30",
+    fontSize: 14,
+    textAlign: "center",
+    fontFamily: "HelveticaNeue",
+  },
+  requestCard: {
+    backgroundColor: "#2C2C2C",
+    paddingVertical: 12,
+    paddingHorizontal: 15,
+    borderRadius: 12,
+    marginVertical: 6,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
   requestInfo: { marginBottom: 8 },
-  requestProductName: { fontSize: 16, fontWeight: "700", color: "#BB86FC", fontFamily: "HelveticaNeue-Bold", marginBottom: 3 },
+  requestProductName: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#BB86FC",
+    fontFamily: "HelveticaNeue-Bold",
+    marginBottom: 3,
+  },
   requestDate: { fontSize: 12, color: "#AAAAAA", fontFamily: "HelveticaNeue" },
   reportContent: { flex: 1, padding: 20, backgroundColor: "#000" },
-  dropdownContainer: { backgroundColor: "#1E1E1E", borderWidth: 1, borderColor: "#555", borderRadius: 6, height: 40, justifyContent: "center", paddingHorizontal: 10, marginBottom: 8, flexDirection: "row", alignItems: "center" },
+  dropdownContainer: {
+    backgroundColor: "#1E1E1E",
+    borderWidth: 1,
+    borderColor: "#555",
+    borderRadius: 6,
+    height: 40,
+    justifyContent: "center",
+    paddingHorizontal: 10,
+    marginBottom: 8,
+    flexDirection: "row",
+    alignItems: "center",
+  },
   dropdownPlaceholderText: { color: "#888", fontSize: 14 },
   requestSender: {
     fontSize: 14,
-    fontWeight: "bold",  // Makes it stand out more
-    color: "#FFFFFF",    // Change this to white
+    fontWeight: "bold", // Makes it stand out more
+    color: "#FFFFFF", // Change this to white
     fontFamily: "HelveticaNeue",
     marginBottom: 5,
   },
-  
+
   dropdownSelectedText: { color: "#FFFFFF", fontSize: 14, fontWeight: "bold" },
   dropdownIcon: { marginLeft: "auto" },
-  dropdownAbsoluteOverlay: { position: "absolute", top: 60, left: 0, right: 0, backgroundColor: "transparent", zIndex: 10 },
-  dropdownAbsoluteContainer: { backgroundColor: "#1E1E1E", marginHorizontal: 20, borderRadius: 8 },
+  dropdownAbsoluteOverlay: {
+    position: "absolute",
+    top: 60,
+    left: 0,
+    right: 0,
+    backgroundColor: "transparent",
+    zIndex: 10,
+  },
+  dropdownAbsoluteContainer: {
+    backgroundColor: "#1E1E1E",
+    marginHorizontal: 20,
+    borderRadius: 8,
+  },
   dropdownOption: { paddingVertical: 12, paddingHorizontal: 15 },
   dropdownOptionText: { color: "#FFFFFF", fontWeight: "bold", fontSize: 16 },
-  otherReasonInput: { backgroundColor: "#333", color: "#fff", borderRadius: 6, paddingHorizontal: 10, height: 40, marginBottom: 10, fontFamily: "HelveticaNeue", fontSize: 14 },
-  reportDescriptionInput: { backgroundColor: "#333", color: "#fff", borderRadius: 6, padding: 15, minHeight: 80, textAlignVertical: "top", marginBottom: 15, fontFamily: "HelveticaNeue", fontSize: 16 },
-  reportInfoText: { fontSize: 12, color: "#AAAAAA", marginBottom: 15, fontFamily: "HelveticaNeue" },
-  reportSubmitButton: { backgroundColor: "#BB86FC", paddingVertical: 10, borderRadius: 6, alignItems: "center", marginBottom: 10 },
-  reportSubmitButtonText: { color: "#000", fontSize: 16, fontFamily: "HelveticaNeue-Bold" },
-  modalContent: { backgroundColor: "#1E1E1E", padding: 30, borderRadius: 15, alignItems: "center", gap: 15 },
+  otherReasonInput: {
+    backgroundColor: "#333",
+    color: "#fff",
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    height: 40,
+    marginBottom: 10,
+    fontFamily: "HelveticaNeue",
+    fontSize: 14,
+  },
+  reportDescriptionInput: {
+    backgroundColor: "#333",
+    color: "#fff",
+    borderRadius: 6,
+    padding: 15,
+    minHeight: 80,
+    textAlignVertical: "top",
+    marginBottom: 15,
+    fontFamily: "HelveticaNeue",
+    fontSize: 16,
+  },
+  reportInfoText: {
+    fontSize: 12,
+    color: "#AAAAAA",
+    marginBottom: 15,
+    fontFamily: "HelveticaNeue",
+  },
+  reportSubmitButton: {
+    backgroundColor: "#BB86FC",
+    paddingVertical: 10,
+    borderRadius: 6,
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  reportSubmitButtonText: {
+    color: "#000",
+    fontSize: 16,
+    fontFamily: "HelveticaNeue-Bold",
+  },
+  modalContent: {
+    backgroundColor: "#1E1E1E",
+    padding: 30,
+    borderRadius: 15,
+    alignItems: "center",
+    gap: 15,
+  },
   modalText: { fontSize: 18, fontWeight: "600", color: "#fff" },
-  popupOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", alignItems: "center" },
-  popupContainer: { backgroundColor: "#1E1E1E", padding: 20, borderRadius: 8, alignItems: "center" },
+  popupOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  popupContainer: {
+    backgroundColor: "#1E1E1E",
+    padding: 20,
+    borderRadius: 8,
+    alignItems: "center",
+  },
   popupText: { color: "#FFFFFF", fontSize: 16, marginBottom: 10 },
-  popupButton: { backgroundColor: "#BB86FC", paddingHorizontal: 20, paddingVertical: 8, borderRadius: 6 },
+  popupButton: {
+    backgroundColor: "#BB86FC",
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 6,
+  },
   popupButtonText: { color: "#000", fontSize: 16, fontWeight: "bold" },
-  productActionButtons: { flexDirection: "row", alignItems: "center", marginLeft: 10 },
-  smallActionButton: { width: 32, height: 32, borderRadius: 6, justifyContent: "center", alignItems: "center", marginHorizontal: 4 },
+  productActionButtons: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginLeft: 10,
+  },
+  smallActionButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 6,
+    justifyContent: "center",
+    alignItems: "center",
+    marginHorizontal: 4,
+  },
   smallActionButtonClose: { backgroundColor: "#E74C3C" },
   smallActionButtonCheck: { backgroundColor: "#27AE60" },
 });
