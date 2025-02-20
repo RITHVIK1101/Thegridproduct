@@ -14,7 +14,10 @@
       "NGROK_URL": "https://de17-71-197-245-145.ngrok-free.app"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "Gridly requires access to your photos so you can upload images for your service listings, helping potential customers view your products or services."
+      }
     },
     "android": {
       "adaptiveIcon": {
