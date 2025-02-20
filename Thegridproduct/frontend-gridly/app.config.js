@@ -20,7 +20,10 @@ export default {
     ],
     ios: {
       supportsTablet: true,
-      bundleIdentifier: "com.gridly.mobile"  // ✅ Update this
+      bundleIdentifier: "com.gridly.mobile",
+      infoPlist: {
+        NSPhotoLibraryUsageDescription: "Gridly requires access to your photos so you can upload images for your service listings, helping potential customers view your products or services."
+      }
     },
     android: {
       adaptiveIcon: {
