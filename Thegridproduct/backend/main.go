@@ -61,6 +61,8 @@ func main() {
 	router.HandleFunc("/login", handlers.LoginHandler).Methods("POST")
 	router.HandleFunc("/verify", handlers.VerifyEmailHandler).Methods("POST")
 	router.HandleFunc("/signup", handlers.SignupHandler).Methods("POST")
+	router.HandleFunc("/user/delete", handlers.DeleteAccountHandler).Methods("DELETE")
+
 	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Welcome to The Gridly API"))
 	}).Methods("GET")

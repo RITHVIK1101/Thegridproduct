@@ -412,3 +412,92 @@ func VerifyEmailHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(response)
 }
+
+// DeleteAccountHandler handles deletion of the user account along with all associated data.
+func DeleteAccountHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method != http.MethodDelete {
+		WriteJSONError(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Extract token from header.
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		WriteJSONError(w, "Authorization token required", http.StatusUnauthorized)
+		return
+	}
+	// Expecting "Bearer <token>"
+	tokenString := authHeader[len("Bearer "):]
+	jwtKey := []byte(os.Getenv("JWT_SECRET_KEY"))
+
+	// Parse and validate JWT.
+	claims := &Claims{}
+	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
+		return jwtKey, nil
+	})
+	if err != nil || !token.Valid {
+		WriteJSONError(w, "Invalid or expired token", http.StatusUnauthorized)
+		return
+	}
+
+	// Convert user ID from the token.
+	userID, err := primitive.ObjectIDFromHex(claims.UserID)
+	if err != nil {
+		WriteJSONError(w, "Invalid user ID", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Determine the user's collection.
+	var userCollectionName string
+	if claims.StudentType == StudentTypeUniversity {
+		userCollectionName = "university_users"
+	} else {
+		userCollectionName = "highschool_users"
+	}
+	userCollection := db.GetCollection("gridlyapp", userCollectionName)
+
+	// Delete the user document.
+	_, err = userCollection.DeleteOne(ctx, bson.M{"_id": userID})
+	if err != nil {
+		log.Printf("Error deleting user account: %v", err)
+		WriteJSONError(w, "Error deleting account", http.StatusInternalServerError)
+		return
+	}
+
+	// Delete all products associated with the user.
+	productsCollection := db.GetCollection("gridlyapp", "products")
+	_, err = productsCollection.DeleteMany(ctx, bson.M{"userId": userID})
+	if err != nil {
+		log.Printf("Error deleting user's products: %v", err)
+		// Log error but proceed.
+	}
+
+	// Delete all gigs associated with the user.
+	gigsCollection := db.GetCollection("gridlyapp", "gigs")
+	_, err = gigsCollection.DeleteMany(ctx, bson.M{"userId": userID})
+	if err != nil {
+		log.Printf("Error deleting user's gigs: %v", err)
+		// Log error but proceed.
+	}
+
+	// Delete all product requests associated with the user.
+	// This uses the "product_requests" collection and deletes documents where "userId" matches.
+	requestsCollection := db.GetCollection("gridlyapp", "product_requests")
+	_, err = requestsCollection.DeleteMany(ctx, bson.M{"userId": userID})
+	if err != nil {
+		log.Printf("Error deleting user's product requests: %v", err)
+		// Log error but proceed.
+	}
+
+	// Respond with success.
+	response := map[string]interface{}{
+		"message": "Account and all associated data deleted successfully.",
+	}
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(response)
+}

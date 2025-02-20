@@ -1,5 +1,3 @@
-// screens/AccountScreen.tsx
-
 import React, { useContext, useEffect, useState } from "react";
 import {
   View,
@@ -35,7 +33,6 @@ const AccountScreen: React.FC = () => {
       setLoading(false);
       return;
     }
-
     try {
       const response = await fetch(`${NGROK_URL}/users/${userId}`, {
         method: "GET",
@@ -89,6 +86,39 @@ const AccountScreen: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Function to delete the user account
+  const handleDeleteAccount = async () => {
+    try {
+      const response = await fetch(`${NGROK_URL}/user/delete`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to delete account: ${errorText}`);
+      }
+
+      Alert.alert(
+        "Account Deleted",
+        "Your account has been successfully deleted."
+      );
+      await clearUser(); // Clear stored user data
+      navigation.dispatch(
+        CommonActions.reset({
+          index: 0,
+          routes: [{ name: "Login" }],
+        })
+      );
+    } catch (error) {
+      console.error("Error deleting account:", error);
+      Alert.alert("Error", "Failed to delete account. Please try again later.");
+    }
+  };
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -137,6 +167,29 @@ const AccountScreen: React.FC = () => {
       <Text style={styles.note}>
         Note: The above information cannot be changed.
       </Text>
+
+      {/* Delete Account Button */}
+      <View style={styles.deleteAccountContainer}>
+        <TouchableOpacity
+          style={styles.deleteAccountButton}
+          onPress={() =>
+            Alert.alert(
+              "Delete Account",
+              "Are you sure you want to delete your account? All your information—including products, gigs, and requests—will be permanently deleted.",
+              [
+                { text: "Cancel", style: "cancel" },
+                {
+                  text: "Delete",
+                  style: "destructive",
+                  onPress: handleDeleteAccount,
+                },
+              ]
+            )
+          }
+        >
+          <Text style={styles.deleteAccountText}>Delete Account</Text>
+        </TouchableOpacity>
+      </View>
     </ScrollView>
   );
 };
@@ -146,10 +199,9 @@ export default AccountScreen;
 const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
-    backgroundColor: "#000", // Pure black background
+    backgroundColor: "#000",
     padding: 20,
     paddingBottom: 40,
-    // Align content to the top
     justifyContent: "flex-start",
   },
   loadingContainer: {
@@ -188,7 +240,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginBottom: 20,
     textAlign: "center",
-    // Reduced top margin for an upward shift
     marginTop: 10,
   },
   infoRow: {
@@ -200,7 +251,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: "#fff",
     fontWeight: "600",
-    width: 140, // Fixed width for labels
+    width: 140,
   },
   value: {
     fontSize: 18,
@@ -218,5 +269,21 @@ const styles = StyleSheet.create({
     color: "#777",
     textAlign: "center",
     fontStyle: "italic",
+  },
+  deleteAccountContainer: {
+    marginTop: 30,
+    paddingHorizontal: 20,
+    marginBottom: 20,
+  },
+  deleteAccountButton: {
+    backgroundColor: "#FF3B30",
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  deleteAccountText: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: 16,
   },
 });
