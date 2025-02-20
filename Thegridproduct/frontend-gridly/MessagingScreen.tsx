@@ -969,6 +969,32 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     setReportModalVisible(true);
     setChatModalVisible(false);
   };
+  const fetchChatDetails = async (chatId: string) => {
+    if (!chatId) {
+      console.error("Error: chatId is undefined!");
+      return null;
+    }
+
+    try {
+      const response = await axios.get(
+        `${NGROK_URL}/chats/${chatId}`, // Correct endpoint
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (response.status === 200 && response.data) {
+        return response.data; // Should contain buyerId & sellerId
+      } else {
+        console.error("Failed to fetch chat details:", response.status);
+        return null;
+      }
+    } catch (error) {
+      console.error(
+        "Error fetching chat details:",
+        error.response?.data || error
+      );
+      return null;
+    }
+  };
 
   const handleModifiedReportSubmit = async () => {
     if (
@@ -979,25 +1005,22 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       setIsIncompletePopupVisible(true);
       return;
     }
+
     setIsSubmittingReport(true);
-    const reportedUserId = selectedChat?.messages?.find(
-      (msg) => msg.senderId !== userId
-    )?.senderId;
-    if (!selectedChat || !reportedUserId) {
+
+    if (!selectedChat || !selectedChat.chatID) {
+      console.error("Error: Missing chat ID.");
+      Alert.alert("Error", "Cannot submit report without a chat ID.");
       setIsSubmittingReport(false);
-      setIsIncompletePopupVisible(true);
       return;
     }
-    const finalReason =
-      reportReason === "Other" ? customReason.trim() : reportReason;
+
     try {
       const response = await axios.post(
         `${NGROK_URL}/report`,
         {
           chatId: selectedChat.chatID,
-          reporterUserId: userId,
-          reportedUserId,
-          reason: finalReason,
+          reason: reportReason === "Other" ? customReason.trim() : reportReason,
           description: reportDescription.trim(),
         },
         {
@@ -1007,18 +1030,17 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
           },
         }
       );
+
       if (response.status === 200) {
         setReportModalVisible(false);
-        setIsReportSuccessModalVisible(true);
-        setTimeout(() => {
-          setIsReportSuccessModalVisible(false);
-        }, 3500);
+        setTimeout(() => setChatModalVisible(true), 300);
+        Alert.alert("Success", "Report submitted successfully.");
       } else {
         throw new Error("Failed to submit report");
       }
     } catch (error) {
       console.error("Error submitting report:", error);
-      setIsIncompletePopupVisible(true);
+      Alert.alert("Error", "Could not submit report.");
     } finally {
       setIsSubmittingReport(false);
     }
