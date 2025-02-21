@@ -111,15 +111,19 @@ const Dashboard: React.FC<DashboardProps> = () => {
     "#Tickets",
     "#Other",
   ];
-  const [selectedCategory, setSelectedCategory] = useState<string>("#Everything");
+  const [selectedCategory, setSelectedCategory] =
+    useState<string>("#Everything");
   const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
 
   // --- Description Modal ---
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [isDescriptionModalVisible, setIsDescriptionModalVisible] = useState(false);
+  const [isDescriptionModalVisible, setIsDescriptionModalVisible] =
+    useState(false);
 
   // --- Requested Products ---
-  const [requestedProducts, setRequestedProducts] = useState<RequestedProduct[]>([]);
+  const [requestedProducts, setRequestedProducts] = useState<
+    RequestedProduct[]
+  >([]);
 
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
 
@@ -178,9 +182,10 @@ const Dashboard: React.FC<DashboardProps> = () => {
       const updated = [...seenProducts, productId];
       setSeenProducts(updated);
       if (userId) {
-        AsyncStorage.setItem(`seenProducts_${userId}`, JSON.stringify(updated)).catch((err) =>
-          console.error("Error saving seen products:", err)
-        );
+        AsyncStorage.setItem(
+          `seenProducts_${userId}`,
+          JSON.stringify(updated)
+        ).catch((err) => console.error("Error saving seen products:", err));
       }
     }
   };
@@ -581,15 +586,17 @@ const Dashboard: React.FC<DashboardProps> = () => {
     // Filter by category first.
     let filtered = allProducts;
     if (selectedCategory !== "#Everything") {
-      filtered = filtered.filter((p) => p.selectedTags?.includes(selectedCategory));
+      filtered = filtered.filter((p) =>
+        p.selectedTags?.includes(selectedCategory)
+      );
     }
     // Calculate unseen: products not in seenProducts.
     let unseen = filtered.filter((p) => !seenProducts.includes(p.id));
     // If there are no unseen products (but some exist in filtered), then reset seenProducts.
     if (filtered.length > 0 && unseen.length === 0) {
       setSeenProducts([]);
-      AsyncStorage.setItem(`seenProducts_${userId}`, JSON.stringify([])).catch((err) =>
-        console.error("Error resetting seen products:", err)
+      AsyncStorage.setItem(`seenProducts_${userId}`, JSON.stringify([])).catch(
+        (err) => console.error("Error resetting seen products:", err)
       );
       unseen = filtered;
     }
@@ -644,7 +651,8 @@ const Dashboard: React.FC<DashboardProps> = () => {
     }, [token])
   );
 
-  const toggleFilterModal = () => setIsFilterModalVisible(!isFilterModalVisible);
+  const toggleFilterModal = () =>
+    setIsFilterModalVisible(!isFilterModalVisible);
 
   // ----- When Swiping to Next Product -----
   const goToNextProduct = () => {
@@ -784,7 +792,13 @@ const Dashboard: React.FC<DashboardProps> = () => {
                 }
               }}
             >
-              <View style={{ width: SCREEN_WIDTH, height: PRODUCT_HEIGHT, backgroundColor: "#000" }}>
+              <View
+                style={{
+                  width: SCREEN_WIDTH,
+                  height: PRODUCT_HEIGHT,
+                  backgroundColor: "#000",
+                }}
+              >
                 <View
                   style={{
                     flexDirection: "row",
@@ -832,7 +846,8 @@ const Dashboard: React.FC<DashboardProps> = () => {
                       key={idx}
                       style={[
                         styles.imageIndicatorDot,
-                        idx === currentImageIndex && styles.imageIndicatorDotActive,
+                        idx === currentImageIndex &&
+                          styles.imageIndicatorDotActive,
                       ]}
                     />
                   ))}
@@ -845,7 +860,9 @@ const Dashboard: React.FC<DashboardProps> = () => {
           <>
             <View style={styles.productInfoBubble}>
               <View style={styles.productInfoTextContainer}>
-                <TouchableOpacity onPress={() => setTitleExpanded(!titleExpanded)}>
+                <TouchableOpacity
+                  onPress={() => setTitleExpanded(!titleExpanded)}
+                >
                   <Text
                     style={styles.productInfoTitle}
                     numberOfLines={titleExpanded ? undefined : 1}
@@ -857,7 +874,9 @@ const Dashboard: React.FC<DashboardProps> = () => {
                 <Text style={styles.productInfoPrice}>
                   ${displayPrice.toFixed(2)} /{" "}
                   {product.rentPrice && product.rentPrice > 0
-                    ? `Renting Price: $${product.rentPrice.toFixed(2)} (${product.rentDuration || "N/A"})`
+                    ? `Renting Price: $${product.rentPrice.toFixed(2)} (${
+                        product.rentDuration || "N/A"
+                      })`
                     : "Renting Unavailable"}
                 </Text>
               </View>
@@ -878,7 +897,11 @@ const Dashboard: React.FC<DashboardProps> = () => {
                   onPress={() => onShowDescription(product)}
                   accessibilityLabel="Show Details"
                 >
-                  <Ionicons name="information-circle" size={25} color="#FFFFFF" />
+                  <Ionicons
+                    name="information-circle"
+                    size={25}
+                    color="#FFFFFF"
+                  />
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.iconButton}
@@ -898,7 +921,10 @@ const Dashboard: React.FC<DashboardProps> = () => {
   return (
     <View style={styles.rootContainer}>
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <LinearGradient colors={["#000000", "#000000"]} style={styles.gradientBackground}>
+        <LinearGradient
+          colors={["#000000", "#000000"]}
+          style={styles.gradientBackground}
+        >
           <View style={styles.topBar}>
             <TouchableOpacity
               style={styles.topBarIconContainer}
@@ -957,25 +983,27 @@ const Dashboard: React.FC<DashboardProps> = () => {
             <View style={{ flex: 1, backgroundColor: "#000000" }} />
           ) : (
             <View style={styles.productStack}>
-              {filteredProducts.slice(currentIndex, currentIndex + 1).map((product, idx) => (
-                <ProductItem
-                  key={product.id}
-                  product={product}
-                  nextProduct={filteredProducts[currentIndex + 1] || null}
-                  index={currentIndex + idx}
-                  currentIndex={currentIndex}
-                  onAddToCart={addToCart}
-                  onToggleFavorite={toggleFavorite}
-                  onShowDescription={(prod) => {
-                    setSelectedProduct(prod);
-                    setIsDescriptionModalVisible(true);
-                  }}
-                  onNextProduct={goToNextProduct}
-                  isFavorite={likedProducts.includes(product.id)}
-                  currentImageIndex={currentImageIndex}
-                  setCurrentImageIndex={setCurrentImageIndex}
-                />
-              ))}
+              {filteredProducts
+                .slice(currentIndex, currentIndex + 1)
+                .map((product, idx) => (
+                  <ProductItem
+                    key={product.id}
+                    product={product}
+                    nextProduct={filteredProducts[currentIndex + 1] || null}
+                    index={currentIndex + idx}
+                    currentIndex={currentIndex}
+                    onAddToCart={addToCart}
+                    onToggleFavorite={toggleFavorite}
+                    onShowDescription={(prod) => {
+                      setSelectedProduct(prod);
+                      setIsDescriptionModalVisible(true);
+                    }}
+                    onNextProduct={goToNextProduct}
+                    isFavorite={likedProducts.includes(product.id)}
+                    currentImageIndex={currentImageIndex}
+                    setCurrentImageIndex={setCurrentImageIndex}
+                  />
+                ))}
             </View>
           )}
 
@@ -996,25 +1024,62 @@ const Dashboard: React.FC<DashboardProps> = () => {
                     showsVerticalScrollIndicator={false}
                     contentContainerStyle={styles.modalScrollContent}
                   >
-                    <Text style={styles.modalTitle}>{selectedProduct.title}</Text>
+                    {/* Title with New Product Badge */}
+                    <View style={styles.titleContainer}>
+                      <Text style={styles.modalTitle}>
+                        {selectedProduct.title}
+                      </Text>
+                      {selectedProduct.quality === "New" && (
+                        <View style={styles.newBadgeContainer}>
+                          <Text style={styles.newBadgeText}>
+                            Condition: New
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+
                     <Text style={styles.detailText}>
                       Price: ${selectedProduct.price.toFixed(2)}
                     </Text>
-                    <Text style={styles.detailText}>
-                      Condition: {selectedProduct.quality || "New"}
-                    </Text>
-                    {selectedProduct.rating && selectedProduct.rating > 0 && (
-                      <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
-                        <Text style={styles.detailText}>Rating: </Text>
-                        {[...Array(selectedProduct.rating)].map((_, i) => (
-                          <Ionicons key={i} name="star" size={16} color="#FFD700" />
-                        ))}
-                      </View>
+
+                    {/* Only show condition & rating if NOT new */}
+                    {selectedProduct.quality !== "New" && (
+                      <>
+                        <Text style={styles.detailText}>
+                          Condition: {selectedProduct.quality}
+                        </Text>
+                        {selectedProduct.rating &&
+                          selectedProduct.rating > 0 && (
+                            <View
+                              style={{
+                                flexDirection: "row",
+                                alignItems: "center",
+                                marginBottom: 8,
+                              }}
+                            >
+                              <Text style={styles.detailText}>Rating: </Text>
+                              {[...Array(selectedProduct.rating)].map(
+                                (_, i) => (
+                                  <Ionicons
+                                    key={i}
+                                    name="star"
+                                    size={16}
+                                    color="#FFD700"
+                                  />
+                                )
+                              )}
+                            </View>
+                          )}
+                      </>
                     )}
+
                     <Text style={styles.sectionHeader}>Description</Text>
-                    <Text style={styles.descriptionText}>{selectedProduct.description}</Text>
+                    <Text style={styles.descriptionText}>
+                      {selectedProduct.description}
+                    </Text>
                   </RNScrollView>
                 )}
+
                 <TouchableOpacity
                   onPress={() => setIsDescriptionModalVisible(false)}
                   style={styles.modalClose}
@@ -1049,21 +1114,29 @@ const Dashboard: React.FC<DashboardProps> = () => {
                     <TouchableOpacity
                       style={[
                         styles.filterModalOption,
-                        selectedCategory === item && styles.filterModalOptionSelected,
+                        selectedCategory === item &&
+                          styles.filterModalOptionSelected,
                       ]}
                       onPress={() => setSelectedCategory(item)}
                       accessibilityLabel={`Filter by ${item}`}
                     >
                       <Ionicons
-                        name={selectedCategory === item ? "checkbox-outline" : "ellipse-outline"}
+                        name={
+                          selectedCategory === item
+                            ? "checkbox-outline"
+                            : "ellipse-outline"
+                        }
                         size={20}
-                        color={selectedCategory === item ? "#BB86FC" : "#FFFFFF"}
+                        color={
+                          selectedCategory === item ? "#BB86FC" : "#FFFFFF"
+                        }
                         style={{ marginRight: 10 }}
                       />
                       <Text
                         style={[
                           styles.filterModalOptionText,
-                          selectedCategory === item && styles.filterModalOptionTextSelected,
+                          selectedCategory === item &&
+                            styles.filterModalOptionTextSelected,
                         ]}
                       >
                         {item === "#Everything" ? "All" : item.replace("#", "")}
@@ -1081,21 +1154,29 @@ const Dashboard: React.FC<DashboardProps> = () => {
                     <TouchableOpacity
                       style={[
                         styles.filterModalOption,
-                        campusMode === item.value && styles.filterModalOptionSelected,
+                        campusMode === item.value &&
+                          styles.filterModalOptionSelected,
                       ]}
                       onPress={() => setCampusMode(item.value)}
                       accessibilityLabel={`Filter by ${item.label}`}
                     >
                       <Ionicons
-                        name={campusMode === item.value ? "checkbox-outline" : "ellipse-outline"}
+                        name={
+                          campusMode === item.value
+                            ? "checkbox-outline"
+                            : "ellipse-outline"
+                        }
                         size={20}
-                        color={campusMode === item.value ? "#BB86FC" : "#FFFFFF"}
+                        color={
+                          campusMode === item.value ? "#BB86FC" : "#FFFFFF"
+                        }
                         style={{ marginRight: 10 }}
                       />
                       <Text
                         style={[
                           styles.filterModalOptionText,
-                          campusMode === item.value && styles.filterModalOptionTextSelected,
+                          campusMode === item.value &&
+                            styles.filterModalOptionTextSelected,
                         ]}
                       >
                         {item.label}
@@ -1125,7 +1206,12 @@ const Dashboard: React.FC<DashboardProps> = () => {
           </Modal>
 
           {successMessage !== "" && (
-            <Animated.View style={[styles.successToastContainer, { opacity: successOpacity }]}>
+            <Animated.View
+              style={[
+                styles.successToastContainer,
+                { opacity: successOpacity },
+              ]}
+            >
               <Text style={styles.toastText}>{successMessage}</Text>
             </Animated.View>
           )}
@@ -1385,6 +1471,26 @@ const styles = StyleSheet.create({
     marginTop: 15,
     alignItems: "center",
   },
+  titleContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between", // Ensures space between title and badge
+    marginBottom: 10, // Adds spacing below the title section
+  },
+  newBadgeContainer: {
+    backgroundColor: "#34C759", // Green color for the badge
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginRight: 26,
+    marginTop: -18, // Space between the title and the badge
+  },
+  newBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "bold",
+  },
+
   applyButtonText: {
     color: "#FFFFFF",
     fontSize: 16,
@@ -1396,7 +1502,7 @@ const styles = StyleSheet.create({
     right: 10,
     backgroundColor: "rgba(255,255,255,0.2)",
     borderRadius: 15,
-    padding: 6,
+    padding: 1,
   },
   detailsModalContent: {
     width: "90%",
@@ -1410,6 +1516,8 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 24,
     fontWeight: "bold",
+    marginRight: -20,
+    marginLeft: 126,
     color: "#FFFFFF",
     textAlign: "center",
     marginBottom: 12,
