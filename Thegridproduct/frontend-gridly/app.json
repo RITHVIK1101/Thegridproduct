@@ -16,7 +16,8 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSPhotoLibraryUsageDescription": "Gridly requires access to your photos so you can upload images for your service listings, helping potential customers view your products or services."
+        "NSPhotoLibraryUsageDescription": "Gridly needs access to your photo library to allow you to upload images when creating service listings. These images will be publicly visible to potential customers browsing your offerings.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {

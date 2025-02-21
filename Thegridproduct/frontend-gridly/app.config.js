@@ -15,14 +15,13 @@ export default {
     updates: {
       fallbackToCacheTimeout: 0
     },
-    assetBundlePatterns: [
-      "**/*"
-    ],
+    assetBundlePatterns: ["**/*"],
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.gridly.mobile",
       infoPlist: {
-        NSPhotoLibraryUsageDescription: "Gridly requires access to your photos so you can upload images for your service listings, helping potential customers view your products or services."
+        NSPhotoLibraryUsageDescription: "Gridly needs access to your photo library to allow you to upload images when creating service listings. These images will be publicly visible to potential customers browsing your offerings.",
+        ITSAppUsesNonExemptEncryption: false
       }
     },
     android: {
@@ -39,6 +38,9 @@ export default {
       eas: {
         projectId: "0f8792ae-5411-4193-898e-8a69005c50e7"
       }
-    },
-  },
+    }
+  }
 };
+
+
+
