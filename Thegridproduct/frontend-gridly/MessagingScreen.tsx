@@ -78,6 +78,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
   const [isImagePreviewModalVisible, setIsImagePreviewModalVisible] = useState<boolean>(false);
   const [isUploadingImage, setIsUploadingImage] = useState<boolean>(false);
   const [filterMenuVisible, setFilterMenuVisible] = useState<boolean>(false);
+  const { width } = Dimensions.get("window");
   const [isRequestsModalVisible, setRequestsModalVisible] = useState<boolean>(false);
   const [incomingRequests, setIncomingRequests] = useState<Request[]>([]);
   const [outgoingRequests, setOutgoingRequests] = useState<Request[]>([]);
@@ -1071,7 +1072,7 @@ const styles = StyleSheet.create({
   emptyMessagesContainer: { flex: 1, justifyContent: "center", alignItems: "center", marginTop: 20 },
   emptyMessagesText: { fontSize: 16, color: "#888888", textAlign: "center", fontFamily: "HelveticaNeue" },
   imagePreviewContainer: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#000" },
-  previewImage: { width, height: undefined, aspectRatio: 1 },
+
   addImageButton: { marginLeft: "auto" },
   requestsModalContainer: { position: "absolute", bottom: 0, left: 0, right: 0, height: "80%", backgroundColor: "#1E1E1E", borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingTop: 20, shadowColor: "#000", shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.3, shadowRadius: 5, elevation: 10 },
   unreadBadge: { position: "absolute", top: 22, backgroundColor: "#FFFFFF", borderRadius: 10, paddingHorizontal: 6, paddingVertical: 2, alignSelf: "center" },
