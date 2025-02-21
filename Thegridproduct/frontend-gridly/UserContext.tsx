@@ -1,8 +1,7 @@
 // UserContext.tsx
-
 import React, { createContext, useState, ReactNode, useEffect } from "react";
-import * as SecureStore from "expo-secure-store"; // If using Expo
-import { NGROK_URL } from "@env"; // Ensure you have NGROK_URL defined in your environment variables
+import * as SecureStore from "expo-secure-store";
+import { NGROK_URL } from "@env";
 
 export enum StudentType {
   HighSchool = "highschool",
@@ -32,14 +31,18 @@ interface UserContextProps {
   lastName: string;
   institution: string;
   studentType: StudentType | null;
-  likedProducts: string[]; // Added likedProducts
-  setLikedProducts: React.Dispatch<React.SetStateAction<string[]>>; // Added setLikedProducts
+  likedProducts: string[];
+  setLikedProducts: React.Dispatch<React.SetStateAction<string[]>>;
   isLoading: boolean;
+
+  // NEW: Expo push token
+  expoPushToken: string | null;
+  setExpoPushToken: React.Dispatch<React.SetStateAction<string | null>>;
+
   setUser: (user: User) => Promise<void>;
   clearUser: () => Promise<void>;
 }
 
-/** Create the UserContext with default values */
 export const UserContext = createContext<UserContextProps>({
   userId: "",
   token: "",
@@ -47,17 +50,18 @@ export const UserContext = createContext<UserContextProps>({
   lastName: "",
   institution: "",
   studentType: null,
-  likedProducts: [], // Initialize as empty array
+  likedProducts: [],
   setLikedProducts: () => {},
   isLoading: true,
+
+  expoPushToken: null,
+  setExpoPushToken: () => {},
+
   setUser: async () => {},
   clearUser: async () => {},
 });
 
-const fetchFullUserProfile = async (
-  userId: string,
-  token: string
-): Promise<UserProfile> => {
+const fetchFullUserProfile = async (userId: string, token: string): Promise<UserProfile> => {
   const response = await fetch(`${NGROK_URL}/users/${userId}`, {
     method: "GET",
     headers: {
@@ -84,7 +88,6 @@ const fetchFullUserProfile = async (
   return { firstName, lastName, institution, studentType };
 };
 
-/** UserProvider component that wraps around your app */
 export const UserProvider = ({ children }: { children: ReactNode }) => {
   const [userId, setUserId] = useState<string>("");
   const [token, setToken] = useState<string>("");
@@ -95,22 +98,18 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   const [likedProducts, setLikedProducts] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  /** Load user data from SecureStore and fetch full profile */
+  // NEW: Expo push token
+  const [expoPushToken, setExpoPushToken] = useState<string | null>(null);
+
   useEffect(() => {
     const loadUserData = async () => {
       try {
-        // Retrieve stored data
         const storedToken = await SecureStore.getItemAsync("userToken");
         const storedUserId = await SecureStore.getItemAsync("userId");
 
         if (storedToken && storedUserId) {
-          // Fetch full user profile from backend
-          const userProfile = await fetchFullUserProfile(
-            storedUserId,
-            storedToken
-          );
+          const userProfile = await fetchFullUserProfile(storedUserId, storedToken);
 
-          // Update state
           setUserId(storedUserId);
           setToken(storedToken);
           setFirstName(userProfile.firstName);
@@ -118,17 +117,10 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
           setInstitution(userProfile.institution);
           setStudentType(userProfile.studentType);
 
-          // Optionally, store additional fields in SecureStore
           await SecureStore.setItemAsync("firstName", userProfile.firstName);
           await SecureStore.setItemAsync("lastName", userProfile.lastName);
-          await SecureStore.setItemAsync(
-            "institution",
-            userProfile.institution
-          );
-          await SecureStore.setItemAsync(
-            "studentType",
-            userProfile.studentType
-          );
+          await SecureStore.setItemAsync("institution", userProfile.institution);
+          await SecureStore.setItemAsync("studentType", userProfile.studentType);
         }
       } finally {
         setIsLoading(false);
@@ -138,20 +130,13 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     loadUserData();
   }, []);
 
-  /**
-   * Sets the user data after login/signup.
-   * Stores minimal data (userId and token) and fetches the full profile.
-   */
   const setUser = async (user: User) => {
     try {
-      // Store minimal data
       await SecureStore.setItemAsync("userToken", user.token);
       await SecureStore.setItemAsync("userId", user.userId);
 
-      // Fetch full user profile from backend
       const userProfile = await fetchFullUserProfile(user.userId, user.token);
 
-      // Update state
       setUserId(user.userId);
       setToken(user.token);
       setFirstName(userProfile.firstName);
@@ -159,23 +144,22 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
       setInstitution(userProfile.institution);
       setStudentType(userProfile.studentType);
 
-      // Store additional fields in SecureStore
       await SecureStore.setItemAsync("firstName", userProfile.firstName);
       await SecureStore.setItemAsync("lastName", userProfile.lastName);
       await SecureStore.setItemAsync("institution", userProfile.institution);
       await SecureStore.setItemAsync("studentType", userProfile.studentType);
+
+      if (expoPushToken) {
+        await storeExpoPushTokenOnServer(user.userId, user.token, expoPushToken);
+      }
     } catch (error) {
       console.error("Error setting user data:", error);
       throw new Error("Failed to set user data.");
     }
   };
 
-  /**
-   * Clears all user data from SecureStore and resets the context state.
-   */
   const clearUser = async () => {
     try {
-      // Delete all stored items
       await SecureStore.deleteItemAsync("userToken");
       await SecureStore.deleteItemAsync("userId");
       await SecureStore.deleteItemAsync("firstName");
@@ -183,21 +167,41 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
       await SecureStore.deleteItemAsync("institution");
       await SecureStore.deleteItemAsync("studentType");
 
-      // Reset state
       setUserId("");
       setToken("");
       setFirstName("");
       setLastName("");
       setInstitution("");
       setStudentType(null);
-      setLikedProducts([]); // Clear likedProducts
+      setLikedProducts([]);
+      setExpoPushToken(null);
     } catch (error) {
       console.error("Error clearing user data:", error);
       throw new Error("Failed to clear user data.");
     }
   };
 
-  /** Define the context value to be provided */
+  const storeExpoPushTokenOnServer = async (userId: string, authToken: string, pushToken: string) => {
+    try {
+      await fetch(`${NGROK_URL}/users/push-token`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ userId, expoPushToken: pushToken }),
+      });
+    } catch (error) {
+      console.error("Failed to store push token on server:", error);
+    }
+  };
+
+  useEffect(() => {
+    if (expoPushToken && userId && token) {
+      storeExpoPushTokenOnServer(userId, token, expoPushToken);
+    }
+  }, [expoPushToken, userId, token]);
+
   const contextValue: UserContextProps = {
     userId,
     token,
@@ -205,14 +209,14 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     lastName,
     institution,
     studentType,
-    likedProducts, // Provide likedProducts
-    setLikedProducts, // Provide setLikedProducts
+    likedProducts,
+    setLikedProducts,
     isLoading,
+    expoPushToken,
+    setExpoPushToken,
     setUser,
     clearUser,
   };
 
-  return (
-    <UserContext.Provider value={contextValue}>{children}</UserContext.Provider>
-  );
+  return <UserContext.Provider value={contextValue}>{children}</UserContext.Provider>;
 };
