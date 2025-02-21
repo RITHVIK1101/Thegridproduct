@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"time"
 )
 
 // PushNotificationRequest defines the expected request body
@@ -56,25 +55,20 @@ func SendPushNotificationHandler(w http.ResponseWriter, r *http.Request) {
 	// Expo push API URL
 	expoAPI := "https://exp.host/--/api/v2/push/send"
 
-	// Wait 5 seconds before sending the notification
-	go func() {
-		time.Sleep(5 * time.Second)
+	// Send the push notification request immediately
+	resp, err := http.Post(expoAPI, "application/json", bytes.NewBuffer(jsonData))
+	if err != nil {
+		log.Printf("Error sending push notification: %v\n", err)
+		return
+	}
+	defer resp.Body.Close()
 
-		// Send the push notification request
-		resp, err := http.Post(expoAPI, "application/json", bytes.NewBuffer(jsonData))
-		if err != nil {
-			log.Printf("Error sending push notification: %v\n", err)
-			return
-		}
-		defer resp.Body.Close()
-
-		// Log the response from Expo
-		var responseMap map[string]interface{}
-		json.NewDecoder(resp.Body).Decode(&responseMap)
-		log.Printf("Expo Push Notification Response: %+v\n", responseMap)
-	}()
+	// Log the response from Expo
+	var responseMap map[string]interface{}
+	json.NewDecoder(resp.Body).Decode(&responseMap)
+	log.Printf("Expo Push Notification Response: %+v\n", responseMap)
 
 	// Respond immediately
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"success": "Notification scheduled in 5 seconds!"})
+	json.NewEncoder(w).Encode(map[string]string{"success": "Notification sent successfully!"})
 }

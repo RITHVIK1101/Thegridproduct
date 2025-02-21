@@ -16,15 +16,12 @@ import {
   Animated,
   Easing,
   ScrollView,
-  Alert,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "./navigationTypes";
 import Ionicons from "react-native-vector-icons/Ionicons";
-import * as Notifications from "expo-notifications";
-import * as Device from "expo-device";
 
 const { width, height } = Dimensions.get("window");
 
@@ -107,6 +104,7 @@ interface SlideItemProps {
 
 /**
  * SlideItem component with parallax effect and an animated custom image.
+ * When the slide is active, the image bounces (pops) between scale 1 and 1.3.
  */
 const SlideItem: FC<SlideItemProps> = memo(
   ({ slide, index, scrollX, slideWidth, active, trigger }) => {
@@ -178,13 +176,11 @@ const SlideItem: FC<SlideItemProps> = memo(
           />
           <Text style={styles.title}>{slide.title}</Text>
           <Text style={styles.description}>{slide.description}</Text>
-          {slide.image ? (
-            <Animated.Image
-              source={{ uri: slide.image }}
-              style={[styles.image, { transform: [{ scale }] }]}
-              resizeMode="contain"
-            />
-          ) : null}
+          <Animated.Image
+            source={{ uri: slide.image }}
+            style={[styles.image, { transform: [{ scale }] }]}
+            resizeMode="contain"
+          />
         </Animated.View>
       </View>
     );
@@ -193,6 +189,7 @@ const SlideItem: FC<SlideItemProps> = memo(
 
 /**
  * NavigationOverviewSlide component for the custom navigation overview slide.
+ * It shows the icons and bubbles explaining what each navigation option does.
  */
 interface NavigationOverviewSlideProps {
   index: number;
@@ -236,7 +233,7 @@ const NavigationOverviewSlide: FC<NavigationOverviewSlideProps> = memo(
         >
           <Text style={styles.title}>Navigation Overview</Text>
           <Text style={styles.description}>
-            Learn how to navigate the app.
+            Learn how to navigate the app. 
           </Text>
           {/* First Row: Home & Jobs */}
           <View style={styles.navigationOverviewContainer}>
@@ -300,22 +297,16 @@ interface DemoScreenProps {
 }
 
 /**
- * DemoScreen component with advanced animations, theming, and push notifications.
+ * DemoScreen component with advanced animations and theming.
  */
 const DemoScreen: FC<DemoScreenProps> = ({ navigation }) => {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [showFounders, setShowFounders] = useState(false);
-  const [expoPushToken, setExpoPushToken] = useState<string | null>(null);
   const scrollRef = useRef<ScrollView>(null);
   const scrollX = useRef(new Animated.Value(0)).current;
 
   // Global background animation
   const { scale: bgScale, rotate: bgRotate } = usePulseAnimation(15000);
-
-  // Register for push notifications on mount
-  useEffect(() => {
-    registerForPushNotificationsAsync().then((token) => setExpoPushToken(token));
-  }, []);
 
   const handleNext = useCallback(() => {
     if (currentSlide < slides.length - 1) {
@@ -333,37 +324,6 @@ const DemoScreen: FC<DemoScreenProps> = ({ navigation }) => {
     setCurrentSlide(index);
   }, []);
 
-  // Function to send push notification via backend
-  const handleSendPushNotification = async () => {
-    if (!expoPushToken) {
-      Alert.alert("Push token not available");
-      return;
-    }
-
-    try {
-      // Replace with your backend URL (e.g. your NGROK URL)
-      const response = await 
-      fetch("http://192.168.5.251:8080/sendPushNotification", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          pushToken: expoPushToken,
-          title: "Hello from Gridly",
-          message: "This notification was triggered from the Demo screen!",
-        }),
-      });
-      const data = await response.json();
-      if (data.success) {
-        Alert.alert("Notification scheduled!", "You will receive it in 5 seconds.");
-      } else {
-        Alert.alert("Error", "Notification could not be scheduled.");
-      }
-    } catch (error) {
-      console.error(error);
-      Alert.alert("Error", "There was a problem sending the notification.");
-    }
-  };
-
   return (
     <LinearGradient colors={["#000000", "#1a0033"]} style={styles.container}>
       {/* Animated Background */}
@@ -380,14 +340,6 @@ const DemoScreen: FC<DemoScreenProps> = ({ navigation }) => {
         onPress={() => setShowFounders(true)}
       >
         <Text style={styles.foundersButtonText}>Founders</Text>
-      </TouchableOpacity>
-
-      {/* New Button for Testing Push Notification */}
-      <TouchableOpacity
-        style={styles.pushButton}
-        onPress={handleSendPushNotification}
-      >
-        <Text style={styles.pushButtonText}>Test Push Notification</Text>
       </TouchableOpacity>
 
       {/* Horizontal ScrollView with slides */}
@@ -474,30 +426,6 @@ const DemoScreen: FC<DemoScreenProps> = ({ navigation }) => {
 
 export default DemoScreen;
 
-// Helper function to register for push notifications
-async function registerForPushNotificationsAsync() {
-  let token;
-  if (Device.isDevice) {
-    const { status: existingStatus } =
-      await Notifications.getPermissionsAsync();
-    let finalStatus = existingStatus;
-    if (existingStatus !== "granted") {
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
-    }
-    if (finalStatus !== "granted") {
-      alert("Failed to get push token for push notification!");
-      return null;
-    }
-    token = (await Notifications.getExpoPushTokenAsync()).data;
-    console.log("Expo push token:", token);
-  } else {
-    alert("Must use physical device for Push Notifications");
-  }
-
-  return token;
-}
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -533,20 +461,6 @@ const styles = StyleSheet.create({
   },
   foundersButtonText: {
     color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  pushButton: {
-    position: "absolute",
-    top: 50,
-    right: 20,
-    zIndex: 10,
-    backgroundColor: "#BB86FC",
-    padding: 10,
-    borderRadius: 5,
-  },
-  pushButtonText: {
-    color: "#000",
     fontSize: 16,
     fontWeight: "600",
   },
