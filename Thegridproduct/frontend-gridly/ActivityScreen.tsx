@@ -110,6 +110,7 @@ const ActivityScreen: React.FC = () => {
           Authorization: `Bearer ${token}`,
         },
       });
+
       const contentType = response.headers.get("content-type");
       if (!response.ok) {
         const errorText = await response.text();
@@ -120,20 +121,23 @@ const ActivityScreen: React.FC = () => {
         console.error("Unexpected content-type:", contentType, errorText);
         throw new Error("Unexpected response format.");
       }
-      const data: Product[] = await response.json();
-      if (!data || data.length === 0) {
-        setProducts([]);
-        setFilteredProducts([]);
-      } else {
-        setProducts(data);
-        setFilteredProducts(
-          data.filter((product) =>
-            (product.title || "")
-              .toLowerCase()
-              .includes(searchQuery.toLowerCase())
-          )
-        );
-      }
+
+      let data: Product[] = await response.json();
+
+      // 🔹 Sort products by `postedDate` (newest first)
+      data = data.sort(
+        (a, b) =>
+          new Date(b.postedDate).getTime() - new Date(a.postedDate).getTime()
+      );
+
+      setProducts(data);
+      setFilteredProducts(
+        data.filter((product) =>
+          (product.title || "")
+            .toLowerCase()
+            .includes(searchQuery.toLowerCase())
+        )
+      );
     } catch (err) {
       console.error("Error fetching products:", err);
       setErrorProducts(
@@ -144,7 +148,6 @@ const ActivityScreen: React.FC = () => {
     }
   };
 
-  // Fetch user gigs
   const fetchUserGigs = async () => {
     if (!userId || !token) {
       setErrorGigs("User not logged in.");
@@ -158,6 +161,7 @@ const ActivityScreen: React.FC = () => {
           Authorization: `Bearer ${token}`,
         },
       });
+
       const contentType = response.headers.get("content-type");
       if (!response.ok) {
         const errorText = await response.text();
@@ -168,19 +172,22 @@ const ActivityScreen: React.FC = () => {
         console.error("Unexpected content-type:", contentType, errorText);
         throw new Error("Unexpected response format.");
       }
-      const data = await response.json();
-      const gigsData: Gig[] = data.gigs || [];
-      if (!gigsData || gigsData.length === 0) {
-        setGigs([]);
-        setFilteredGigs([]);
-      } else {
-        setGigs(gigsData);
-        setFilteredGigs(
-          gigsData.filter((gig) =>
-            (gig.title || "").toLowerCase().includes(searchQuery.toLowerCase())
-          )
-        );
-      }
+
+      let data = await response.json();
+      let gigsData: Gig[] = data.gigs || [];
+
+      // 🔹 Sort gigs by `postedDate` (newest first)
+      gigsData = gigsData.sort(
+        (a, b) =>
+          new Date(b.postedDate).getTime() - new Date(a.postedDate).getTime()
+      );
+
+      setGigs(gigsData);
+      setFilteredGigs(
+        gigsData.filter((gig) =>
+          (gig.title || "").toLowerCase().includes(searchQuery.toLowerCase())
+        )
+      );
     } catch (err) {
       console.error("Error fetching gigs:", err);
       setErrorGigs(
@@ -191,7 +198,6 @@ const ActivityScreen: React.FC = () => {
     }
   };
 
-  // Fetch user requested products
   const fetchUserRequestedProducts = async () => {
     if (!userId || !token) {
       setErrorRequested("User not logged in.");
@@ -205,6 +211,7 @@ const ActivityScreen: React.FC = () => {
           Authorization: `Bearer ${token}`,
         },
       });
+
       const contentType = response.headers.get("content-type");
       if (!response.ok) {
         const errorText = await response.text();
@@ -217,22 +224,23 @@ const ActivityScreen: React.FC = () => {
         console.error("Unexpected content-type:", contentType, errorText);
         throw new Error("Unexpected response format.");
       }
-      const data: ProductRequest[] = await response.json();
-      if (!data || data.length === 0) {
-        setRequestedProducts([]);
-        setFilteredRequestedProducts([]);
-      } else {
-        setRequestedProducts(data);
-        setFilteredRequestedProducts(
-          data.filter((req) =>
-            req.productName
-              ? req.productName
-                  .toLowerCase()
-                  .includes(searchQuery.toLowerCase())
-              : false
-          )
-        );
-      }
+
+      let data: ProductRequest[] = await response.json();
+
+      // 🔹 Sort requested products by `createdAt` (newest first)
+      data = data.sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+
+      setRequestedProducts(data);
+      setFilteredRequestedProducts(
+        data.filter((req) =>
+          req.productName
+            ? req.productName.toLowerCase().includes(searchQuery.toLowerCase())
+            : false
+        )
+      );
     } catch (err) {
       console.error("Error fetching requested products:", err);
       setErrorRequested(
