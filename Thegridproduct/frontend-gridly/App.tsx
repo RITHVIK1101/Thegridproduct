@@ -61,7 +61,14 @@ Notifications.setNotificationHandler({
   }),
 });
 
-// This function now requires three arguments.
+/**
+ * Requests notification permission, retrieves the Expo push token,
+ * saves it locally, and sends it to the backend.
+ *
+ * @param userId - The user's ID.
+ * @param userType - The user's type (e.g., "university" or "highschool").
+ * @param token - The authentication token.
+ */
 async function requestPermissionAndGetToken(
   userId: string,
   userType: string,
@@ -107,7 +114,9 @@ async function requestPermissionAndGetToken(
   }
 }
 
-// A separate component to handle push notification setup using UserContext.
+/**
+ * A component that uses the UserContext to set up push notifications.
+ */
 const PushNotificationSetup: React.FC = () => {
   const { userId, token, studentType } = useContext(UserContext);
 
@@ -550,6 +559,8 @@ const App: React.FC = () => {
   useChatListener();
   const [showSplash, setShowSplash] = useState(true);
   const [firstRender, setFirstRender] = useState(true);
+
+  // Set up foreground notification listener
   useEffect(() => {
     console.log("🔔 Setting up foreground notification listener...");
     const subscription = Notifications.addNotificationReceivedListener(
@@ -573,6 +584,7 @@ const App: React.FC = () => {
 
   return (
     <UserProvider>
+      {/* PushNotificationSetup will check if user info is loaded and then request and send push token */}
       <PushNotificationSetup />
       {showSplash ? (
         <SplashScreen onAnimationEnd={handleSplashEnd} />
