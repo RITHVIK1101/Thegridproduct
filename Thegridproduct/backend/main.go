@@ -74,6 +74,7 @@ func main() {
 
 	protected.HandleFunc("/products", handlers.AddProductHandler).Methods("POST")
 	router.HandleFunc("/user/push-token", handlers.StorePushTokenHandler).Methods("POST")
+	protected.HandleFunc("/api/test/push-notification", handlers.ManualPushNotificationHandler).Methods("POST")
 
 	protected.HandleFunc("/products/user", handlers.GetUserProductsHandler).Methods("GET")
 	protected.HandleFunc("/products/all", handlers.GetAllProductsHandler).Methods("GET")

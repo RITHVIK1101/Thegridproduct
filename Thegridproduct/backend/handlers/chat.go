@@ -279,7 +279,6 @@ func init() {
 	log.Println("✅ Firestore client initialized successfully")
 }
 
-// 🔹 Add Message to Firestore Chat Room
 func AddMessageHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	chatID := vars["chatId"]
@@ -294,7 +293,7 @@ func AddMessageHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// ✅ Ensure required fields exist
+	// Ensure required fields exist.
 	if message.SenderID == "" || message.Content == "" {
 		WriteJSONError(w, "Sender ID and content are required", http.StatusBadRequest)
 		return
@@ -305,14 +304,15 @@ func AddMessageHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
 	chatDocRef := fsClient.Collection("chatRooms").Doc(chatID)
 
-	// 🔹 Ensure `_id` is unique
+	// Generate a unique ID for the message.
 	messageData := map[string]interface{}{
-		"_id":       primitive.NewObjectID().Hex(), // ✅ Generates a unique ID
+		"_id":       primitive.NewObjectID().Hex(),
 		"senderId":  message.SenderID,
 		"content":   message.Content,
 		"timestamp": message.Timestamp.Format(time.RFC3339),
 	}
 
+	// Update Firestore chat room with the new message.
 	_, err := chatDocRef.Update(ctx, []firestore.Update{
 		{Path: "messages", Value: firestore.ArrayUnion(messageData)},
 	})
@@ -323,6 +323,59 @@ func AddMessageHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Printf("✅ Message added to chat room: %s", chatID)
+
+	// 🔹 Fetch chat document to determine recipient
+	docSnap, err := chatDocRef.Get(ctx)
+	if err != nil {
+		log.Printf("❌ Failed to retrieve chat document: %v", err)
+		WriteJSONError(w, "Failed to fetch chat details", http.StatusInternalServerError)
+		return
+	}
+
+	chatData := docSnap.Data()
+	buyerID, okBuyer := chatData["buyerID"].(string)
+	sellerID, okSeller := chatData["sellerID"].(string)
+	if !okBuyer || !okSeller {
+		WriteJSONError(w, "Chat document missing buyerID or sellerID", http.StatusInternalServerError)
+		return
+	}
+
+	// Determine recipient (the user who is NOT the sender)
+	var recipientID string
+	if message.SenderID == buyerID {
+		recipientID = sellerID
+	} else if message.SenderID == sellerID {
+		recipientID = buyerID
+	} else {
+		WriteJSONError(w, "SenderID does not match any chat participant", http.StatusBadRequest)
+		return
+	}
+
+	// 🔹 Fetch recipient details (for push token)
+	recipient, err := db.GetUserByID(recipientID)
+	if err != nil {
+		log.Printf("❌ Failed to fetch recipient user: %v", err)
+		WriteJSONError(w, "Failed to find recipient", http.StatusInternalServerError)
+		return
+	}
+
+	if recipient.ExpoPushToken == "" {
+		log.Println("🚫 Recipient does not have a push token; skipping notification.")
+		WriteJSON(w, map[string]string{"message": "Message sent, but recipient has no push token"}, http.StatusOK)
+		return
+	}
+
+	// 🔹 Send push notification
+	notificationTitle := "New Message"
+	notificationBody := "You have a new message in your chat."
+
+	err = SendPushNotification(recipient.ExpoPushToken, notificationTitle, notificationBody, map[string]string{
+		"chatId": chatID,
+	})
+	if err != nil {
+		log.Printf("❌ Error sending push notification: %v", err)
+	}
+
 	WriteJSON(w, map[string]string{"message": "Message sent successfully"}, http.StatusOK)
 }
 
@@ -469,7 +522,7 @@ func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Fetch seller details to get the Expo push token.
-		// Here we assume the seller is in the "university_users" collection.
+		// (Assuming seller is stored in the "university_users" collection.)
 		usersCol := db.GetCollection("gridlyapp", "university_users")
 		var seller models.User
 		err = usersCol.FindOne(sessCtx, bson.M{"_id": sellerObjectID}).Decode(&seller)
@@ -486,8 +539,8 @@ func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 					"referenceId":   req.ReferenceID,
 					"referenceType": req.ReferenceType,
 				}
-				err := SendPushNotification(seller.ExpoPushToken, notificationTitle, "Someone has requested to chat with you!", data)
-				if err != nil {
+				// Send push notification to seller.
+				if err := SendPushNotification(seller.ExpoPushToken, notificationTitle, "Someone has requested to chat with you!", data); err != nil {
 					log.Printf("Error sending push notification: %v", err)
 				}
 			} else {
