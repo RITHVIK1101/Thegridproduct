@@ -355,6 +355,7 @@ func GetMessagesHandler(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, messages, http.StatusOK)
 }
 
+// RequestChatHandler handles creating a chat request between a buyer and seller.
 func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -410,9 +411,9 @@ func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 	callback := func(sessCtx mongo.SessionContext) (interface{}, error) {
 		chatRequests := db.GetCollection("gridlyapp", "chat_requests")
 		var referenceTitle string
-		isAnonymous := false
+		isAnonymous := false // Track if the request is anonymous
 
-		// Fetch the reference title from the correct collection
+		// Fetch the reference title from the appropriate collection
 		switch req.ReferenceType {
 		case "gig":
 			gigsCol := db.GetCollection("gridlyapp", "gigs")
@@ -422,7 +423,7 @@ func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 				return nil, &AppError{Message: "Gig not found", StatusCode: http.StatusNotFound}
 			}
 			referenceTitle = gig.Title
-			isAnonymous = gig.IsAnonymous // Check if the gig is anonymous
+			isAnonymous = gig.IsAnonymous
 
 		case "product":
 			productsCol := db.GetCollection("gridlyapp", "products")
@@ -443,8 +444,8 @@ func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 			referenceTitle = productRequest.ProductName
 		}
 
-		// Check if there's already a pending chat request for this reference by the buyer
-		existingRequest := models.ChatRequest{}
+		// Check if a pending chat request already exists for this reference by the buyer
+		var existingRequest models.ChatRequest
 		findErr := chatRequests.FindOne(sessCtx, bson.M{
 			"referenceId":   referenceObjectID,
 			"referenceType": req.ReferenceType,
@@ -457,79 +458,45 @@ func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 			return nil, findErr
 		}
 
-		var buyerFirstName, buyerLastName, sellerFirstName, sellerLastName string
-
-		if isAnonymous {
-			buyerFirstName, buyerLastName = "Anonymous", "User"
-			sellerFirstName, sellerLastName = "Anonymous", "User"
-		} else {
-			// ✅ Otherwise, fetch real names
-			buyer, err := db.GetUserByID(req.BuyerID)
-			if err != nil {
-				return nil, &AppError{Message: "Buyer not found", StatusCode: http.StatusNotFound}
-			}
-			buyerFirstName, buyerLastName = buyer.FirstName, buyer.LastName
-
-			seller, err := db.GetUserByID(req.SellerID)
-			if err != nil {
-				return nil, &AppError{Message: "Seller not found", StatusCode: http.StatusNotFound}
-			}
-			sellerFirstName, sellerLastName = seller.FirstName, seller.LastName
-		}
-
-		// Create the chat request with the reference title
+		// Create the chat request
 		chatRequest := models.NewChatRequest(
 			referenceObjectID, req.ReferenceType, referenceTitle,
 			buyerObjectID, sellerObjectID,
 		)
-
 		_, err = chatRequests.InsertOne(sessCtx, chatRequest)
 		if err != nil {
 			return nil, err
 		}
 
-		// ✅ Update "requestedBy" field for all types
-		switch req.ReferenceType {
-		case "gig":
-			gigsCol := db.GetCollection("gridlyapp", "gigs")
-			_, err = gigsCol.UpdateOne(
-				sessCtx,
-				bson.M{"_id": referenceObjectID},
-				bson.M{"$addToSet": bson.M{"requestedBy": buyerObjectID}},
-			)
-			if err != nil {
-				return nil, err
-			}
-
-		case "product":
-			productsCol := db.GetCollection("gridlyapp", "products")
-			_, err = productsCol.UpdateOne(
-				sessCtx,
-				bson.M{"_id": referenceObjectID},
-				bson.M{"$addToSet": bson.M{"requestedBy": buyerObjectID}},
-			)
-			if err != nil {
-				return nil, err
-			}
-
-		case "product_request":
-			requestsCol := db.GetCollection("gridlyapp", "product_requests")
-			_, err = requestsCol.UpdateOne(
-				sessCtx,
-				bson.M{"_id": referenceObjectID},
-				bson.M{"$addToSet": bson.M{"requestedBy": buyerObjectID}},
-			)
-			if err != nil {
-				return nil, err
+		// Fetch seller details to get the Expo push token.
+		// Here we assume the seller is in the "university_users" collection.
+		usersCol := db.GetCollection("gridlyapp", "university_users")
+		var seller models.User
+		err = usersCol.FindOne(sessCtx, bson.M{"_id": sellerObjectID}).Decode(&seller)
+		if err != nil {
+			log.Printf("Error fetching seller details: %v", err)
+		} else {
+			if seller.ExpoPushToken != "" {
+				notificationTitle := "New Chat Request"
+				if isAnonymous {
+					notificationTitle = "Anonymous Chat Request"
+				}
+				data := map[string]string{
+					"type":          "chat_request",
+					"referenceId":   req.ReferenceID,
+					"referenceType": req.ReferenceType,
+				}
+				err := SendPushNotification(seller.ExpoPushToken, notificationTitle, "Someone has requested to chat with you!", data)
+				if err != nil {
+					log.Printf("Error sending push notification: %v", err)
+				}
+			} else {
+				log.Println("Seller does not have a push token; skipping notification.")
 			}
 		}
 
 		return map[string]interface{}{
-			"message":         "Chat request sent successfully",
-			"buyerFirstName":  buyerFirstName,
-			"buyerLastName":   buyerLastName,
-			"sellerFirstName": sellerFirstName,
-			"sellerLastName":  sellerLastName,
+			"message": "Chat request sent successfully",
 		}, nil
 	}
 

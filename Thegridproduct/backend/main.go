@@ -64,9 +64,6 @@ func main() {
 	router.HandleFunc("/signup", handlers.SignupHandler).Methods("POST")
 	router.HandleFunc("/user/delete", handlers.DeleteAccountHandler).Methods("DELETE")
 
-	// Add your new Push Notification endpoint here:
-	router.HandleFunc("/sendPushNotification", handlers.SendPushNotificationHandler).Methods("POST")
-
 	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Welcome to The Gridly API"))
 	}).Methods("GET")

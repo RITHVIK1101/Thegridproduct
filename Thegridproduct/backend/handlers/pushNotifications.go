@@ -3,72 +3,56 @@ package handlers
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 )
 
-// PushNotificationRequest defines the expected request body
-type PushNotificationRequest struct {
-	PushToken string `json:"pushToken"`
-	Title     string `json:"title"`
-	Message   string `json:"message"`
-}
-
-// ExpoPushMessage defines the payload format required by Expo's API
-type ExpoPushMessage struct {
-	To    string `json:"to"`
-	Title string `json:"title"`
-	Body  string `json:"body"`
-	Sound string `json:"sound"`
-}
-
-// SendPushNotificationHandler handles push notification requests
-func SendPushNotificationHandler(w http.ResponseWriter, r *http.Request) {
-	// Parse the request body
-	var req PushNotificationRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request payload", http.StatusBadRequest)
-		return
+// SendPushNotification sends a push notification to a specific user via Expo.
+func SendPushNotification(pushToken, title, message string, data map[string]string) error {
+	// Validate the push token format.
+	if len(pushToken) < 10 {
+		return errors.New("invalid Expo push token")
 	}
 
-	// Validate the push token format
-	if len(req.PushToken) < 10 {
-		http.Error(w, "Invalid Expo push token", http.StatusBadRequest)
-		return
+	// Construct the push message payload.
+	pushMessage := map[string]interface{}{
+		"to":    pushToken,
+		"title": title,
+		"body":  message,
+		"sound": "default",
+		"data":  data, // Additional data for deep linking or other logic
 	}
 
-	// Create the push message
-	pushMessage := ExpoPushMessage{
-		To:    req.PushToken,
-		Title: req.Title,
-		Body:  req.Message,
-		Sound: "default",
-	}
-
-	// Convert to JSON
-	jsonData, err := json.Marshal([]ExpoPushMessage{pushMessage})
+	// Convert message to JSON.
+	jsonData, err := json.Marshal([]map[string]interface{}{pushMessage})
 	if err != nil {
-		http.Error(w, "Failed to serialize push message", http.StatusInternalServerError)
-		return
+		return err
 	}
 
-	// Expo push API URL
+	// Expo push API endpoint.
 	expoAPI := "https://exp.host/--/api/v2/push/send"
 
-	// Send the push notification request immediately
+	// Send the push notification request.
 	resp, err := http.Post(expoAPI, "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
-		log.Printf("Error sending push notification: %v\n", err)
-		return
+		return err
 	}
 	defer resp.Body.Close()
 
-	// Log the response from Expo
-	var responseMap map[string]interface{}
-	json.NewDecoder(resp.Body).Decode(&responseMap)
-	log.Printf("Expo Push Notification Response: %+v\n", responseMap)
+	// Check if Expo API returned a non-OK response.
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("Expo push API error: %v", resp.Status)
+		return errors.New("failed to send push notification")
+	}
 
-	// Respond immediately
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"success": "Notification sent successfully!"})
+	// Log the response from Expo.
+	var responseMap map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&responseMap); err != nil {
+		log.Printf("Error decoding Expo response: %v", err)
+	} else {
+		log.Printf("Expo Push Notification Response: %+v", responseMap)
+	}
+
+	return nil
 }
