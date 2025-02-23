@@ -950,10 +950,11 @@ func createFirestoreChatRoom(chatID, buyerID, sellerID, referenceID, referenceTy
 	return nil
 }
 
-// TestSendMessageHandler sends a test message to Firestore.
+// TestSendMessageHandler sends a test message to Firestore and notifies the recipient.
 func TestSendMessageHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
+	// Decode the incoming JSON payload.
 	var req struct {
 		ChatID   string `json:"chatId"`
 		SenderID string `json:"senderId"`
@@ -963,40 +964,90 @@ func TestSendMessageHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
 		return
 	}
-
 	if req.ChatID == "" || req.SenderID == "" || req.Content == "" {
 		http.Error(w, "Missing chatId, senderId, or content", http.StatusBadRequest)
 		return
 	}
 
 	ctx := context.Background()
-	docRef := fsClient.Collection("chatRooms").Doc(req.ChatID)
-	_, err := docRef.Get(ctx)
+	chatDocRef := fsClient.Collection("chatRooms").Doc(req.ChatID)
+
+	// Get the chat room document so we can determine the buyer and seller.
+	docSnap, err := chatDocRef.Get(ctx)
 	if err != nil {
 		log.Printf("Chat room not found in Firestore: %s", req.ChatID)
 		http.Error(w, "Chat room does not exist", http.StatusNotFound)
 		return
 	}
+	data := docSnap.Data()
+	buyerID, ok1 := data["buyerID"].(string)
+	sellerID, ok2 := data["sellerID"].(string)
+	if !ok1 || !ok2 {
+		http.Error(w, "Chat room missing buyer/seller information", http.StatusInternalServerError)
+		return
+	}
 
+	// Create the new message payload.
 	newMessage := map[string]interface{}{
-		"_id":       fmt.Sprintf("%d", time.Now().UnixNano()),
+		"_id":       primitive.NewObjectID().Hex(),
 		"senderId":  req.SenderID,
 		"content":   req.Content,
 		"timestamp": time.Now().UTC().Format(time.RFC3339),
 	}
 
-	_, err = docRef.Update(ctx, []firestore.Update{
+	// Update Firestore by adding the new message.
+	_, err = chatDocRef.Update(ctx, []firestore.Update{
 		{Path: "messages", Value: firestore.ArrayUnion(newMessage)},
 	})
 	if err != nil {
-		http.Error(w, "Failed to add message to Firestore", http.StatusInternalServerError)
+		log.Printf("❌ Failed to add message to Firestore: %v", err)
+		http.Error(w, "Failed to send message", http.StatusInternalServerError)
 		return
 	}
 
+	// Determine the recipient: if the sender is the buyer, the recipient is the seller, and vice versa.
+	var recipientID string
+	if req.SenderID == buyerID {
+		recipientID = sellerID
+	} else {
+		recipientID = buyerID
+	}
+
+	// Convert recipientID to ObjectID.
+	recipientObjID, err := primitive.ObjectIDFromHex(recipientID)
+	if err != nil {
+		log.Printf("Error converting recipient ID: %v", err)
+		// Even if we can't send a notification, we still want to return success for the message.
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]string{"status": "success"})
+		return
+	}
+
+	// Look up the recipient in MongoDB.
+	usersCol := db.GetCollection("gridlyapp", "university_users")
+	var recipient models.User
+	err = usersCol.FindOne(ctx, bson.M{"_id": recipientObjID}).Decode(&recipient)
+	if err != nil {
+		log.Printf("Error fetching recipient details: %v", err)
+	} else {
+		if recipient.ExpoPushToken != "" {
+			// Prepare additional data for the push notification.
+			pushData := map[string]string{
+				"type":   "new_message",
+				"chatId": req.ChatID,
+			}
+			// Send the push notification.
+			err = SendPushNotification(recipient.ExpoPushToken, "New Message", req.Content, pushData)
+			if err != nil {
+				log.Printf("Error sending push notification: %v", err)
+			}
+		} else {
+			log.Println("Recipient does not have a push token; skipping notification.")
+		}
+	}
+
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{
-		"status": "success",
-	})
+	json.NewEncoder(w).Encode(map[string]string{"status": "success"})
 }
 
 // DeleteChatHandler deletes a chat room and decrements the chatCount for the referenced item.
