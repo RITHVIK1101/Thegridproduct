@@ -1408,10 +1408,10 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                   renderItem={renderMessage}
                   contentContainerStyle={styles.messagesList}
                   onContentSizeChange={() =>
-                    flatListRef.current?.scrollToEnd({ animated: true })
+                    flatListRef.current?.scrollToEnd({ animated: false })
                   }
                   onLayout={() =>
-                    flatListRef.current?.scrollToEnd({ animated: true })
+                    flatListRef.current?.scrollToEnd({ animated: false })
                   }
                   ListEmptyComponent={
                     <View style={styles.emptyMessagesContainer}>

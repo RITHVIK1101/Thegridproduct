@@ -1,5 +1,5 @@
 // App.tsx
-import React, { useState, useContext, useRef, useEffect } from "react";
+import React, { useState, useEffect, useContext, useRef } from "react";
 import {
   TouchableOpacity,
   View,
@@ -10,11 +10,17 @@ import {
   Dimensions,
   Animated,
   Easing,
+  Alert,
+  Platform,
 } from "react-native";
 import Icon from "react-native-vector-icons/MaterialIcons";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { NavigationContainer } from "@react-navigation/native";
 import { Image } from "react-native";
+import * as Device from "expo-device";
+import * as Notifications from "expo-notifications";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
 import {
   createStackNavigator,
   StackNavigationOptions,
@@ -41,6 +47,81 @@ import DemoScreen from "./DemoScreen"; // New demo screen
 import { RootStackParamList } from "./navigationTypes";
 import TermsOfServiceContent from "./TermsOfServiceContent";
 import VerificationScreen from "./VerificationScreen";
+
+// -------------------
+// Push Notification Setup (Expo)
+// -------------------
+
+// Configure notification handling so alerts and sounds are shown even when the app is foregrounded.
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
+
+// This function now requires three arguments.
+async function requestPermissionAndGetToken(
+  userId: string,
+  userType: string,
+  token: string
+): Promise<void> {
+  if (!Device.isDevice) {
+    console.log("Push notifications require a physical device.");
+    return;
+  }
+
+  const { status } = await Notifications.requestPermissionsAsync();
+  if (status !== "granted") {
+    Alert.alert("Permission required", "Please enable notifications.");
+    return;
+  }
+
+  try {
+    const expoPushTokenResponse = await Notifications.getExpoPushTokenAsync();
+    console.log("Expo Push Token:", expoPushTokenResponse.data);
+
+    // Save the token locally
+    await AsyncStorage.setItem("expoPushToken", expoPushTokenResponse.data);
+
+    // Send token to backend
+    await fetch(
+      "https://thegridproduct-production.up.railway.app/user/push-token",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`, // assuming your auth token
+          "X-User-Type": userType, // e.g., "university" or "highschool"
+        },
+        body: JSON.stringify({
+          userId,
+          expoPushToken: expoPushTokenResponse.data,
+        }),
+      }
+    );
+    console.log("Push token sent to backend.");
+  } catch (error) {
+    console.error("Error getting or sending Expo push token:", error);
+  }
+}
+
+// A separate component to handle push notification setup using UserContext.
+const PushNotificationSetup: React.FC = () => {
+  const { userId, token, studentType } = useContext(UserContext);
+
+  useEffect(() => {
+    if (userId && token && studentType) {
+      requestPermissionAndGetToken(userId, studentType, token);
+    }
+  }, [userId, token, studentType]);
+
+  return null;
+};
+// -------------------
+// End Push Notification Setup
+// -------------------
 
 const TermsOfServiceScreen: React.FC = () => <TermsOfServiceContent />;
 
@@ -79,7 +160,6 @@ const UserMenuScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const handleLogout = async () => {
     try {
       await clearUser();
-      // When logging out, we replace the current screen with "Login"
       navigation.replace("Login");
     } catch (error) {
       console.error("Logout Error:", error);
@@ -96,7 +176,6 @@ const UserMenuScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           <Ionicons name="close" size={24} color="#FFFFFF" />
         </TouchableOpacity>
       </View>
-
       <View style={styles.fullScreenMenuContent}>
         <View style={styles.bottomSheetUserInfo}>
           <View style={styles.bottomSheetAvatar}>
@@ -121,7 +200,6 @@ const UserMenuScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
             </Text>
           )}
         </View>
-
         <View style={styles.bottomSheetOptions}>
           <TouchableOpacity
             style={styles.bottomSheetOption}
@@ -178,10 +256,8 @@ const UserMenuScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 };
 
 export const navigationRef = React.createRef();
-
 const Stack = createStackNavigator<RootStackParamList>();
 
-// Updated HeaderTitleWithLogo with a bouncing animated logo
 const HeaderTitleWithLogo: React.FC<{ title: string }> = ({ title }) => {
   const bounceAnim = useRef(new Animated.Value(1)).current;
 
@@ -209,7 +285,12 @@ const HeaderTitleWithLogo: React.FC<{ title: string }> = ({ title }) => {
       <Animated.Image
         source={require("./assets/logonobg.png")} // Logo file
         style={[
-          { width: 35, height: 35, marginRight: 8, transform: [{ scale: bounceAnim }] },
+          {
+            width: 35,
+            height: 35,
+            marginRight: 8,
+            transform: [{ scale: bounceAnim }],
+          },
         ]}
         resizeMode="contain"
       />
@@ -427,8 +508,6 @@ const AppNavigator: React.FC<AppNavigatorProps> = ({ firstRender }) => {
         </>
       ) : (
         <>
-          {/* When not authenticated, on first launch show Demo, then Login & Verification.
-              Otherwise (after logout) show Login and Verification screens immediately. */}
           {!firstRender ? (
             <>
               <Stack.Screen
@@ -471,6 +550,22 @@ const App: React.FC = () => {
   useChatListener();
   const [showSplash, setShowSplash] = useState(true);
   const [firstRender, setFirstRender] = useState(true);
+  useEffect(() => {
+    console.log("🔔 Setting up foreground notification listener...");
+    const subscription = Notifications.addNotificationReceivedListener(
+      (notification) => {
+        console.log("📩 Foreground Notification Received:", notification);
+        Alert.alert(
+          notification.request.content.title || "New Notification",
+          notification.request.content.body || "You have a new message!"
+        );
+      }
+    );
+    return () => {
+      console.log("🛑 Removing foreground notification listener...");
+      subscription.remove();
+    };
+  }, []);
 
   const handleSplashEnd = () => {
     setShowSplash(false);
@@ -478,6 +573,7 @@ const App: React.FC = () => {
 
   return (
     <UserProvider>
+      <PushNotificationSetup />
       {showSplash ? (
         <SplashScreen onAnimationEnd={handleSplashEnd} />
       ) : (

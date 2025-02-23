@@ -19,5 +19,5 @@ type User struct {
 	UpdatedAt        time.Time            `json:"updatedAt" bson:"updatedAt"`
 	StripeCustomerID string               `json:"stripeCustomerId,omitempty" bson:"stripeCustomerId,omitempty"`
 	LikedProducts    []primitive.ObjectID `json:"likedProducts,omitempty" bson:"likedProducts,omitempty"`
-	ExpoPushToken    string               `json:"expoPushToken,omitempty" bson:"expoPushToken,omitempty"`
+	ExpoPushToken    string               `json:"expoPushToken" bson:"expoPushToken"`
 }
