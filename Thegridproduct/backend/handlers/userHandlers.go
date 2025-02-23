@@ -85,3 +85,56 @@ func GetUserHandler(w http.ResponseWriter, r *http.Request) {
 	// User not found in either collection
 	WriteJSONError(w, "User not found", http.StatusNotFound)
 }
+
+// UpdateUserPushToken updates the user's push notification token
+func UpdateUserPushToken(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method != http.MethodPost {
+		WriteJSONError(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Parse request body
+	var requestBody struct {
+		UserID        string `json:"userId"`
+		ExpoPushToken string `json:"expoPushToken"`
+	}
+
+	err := json.NewDecoder(r.Body).Decode(&requestBody)
+	if err != nil {
+		WriteJSONError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// Validate UserID
+	userID, err := primitive.ObjectIDFromHex(requestBody.UserID)
+	if err != nil {
+		WriteJSONError(w, "Invalid user ID format", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Determine the user collection
+	var userCollection *mongo.Collection
+	if r.Header.Get("X-User-Type") == "university" {
+		userCollection = db.GetCollection("gridlyapp", "university_users")
+	} else {
+		userCollection = db.GetCollection("gridlyapp", "high_school_users")
+	}
+
+	// Update user document with push token
+	update := bson.M{"$set": bson.M{"expoPushToken": requestBody.ExpoPushToken, "updatedAt": time.Now()}}
+	_, err = userCollection.UpdateOne(ctx, bson.M{"_id": userID}, update)
+	if err != nil {
+		log.Printf("Error updating user push token: %v", err)
+		WriteJSONError(w, "Failed to update push token", http.StatusInternalServerError)
+		return
+	}
+
+	// Send success response
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"message": "Push token updated successfully"})
+}

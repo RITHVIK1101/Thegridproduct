@@ -76,6 +76,8 @@ func main() {
 	protected.Use(handlers.AuthMiddleware)
 
 	protected.HandleFunc("/products", handlers.AddProductHandler).Methods("POST")
+	protected.HandleFunc("/user/push-token", handlers.UpdateUserPushToken).Methods("POST")
+
 	protected.HandleFunc("/products/user", handlers.GetUserProductsHandler).Methods("GET")
 	protected.HandleFunc("/products/all", handlers.GetAllProductsHandler).Methods("GET")
 	protected.HandleFunc("/products/by-ids", handlers.GetProductsByIDsHandler).Methods("GET")
