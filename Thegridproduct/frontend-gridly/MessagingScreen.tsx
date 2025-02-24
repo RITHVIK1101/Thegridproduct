@@ -552,7 +552,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
   };
 
   // --- Fix for Request Fetching ---
-  // Changed endpoint to plural "/chat/requests" which matches the backend's GetChatRequestsHandler
+  // Changed endpoint to plural "/chat/request" which matches the backend's GetChatRequestsHandler
   const fetchUserRequests = async () => {
     if (!userId || !token) {
       setErrorRequests("User not authenticated.");
