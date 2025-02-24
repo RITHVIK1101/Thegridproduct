@@ -1,6 +1,6 @@
-// App.tsx
 import React, { useState, useEffect, useContext, useRef } from "react";
 import {
+  AppState,
   TouchableOpacity,
   View,
   Text,
@@ -20,7 +20,6 @@ import { Image } from "react-native";
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-
 import {
   createStackNavigator,
   StackNavigationOptions,
@@ -52,13 +51,17 @@ import VerificationScreen from "./VerificationScreen";
 // Push Notification Setup (Expo)
 // -------------------
 
-// Configure notification handling so alerts and sounds are shown even when the app is foregrounded.
+// Configure notification handling so that notifications are suppressed in the foreground.
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
+  handleNotification: async () => {
+    const appState = await AsyncStorage.getItem("appState");
+    const isAppInForeground = appState === "active";
+    return {
+      shouldShowAlert: !isAppInForeground,
+      shouldPlaySound: !isAppInForeground,
+      shouldSetBadge: !isAppInForeground,
+    };
+  },
 });
 
 /**
@@ -99,8 +102,8 @@ async function requestPermissionAndGetToken(
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`, // assuming your auth token
-          "X-User-Type": userType, // e.g., "university" or "highschool"
+          Authorization: `Bearer ${token}`,
+          "X-User-Type": userType,
         },
         body: JSON.stringify({
           userId,
@@ -292,7 +295,7 @@ const HeaderTitleWithLogo: React.FC<{ title: string }> = ({ title }) => {
   return (
     <View style={styles.headerTitleContainer}>
       <Animated.Image
-        source={require("./assets/logonobg.png")} // Logo file
+        source={require("./assets/logonobg.png")}
         style={[
           {
             width: 35,
@@ -395,10 +398,7 @@ const AppNavigator: React.FC<AppNavigatorProps> = ({ firstRender }) => {
           elevation: 0,
         },
         headerTintColor: "#FFFFFF",
-        headerTitleStyle: {
-          fontWeight: "700",
-          color: "#FFFFFF",
-        },
+        headerTitleStyle: { fontWeight: "700", color: "#FFFFFF" },
         animationEnabled: false,
       }}
     >
@@ -560,27 +560,25 @@ const App: React.FC = () => {
   const [showSplash, setShowSplash] = useState(true);
   const [firstRender, setFirstRender] = useState(true);
 
-  // Set up foreground notification listener
-  useEffect(() => {
-    console.log("🔔 Setting up foreground notification listener...");
-    const subscription = Notifications.addNotificationReceivedListener(
-      (notification) => {
-        console.log("📩 Foreground Notification Received:", notification);
-        Alert.alert(
-          notification.request.content.title || "New Notification",
-          notification.request.content.body || "You have a new message!"
-        );
-      }
-    );
-    return () => {
-      console.log("🛑 Removing foreground notification listener...");
-      subscription.remove();
-    };
-  }, []);
-
   const handleSplashEnd = () => {
     setShowSplash(false);
   };
+
+  // Track app state and store it in AsyncStorage
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: string) => {
+      AsyncStorage.setItem("appState", nextAppState);
+    };
+
+    const appStateListener = AppState.addEventListener(
+      "change",
+      handleAppStateChange
+    );
+
+    return () => {
+      appStateListener.remove();
+    };
+  }, []);
 
   return (
     <UserProvider>

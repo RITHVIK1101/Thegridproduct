@@ -55,6 +55,7 @@ import {
   useFocusEffect,
 } from "@react-navigation/native";
 import { RootStackParamList } from "./navigationTypes";
+
 type Chat = Conversation & { latestSenderId?: string; sold?: boolean };
 type Request = {
   requestId: string;
@@ -73,6 +74,7 @@ type Request = {
 };
 type MessagingScreenRouteProp = RouteProp<RootStackParamList, "Messaging">;
 type MessagingScreenProps = { route: MessagingScreenRouteProp };
+
 const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
   const [chats, setChats] = useState<Chat[]>([]);
   const [filteredChats, setFilteredChats] = useState<Chat[]>([]);
@@ -120,6 +122,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
   const [unreadCounts, setUnreadCounts] = useState<{ [key: string]: number }>(
     {}
   );
+
   const { userId, token } = useContext(UserContext);
   const firestoreDB = getFirestore();
   const flatListRef = useRef<FlatList<Message> | null>(null);
@@ -138,6 +141,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
   const CLOUDINARY_URL =
     "https://api.cloudinary.com/v1_1/ds0zpfht9/image/upload";
   const UPLOAD_PRESET = "gridly_preset";
+
   const applyFilter = (
     chatsToFilter: Chat[],
     f: "all" | "products" | "gigs" | "product_request"
@@ -149,6 +153,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       return chatsToFilter.filter((c) => c.referenceType === "gig");
     return chatsToFilter.filter((c) => c.referenceType === f);
   };
+
   useEffect(() => {
     const filtered = applyFilter(chats, filter);
     const sorted = [...filtered].sort((a, b) => {
@@ -162,6 +167,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     });
     setFilteredChats(sorted);
   }, [chats, filter]);
+
   useEffect(() => {
     const loadCachedChats = async () => {
       try {
@@ -178,6 +184,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       fetchUserChats();
     }
   }, [userId, token]);
+
   useFocusEffect(
     useCallback(() => {
       if (userId && token) {
@@ -185,6 +192,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       }
     }, [userId, token])
   );
+
   useEffect(() => {
     const intervalId = setInterval(() => {
       if (userId && token) {
@@ -193,6 +201,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }, 20000);
     return () => clearInterval(intervalId);
   }, [userId, token]);
+
   const fetchUnreadCount = async (chatID: string): Promise<number> => {
     try {
       const response = await axios.get(
@@ -205,6 +214,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       return 0;
     }
   };
+
   useEffect(() => {
     const fetchAllUnreadCounts = async () => {
       const counts: { [key: string]: number } = {};
@@ -220,6 +230,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       fetchAllUnreadCounts();
     }
   }, [chats, userId, token]);
+
   const fetchUserChats = async () => {
     if (!userId || !token) return;
     setLoading(true);
@@ -260,6 +271,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       setLoading(false);
     }
   };
+
   const updateLastRead = async (chatId: string) => {
     const currentTime = new Date().toISOString();
     const chatDocRef = doc(firestoreDB, "chatRooms", chatId);
@@ -270,6 +282,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       console.error("Failed to update lastRead: ", error);
     }
   };
+
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
     if (selectedChat) {
@@ -288,13 +301,9 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                   sold: data.sold,
                 };
               if (!prev.messages || !Array.isArray(data.messages)) return prev;
-              if (data.messages.length <= prev.messages.length)
-                return { ...prev, sold: data.sold };
+              // Remove auto scroll here so the user can scroll manually.
               return { ...prev, messages: data.messages, sold: data.sold };
             });
-            setTimeout(() => {
-              flatListRef.current?.scrollToEnd({ animated: true });
-            }, 100);
           } else if (data.sold !== undefined) {
             setSelectedChat((prev) =>
               prev ? { ...prev, sold: data.sold } : prev
@@ -307,6 +316,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       if (unsubscribe) unsubscribe();
     };
   }, [selectedChat, firestoreDB]);
+
   useEffect(() => {
     if (chats.length > 0) {
       const chatIDs = chats.map((chat) => chat.chatID);
@@ -348,20 +358,25 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       return () => unsubscribe();
     }
   }, [chats.map((c) => c.chatID).join(","), firestoreDB]);
+
   const openChat = async (chat: Chat) => {
     setLoading(true);
     try {
       setSelectedChat((prev) =>
         prev && prev.chatID === chat.chatID ? prev : { ...chat, messages: [] }
       );
+
       const messages = await getMessages(chat.chatID, token);
       setSelectedChat({ ...chat, messages });
+
       await updateLastRead(chat.chatID);
       setChatModalVisible(true);
       setNewMessage("");
+
+      // Scroll to bottom after a small delay to ensure content is rendered
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
-      }, 100);
+      }, 300);
     } catch (error) {
       console.error("Error opening chat:", error);
       Alert.alert("Error", "Failed to load messages.");
@@ -369,6 +384,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       setLoading(false);
     }
   };
+
   const handleBackFromChat = async () => {
     if (selectedChat) {
       const messages = selectedChat.messages;
@@ -417,17 +433,19 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     setChatModalVisible(false);
     setSelectedChat(null);
   };
+
   const sendMessage = async () => {
     if (!newMessage.trim() || !selectedChat) {
       Alert.alert("Error", "Please enter a message.");
       return;
     }
     const messageContent = newMessage.trim();
+
     try {
       await postMessage(selectedChat.chatID, messageContent, { token, userId });
-
-      // Clear the message input; the onSnapshot listener will update the chat UI.
       setNewMessage("");
+
+      // Scroll to bottom after sending a message
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
       }, 100);
@@ -460,6 +478,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       Alert.alert("Error", "An error occurred while selecting an image.");
     }
   };
+
   const sendImageMessage = async (imageUrl: string) => {
     if (!selectedChat) return;
     const msgData = {
@@ -475,6 +494,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       { merge: true }
     );
   };
+
   const uploadImageToCloudinary = async (uri: string): Promise<string> => {
     if (!uri) throw new Error("Cannot upload an empty URI");
     setIsUploadingImage(true);
@@ -503,6 +523,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       setIsUploadingImage(false);
     }
   };
+
   const confirmAddImage = async () => {
     if (!selectedChat || !selectedImageUri) return;
     setSending(true);
@@ -529,6 +550,9 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       setSending(false);
     }
   };
+
+  // --- Fix for Request Fetching ---
+  // Changed endpoint to plural "/chat/requests" which matches the backend's GetChatRequestsHandler
   const fetchUserRequests = async () => {
     if (!userId || !token) {
       setErrorRequests("User not authenticated.");
@@ -547,11 +571,12 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
           },
         }
       );
-
+      console.log("Fetched Requests:", response.data);
       if (response.status === 200) {
         let { incomingRequests, outgoingRequests } = response.data;
-
-        // Sort both arrays by `createdAt` in descending order (newest first)
+        // Default to empty arrays if null:
+        incomingRequests = incomingRequests || [];
+        outgoingRequests = outgoingRequests || [];
         incomingRequests = incomingRequests.sort(
           (a: Request, b: Request) =>
             new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -560,7 +585,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
           (a: Request, b: Request) =>
             new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         );
-
         setIncomingRequests(incomingRequests);
         setOutgoingRequests(outgoingRequests);
         setHasNewIncomingRequests(incomingRequests.length > 0);
@@ -619,6 +643,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       setProcessingRequestId(null);
     }
   };
+
   const rejectRequest = async (requestId: string) => {
     setProcessingRequestId(requestId);
     try {
@@ -651,6 +676,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       setProcessingRequestId(null);
     }
   };
+
   const renderChat = ({ item }: { item: Chat }) => {
     if (!item.user) {
       console.warn(`Chat with chatID ${item.chatID} is missing user data.`);
@@ -731,6 +757,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       </Pressable>
     );
   };
+
   const renderMessage = ({ item }: { item: Message }) => {
     const isImageMessage = item.content.startsWith("[Image] ");
     const imageUri = isImageMessage
@@ -787,6 +814,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       </View>
     );
   };
+
   const handleDeleteChat = async () => {
     if (!selectedChat) return;
     Alert.alert(
@@ -823,6 +851,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       ]
     );
   };
+
   const handleMarkAsSold = async () => {
     if (!selectedChat) return;
     Alert.alert(
@@ -866,11 +895,13 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       ]
     );
   };
+
   const productsOrGigs = chats.map((c) => ({
     chatID: c.chatID,
     title: c.referenceTitle || "Unnamed Item",
     type: c.referenceType || "product",
   }));
+
   const handleNavigateFromProductOrGig = (item: {
     chatID: string;
     title: string;
@@ -881,6 +912,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       openChat(chat);
     }
   };
+
   const currentHeaderTitle =
     filter === "all"
       ? "All Chats"
@@ -908,6 +940,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     setReportModalVisible(true);
     setChatModalVisible(false);
   };
+
   const fetchChatDetails = async (chatId: string) => {
     if (!chatId) {
       console.error("Error: chatId is undefined!");
@@ -931,6 +964,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       return null;
     }
   };
+
   const handleModifiedReportSubmit = async () => {
     if (
       reportReason === "Select a Reason" ||
@@ -976,22 +1010,15 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       setIsSubmittingReport(false);
     }
   };
+
   const renderRequestsModal = () => {
-    if (isRequestsModalVisible) {
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 250,
-        easing: Easing.inOut(Easing.ease),
-        useNativeDriver: true,
-      }).start();
-    } else {
-      Animated.timing(slideAnim, {
-        toValue: Dimensions.get("window").height,
-        duration: 250,
-        easing: Easing.inOut(Easing.ease),
-        useNativeDriver: true,
-      }).start();
-    }
+    Animated.timing(slideAnim, {
+      toValue: isRequestsModalVisible ? 0 : Dimensions.get("window").height,
+      duration: 250,
+      easing: Easing.inOut(Easing.ease),
+      useNativeDriver: true,
+    }).start();
+
     const renderRequestItem = ({ item }: { item: Request }) => {
       const referenceTypeLabel =
         item.referenceType === "product"
@@ -1057,8 +1084,10 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         </View>
       );
     };
+
     const dataToShow =
       selectedRequestsTab === "incoming" ? incomingRequests : outgoingRequests;
+
     return (
       <Modal
         visible={isRequestsModalVisible}
@@ -1161,6 +1190,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       </Modal>
     );
   };
+
   return (
     <View style={styles.container}>
       <SafeAreaView style={{ flex: 1 }}>
@@ -1388,26 +1418,22 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                       ))}
                   </View>
                 )}
+                {/* Removed onContentSizeChange and onLayout auto scroll props to allow manual scrolling */}
                 <FlatList
                   ref={flatListRef}
                   data={selectedChat?.messages || []}
                   keyExtractor={(item, index) => item._id || index.toString()}
                   renderItem={renderMessage}
                   contentContainerStyle={styles.messagesList}
+                  inverted={false} // Ensure it is set to false
                   onContentSizeChange={() =>
-                    flatListRef.current?.scrollToEnd({ animated: false })
+                    flatListRef.current?.scrollToEnd({ animated: true })
                   }
                   onLayout={() =>
-                    flatListRef.current?.scrollToEnd({ animated: false })
-                  }
-                  ListEmptyComponent={
-                    <View style={styles.emptyMessagesContainer}>
-                      <Text style={styles.emptyMessagesText}>
-                        Start the conversation by sending a message!
-                      </Text>
-                    </View>
+                    flatListRef.current?.scrollToEnd({ animated: true })
                   }
                 />
+
                 <View style={styles.inputBarContainer}>
                   <View style={styles.inputBarLine} />
                   <View style={styles.inputContainer}>
@@ -1652,8 +1678,11 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     </View>
   );
 };
+
 export default MessagingScreen;
+
 const { width } = Dimensions.get("window");
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#000" },
   headerRow: {

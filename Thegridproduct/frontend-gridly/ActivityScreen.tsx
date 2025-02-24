@@ -122,7 +122,13 @@ const ActivityScreen: React.FC = () => {
         throw new Error("Unexpected response format.");
       }
 
-      let data: Product[] = await response.json();
+      let data = await response.json();
+
+      // ✅ Fix: Ensure `data` is an array, default to `[]` if null
+      if (!Array.isArray(data)) {
+        console.warn("Received unexpected response:", data);
+        data = [];
+      }
 
       // 🔹 Sort products by `postedDate` (newest first)
       data = data.sort(
