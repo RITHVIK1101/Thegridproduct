@@ -407,8 +407,6 @@ func GetMessagesHandler(w http.ResponseWriter, r *http.Request) {
 	// Return messages as JSON response
 	WriteJSON(w, messages, http.StatusOK)
 }
-
-// RequestChatHandler handles creating a chat request between a buyer and seller.
 func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -486,6 +484,30 @@ func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 				return nil, &AppError{Message: "Product not found", StatusCode: http.StatusNotFound}
 			}
 			referenceTitle = product.Title
+
+			// ✅ Update `requestedBy` field in the `products` collection
+			_, err = productsCol.UpdateOne(sessCtx,
+				bson.M{"_id": referenceObjectID},
+				bson.M{"$addToSet": bson.M{"requestedBy": buyerObjectID}}, // Ensures no duplicate entries
+			)
+			if err != nil {
+				log.Printf("Error updating requestedBy field for product: %v", err)
+				return nil, err
+			}
+
+			// ✅ Remove the product from the buyer's cart
+			cartCollection := db.GetCollection("gridlyapp", "carts")
+			_, err = cartCollection.UpdateOne(sessCtx,
+				bson.M{"userId": buyerObjectID},
+				bson.M{
+					"$pull": bson.M{"items": bson.M{"productId": referenceObjectID}}, // Removes product from cart
+					"$set":  bson.M{"updatedAt": time.Now()},
+				},
+			)
+			if err != nil {
+				log.Printf("Error removing product from cart: %v", err)
+				return nil, err
+			}
 
 		case "product_request":
 			requestsCol := db.GetCollection("gridlyapp", "product_requests")
