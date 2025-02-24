@@ -252,7 +252,7 @@ func GetAllProductsHandler(w http.ResponseWriter, r *http.Request) {
 			"$and": []bson.M{
 				baseFilter,
 				{"userId": bson.M{"$ne": userObjID}},
-				{"availability": bson.M{"$in": []string{"Off Campus Only", "On and Off Campus"}}},
+				{"availability": bson.M{"$in": []string{"Off Campus Only", "On and Off Campus", "In Campus Only"}}},
 			},
 		}
 	} else {
