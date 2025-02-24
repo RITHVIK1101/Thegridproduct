@@ -30,7 +30,7 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import BottomNavBar from "./components/BottomNavbar";
-import { fetchConversations, getMessages } from "./api";
+import { fetchConversations, getMessages, postMessage } from "./api";
 import {
   getFirestore,
   doc,
@@ -423,33 +423,20 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       return;
     }
     const messageContent = newMessage.trim();
-    const newMessageObj: Message = {
-      _id: Date.now().toString(),
-      senderId: userId,
-      content: messageContent,
-      timestamp: new Date().toISOString(),
-    };
-    setSelectedChat((prev) =>
-      prev
-        ? { ...prev, messages: [...(prev.messages || []), newMessageObj] }
-        : prev
-    );
-    setNewMessage("");
-    setTimeout(() => {
-      flatListRef.current?.scrollToEnd({ animated: true });
-    }, 100);
     try {
-      const chatDocRef = doc(firestoreDB, "chatRooms", selectedChat.chatID);
-      await setDoc(
-        chatDocRef,
-        { messages: arrayUnion(newMessageObj) },
-        { merge: true }
-      );
+      await postMessage(selectedChat.chatID, messageContent, { token, userId });
+
+      // Clear the message input; the onSnapshot listener will update the chat UI.
+      setNewMessage("");
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
     } catch (error) {
       console.error("Error sending message:", error);
       Alert.alert("Error", "Failed to send message.");
     }
   };
+
   const handleImagePress = async () => {
     try {
       const { status } =

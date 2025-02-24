@@ -950,7 +950,6 @@ func createFirestoreChatRoom(chatID, buyerID, sellerID, referenceID, referenceTy
 	return nil
 }
 
-// TestSendMessageHandler sends a test message to Firestore and notifies the recipient.
 func TestSendMessageHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -1036,8 +1035,18 @@ func TestSendMessageHandler(w http.ResponseWriter, r *http.Request) {
 				"type":   "new_message",
 				"chatId": req.ChatID,
 			}
-			// Send the push notification.
-			err = SendPushNotification(recipient.ExpoPushToken, "New Message", req.Content, pushData)
+
+			// Look up the sender using db.GetUserByID.
+			sender, err := db.GetUserByID(req.SenderID)
+			senderName := "New Message" // fallback title
+			if err != nil {
+				log.Printf("Error fetching sender details: %v", err)
+			} else {
+				senderName = sender.FirstName + " " + sender.LastName
+			}
+
+			// Send the push notification with the sender's name as the title.
+			err = SendPushNotification(recipient.ExpoPushToken, senderName, req.Content, pushData)
 			if err != nil {
 				log.Printf("Error sending push notification: %v", err)
 			}
