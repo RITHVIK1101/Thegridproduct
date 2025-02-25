@@ -220,7 +220,7 @@ const BottomNavBar: React.FC = () => {
           color="#FFFFFF"
         />
         <Text style={[styles.navText, isActive("Jobs") && styles.navTextActive]}>
-          Jobs
+          Gigs
         </Text>
       </TouchableOpacity>
       {/* Add Button */}
@@ -322,7 +322,7 @@ const BottomNavBar: React.FC = () => {
                 }}
                 accessibilityLabel="Add Job"
               >
-                <Text style={styles.modalButtonText}>Add Job</Text>
+                <Text style={styles.modalButtonText}>Add Gig</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.modalButton}

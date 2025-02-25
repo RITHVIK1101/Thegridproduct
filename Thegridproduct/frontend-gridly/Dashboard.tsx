@@ -124,6 +124,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
   const [requestedProducts, setRequestedProducts] = useState<
     RequestedProduct[]
   >([]);
+  const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
 
@@ -581,6 +582,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
     }
   };
 
+  
   // ----- Recalculate Product Ordering: Unseen Products Only -----
   useEffect(() => {
     // Filter by category first.
@@ -709,6 +711,14 @@ const Dashboard: React.FC<DashboardProps> = () => {
   }) => {
     const [titleExpanded, setTitleExpanded] = useState(false);
     const doubleTapRef = useRef<any>(null);
+    useEffect(() => {
+      if (nextProduct && nextProduct.images.length > 0) {
+        Image.prefetch(nextProduct.images[0]).catch((err) =>
+          console.warn("Image prefetch error:", err)
+        );
+      }
+    }, [nextProduct]); // Runs every time the next product changes
+    
     const SWIPE_THRESHOLD = 20;
 
     const onPanHandlerStateChange = (event: any) => {
@@ -1024,30 +1034,25 @@ const Dashboard: React.FC<DashboardProps> = () => {
                     showsVerticalScrollIndicator={false}
                     contentContainerStyle={styles.modalScrollContent}
                   >
-                    {/* Title with New Product Badge */}
-                    <View style={styles.titleContainer}>
-                      <Text style={styles.modalTitle}>
-                        {selectedProduct.title}
-                      </Text>
-                      {selectedProduct.quality === "New" && (
-                        <View style={styles.newBadgeContainer}>
-                          <Text style={styles.newBadgeText}>
-                            Condition: New
-                          </Text>
-                        </View>
-                      )}
-                    </View>
+<View style={styles.modalContentContainer}>
+  {/* Title: Centered */}
+  <View style={{ alignItems: "center", width: "100%", marginBottom: 10 }}>
+  <Text style={styles.modalTitle}>{selectedProduct?.title}</Text>
+</View>
 
-                    <Text style={styles.detailText}>
-                      Price: ${selectedProduct.price.toFixed(2)}
-                    </Text>
+
+  {/* Everything else: Left-aligned */}
+  <View style={{ alignSelf: "flex-start", width: "100%" }}>
+    <Text style={styles.detailText}>Condition: {selectedProduct?.quality}</Text>
+    <Text style={styles.detailText}>Price: ${selectedProduct?.price.toFixed(2)}</Text>
+  </View>
+</View>
+
+
 
                     {/* Only show condition & rating if NOT new */}
                     {selectedProduct.quality !== "New" && (
                       <>
-                        <Text style={styles.detailText}>
-                          Condition: {selectedProduct.quality}
-                        </Text>
                         {selectedProduct.rating &&
                           selectedProduct.rating > 0 && (
                             <View
@@ -1435,6 +1440,21 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     textAlign: "center",
   },
+  modalTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#FFFFFF",
+    textAlign: "center",
+    alignSelf: "center",
+    marginBottom: 12,
+    width: "100%", // Ensures it takes full width
+  },
+  
+
+  
+  
+  
+  
   divider: {
     backgroundColor: "#444",
     height: 1,
@@ -1455,6 +1475,12 @@ const styles = StyleSheet.create({
   filterModalOptionSelected: {
     backgroundColor: "#BB86FC20",
     borderRadius: 10,
+  },
+
+  
+  modalContentContainer: {
+    alignItems: "center", // Center everything inside
+    width: "100%",  // Make sure it takes full width of the modal
   },
   filterModalOptionText: {
     fontSize: 14,
@@ -1513,15 +1539,7 @@ const styles = StyleSheet.create({
     maxHeight: "70%",
     position: "relative",
   },
-  modalTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
-    marginRight: -20,
-    marginLeft: 126,
-    color: "#FFFFFF",
-    textAlign: "center",
-    marginBottom: 12,
-  },
+
   descriptionModalContent: {
     width: "90%",
     maxHeight: "80%",

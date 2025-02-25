@@ -2,9 +2,9 @@ import 'dotenv/config';
 
 export default {
   expo: {
-    name: "The Gridly",
+    name: "Gridly",
     slug: "your-app-slug",
-    owner: "rithvik1101", // 👈 Add your Expo username here
+    owner: "rithvik1101",
     version: "1.0.0",
     orientation: "portrait",
     icon: "./assets/icon.jpg",
