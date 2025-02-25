@@ -1,46 +1,36 @@
-import 'dotenv/config';
-
 export default {
   expo: {
-    name: "The Gridly",
-    slug: "your-app-slug",
+    name: "GridlyApp",
+    slug: "GridlyApp",
+    owner: "rithvik1101", // Updated owner: change this to the desired Expo username or team name.
     version: "1.0.0",
     orientation: "portrait",
     icon: "./assets/icon.jpg",
+    userInterfaceStyle: "light",
     splash: {
-      image: "./assets/splash.png",
       resizeMode: "contain",
-      backgroundColor: "#ffffff"
+      backgroundColor: "#000000",
     },
-    updates: {
-      fallbackToCacheTimeout: 0
+    extra: {
+      NGROK_URL: "https://de17-71-197-245-145.ngrok-free.app",
+      // Removed the old "eas" field with projectId to allow re-linking under the new owner.
     },
-    assetBundlePatterns: ["**/*"],
     ios: {
       supportsTablet: true,
-      bundleIdentifier: "com.gridly.mobile",
       infoPlist: {
-        NSPhotoLibraryUsageDescription: "Gridly needs access to your photo library to allow you to upload images when creating service listings. These images will be publicly visible to potential customers browsing your offerings.",
-        ITSAppUsesNonExemptEncryption: false
-      }
+        NSPhotoLibraryUsageDescription:
+          "Gridly needs access to your photo library to allow you to upload images when creating service listings. These images will be publicly visible to potential customers browsing your offerings.",
+        ITSAppUsesNonExemptEncryption: false,
+      },
     },
     android: {
       adaptiveIcon: {
         foregroundImage: "./assets/adaptive-icon.png",
-        backgroundColor: "#ffffff"
-      }
+        backgroundColor: "#000000",
+      },
     },
     web: {
-      favicon: "./assets/favicon.png"
+      favicon: "./assets/favicon.png",
     },
-    extra: {
-      NGROK_URL: process.env.NGROK_URL,
-      eas: {
-        projectId: "0f8792ae-5411-4193-898e-8a69005c50e7"
-      }
-    }
-  }
+  },
 };
-
-
-
