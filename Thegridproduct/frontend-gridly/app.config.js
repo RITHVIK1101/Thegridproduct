@@ -4,6 +4,7 @@ export default {
   expo: {
     name: "The Gridly",
     slug: "your-app-slug",
+    owner: "rithvik1101", // 👈 Add your Expo username here
     version: "1.0.0",
     orientation: "portrait",
     icon: "./assets/icon.jpg",
@@ -34,13 +35,8 @@ export default {
       favicon: "./assets/favicon.png"
     },
     extra: {
-      NGROK_URL: process.env.NGROK_URL,
-      eas: {
-        projectId: "0f8792ae-5411-4193-898e-8a69005c50e7"
-      }
+      NGROK_URL: process.env.NGROK_URL
+      // 🚀 Removed the old "eas.projectId" to unlink the previous project
     }
   }
 };
-
-
-
