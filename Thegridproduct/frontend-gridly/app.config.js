@@ -35,8 +35,10 @@ export default {
       favicon: "./assets/favicon.png"
     },
     extra: {
-      NGROK_URL: process.env.NGROK_URL
-      // 🚀 Removed the old "eas.projectId" to unlink the previous project
+      NGROK_URL: process.env.NGROK_URL,
+      eas: {
+        projectId: "cd96f29a-78be-4337-a376-08be6d0f97a5"
+      }
     }
   }
 };
