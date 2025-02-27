@@ -18,6 +18,91 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
+// GeneralReportRequest represents the request payload for general reports.
+type GeneralReportRequest struct {
+	Category    string `json:"category"`    // "Report", "Talk to Founders", etc.
+	SubCategory string `json:"subcategory"` // Optional: More specific reason
+	Description string `json:"description"` // Required detailed message
+}
+
+// GeneralReportHandler handles various user reports (including user feedback, general inquiries, and reporting issues).
+func GeneralReportHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Only allow POST requests
+	if r.Method != http.MethodPost {
+		WriteJSONError(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Decode the report request payload
+	var reportReq GeneralReportRequest
+	if err := json.NewDecoder(r.Body).Decode(&reportReq); err != nil {
+		WriteJSONError(w, "Invalid request payload", http.StatusBadRequest)
+		return
+	}
+
+	// Ensure required fields are provided
+	if reportReq.Category == "" || reportReq.Description == "" {
+		WriteJSONError(w, "Category and Description are required", http.StatusBadRequest)
+		return
+	}
+
+	// Get the user ID from the request context (set by AuthMiddleware)
+	userIDStr, ok := r.Context().Value(userIDKey).(string)
+	if !ok || userIDStr == "" {
+		WriteJSONError(w, "User not authenticated", http.StatusUnauthorized)
+		return
+	}
+
+	// Fetch user details from the database
+	user, err := db.GetUserByID(userIDStr)
+	if err != nil {
+		WriteJSONError(w, "Error fetching user details", http.StatusInternalServerError)
+		return
+	}
+
+	// Prepare the email body with user details
+	emailBody := fmt.Sprintf(`User Inquiry / Report:
+
+Category: %s
+SubCategory: %s
+Description: %s
+
+User Details:
+    Name: %s %s
+    Email: %s
+    UserID: %s
+`, reportReq.Category, reportReq.SubCategory, reportReq.Description,
+		user.FirstName, user.LastName, user.Email, userIDStr)
+
+	// Specify the email subject and recipients
+	subject := "New User Inquiry / Report"
+	recipients := []string{"thegridly@gmail.com"}
+	message := fmt.Sprintf("Subject: %s\n\n%s", subject, emailBody)
+
+	// SMTP configuration (ensure these are set in your environment variables)
+	smtpHost := "smtp.gmail.com"
+	smtpPort := "587"
+	smtpUser := os.Getenv("SMTP_USER") // e.g., sender's email address
+	smtpPass := os.Getenv("SMTP_PASS") // sender's app password
+
+	if smtpUser == "" || smtpPass == "" {
+		WriteJSONError(w, "SMTP credentials not configured", http.StatusInternalServerError)
+		return
+	}
+
+	auth := smtp.PlainAuth("", smtpUser, smtpPass, smtpHost)
+	if err := smtp.SendMail(smtpHost+":"+smtpPort, auth, smtpUser, recipients, []byte(message)); err != nil {
+		log.Printf("Error sending email: %v", err)
+		WriteJSONError(w, "Error sending report email", http.StatusInternalServerError)
+		return
+	}
+
+	// Respond with success message
+	WriteJSON(w, map[string]string{"message": "Report submitted successfully"}, http.StatusOK)
+}
+
 // ReportRequest represents the incoming JSON payload for a report.
 type ReportRequest struct {
 	ChatID      string `json:"chatId"`
