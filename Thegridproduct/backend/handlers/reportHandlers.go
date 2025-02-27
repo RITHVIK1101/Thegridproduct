@@ -26,6 +26,7 @@ type GeneralReportRequest struct {
 }
 
 // GeneralReportHandler handles various user reports (including user feedback, general inquiries, and reporting issues).
+// GeneralReportHandler handles different types of user reports/feedback
 func GeneralReportHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -35,72 +36,77 @@ func GeneralReportHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Decode the report request payload
-	var reportReq GeneralReportRequest
+	// Decode the request payload
+	var reportReq struct {
+		Type        string `json:"type"`        // "report", "talk", "feedback", etc.
+		Category    string `json:"category"`    // Optional: Only used for reports
+		Description string `json:"description"` // Required: User's input
+	}
 	if err := json.NewDecoder(r.Body).Decode(&reportReq); err != nil {
 		WriteJSONError(w, "Invalid request payload", http.StatusBadRequest)
 		return
 	}
 
 	// Ensure required fields are provided
-	if reportReq.Category == "" || reportReq.Description == "" {
-		WriteJSONError(w, "Category and Description are required", http.StatusBadRequest)
+	if reportReq.Type == "" || reportReq.Description == "" {
+		WriteJSONError(w, "Type and Description are required", http.StatusBadRequest)
 		return
 	}
 
-	// Get the user ID from the request context (set by AuthMiddleware)
+	// Get the user's ID from the request context
 	userIDStr, ok := r.Context().Value(userIDKey).(string)
 	if !ok || userIDStr == "" {
 		WriteJSONError(w, "User not authenticated", http.StatusUnauthorized)
 		return
 	}
 
-	// Fetch user details from the database
+	// Get user details from the database
 	user, err := db.GetUserByID(userIDStr)
 	if err != nil {
 		WriteJSONError(w, "Error fetching user details", http.StatusInternalServerError)
 		return
 	}
 
-	// Prepare the email body with user details
-	emailBody := fmt.Sprintf(`User Inquiry / Report:
+	// Create the email body
+	emailBody := fmt.Sprintf(`User Request:
 
+Request Type: %s
 Category: %s
-SubCategory: %s
 Description: %s
 
 User Details:
     Name: %s %s
     Email: %s
     UserID: %s
-`, reportReq.Category, reportReq.SubCategory, reportReq.Description,
+`, reportReq.Type, reportReq.Category, reportReq.Description,
 		user.FirstName, user.LastName, user.Email, userIDStr)
 
-	// Specify the email subject and recipients
-	subject := "New User Inquiry / Report"
+	// Email subject & recipients
+	subject := "New User Report/Feedback"
 	recipients := []string{"thegridly@gmail.com"}
 	message := fmt.Sprintf("Subject: %s\n\n%s", subject, emailBody)
 
-	// SMTP configuration (ensure these are set in your environment variables)
+	// SMTP Configuration (ensure these are set in your environment variables)
 	smtpHost := "smtp.gmail.com"
 	smtpPort := "587"
-	smtpUser := os.Getenv("SMTP_USER") // e.g., sender's email address
-	smtpPass := os.Getenv("SMTP_PASS") // sender's app password
+	smtpUser := os.Getenv("SMTP_USER")
+	smtpPass := os.Getenv("SMTP_PASS")
 
 	if smtpUser == "" || smtpPass == "" {
 		WriteJSONError(w, "SMTP credentials not configured", http.StatusInternalServerError)
 		return
 	}
 
+	// Send email
 	auth := smtp.PlainAuth("", smtpUser, smtpPass, smtpHost)
 	if err := smtp.SendMail(smtpHost+":"+smtpPort, auth, smtpUser, recipients, []byte(message)); err != nil {
 		log.Printf("Error sending email: %v", err)
-		WriteJSONError(w, "Error sending report email", http.StatusInternalServerError)
+		WriteJSONError(w, "Error sending email", http.StatusInternalServerError)
 		return
 	}
 
 	// Respond with success message
-	WriteJSON(w, map[string]string{"message": "Report submitted successfully"}, http.StatusOK)
+	WriteJSON(w, map[string]string{"message": "Request submitted successfully"}, http.StatusOK)
 }
 
 // ReportRequest represents the incoming JSON payload for a report.
