@@ -66,11 +66,11 @@ func GetUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// If not found, try to find the user in the "high_school_users" collection
+	// If not found, try to find the user in the "highschool_users" collection
 	highSchoolUsersCollection := db.GetCollection("gridlyapp", "highschool_users")
 	err = highSchoolUsersCollection.FindOne(ctx, bson.M{"_id": userID}, findOptions).Decode(&user)
 	if err == nil {
-		// User found in "high_school_users" collection
+		// User found in "highschool_users" collection
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(user)
 		return

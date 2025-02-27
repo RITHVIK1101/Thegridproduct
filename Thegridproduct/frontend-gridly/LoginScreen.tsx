@@ -49,6 +49,11 @@ const LoginScreen: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [isEmailFocused, setIsEmailFocused] = useState(false);
+
+  // Added state for toggling password visibility
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const [open, setOpen] = useState(false);
   const [selectedInstitution, setSelectedInstitution] = useState("");
@@ -230,15 +235,19 @@ const LoginScreen: React.FC = () => {
 
   const handleSignup = async () => {
     setError("");
+
     if (!firstName.trim() || !lastName.trim()) {
       setError("Please enter your first and last name.");
       return;
     }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    // Updated regex to allow only .edu, .org, or .college emails
+    const emailRegex = /^[^\s@]+@[^\s@]+\.(edu|org|college)$/;
     if (!emailRegex.test(email)) {
-      setError("Please enter a valid email address.");
+      setError("Please enter a valid .edu, .org, or .college email address.");
       return;
     }
+
     if (password.length <= 6) {
       setError("Password must be longer than 6 characters.");
       return;
@@ -293,16 +302,28 @@ const LoginScreen: React.FC = () => {
         autoCapitalize="none"
         autoComplete="email"
       />
-      <TextInput
-        style={styles.input}
-        placeholder="Password"
-        placeholderTextColor="#888"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-        autoCapitalize="none"
-        autoComplete="password"
-      />
+      <View style={styles.inputContainer}>
+        <TextInput
+          style={styles.input}
+          placeholder="Password"
+          placeholderTextColor="#888"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry={!showPassword}
+          autoCapitalize="none"
+          autoComplete="password"
+        />
+        <TouchableOpacity
+          style={styles.eyeIcon}
+          onPress={() => setShowPassword(!showPassword)}
+        >
+          <Ionicons
+            name={showPassword ? "eye-off-outline" : "eye-outline"}
+            size={20}
+            color="#aaa"
+          />
+        </TouchableOpacity>
+      </View>
       {renderError()}
       <TouchableOpacity
         style={[styles.button, styles.simpleButton]}
@@ -395,6 +416,7 @@ const LoginScreen: React.FC = () => {
             onChangeText={setLastName}
             autoCapitalize="words"
           />
+
           <TextInput
             style={styles.input}
             placeholder="Email"
@@ -403,25 +425,57 @@ const LoginScreen: React.FC = () => {
             onChangeText={setEmail}
             keyboardType="email-address"
             autoCapitalize="none"
+            onFocus={() => setIsEmailFocused(true)}
+            onBlur={() => setIsEmailFocused(false)}
           />
-          <TextInput
-            style={styles.input}
-            placeholder="Password"
-            placeholderTextColor="#888"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            autoCapitalize="none"
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Confirm Password"
-            placeholderTextColor="#888"
-            value={confirmPassword}
-            onChangeText={setConfirmPassword}
-            secureTextEntry
-            autoCapitalize="none"
-          />
+
+          {isEmailFocused && (
+            <Text style={styles.subtleHint}>Use a school email address</Text>
+          )}
+
+          <View style={styles.inputContainer}>
+            <TextInput
+              style={styles.input}
+              placeholder="Password"
+              placeholderTextColor="#888"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry={!showPassword}
+              autoCapitalize="none"
+            />
+            <TouchableOpacity
+              style={styles.eyeIcon}
+              onPress={() => setShowPassword(!showPassword)}
+            >
+              <Ionicons
+                name={showPassword ? "eye-off-outline" : "eye-outline"}
+                size={20}
+                color="#aaa"
+              />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.inputContainer}>
+            <TextInput
+              style={styles.input}
+              placeholder="Confirm Password"
+              placeholderTextColor="#888"
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              secureTextEntry={!showConfirmPassword}
+              autoCapitalize="none"
+            />
+            <TouchableOpacity
+              style={styles.eyeIcon}
+              onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+            >
+              <Ionicons
+                name={showConfirmPassword ? "eye-off-outline" : "eye-outline"}
+                size={20}
+                color="#aaa"
+              />
+            </TouchableOpacity>
+          </View>
 
           {renderError()}
 
@@ -675,17 +729,27 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.05)",
   },
+  inputContainer: {
+    position: "relative",
+    width: "100%",
+    marginBottom: 1,
+  },
   input: {
     height: 50,
     borderColor: "#333",
     borderWidth: 1,
     borderRadius: 12,
     paddingHorizontal: 15,
-    marginBottom: 12,
     color: "#fff",
     fontSize: 15,
     backgroundColor: "#1D1D1D",
     fontFamily: Platform.OS === "ios" ? "HelveticaNeue" : "Roboto",
+    marginBottom: 12,
+  },
+  eyeIcon: {
+    position: "absolute",
+    right: 15,
+    top: 15,
   },
   dropdownContainer: {
     marginBottom: 12,
@@ -781,6 +845,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     alignItems: "center",
     width: "45%",
+  },
+  subtleHint: {
+    fontSize: 12,
+    color: "#bbb",
+    marginTop: -8,
+    marginBottom: 8,
+    textAlign: "center",
+    fontFamily: Platform.OS === "ios" ? "HelveticaNeue" : "Roboto",
   },
   selectedType: {
     borderColor: "#A78BFA",

@@ -505,13 +505,11 @@ func GetAllGigsHandler(w http.ResponseWriter, r *http.Request) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
-
-	// 🔥 Fetch the user's institution from university_users or high_school_users
 	userCollection := db.GetCollection("gridlyapp", "university_users")
 	var user models.User
 	err = userCollection.FindOne(ctx, bson.M{"_id": userObjID}).Decode(&user)
 	if err == mongo.ErrNoDocuments {
-		userCollection = db.GetCollection("gridlyapp", "high_school_users")
+		userCollection = db.GetCollection("gridlyapp", "highschool_users")
 		err = userCollection.FindOne(ctx, bson.M{"_id": userObjID}).Decode(&user)
 	}
 	if err != nil {
