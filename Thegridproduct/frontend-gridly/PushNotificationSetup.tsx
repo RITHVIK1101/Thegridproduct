@@ -1,10 +1,14 @@
-// PushNotificationSetup.tsx
 import React, { useContext, useEffect } from "react";
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import Constants from "expo-constants"; // Import Constants from Expo
 import { UserContext } from "./UserContext";
 
+/**
+ * Requests notification permissions, retrieves the Expo push token,
+ * saves it locally, and sends it to the backend.
+ */
 async function requestPermissionAndGetToken(
   userId: string,
   userType: string,
@@ -22,11 +26,26 @@ async function requestPermissionAndGetToken(
   }
 
   try {
-    const expoPushTokenResponse = await Notifications.getExpoPushTokenAsync();
+    // Ensure projectId is provided in the bare workflow
+    const projectId = Constants?.expoConfig?.extra?.eas?.projectId;
+    if (!projectId) {
+      console.error(
+        "Expo projectId is missing. Check app.json or app.config.js."
+      );
+      return;
+    }
+
+    // Fetch Expo push token
+    const expoPushTokenResponse = await Notifications.getExpoPushTokenAsync({
+      projectId, // Pass projectId explicitly
+    });
+
     console.log("Expo Push Token:", expoPushTokenResponse.data);
 
+    // Save the push token locally
     await AsyncStorage.setItem("expoPushToken", expoPushTokenResponse.data);
 
+    // Send the token to the backend
     await fetch(
       "https://thegridproduct-production.up.railway.app/user/push-token",
       {
@@ -49,6 +68,10 @@ async function requestPermissionAndGetToken(
   }
 }
 
+/**
+ * Push Notification Setup Component
+ * Runs once on app load to request permission and register the token.
+ */
 export const PushNotificationSetup: React.FC = () => {
   const { userId, token, studentType } = useContext(UserContext);
 
