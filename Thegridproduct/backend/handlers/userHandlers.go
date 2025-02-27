@@ -54,11 +54,9 @@ func GetUserHandler(w http.ResponseWriter, r *http.Request) {
 
 	var user models.User
 
-	// Try to find the user in the "university_users" collection
 	universityUsersCollection := db.GetCollection("gridlyapp", "university_users")
 	err = universityUsersCollection.FindOne(ctx, bson.M{"_id": userID}, findOptions).Decode(&user)
 	if err == nil {
-		// User found in "university_users" collection
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(user)
 		return
@@ -69,7 +67,7 @@ func GetUserHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// If not found, try to find the user in the "high_school_users" collection
-	highSchoolUsersCollection := db.GetCollection("gridlyapp", "high_school_users")
+	highSchoolUsersCollection := db.GetCollection("gridlyapp", "highschool_users")
 	err = highSchoolUsersCollection.FindOne(ctx, bson.M{"_id": userID}, findOptions).Decode(&user)
 	if err == nil {
 		// User found in "high_school_users" collection
@@ -77,7 +75,7 @@ func GetUserHandler(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(user)
 		return
 	} else if err != mongo.ErrNoDocuments {
-		log.Printf("Error fetching user from high_school_users: %v", err)
+		log.Printf("Error fetching user from highschool_users: %v", err)
 		WriteJSONError(w, "Error fetching user data", http.StatusInternalServerError)
 		return
 	}
@@ -93,6 +91,7 @@ func StorePushTokenHandler(w http.ResponseWriter, r *http.Request) {
 		UserID        string `json:"userId"`
 		ExpoPushToken string `json:"expoPushToken"`
 	}
+
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request payload", http.StatusBadRequest)
 		return
@@ -112,17 +111,36 @@ func StorePushTokenHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	collection := db.GetCollection("gridlyapp", "university_users") // or "high_school_users"
-	filter := bson.M{"_id": userID}
+	// Define the update operation
 	update := bson.M{"$set": bson.M{"expoPushToken": req.ExpoPushToken}}
 	opts := options.Update().SetUpsert(true)
-	result, err := collection.UpdateOne(ctx, filter, update, opts)
+
+	universityUsersCollection := db.GetCollection("gridlyapp", "university_users")
+	highSchoolUsersCollection := db.GetCollection("gridlyapp", "highschool_users")
+
+	// Try updating in university_users
+	filter := bson.M{"_id": userID}
+	result, err := universityUsersCollection.UpdateOne(ctx, filter, update, opts)
 	if err != nil {
-		log.Printf("Error updating push token: %v", err)
+		log.Printf("Error updating push token in university_users: %v", err)
 		http.Error(w, "Failed to update push token", http.StatusInternalServerError)
 		return
 	}
+	if result.MatchedCount == 0 {
+		result, err = highSchoolUsersCollection.UpdateOne(ctx, filter, update, opts)
+		if err != nil {
+			log.Printf("Error updating push token in highschool_users: %v", err)
+			http.Error(w, "Failed to update push token", http.StatusInternalServerError)
+			return
+		}
 
-	log.Printf("Update result: %+v", result)
+		// If user is not found in either collection, return an error
+		if result.MatchedCount == 0 {
+			http.Error(w, "User not found in any collection", http.StatusNotFound)
+			return
+		}
+	}
+
+	log.Printf("Push token updated successfully for user %s", req.UserID)
 	json.NewEncoder(w).Encode(map[string]string{"message": "Push token stored successfully"})
 }
