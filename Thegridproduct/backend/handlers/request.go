@@ -46,8 +46,7 @@ func CreateProductRequestHandler(w http.ResponseWriter, r *http.Request) {
 	err = userCollection.FindOne(ctx, bson.M{"_id": userObjID}).Decode(&user)
 
 	if err == mongo.ErrNoDocuments {
-		// 🔥 If not found in university_users, check high_school_users
-		userCollection = db.GetCollection("gridlyapp", "high_school_users")
+		userCollection = db.GetCollection("gridlyapp", "highschool_users")
 		err = userCollection.FindOne(ctx, bson.M{"_id": userObjID}).Decode(&user)
 	}
 
@@ -173,7 +172,7 @@ func GetAllOtherProductRequestsHandler(w http.ResponseWriter, r *http.Request) {
 	err = userCollection.FindOne(ctx, bson.M{"_id": userObjID}).Decode(&user)
 
 	if err == mongo.ErrNoDocuments {
-		userCollection = db.GetCollection("gridlyapp", "high_school_users")
+		userCollection = db.GetCollection("gridlyapp", "highschool_users")
 		err = userCollection.FindOne(ctx, bson.M{"_id": userObjID}).Decode(&user)
 	}
 
