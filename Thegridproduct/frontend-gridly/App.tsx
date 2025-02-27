@@ -39,6 +39,7 @@ import ActivityScreen from "./ActivityScreen";
 import EditProduct from "./EditProductScreen";
 import MessagingScreen from "./MessagingScreen";
 import CartScreen from "./CartScreen";
+import GetInTouch from "./getintouch";
 import AccountScreen from "./AccountScreen";
 import JobDetails from "./JobDetails";
 import RequestProduct from "./RequestProduct";
@@ -132,7 +133,8 @@ const PushNotificationSetup: React.FC = () => {
 
 // Define UserMenuScreen since it was missing
 const UserMenuScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
-  const { clearUser, firstName, lastName, institution, studentType } = useContext(UserContext);
+  const { clearUser, firstName, lastName, institution, studentType } =
+    useContext(UserContext);
 
   const handleLogout = async () => {
     try {
@@ -146,7 +148,10 @@ const UserMenuScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   return (
     <View style={styles.fullScreenMenuContainer}>
       <View style={styles.fullScreenMenuHeader}>
-        <TouchableOpacity onPress={() => navigation.goBack()} accessibilityLabel="Close User Menu">
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          accessibilityLabel="Close User Menu"
+        >
           <Ionicons name="close" size={24} color="#FFFFFF" />
         </TouchableOpacity>
       </View>
@@ -154,14 +159,20 @@ const UserMenuScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         <View style={styles.bottomSheetUserInfo}>
           <View style={styles.bottomSheetAvatar}>
             <Text style={styles.bottomSheetAvatarText}>
-              {firstName && firstName.length > 0 ? firstName.charAt(0).toUpperCase() : "?"}
-              {lastName && lastName.length > 0 ? lastName.charAt(0).toUpperCase() : "?"}
+              {firstName && firstName.length > 0
+                ? firstName.charAt(0).toUpperCase()
+                : "?"}
+              {lastName && lastName.length > 0
+                ? lastName.charAt(0).toUpperCase()
+                : "?"}
             </Text>
           </View>
           <Text style={styles.bottomSheetUserName}>
             {firstName} {lastName}
           </Text>
-          {institution && <Text style={styles.bottomSheetUserInstitution}>{institution}</Text>}
+          {institution && (
+            <Text style={styles.bottomSheetUserInstitution}>{institution}</Text>
+          )}
           {studentType && (
             <Text style={styles.bottomSheetUserInstitution}>
               {studentType.charAt(0).toUpperCase() + studentType.slice(1)}
@@ -169,24 +180,53 @@ const UserMenuScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           )}
         </View>
         <View style={styles.bottomSheetOptions}>
-          <TouchableOpacity style={styles.bottomSheetOption} onPress={handleLogout}>
-            <Ionicons name="log-out-outline" size={20} color="#FFFFFF" style={{ marginRight: 10 }} />
+          <TouchableOpacity
+            style={styles.bottomSheetOption}
+            onPress={handleLogout}
+          >
+            <Ionicons
+              name="log-out-outline"
+              size={20}
+              color="#FFFFFF"
+              style={{ marginRight: 10 }}
+            />
             <Text style={styles.bottomSheetOptionText}>Logout</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.bottomSheetOption}
             onPress={() => navigation.navigate("TermsOfService")}
           >
-            <Ionicons name="document-text-outline" size={20} color="#FFFFFF" style={{ marginRight: 10 }} />
+            <Ionicons
+              name="document-text-outline"
+              size={20}
+              color="#FFFFFF"
+              style={{ marginRight: 10 }}
+            />
             <Text style={styles.bottomSheetOptionText}>View Terms of Use</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.bottomSheetOption} onPress={() => navigation.navigate("Account")}>
-            <Ionicons name="person-circle-outline" size={20} color="#FFFFFF" style={{ marginRight: 10 }} />
+          <TouchableOpacity
+            style={styles.bottomSheetOption}
+            onPress={() => navigation.navigate("Account")}
+          >
+            <Ionicons
+              name="person-circle-outline"
+              size={20}
+              color="#FFFFFF"
+              style={{ marginRight: 10 }}
+            />
             <Text style={styles.bottomSheetOptionText}>My Account</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.bottomSheetOption} onPress={() => navigation.navigate("LikedItems")}>
-            <Ionicons name="heart-outline" size={20} color="#FFFFFF" style={{ marginRight: 10 }} />
-            <Text style={styles.bottomSheetOptionText}>Liked Items</Text>
+          <TouchableOpacity
+            style={styles.bottomSheetOption}
+            onPress={() => navigation.navigate("GetInTouch")}
+          >
+            <Ionicons
+              name="mail-outline"
+              size={20}
+              color="#FFFFFF"
+              style={{ marginRight: 10 }}
+            />
+            <Text style={styles.bottomSheetOptionText}>Get in Touch</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -197,7 +237,8 @@ const UserMenuScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 // Define LikedItemsScreen if not already defined elsewhere
 const LikedItemsScreen: React.FC = () => {
   const { favorites, allProducts } = useContext<any>(UserContext);
-  const likedProducts = allProducts?.filter((p: any) => favorites?.includes(p.id)) || [];
+  const likedProducts =
+    allProducts?.filter((p: any) => favorites?.includes(p.id)) || [];
 
   return (
     <View style={styles.screenContainer}>
@@ -211,7 +252,9 @@ const LikedItemsScreen: React.FC = () => {
           {likedProducts.map((product: any) => (
             <View key={product.id} style={styles.likedItem}>
               <Text style={styles.likedItemTitle}>{product.title}</Text>
-              <Text style={styles.likedItemPrice}>${product.price.toFixed(2)}</Text>
+              <Text style={styles.likedItemPrice}>
+                ${product.price.toFixed(2)}
+              </Text>
             </View>
           ))}
         </ScrollView>
@@ -273,7 +316,11 @@ const UserAvatar: React.FC<{
     lastName?.charAt(0).toUpperCase() || "?"
   }`;
   return (
-    <TouchableOpacity onPress={onPress} style={styles.userAvatar} accessibilityLabel="Open User Menu">
+    <TouchableOpacity
+      onPress={onPress}
+      style={styles.userAvatar}
+      accessibilityLabel="Open User Menu"
+    >
       <Text style={styles.userAvatarText}>{initials}</Text>
     </TouchableOpacity>
   );
@@ -285,10 +332,18 @@ const HeaderRightComponent = (
   lastName?: string
 ) => (
   <View style={styles.headerRightContainer}>
-    <TouchableOpacity onPress={() => navigation.navigate("Cart")} style={styles.headerIcon} accessibilityLabel="Go to Cart">
+    <TouchableOpacity
+      onPress={() => navigation.navigate("Cart")}
+      style={styles.headerIcon}
+      accessibilityLabel="Go to Cart"
+    >
       <Ionicons name="cart-outline" size={26} color="#FFFFFF" />
     </TouchableOpacity>
-    <UserAvatar firstName={firstName} lastName={lastName} onPress={() => navigation.navigate("UserMenu")} />
+    <UserAvatar
+      firstName={firstName}
+      lastName={lastName}
+      onPress={() => navigation.navigate("UserMenu")}
+    />
   </View>
 );
 
@@ -303,7 +358,11 @@ const getHeaderOptions = (
   headerRight: () => HeaderRightComponent(navigation, firstName, lastName),
   headerLeft: showBackButton
     ? () => (
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerLeftButton} accessibilityLabel="Go Back">
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.headerLeftButton}
+          accessibilityLabel="Go Back"
+        >
           <Icon name="arrow-back" size={24} color="#FFFFFF" />
         </TouchableOpacity>
       )
@@ -347,48 +406,73 @@ const AppNavigator: React.FC<AppNavigatorProps> = ({ firstRender }) => {
             options={({ navigation }) => ({
               headerTransparent: true,
               headerTitle: () => <HeaderTitleWithLogo title="Gridly" />,
-              headerRight: () => HeaderRightComponent(navigation, firstName, lastName),
+              headerRight: () =>
+                HeaderRightComponent(navigation, firstName, lastName),
             })}
           />
           <Stack.Screen
             name="Jobs"
             component={JobsScreen}
-            options={({ navigation }) => getHeaderOptions(navigation, firstName, lastName)}
+            options={({ navigation }) =>
+              getHeaderOptions(navigation, firstName, lastName)
+            }
           />
           <Stack.Screen
             name="AddProduct"
             component={AddProductScreen}
-            options={({ navigation }) => getHeaderOptions(navigation, firstName, lastName, true, true)}
+            options={({ navigation }) =>
+              getHeaderOptions(navigation, firstName, lastName, true, true)
+            }
           />
           <Stack.Screen
             name="AddGig"
             component={AddGigScreen}
-            options={({ navigation }) => getHeaderOptions(navigation, firstName, lastName, true, true)}
+            options={({ navigation }) =>
+              getHeaderOptions(navigation, firstName, lastName, true, true)
+            }
           />
           <Stack.Screen
             name="Activity"
             component={ActivityScreen}
-            options={({ navigation }) => getHeaderOptions(navigation, firstName, lastName)}
+            options={({ navigation }) =>
+              getHeaderOptions(navigation, firstName, lastName)
+            }
           />
           <Stack.Screen
             name="EditProduct"
             component={EditProduct}
-            options={({ navigation }) => getHeaderOptions(navigation, firstName, lastName, true, true)}
+            options={({ navigation }) =>
+              getHeaderOptions(navigation, firstName, lastName, true, true)
+            }
           />
           <Stack.Screen
             name="Messaging"
             component={MessagingScreen}
-            options={({ navigation }) => getHeaderOptions(navigation, firstName, lastName)}
+            options={({ navigation }) =>
+              getHeaderOptions(navigation, firstName, lastName)
+            }
           />
           <Stack.Screen
             name="Cart"
             component={CartScreen}
-            options={({ navigation }) => getHeaderOptions(navigation, firstName, lastName, true, true)}
+            options={({ navigation }) =>
+              getHeaderOptions(navigation, firstName, lastName, true, true)
+            }
           />
+          <Stack.Screen
+            name="GetInTouch"
+            component={GetInTouch}
+            options={({ navigation }) =>
+              getHeaderOptions(navigation, firstName, lastName, true, true)
+            }
+          />
+
           <Stack.Screen
             name="Account"
             component={AccountScreen}
-            options={({ navigation }) => getHeaderOptions(navigation, firstName, lastName, true, true)}
+            options={({ navigation }) =>
+              getHeaderOptions(navigation, firstName, lastName, true, true)
+            }
           />
           <Stack.Screen
             name="UserMenu"
@@ -402,41 +486,71 @@ const AppNavigator: React.FC<AppNavigatorProps> = ({ firstRender }) => {
           <Stack.Screen
             name="TermsOfService"
             component={TermsOfServiceContent}
-            options={({ navigation }) => getHeaderOptions(navigation, firstName, lastName, true, true)}
+            options={({ navigation }) =>
+              getHeaderOptions(navigation, firstName, lastName, true, true)
+            }
           />
           <Stack.Screen
             name="LikedItems"
             component={LikedItemsScreen}
-            options={({ navigation }) => getHeaderOptions(navigation, firstName, lastName, true, true)}
+            options={({ navigation }) =>
+              getHeaderOptions(navigation, firstName, lastName, true, true)
+            }
           />
           <Stack.Screen
             name="JobDetail"
             component={JobDetails}
-            options={({ navigation }) => getHeaderOptions(navigation, firstName, lastName, true, true)}
+            options={({ navigation }) =>
+              getHeaderOptions(navigation, firstName, lastName, true, true)
+            }
           />
           <Stack.Screen
             name="RequestProduct"
             component={RequestProduct}
-            options={({ navigation }) => getHeaderOptions(navigation, firstName, lastName, true, true)}
+            options={({ navigation }) =>
+              getHeaderOptions(navigation, firstName, lastName, true, true)
+            }
           />
           <Stack.Screen
             name="RequestedProductsPage"
             component={RequestedProductsPage}
-            options={({ navigation }) => getHeaderOptions(navigation, firstName, lastName, true, true)}
+            options={({ navigation }) =>
+              getHeaderOptions(navigation, firstName, lastName, true, true)
+            }
           />
         </>
       ) : (
         <>
           {!firstRender ? (
             <>
-              <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
-              <Stack.Screen name="Verification" component={VerificationScreen} options={{ headerShown: false }} />
+              <Stack.Screen
+                name="Login"
+                component={LoginScreen}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen
+                name="Verification"
+                component={VerificationScreen}
+                options={{ headerShown: false }}
+              />
             </>
           ) : (
             <>
-              <Stack.Screen name="Demo" component={DemoScreen} options={{ headerShown: false }} />
-              <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
-              <Stack.Screen name="Verification" component={VerificationScreen} options={{ headerShown: false }} />
+              <Stack.Screen
+                name="Demo"
+                component={DemoScreen}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen
+                name="Login"
+                component={LoginScreen}
+                options={{ headerShown: false }}
+              />
+              <Stack.Screen
+                name="Verification"
+                component={VerificationScreen}
+                options={{ headerShown: false }}
+              />
             </>
           )}
         </>
@@ -460,7 +574,10 @@ const App: React.FC = () => {
       AsyncStorage.setItem("appState", nextAppState);
     };
 
-    const appStateListener = AppState.addEventListener("change", handleAppStateChange);
+    const appStateListener = AppState.addEventListener(
+      "change",
+      handleAppStateChange
+    );
 
     return () => {
       appStateListener.remove();
