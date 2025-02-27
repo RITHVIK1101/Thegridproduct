@@ -58,7 +58,6 @@ import { RootStackParamList } from "./navigationTypes";
 import MessageReplyHandler from "./MessageReplyHandler";
 import GestureRecognizer from "react-native-swipe-gestures"; // Import swipe gesture
 
-
 type Chat = Conversation & { latestSenderId?: string; sold?: boolean };
 type Request = {
   requestId: string;
@@ -122,12 +121,13 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
   const [requestPopupMessage, setRequestPopupMessage] = useState<string>("");
   const [hasNewIncomingRequests, setHasNewIncomingRequests] =
     useState<boolean>(false);
-  const [unreadCounts, setUnreadCounts] = useState<{ [key: string]: number }>({});
+  const [unreadCounts, setUnreadCounts] = useState<{ [key: string]: number }>(
+    {}
+  );
   const [replyToMessage, setReplyToMessage] = useState<{
     content: string;
     senderName: string;
   } | null>(null);
-  
 
   const { userId, token } = useContext(UserContext);
   const firestoreDB = getFirestore();
@@ -279,7 +279,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
   };
 
   const updateLastRead = async (chatId: string) => {
-
     const currentTime = new Date().toISOString();
     const chatDocRef = doc(firestoreDB, "chatRooms", chatId);
     try {
@@ -290,20 +289,21 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     }
   };
 
-    // Function to handle swipe and set reply
-    const handleReply = (message: Message) => {
-      setReplyToMessage({
-        content: message.content,
-        senderName: message.senderId === userId ? "You" : selectedChat?.user.firstName || "User",
-      });
-    };
-    
+  // Function to handle swipe and set reply
+  const handleReply = (message: Message) => {
+    setReplyToMessage({
+      content: message.content,
+      senderName:
+        message.senderId === userId
+          ? "You"
+          : selectedChat?.user.firstName || "User",
+    });
+  };
 
   // Function to clear reply
   const cancelReply = () => {
     setReplyToMessage(null);
   };
-
 
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
@@ -461,7 +461,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       Alert.alert("Error", "Please enter a message.");
       return;
     }
-  
+
     // Construct message object with optional reply reference
     const messageContent = newMessage.trim();
     const newMessageObject = {
@@ -469,19 +469,25 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       senderId: userId,
       content: messageContent,
       timestamp: new Date().toISOString(),
-      replyTo: replyToMessage ? { 
-        content: replyToMessage.content, 
-        senderName: replyToMessage.senderName 
-      } : null, // Include reply reference if replying
+      replyTo: replyToMessage
+        ? {
+            content: replyToMessage.content,
+            senderName: replyToMessage.senderName,
+          }
+        : null, // Include reply reference if replying
     };
-  
+
     try {
       const chatDocRef = doc(firestoreDB, "chatRooms", selectedChat.chatID);
-      await setDoc(chatDocRef, { messages: arrayUnion(newMessageObject) }, { merge: true });
-  
+      await setDoc(
+        chatDocRef,
+        { messages: arrayUnion(newMessageObject) },
+        { merge: true }
+      );
+
       setNewMessage("");
       setReplyToMessage(null); // Clear reply after sending
-  
+
       setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
       }, 100);
@@ -490,7 +496,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       Alert.alert("Error", "Failed to send message.");
     }
   };
-  
 
   const handleImagePress = async () => {
     try {
@@ -799,27 +804,31 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
 
   const handleDoubleTap = (message: Message) => {
     if (tapCount === 1) {
-      setTapCount(0);  // Reset the tap count
-      handleReply(message);  // Reply to the message
+      setTapCount(0); // Reset the tap count
+      handleReply(message); // Reply to the message
     } else {
-      setTapCount(1);  // First tap
+      setTapCount(1); // First tap
       setTimeout(() => {
-        setTapCount(0);  // Reset after a short delay
-      }, 300);  // 300ms delay for double-tap
+        setTapCount(0); // Reset after a short delay
+      }, 300); // 300ms delay for double-tap
     }
   };
-  
+
   const renderMessage = ({ item }: { item: Message }) => {
     const isImageMessage = item.content.startsWith("[Image] ");
-    const imageUri = isImageMessage ? item.content.replace("[Image] ", "") : null;
+    const imageUri = isImageMessage
+      ? item.content.replace("[Image] ", "")
+      : null;
     const isCurrentUser = item.senderId === userId;
-  
+
     return (
       <TouchableOpacity onPress={() => handleDoubleTap(item)}>
         <View
           style={[
             styles.messageContainer,
-            isCurrentUser ? styles.myMessageContainer : styles.theirMessageContainer,
+            isCurrentUser
+              ? styles.myMessageContainer
+              : styles.theirMessageContainer,
           ]}
         >
           <View
@@ -830,40 +839,49 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
           >
             {/* Show reply message above if it exists */}
             {item.replyTo && (
-  <View style={styles.replyContainer}>
-    <Text style={styles.replySenderText}>{item.replyTo.senderName}:</Text>
-    <Text 
-  style={[
-    styles.originalMessage, 
-    isCurrentUser ? styles.myReplyText : styles.theirReplyText
-  ]}
->
-  {item.replyTo.content}
-</Text>
+              <View style={styles.replyContainer}>
+                <Text style={styles.replySenderText}>
+                  {item.replyTo.senderName}:
+                </Text>
+                <Text
+                  style={[
+                    styles.originalMessage,
+                    isCurrentUser ? styles.myReplyText : styles.theirReplyText,
+                  ]}
+                >
+                  {item.replyTo.content}
+                </Text>
 
-    <View style={styles.curvedArrow} />
-  </View>
-)}
+                <View style={styles.curvedArrow} />
+              </View>
+            )}
 
-  
             {/* Show image or normal text */}
             {isImageMessage ? (
-              <Image source={{ uri: imageUri! }} style={styles.messageImage} resizeMode="cover" />
+              <Image
+                source={{ uri: imageUri! }}
+                style={styles.messageImage}
+                resizeMode="cover"
+              />
             ) : (
               <Text
                 style={[
                   styles.messageText,
-                  isCurrentUser ? styles.myMessageTextColor : styles.theirMessageTextColor,
+                  isCurrentUser
+                    ? styles.myMessageTextColor
+                    : styles.theirMessageTextColor,
                 ]}
               >
                 {item.content}
               </Text>
             )}
-  
+
             <Text
               style={[
                 styles.messageTimestamp,
-                isCurrentUser ? styles.myTimestampColor : styles.theirTimestampColor,
+                isCurrentUser
+                  ? styles.myTimestampColor
+                  : styles.theirTimestampColor,
               ]}
             >
               {new Date(item.timestamp).toLocaleTimeString([], {
@@ -876,13 +894,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       </TouchableOpacity>
     );
   };
-  
-  
-  
-  
-  
-  
-  
 
   const handleDeleteChat = async () => {
     if (!selectedChat) return;
@@ -1009,6 +1020,12 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
     setReportModalVisible(true);
     setChatModalVisible(false);
   };
+
+  useEffect(() => {
+    if (reportModalVisible) {
+      console.log("Report modal is visible");
+    }
+  }, [reportModalVisible]);
 
   const fetchChatDetails = async (chatId: string) => {
     if (!chatId) {
@@ -1449,9 +1466,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                       onPress={handleReportPress}
                       style={styles.reportButton}
                       accessibilityLabel="Report User"
-                    >
-                      <Ionicons name="flag" size={24} color="#F08080" />
-                    </Pressable>
+                    ></Pressable>
                     {selectedChat?.referenceType === "product" &&
                       (selectedChat.sold ? (
                         <View style={styles.productActionButtons}>
@@ -1505,12 +1520,11 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
 
                 <View style={styles.inputBarContainer}>
                   <View style={styles.inputBarLine} />
-                  <MessageReplyHandler 
-  replyToMessage={replyToMessage} 
-  onCancelReply={cancelReply} 
-  setNewMessage={setNewMessage} // Now it's passed correctly
-/>
-
+                  <MessageReplyHandler
+                    replyToMessage={replyToMessage}
+                    onCancelReply={cancelReply}
+                    setNewMessage={setNewMessage} // Now it's passed correctly
+                  />
 
                   <View style={styles.inputContainer}>
                     <Pressable
@@ -2057,7 +2071,7 @@ const styles = StyleSheet.create({
   },
   myTimestampColor: { color: "#333333" },
   theirTimestampColor: { color: "#999999" },
-  
+
   messageImage: { width: 200, height: 200, borderRadius: 10, marginRight: 5 },
   inputBarContainer: { backgroundColor: "#000" },
   inputBarLine: { height: 1, backgroundColor: "#333333" },
@@ -2243,7 +2257,7 @@ const styles = StyleSheet.create({
   theirReplyText: {
     color: "#FFF", // Light text for incoming messages (background: dark)
   },
-  
+
   dropdownAbsoluteContainer: {
     backgroundColor: "#1E1E1E",
     marginHorizontal: 20,
@@ -2261,7 +2275,7 @@ const styles = StyleSheet.create({
     fontFamily: "HelveticaNeue",
     fontSize: 14,
   },
-  
+
   reportDescriptionInput: {
     backgroundColor: "#333",
     color: "#fff",
@@ -2305,12 +2319,12 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
   originalMessage: {
-    color: "#FFFFFF",  // Change reply message text color to black
+    color: "#FFFFFF", // Change reply message text color to black
     fontSize: 14,
     fontStyle: "italic",
     marginBottom: 2,
   },
-  
+
   curvedArrow: {
     width: 10,
     height: 10,
@@ -2323,7 +2337,7 @@ const styles = StyleSheet.create({
     left: -8,
     bottom: -5,
   },
-  
+
   originalMessage: {
     color: "#AAAAAA",
     fontSize: 14,
@@ -2336,7 +2350,7 @@ const styles = StyleSheet.create({
     marginTop: -5,
     fontWeight: "bold",
   },
-  
+
   modalContent: {
     backgroundColor: "#1E1E1E",
     padding: 30,
