@@ -649,9 +649,19 @@ const Dashboard: React.FC<DashboardProps> = () => {
 
   useFocusEffect(
     React.useCallback(() => {
+      fetchProducts();
       fetchLikedProducts();
     }, [token])
   );
+  
+  useEffect(() => {
+    fetchProducts();
+    fetchCart();
+    fetchUserInfo();
+    fetchLikedProducts();
+  }, []);
+  
+  
 
   const toggleFilterModal = () =>
     setIsFilterModalVisible(!isFilterModalVisible);
