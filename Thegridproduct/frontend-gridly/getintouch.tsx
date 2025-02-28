@@ -18,7 +18,7 @@ import { NGROK_URL } from "@env";
 import { UserContext } from "./UserContext";
 
 const contactOptions = [
-  { id: "report", label: "Report an Issue", icon: "alert-circle-outline" },
+  { id: "report", label: "Report Issue/User", icon: "alert-circle-outline" },
   { id: "talk", label: "Talk to Founders", icon: "chatbubbles-outline" },
   { id: "feedback", label: "Give Feedback", icon: "star-outline" },
   { id: "feature", label: "Suggest a Feature", icon: "bulb-outline" },
@@ -80,16 +80,7 @@ const GetInTouch: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={styles.backButton}
-        >
-          <Ionicons name="arrow-back" size={24} color="#BB86FC" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Get in Touch</Text>
-      </View>
+
 
       {/* Contact Options */}
       {!selectedOption ? (
@@ -168,7 +159,7 @@ const GetInTouch: React.FC = () => {
           <Text style={styles.label}>Description</Text>
           <TextInput
             style={styles.input}
-            placeholder="Describe your issue..."
+            placeholder="Type here..."
             placeholderTextColor="#AAAAAA"
             multiline
             value={description}
