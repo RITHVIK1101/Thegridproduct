@@ -111,36 +111,45 @@ func StorePushTokenHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
+	universityUsersCollection := db.GetCollection("gridlyapp", "university_users")
+	highSchoolUsersCollection := db.GetCollection("gridlyapp", "highschool_users")
+
 	// Define the update operation
 	update := bson.M{"$set": bson.M{"expoPushToken": req.ExpoPushToken}}
 	opts := options.Update().SetUpsert(true)
 
-	universityUsersCollection := db.GetCollection("gridlyapp", "university_users")
-	highSchoolUsersCollection := db.GetCollection("gridlyapp", "highschool_users")
-
-	// Try updating in university_users
-	filter := bson.M{"_id": userID}
-	result, err := universityUsersCollection.UpdateOne(ctx, filter, update, opts)
-	if err != nil {
-		log.Printf("Error updating push token in university_users: %v", err)
-		http.Error(w, "Failed to update push token", http.StatusInternalServerError)
+	// First, check if the user exists in university_users
+	var universityUser bson.M
+	err = universityUsersCollection.FindOne(ctx, bson.M{"_id": userID}).Decode(&universityUser)
+	if err == nil {
+		// User exists in university_users, update them there
+		_, err = universityUsersCollection.UpdateOne(ctx, bson.M{"_id": userID}, update, opts)
+		if err != nil {
+			log.Printf("Error updating push token in university_users: %v", err)
+			http.Error(w, "Failed to update push token", http.StatusInternalServerError)
+			return
+		}
+		log.Printf("Push token updated successfully in university_users for user %s", req.UserID)
+		json.NewEncoder(w).Encode(map[string]string{"message": "Push token stored successfully"})
 		return
 	}
-	if result.MatchedCount == 0 {
-		result, err = highSchoolUsersCollection.UpdateOne(ctx, filter, update, opts)
+
+	// If not found in university_users, check highschool_users
+	var highSchoolUser bson.M
+	err = highSchoolUsersCollection.FindOne(ctx, bson.M{"_id": userID}).Decode(&highSchoolUser)
+	if err == nil {
+		// User exists in highschool_users, update them there
+		_, err = highSchoolUsersCollection.UpdateOne(ctx, bson.M{"_id": userID}, update, opts)
 		if err != nil {
 			log.Printf("Error updating push token in highschool_users: %v", err)
 			http.Error(w, "Failed to update push token", http.StatusInternalServerError)
 			return
 		}
-
-		// If user is not found in either collection, return an error
-		if result.MatchedCount == 0 {
-			http.Error(w, "User not found in any collection", http.StatusNotFound)
-			return
-		}
+		log.Printf("Push token updated successfully in highschool_users for user %s", req.UserID)
+		json.NewEncoder(w).Encode(map[string]string{"message": "Push token stored successfully"})
+		return
 	}
 
-	log.Printf("Push token updated successfully for user %s", req.UserID)
-	json.NewEncoder(w).Encode(map[string]string{"message": "Push token stored successfully"})
+	// If user is found in neither collection
+	http.Error(w, "User not found in any collection", http.StatusNotFound)
 }
