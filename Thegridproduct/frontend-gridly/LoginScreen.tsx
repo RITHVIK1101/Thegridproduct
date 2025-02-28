@@ -300,8 +300,10 @@ const LoginScreen: React.FC = () => {
         onChangeText={setEmail}
         keyboardType="email-address"
         autoCapitalize="none"
-        autoComplete="email"
+        textContentType="username" // Prevents bouncing by keeping autofill suggestions static
+        autoComplete="email" // Helps autofill and keeps it visible
       />
+
       <View style={styles.inputContainer}>
         <TextInput
           style={styles.input}
