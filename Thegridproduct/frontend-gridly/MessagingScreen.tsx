@@ -56,6 +56,7 @@ import {
 } from "@react-navigation/native";
 import { RootStackParamList } from "./navigationTypes";
 import MessageReplyHandler from "./MessageReplyHandler";
+import AnimatedBackButton from "./AnimatedBackButton";
 import GestureRecognizer from "react-native-swipe-gestures"; // Import swipe gesture
 
 type Chat = Conversation & { latestSenderId?: string; sold?: boolean };
@@ -747,11 +748,13 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         ? "Product Request Name: "
         : "Unnamed Item";
     return (
-      <Pressable
-        style={styles.chatItemContainer}
-        onPress={() => openChat(item)}
-        accessibilityLabel={`Open chat with ${item.user.firstName} ${item.user.lastName}`}
-      >
+<Pressable
+  style={styles.chatItemContainer}
+  onPressIn={() => openChat(item)}
+  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+  accessibilityLabel={`Open chat with ${item.user.firstName} ${item.user.lastName}`}
+>
+
         <View style={styles.chatItem}>
           <View style={styles.profilePicWrapper}>
             <View style={styles.profilePicPlaceholder}>
@@ -1430,13 +1433,8 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
               >
                 {selectedChat && (
                   <View style={styles.enhancedChatHeader}>
-                    <Pressable
-                      onPress={handleBackFromChat}
-                      style={styles.backButton}
-                      accessibilityLabel="Go Back"
-                    >
-                      <Ionicons name="arrow-back" size={24} color="#BB86FC" />
-                    </Pressable>
+<AnimatedBackButton onPress={handleBackFromChat} />
+
                     <View style={styles.chatHeaderInfo}>
                       <View style={styles.headerProfilePicPlaceholder}>
                         <Text style={styles.headerProfilePicInitials}>
@@ -1571,16 +1569,10 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
           <View style={[styles.modalSafeArea, { backgroundColor: "#000" }]}>
             <SafeAreaView style={{ flex: 1 }}>
               <View style={styles.enhancedChatHeader}>
-                <Pressable
-                  onPress={() => {
-                    setIsImagePreviewModalVisible(false);
-                    setSelectedImageUri(null);
-                  }}
-                  style={styles.backButton}
-                  accessibilityLabel="Go Back"
-                >
-                  <Ionicons name="arrow-back" size={24} color="#BB86FC" />
-                </Pressable>
+
+
+<AnimatedBackButton onPress={handleBackFromChat} />
+
                 <View style={{ flex: 1 }} />
                 <Pressable
                   onPress={confirmAddImage}
@@ -2009,7 +2001,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   backButton: { marginRight: 10 },
-  chatHeaderInfo: { flexDirection: "row", alignItems: "center", flex: 1 },
+  chatHeaderInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    marginLeft: 15, // Increase this to shift everything to the right
+  },
   headerProfilePicPlaceholder: {
     width: 40,
     height: 40,
