@@ -747,14 +747,15 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         : item.referenceType === "product_request"
         ? "Product Request Name: "
         : "Unnamed Item";
+  
     return (
-<Pressable
-  style={styles.chatItemContainer}
-  onPressIn={() => openChat(item)}
-  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-  accessibilityLabel={`Open chat with ${item.user.firstName} ${item.user.lastName}`}
->
-
+      <Pressable
+        style={styles.chatItemContainer}
+        onPress={() => openChat(item)}
+        delayPressIn={100} // Delays press to prevent accidental opening
+        hitSlop={{ top: 5, bottom: 5, left: 10, right: 10 }} // Prevents unwanted touches
+        accessibilityLabel={`Open chat with ${item.user.firstName} ${item.user.lastName}`}
+      >
         <View style={styles.chatItem}>
           <View style={styles.profilePicWrapper}>
             <View style={styles.profilePicPlaceholder}>
@@ -802,6 +803,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       </Pressable>
     );
   };
+  
 
   const [tapCount, setTapCount] = useState(0);
 
