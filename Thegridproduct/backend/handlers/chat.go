@@ -476,6 +476,16 @@ func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 			referenceTitle = gig.Title
 			isAnonymous = gig.IsAnonymous
 
+			// ✅ Update `requestedBy` field in the `gigs` collection
+			_, err = gigsCol.UpdateOne(sessCtx,
+				bson.M{"_id": referenceObjectID},
+				bson.M{"$addToSet": bson.M{"requestedBy": buyerObjectID}}, // Ensures no duplicate entries
+			)
+			if err != nil {
+				log.Printf("Error updating requestedBy field for gig: %v", err)
+				return nil, err
+			}
+
 		case "product":
 			productsCol := db.GetCollection("gridlyapp", "products")
 			var product models.Product
@@ -517,6 +527,16 @@ func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 				return nil, &AppError{Message: "Product request not found", StatusCode: http.StatusNotFound}
 			}
 			referenceTitle = productRequest.ProductName
+
+			// ✅ Update `requestedBy` field in the `product_requests` collection
+			_, err = requestsCol.UpdateOne(sessCtx,
+				bson.M{"_id": referenceObjectID},
+				bson.M{"$addToSet": bson.M{"requestedBy": buyerObjectID}}, // Ensures no duplicate entries
+			)
+			if err != nil {
+				log.Printf("Error updating requestedBy field for product request: %v", err)
+				return nil, err
+			}
 		}
 
 		// Check if a pending chat request already exists for this reference by the buyer
@@ -544,7 +564,6 @@ func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Fetch seller details to get the Expo push token.
-		// (Assuming seller is stored in the "university_users" collection.)
 		usersCol := db.GetCollection("gridlyapp", "university_users")
 		var seller models.User
 		err = usersCol.FindOne(sessCtx, bson.M{"_id": sellerObjectID}).Decode(&seller)
@@ -565,8 +584,6 @@ func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 				if err := SendPushNotification(seller.ExpoPushToken, notificationTitle, "Someone has requested to chat with you!", data); err != nil {
 					log.Printf("Error sending push notification: %v", err)
 				}
-			} else {
-				log.Println("Seller does not have a push token; skipping notification.")
 			}
 		}
 
@@ -577,11 +594,6 @@ func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 
 	res, err := session.WithTransaction(context.Background(), callback)
 	if err != nil {
-		if appErr, ok := err.(*AppError); ok {
-			WriteJSONError(w, appErr.Message, appErr.StatusCode)
-			return
-		}
-		log.Printf("Transaction error in RequestChatHandler: %v", err)
 		WriteJSONError(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
