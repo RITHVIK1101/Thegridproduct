@@ -124,6 +124,7 @@ func main() {
 	protected.HandleFunc("/chats/{chatId}/{userId}/unread", handlers.GetUnreadMessagesCountHandler).Methods("GET")
 	protected.HandleFunc("/report", handlers.ReportChatHandler).Methods("POST")
 	protected.HandleFunc("/ai/process", handlers.ProcessAIInput).Methods("POST")
+	protected.HandleFunc("/chat_requests/{requestId}", handlers.DeleteChatRequestHandler).Methods("DELETE")
 	protected.HandleFunc("/general-report", handlers.GeneralReportHandler).Methods("POST")
 
 	router.NotFoundHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

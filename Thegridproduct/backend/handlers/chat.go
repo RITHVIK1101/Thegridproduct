@@ -1324,3 +1324,100 @@ func GetUnreadMessagesCountHandler(w http.ResponseWriter, r *http.Request) {
 	// Return the unread count for this specific chat room
 	WriteJSON(w, map[string]int{"unreadCount": unreadCount}, http.StatusOK)
 }
+func DeleteChatRequestHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method != http.MethodDelete {
+		WriteJSONError(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Extract request ID from the URL
+	vars := mux.Vars(r)
+	requestIDStr := vars["requestId"]
+	if requestIDStr == "" {
+		WriteJSONError(w, "Request ID is required", http.StatusBadRequest)
+		return
+	}
+
+	// Convert requestID to ObjectID
+	requestObjID, err := primitive.ObjectIDFromHex(requestIDStr)
+	if err != nil {
+		WriteJSONError(w, "Invalid Request ID format", http.StatusBadRequest)
+		return
+	}
+
+	session, err := db.MongoDBClient.StartSession()
+	if err != nil {
+		log.Printf("Failed to start MongoDB session: %v", err)
+		WriteJSONError(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	defer session.EndSession(context.Background())
+
+	callback := func(sessCtx mongo.SessionContext) (interface{}, error) {
+		chatRequests := db.GetCollection("gridlyapp", "chat_requests")
+
+		// Fetch the chat request to get its reference information
+		var chatReq models.ChatRequest
+		err := chatRequests.FindOne(sessCtx, bson.M{"_id": requestObjID}).Decode(&chatReq)
+		if err != nil {
+			if err == mongo.ErrNoDocuments {
+				return nil, &AppError{Message: "Chat request not found", StatusCode: http.StatusNotFound}
+			}
+			return nil, err
+		}
+
+		// Ensure the request is still pending before allowing deletion
+		if chatReq.Status != models.ChatRequestStatusPending {
+			return nil, &AppError{Message: "Chat request is not pending and cannot be deleted", StatusCode: http.StatusBadRequest}
+		}
+
+		// Delete the chat request
+		_, err = chatRequests.DeleteOne(sessCtx, bson.M{"_id": requestObjID})
+		if err != nil {
+			return nil, err
+		}
+
+		// Determine the correct collection based on referenceType
+		var refCollection *mongo.Collection
+		switch chatReq.ReferenceType {
+		case "product":
+			refCollection = db.GetCollection("gridlyapp", "products")
+		case "gig":
+			refCollection = db.GetCollection("gridlyapp", "gigs")
+		case "product_request":
+			refCollection = db.GetCollection("gridlyapp", "product_requests")
+		default:
+			log.Printf("Unknown referenceType: %s", chatReq.ReferenceType)
+			return nil, &AppError{Message: "Invalid reference type", StatusCode: http.StatusInternalServerError}
+		}
+
+		// Decrease chat count for the referenced item
+		_, err = refCollection.UpdateOne(sessCtx,
+			bson.M{"_id": chatReq.ReferenceID},
+			bson.M{"$inc": bson.M{"chatCount": -1}},
+		)
+		if err != nil {
+			log.Printf("Error updating chatCount for referenceID %s: %v", chatReq.ReferenceID.Hex(), err)
+		}
+
+		return nil, nil
+	}
+
+	_, err = session.WithTransaction(context.Background(), callback)
+	if err != nil {
+		if appErr, ok := err.(*AppError); ok {
+			WriteJSONError(w, appErr.Message, appErr.StatusCode)
+			return
+		}
+		log.Printf("Transaction error in DeleteChatRequestHandler: %v", err)
+		WriteJSONError(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	// Return success response
+	WriteJSON(w, map[string]string{
+		"message": "Chat request deleted successfully",
+	}, http.StatusOK)
+}
