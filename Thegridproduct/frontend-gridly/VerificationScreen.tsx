@@ -15,6 +15,7 @@ import { RootStackParamList } from "./navigationTypes";
 import { NGROK_URL } from "@env";
 import * as SecureStore from "expo-secure-store";
 import { UserContext } from "./UserContext";
+import Ionicons from "react-native-vector-icons/Ionicons";
 
 type VerificationScreenRouteProp = RouteProp<
   RootStackParamList,
@@ -95,8 +96,6 @@ const VerificationScreen: React.FC = () => {
         firstName: data.firstName,
         lastName: data.lastName,
       });
-
-
     } catch (err) {
       setError("An error occurred. Please try again.");
     }
@@ -108,6 +107,13 @@ const VerificationScreen: React.FC = () => {
       <Text style={styles.subtitle}>
         Enter the 6-digit code sent to <Text style={styles.bold}>{email}</Text>
       </Text>
+      <View style={styles.warningContainer}>
+        <Ionicons name="alert-circle-outline" size={16} color="#A78BFA" />
+        <Text style={styles.warningText}>
+          Make sure to check your junk/spam folder.
+        </Text>
+      </View>
+
       <View style={styles.inputContainer}>
         {codeDigits.map((digit, index) => (
           <TextInput
@@ -185,6 +191,23 @@ const styles = StyleSheet.create({
   error: {
     color: "#FF6B6B",
     marginBottom: 10,
+  },
+  warningContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 15,
+    backgroundColor: "rgba(167, 139, 250, 0.1)", // Light purple background
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+  },
+
+  warningText: {
+    color: "#A78BFA", // Purple text
+    fontSize: 14,
+    marginLeft: 6,
+    fontWeight: "500",
+    textAlign: "center",
   },
 });
 
