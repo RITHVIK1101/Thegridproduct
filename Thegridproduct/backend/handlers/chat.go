@@ -476,10 +476,9 @@ func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 			referenceTitle = gig.Title
 			isAnonymous = gig.IsAnonymous
 
-			// ✅ Update `requestedBy` field in the `gigs` collection
 			_, err = gigsCol.UpdateOne(sessCtx,
 				bson.M{"_id": referenceObjectID},
-				bson.M{"$addToSet": bson.M{"requestedBy": buyerObjectID}}, // Ensures no duplicate entries
+				bson.M{"$addToSet": bson.M{"requestedBy": buyerObjectID}},
 			)
 			if err != nil {
 				log.Printf("Error updating requestedBy field for gig: %v", err)
@@ -495,22 +494,20 @@ func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			referenceTitle = product.Title
 
-			// ✅ Update `requestedBy` field in the `products` collection
 			_, err = productsCol.UpdateOne(sessCtx,
 				bson.M{"_id": referenceObjectID},
-				bson.M{"$addToSet": bson.M{"requestedBy": buyerObjectID}}, // Ensures no duplicate entries
+				bson.M{"$addToSet": bson.M{"requestedBy": buyerObjectID}},
 			)
 			if err != nil {
 				log.Printf("Error updating requestedBy field for product: %v", err)
 				return nil, err
 			}
 
-			// ✅ Remove the product from the buyer's cart
 			cartCollection := db.GetCollection("gridlyapp", "carts")
 			_, err = cartCollection.UpdateOne(sessCtx,
 				bson.M{"userId": buyerObjectID},
 				bson.M{
-					"$pull": bson.M{"items": bson.M{"productId": referenceObjectID}}, // Removes product from cart
+					"$pull": bson.M{"items": bson.M{"productId": referenceObjectID}},
 					"$set":  bson.M{"updatedAt": time.Now()},
 				},
 			)
@@ -528,10 +525,9 @@ func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			referenceTitle = productRequest.ProductName
 
-			// ✅ Update `requestedBy` field in the `product_requests` collection
 			_, err = requestsCol.UpdateOne(sessCtx,
 				bson.M{"_id": referenceObjectID},
-				bson.M{"$addToSet": bson.M{"requestedBy": buyerObjectID}}, // Ensures no duplicate entries
+				bson.M{"$addToSet": bson.M{"requestedBy": buyerObjectID}},
 			)
 			if err != nil {
 				log.Printf("Error updating requestedBy field for product request: %v", err)
@@ -539,7 +535,7 @@ func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		// Check if a pending chat request already exists for this reference by the buyer
+		// Check if a pending chat request already exists
 		var existingRequest models.ChatRequest
 		findErr := chatRequests.FindOne(sessCtx, bson.M{
 			"referenceId":   referenceObjectID,
@@ -567,24 +563,36 @@ func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 		usersCol := db.GetCollection("gridlyapp", "university_users")
 		var seller models.User
 		err = usersCol.FindOne(sessCtx, bson.M{"_id": sellerObjectID}).Decode(&seller)
+
 		if err != nil {
-			log.Printf("Error fetching seller details: %v", err)
-		} else {
-			if seller.ExpoPushToken != "" {
-				notificationTitle := "New Chat Request"
-				if isAnonymous {
-					notificationTitle = "Anonymous Chat Request"
-				}
-				data := map[string]string{
-					"type":          "chat_request",
-					"referenceId":   req.ReferenceID,
-					"referenceType": req.ReferenceType,
-				}
-				// Send push notification to seller.
-				if err := SendPushNotification(seller.ExpoPushToken, notificationTitle, "Someone has requested to chat with you!", data); err != nil {
-					log.Printf("Error sending push notification: %v", err)
-				}
+			log.Printf("❌ Seller not found in university_users. Checking highschool_users...")
+
+			// If not found, check highschool_users
+			usersCol = db.GetCollection("gridlyapp", "highschool_users")
+			err = usersCol.FindOne(sessCtx, bson.M{"_id": sellerObjectID}).Decode(&seller)
+			if err != nil {
+				log.Printf("❌ Seller not found in highschool_users either. No push notification will be sent.")
+				return map[string]interface{}{"message": "Chat request sent successfully"}, nil
 			}
+		}
+
+		// If seller has a push token, send notification
+		if seller.ExpoPushToken != "" {
+			notificationTitle := "New Chat Request"
+			if isAnonymous {
+				notificationTitle = "Anonymous Chat Request"
+			}
+			data := map[string]string{
+				"type":          "chat_request",
+				"referenceId":   req.ReferenceID,
+				"referenceType": req.ReferenceType,
+			}
+			// Send push notification to seller.
+			if err := SendPushNotification(seller.ExpoPushToken, notificationTitle, "Someone has requested to chat with you!", data); err != nil {
+				log.Printf("Error sending push notification: %v", err)
+			}
+		} else {
+			log.Println("Seller does not have a push token; skipping notification.")
 		}
 
 		return map[string]interface{}{
@@ -1050,43 +1058,53 @@ func TestSendMessageHandler(w http.ResponseWriter, r *http.Request) {
 	recipientObjID, err := primitive.ObjectIDFromHex(recipientID)
 	if err != nil {
 		log.Printf("Error converting recipient ID: %v", err)
-		// Even if we can't send a notification, we still want to return success for the message.
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(map[string]string{"status": "success"})
 		return
 	}
 
-	// Look up the recipient in MongoDB.
+	// Look up the recipient in university_users first.
 	usersCol := db.GetCollection("gridlyapp", "university_users")
 	var recipient models.User
 	err = usersCol.FindOne(ctx, bson.M{"_id": recipientObjID}).Decode(&recipient)
+
 	if err != nil {
-		log.Printf("Error fetching recipient details: %v", err)
-	} else {
-		if recipient.ExpoPushToken != "" {
-			// Prepare additional data for the push notification.
-			pushData := map[string]string{
-				"type":   "new_message",
-				"chatId": req.ChatID,
-			}
+		log.Printf("❌ Recipient not found in university_users. Checking highschool_users...")
 
-			// Look up the sender using db.GetUserByID.
-			sender, err := db.GetUserByID(req.SenderID)
-			senderName := "New Message" // fallback title
-			if err != nil {
-				log.Printf("Error fetching sender details: %v", err)
-			} else {
-				senderName = sender.FirstName + " " + sender.LastName
-			}
-
-			// Send the push notification with the sender's name as the title.
-			err = SendPushNotification(recipient.ExpoPushToken, senderName, req.Content, pushData)
-			if err != nil {
-				log.Printf("Error sending push notification: %v", err)
-			}
-		} else {
-			log.Println("Recipient does not have a push token; skipping notification.")
+		// If not found, check highschool_users
+		usersCol = db.GetCollection("gridlyapp", "highschool_users")
+		err = usersCol.FindOne(ctx, bson.M{"_id": recipientObjID}).Decode(&recipient)
+		if err != nil {
+			log.Printf("❌ Recipient not found in highschool_users either. No push notification will be sent.")
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(map[string]string{"status": "success"})
+			return
 		}
+	}
+
+	// If recipient has a push token, send the notification
+	if recipient.ExpoPushToken != "" {
+		pushData := map[string]string{
+			"type":   "new_message",
+			"chatId": req.ChatID,
+		}
+
+		// Look up the sender using db.GetUserByID.
+		sender, err := db.GetUserByID(req.SenderID)
+		senderName := "New Message"
+		if err == nil {
+			senderName = sender.FirstName + " " + sender.LastName
+		} else {
+			log.Printf("Error fetching sender details: %v", err)
+		}
+
+		// Send push notification
+		err = SendPushNotification(recipient.ExpoPushToken, senderName, req.Content, pushData)
+		if err != nil {
+			log.Printf("Error sending push notification: %v", err)
+		}
+	} else {
+		log.Println("Recipient does not have a push token; skipping notification.")
 	}
 
 	w.WriteHeader(http.StatusOK)
