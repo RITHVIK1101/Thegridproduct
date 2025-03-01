@@ -357,7 +357,6 @@ func VerifyEmailHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Check if the verification code has expired.
 	if time.Now().After(pendingUser.ExpiresAt) {
-		// Delete the expired pending record.
 		_, delErr := pendingCollection.DeleteOne(ctx, bson.M{"email": req.Email})
 		if delErr != nil {
 			log.Printf("Error deleting expired pending user: %v", delErr)
@@ -366,6 +365,7 @@ func VerifyEmailHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Create a new user object
 	newUser := models.User{
 		ID:          pendingUser.ID,
 		Email:       pendingUser.Email,
@@ -379,6 +379,7 @@ func VerifyEmailHandler(w http.ResponseWriter, r *http.Request) {
 		UpdatedAt:   time.Now(),
 	}
 
+	// Determine the correct collection
 	var collectionName string
 	if pendingUser.StudentType == StudentTypeUniversity {
 		collectionName = "university_users"
@@ -400,12 +401,22 @@ func VerifyEmailHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Error deleting pending user record: %v", delErr)
 	}
 
+	// 🔥 **Generate JWT Token**
+	tokenString, err := generateToken(newUser.ID, newUser.Institution, newUser.StudentType)
+	if err != nil {
+		log.Printf("Error generating token: %v", err)
+		WriteJSONError(w, "Could not generate token", http.StatusInternalServerError)
+		return
+	}
+
+	// 🔥 **Send Token in Response**
 	response := map[string]interface{}{
 		"message":     "Email verified successfully. Your account is now active.",
 		"userId":      newUser.ID.Hex(),
 		"institution": newUser.Institution,
 		"studentType": newUser.StudentType,
 		"profilePic":  newUser.ProfilePic,
+		"token":       tokenString, // ✅ Include the token
 	}
 
 	w.WriteHeader(http.StatusOK)
