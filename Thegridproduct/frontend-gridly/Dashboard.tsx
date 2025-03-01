@@ -971,47 +971,49 @@ const Dashboard: React.FC<DashboardProps> = () => {
             </View>
           )}
 
-          <Modal
-            visible={isDescriptionModalVisible}
-            animationType="slide"
-            transparent={true}
-            onRequestClose={() => setIsDescriptionModalVisible(false)}
-          >
-            <TouchableOpacity style={styles.centerModalOverlay} activeOpacity={1} onPressOut={() => setIsDescriptionModalVisible(false)}>
-              <View style={styles.descriptionModalContent}>
-                {selectedProduct && (
-                  <RNScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScrollContent}>
-                    <View style={styles.modalContentContainer}>
-                      <View style={{ alignItems: "center", width: "100%", marginBottom: 10 }}>
-                        <Text style={styles.modalTitle}>{selectedProduct?.title}</Text>
-                      </View>
-                      <View style={{ alignSelf: "flex-start", width: "100%" }}>
-                        <Text style={styles.detailText}>Condition: {selectedProduct?.quality}</Text>
-                        <Text style={styles.detailText}>Price: ${selectedProduct?.price.toFixed(2)}</Text>
-                      </View>
-                    </View>
-                    {selectedProduct.quality !== "New" && (
-                      <>
-                        {selectedProduct.rating && selectedProduct.rating > 0 && (
-                          <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
-                            <Text style={styles.detailText}>Rating: </Text>
-                            {[...Array(selectedProduct.rating)].map((_, i) => (
-                              <Ionicons key={i} name="star" size={16} color="#FFD700" />
-                            ))}
-                          </View>
-                        )}
-                      </>
-                    )}
-                    <Text style={styles.sectionHeader}>Description</Text>
-                    <Text style={styles.descriptionText}>{selectedProduct.description}</Text>
-                  </RNScrollView>
-                )}
-                <TouchableOpacity onPress={() => setIsDescriptionModalVisible(false)} style={styles.modalClose} accessibilityLabel="Close Details Modal">
-                  <Ionicons name="close-outline" size={24} color="#FFFFFF" />
-                </TouchableOpacity>
-              </View>
-            </TouchableOpacity>
-          </Modal>
+<Modal
+  visible={isDescriptionModalVisible}
+  animationType="slide"
+  transparent={true}
+  onRequestClose={() => setIsDescriptionModalVisible(false)}
+>
+  <TouchableOpacity style={styles.centerModalOverlay} activeOpacity={1} onPressOut={() => setIsDescriptionModalVisible(false)}>
+    <View style={styles.descriptionModalContent}>
+      {selectedProduct && (
+        <RNScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScrollContent}>
+          <View style={styles.modalContentContainer}>
+            <View style={{ alignItems: "center", width: "100%", marginBottom: 10 }}>
+              <Text style={styles.modalTitle}>{selectedProduct?.title}</Text>
+            </View>
+            <View style={{ alignSelf: "flex-start", width: "100%" }}>
+              <Text style={styles.detailText}>Condition: {selectedProduct?.quality}</Text>
+              <Text style={styles.detailText}>Price: ${selectedProduct?.price.toFixed(2)}</Text>
+              <Text style={styles.detailText}>Seller's Campus: {selectedProduct?.university}</Text> 
+            </View>
+          </View>
+          {selectedProduct.quality !== "New" && (
+            <>
+              {selectedProduct.rating && selectedProduct.rating > 0 && (
+                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
+                  <Text style={styles.detailText}>Rating: </Text>
+                  {[...Array(selectedProduct.rating)].map((_, i) => (
+                    <Ionicons key={i} name="star" size={16} color="#FFD700" />
+                  ))}
+                </View>
+              )}
+            </>
+          )}
+          <Text style={styles.sectionHeader}>Description</Text>
+          <Text style={styles.descriptionText}>{selectedProduct.description}</Text>
+        </RNScrollView>
+      )}
+      <TouchableOpacity onPress={() => setIsDescriptionModalVisible(false)} style={styles.modalClose} accessibilityLabel="Close Details Modal">
+        <Ionicons name="close-outline" size={24} color="#FFFFFF" />
+      </TouchableOpacity>
+    </View>
+  </TouchableOpacity>
+</Modal>
+
 
           <Modal
             visible={isFilterModalVisible}
