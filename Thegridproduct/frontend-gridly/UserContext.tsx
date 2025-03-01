@@ -1,4 +1,3 @@
-// UserContext.tsx
 import React, { createContext, useState, ReactNode, useEffect } from "react";
 import * as SecureStore from "expo-secure-store";
 import { NGROK_URL } from "@env";
@@ -15,6 +14,7 @@ interface User {
   lastName: string;
   institution: string;
   studentType: StudentType;
+  profilePic: string; // ✅ Added profilePic
 }
 
 interface UserProfile {
@@ -22,6 +22,7 @@ interface UserProfile {
   lastName: string;
   institution: string;
   studentType: StudentType;
+  profilePic: string; // ✅ Added profilePic
 }
 
 interface UserContextProps {
@@ -31,11 +32,11 @@ interface UserContextProps {
   lastName: string;
   institution: string;
   studentType: StudentType | null;
+  profilePic: string | null; // ✅ Added profilePic state
   likedProducts: string[];
   setLikedProducts: React.Dispatch<React.SetStateAction<string[]>>;
   isLoading: boolean;
 
-  // NEW: Expo push token
   expoPushToken: string | null;
   setExpoPushToken: React.Dispatch<React.SetStateAction<string | null>>;
 
@@ -50,6 +51,7 @@ export const UserContext = createContext<UserContextProps>({
   lastName: "",
   institution: "",
   studentType: null,
+  profilePic: null, // ✅ Default profilePic is null
   likedProducts: [],
   setLikedProducts: () => {},
   isLoading: true,
@@ -61,7 +63,10 @@ export const UserContext = createContext<UserContextProps>({
   clearUser: async () => {},
 });
 
-const fetchFullUserProfile = async (userId: string, token: string): Promise<UserProfile> => {
+const fetchFullUserProfile = async (
+  userId: string,
+  token: string
+): Promise<UserProfile> => {
   const response = await fetch(`${NGROK_URL}/users/${userId}`, {
     method: "GET",
     headers: {
@@ -77,15 +82,16 @@ const fetchFullUserProfile = async (userId: string, token: string): Promise<User
   const data = await response.json();
   console.log("API Response:", data);
 
-  const firstName = data.firstName || "Unknown";
-  const lastName = data.lastName || "User";
-  const institution = data.institution || "N/A";
-  const studentType =
-    data.studentType && Object.values(StudentType).includes(data.studentType)
-      ? (data.studentType as StudentType)
-      : StudentType.University;
-
-  return { firstName, lastName, institution, studentType };
+  return {
+    firstName: data.firstName || "Unknown",
+    lastName: data.lastName || "User",
+    institution: data.institution || "N/A",
+    studentType:
+      data.studentType && Object.values(StudentType).includes(data.studentType)
+        ? (data.studentType as StudentType)
+        : StudentType.University,
+    profilePic: data.profilePic || null, // ✅ Fetch profilePic
+  };
 };
 
 export const UserProvider = ({ children }: { children: ReactNode }) => {
@@ -95,10 +101,10 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   const [lastName, setLastName] = useState<string>("");
   const [institution, setInstitution] = useState<string>("");
   const [studentType, setStudentType] = useState<StudentType | null>(null);
+  const [profilePic, setProfilePic] = useState<string | null>(null); // ✅ Added profilePic state
   const [likedProducts, setLikedProducts] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // NEW: Expo push token
   const [expoPushToken, setExpoPushToken] = useState<string | null>(null);
 
   useEffect(() => {
@@ -108,7 +114,10 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
         const storedUserId = await SecureStore.getItemAsync("userId");
 
         if (storedToken && storedUserId) {
-          const userProfile = await fetchFullUserProfile(storedUserId, storedToken);
+          const userProfile = await fetchFullUserProfile(
+            storedUserId,
+            storedToken
+          );
 
           setUserId(storedUserId);
           setToken(storedToken);
@@ -116,11 +125,24 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
           setLastName(userProfile.lastName);
           setInstitution(userProfile.institution);
           setStudentType(userProfile.studentType);
+          setProfilePic(userProfile.profilePic); // ✅ Set profilePic state
 
           await SecureStore.setItemAsync("firstName", userProfile.firstName);
           await SecureStore.setItemAsync("lastName", userProfile.lastName);
-          await SecureStore.setItemAsync("institution", userProfile.institution);
-          await SecureStore.setItemAsync("studentType", userProfile.studentType);
+          await SecureStore.setItemAsync(
+            "institution",
+            userProfile.institution
+          );
+          await SecureStore.setItemAsync(
+            "studentType",
+            userProfile.studentType
+          );
+          if (userProfile.profilePic) {
+            await SecureStore.setItemAsync(
+              "profilePic",
+              userProfile.profilePic
+            ); // ✅ Store profilePic
+          }
         }
       } finally {
         setIsLoading(false);
@@ -143,14 +165,22 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
       setLastName(userProfile.lastName);
       setInstitution(userProfile.institution);
       setStudentType(userProfile.studentType);
+      setProfilePic(userProfile.profilePic); // ✅ Store profilePic in state
 
       await SecureStore.setItemAsync("firstName", userProfile.firstName);
       await SecureStore.setItemAsync("lastName", userProfile.lastName);
       await SecureStore.setItemAsync("institution", userProfile.institution);
       await SecureStore.setItemAsync("studentType", userProfile.studentType);
+      if (userProfile.profilePic) {
+        await SecureStore.setItemAsync("profilePic", userProfile.profilePic); // ✅ Store profilePic
+      }
 
       if (expoPushToken) {
-        await storeExpoPushTokenOnServer(user.userId, user.token, expoPushToken);
+        await storeExpoPushTokenOnServer(
+          user.userId,
+          user.token,
+          expoPushToken
+        );
       }
     } catch (error) {
       console.error("Error setting user data:", error);
@@ -166,6 +196,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
       await SecureStore.deleteItemAsync("lastName");
       await SecureStore.deleteItemAsync("institution");
       await SecureStore.deleteItemAsync("studentType");
+      await SecureStore.deleteItemAsync("profilePic"); // ✅ Clear profilePic
 
       setUserId("");
       setToken("");
@@ -173,6 +204,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
       setLastName("");
       setInstitution("");
       setStudentType(null);
+      setProfilePic(null); // ✅ Clear profilePic state
       setLikedProducts([]);
       setExpoPushToken(null);
     } catch (error) {
@@ -181,7 +213,11 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const storeExpoPushTokenOnServer = async (userId: string, authToken: string, pushToken: string) => {
+  const storeExpoPushTokenOnServer = async (
+    userId: string,
+    authToken: string,
+    pushToken: string
+  ) => {
     try {
       await fetch(`${NGROK_URL}/users/push-token`, {
         method: "POST",
@@ -209,6 +245,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     lastName,
     institution,
     studentType,
+    profilePic, // ✅ Provide profilePic in context
     likedProducts,
     setLikedProducts,
     isLoading,
@@ -218,5 +255,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     clearUser,
   };
 
-  return <UserContext.Provider value={contextValue}>{children}</UserContext.Provider>;
+  return (
+    <UserContext.Provider value={contextValue}>{children}</UserContext.Provider>
+  );
 };
