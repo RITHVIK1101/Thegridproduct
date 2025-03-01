@@ -42,8 +42,9 @@ type SignupRequest struct {
 	Password    string `json:"password"`
 	FirstName   string `json:"firstName"`
 	LastName    string `json:"lastName"`
-	StudentType string `json:"studentType"` // "highschool" or "university"
-	Institution string `json:"institution"` // Name of high school or university
+	StudentType string `json:"studentType"`          // "highschool" or "university"
+	Institution string `json:"institution"`          // Name of high school or university
+	ProfilePic  string `json:"profilePic,omitempty"` // Optional profile picture URL
 }
 
 // generateToken creates a JWT token for the authenticated user.
@@ -194,6 +195,7 @@ func sendVerificationEmail(email string, code string) error {
 // ----- New Types for Pending Signup and Verification -----
 
 // PendingUser holds the signup data until the email is verified.
+// PendingUser holds the signup data until the email is verified.
 type PendingUser struct {
 	ID               primitive.ObjectID `bson:"_id"`
 	Email            string             `bson:"email"`
@@ -202,6 +204,7 @@ type PendingUser struct {
 	LastName         string             `bson:"lastName"`
 	StudentType      string             `bson:"studentType"`
 	Institution      string             `bson:"institution"`
+	ProfilePic       string             `bson:"profilePic,omitempty"`
 	VerificationCode string             `bson:"verificationCode"`
 	ExpiresAt        time.Time          `bson:"expiresAt"`
 	CreatedAt        time.Time          `bson:"createdAt"`
@@ -277,6 +280,7 @@ func SignupHandler(w http.ResponseWriter, r *http.Request) {
 		LastName:         req.LastName,
 		StudentType:      req.StudentType,
 		Institution:      req.Institution,
+		ProfilePic:       req.ProfilePic, // Store profile picture
 		VerificationCode: verificationCode,
 		ExpiresAt:        expiresAt,
 		CreatedAt:        time.Now(),
@@ -353,8 +357,11 @@ func VerifyEmailHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Check if the verification code has expired.
 	if time.Now().After(pendingUser.ExpiresAt) {
-		// Optionally delete the expired pending record.
-		_, _ = pendingCollection.DeleteOne(ctx, bson.M{"email": req.Email})
+		// Delete the expired pending record.
+		_, delErr := pendingCollection.DeleteOne(ctx, bson.M{"email": req.Email})
+		if delErr != nil {
+			log.Printf("Error deleting expired pending user: %v", delErr)
+		}
 		WriteJSONError(w, "Verification code expired. Please sign up again.", http.StatusUnauthorized)
 		return
 	}
@@ -367,6 +374,7 @@ func VerifyEmailHandler(w http.ResponseWriter, r *http.Request) {
 		LastName:    pendingUser.LastName,
 		StudentType: pendingUser.StudentType,
 		Institution: pendingUser.Institution,
+		ProfilePic:  pendingUser.ProfilePic,
 		CreatedAt:   time.Now(),
 		UpdatedAt:   time.Now(),
 	}
@@ -387,26 +395,17 @@ func VerifyEmailHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Delete the pending user record.
-	_, err = pendingCollection.DeleteOne(ctx, bson.M{"email": req.Email})
-	if err != nil {
-		log.Printf("Error deleting pending user record: %v", err)
-		// Not a critical error; we continue.
-	}
-
-	// Optionally, generate a token upon successful verification.
-	tokenString, err := generateToken(newUser.ID, newUser.Institution, newUser.StudentType)
-	if err != nil {
-		log.Printf("Error generating token: %v", err)
-		WriteJSONError(w, "Error generating token", http.StatusInternalServerError)
-		return
+	_, delErr := pendingCollection.DeleteOne(ctx, bson.M{"email": req.Email})
+	if delErr != nil {
+		log.Printf("Error deleting pending user record: %v", delErr)
 	}
 
 	response := map[string]interface{}{
 		"message":     "Email verified successfully. Your account is now active.",
-		"token":       tokenString,
 		"userId":      newUser.ID.Hex(),
 		"institution": newUser.Institution,
 		"studentType": newUser.StudentType,
+		"profilePic":  newUser.ProfilePic,
 	}
 
 	w.WriteHeader(http.StatusOK)
