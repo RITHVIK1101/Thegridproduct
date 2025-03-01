@@ -30,7 +30,12 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import BottomNavBar from "./components/BottomNavbar";
-import { fetchConversations, getMessages, postMessage } from "./api";
+import {
+  fetchConversations,
+  getMessages,
+  postMessage,
+  sendChatMessage,
+} from "./api";
 import {
   getFirestore,
   doc,
@@ -237,6 +242,51 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       fetchAllUnreadCounts();
     }
   }, [chats, userId, token]);
+  const handleDeleteRequest = async (requestId: string) => {
+    Alert.alert(
+      "Confirm Delete",
+      "Are you sure you want to delete this chat request?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const response = await axios.delete(
+                `${NGROK_URL}/chat_requests/${requestId}`,
+                {
+                  headers: {
+                    Authorization: `Bearer ${token}`,
+                    "Content-Type": "application/json",
+                  },
+                }
+              );
+
+              if (response.status === 200) {
+                setIncomingRequests((prev) =>
+                  prev.filter((req) => req.requestId !== requestId)
+                );
+                setOutgoingRequests((prev) =>
+                  prev.filter((req) => req.requestId !== requestId)
+                );
+                Alert.alert("Success", "Chat request deleted successfully.");
+              } else {
+                Alert.alert("Error", "Failed to delete chat request.");
+              }
+            } catch (error: any) {
+              console.error("Error deleting chat request:", error);
+              Alert.alert(
+                "Error",
+                error.response?.data?.message ||
+                  "Failed to delete chat request."
+              );
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const fetchUserChats = async () => {
     if (!userId || !token) return;
@@ -463,35 +513,18 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       return;
     }
 
-    // Construct message object with optional reply reference
-    const messageContent = newMessage.trim();
-    const newMessageObject = {
-      _id: Date.now().toString(),
-      senderId: userId,
-      content: messageContent,
-      timestamp: new Date().toISOString(),
-      replyTo: replyToMessage
-        ? {
-            content: replyToMessage.content,
-            senderName: replyToMessage.senderName,
-          }
-        : null, // Include reply reference if replying
-    };
+    console.log("Sending message:", newMessage.trim());
+    console.log("Chat ID:", selectedChat.chatID);
 
     try {
-      const chatDocRef = doc(firestoreDB, "chatRooms", selectedChat.chatID);
-      await setDoc(
-        chatDocRef,
-        { messages: arrayUnion(newMessageObject) },
-        { merge: true }
-      );
+      const response = await sendChatMessage(selectedChat.chatID, newMessage, {
+        token,
+        userId,
+      });
 
+      console.log("Message sent successfully:", response);
       setNewMessage("");
-      setReplyToMessage(null); // Clear reply after sending
-
-      setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
-      }, 100);
+      setReplyToMessage(null);
     } catch (error) {
       console.error("Error sending message:", error);
       Alert.alert("Error", "Failed to send message.");
@@ -747,7 +780,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
         : item.referenceType === "product_request"
         ? "Product Request Name: "
         : "Unnamed Item";
-  
+
     return (
       <Pressable
         style={styles.chatItemContainer}
@@ -803,7 +836,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       </Pressable>
     );
   };
-  
 
   const [tapCount, setTapCount] = useState(0);
 
@@ -1170,7 +1202,13 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
               </TouchableOpacity>
             </View>
           ) : (
-            <View style={styles.requestActions} />
+            <TouchableOpacity
+              style={styles.deleteRequestButton}
+              onPress={() => handleDeleteRequest(item.requestId)}
+              accessibilityLabel="Delete Request"
+            >
+              <Ionicons name="trash-outline" size={18} color="#FFFFFF" />
+            </TouchableOpacity>
           )}
         </View>
       );
@@ -1435,7 +1473,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
               >
                 {selectedChat && (
                   <View style={styles.enhancedChatHeader}>
-<AnimatedBackButton onPress={handleBackFromChat} />
+                    <AnimatedBackButton onPress={handleBackFromChat} />
 
                     <View style={styles.chatHeaderInfo}>
                       <View style={styles.headerProfilePicPlaceholder}>
@@ -1571,9 +1609,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
           <View style={[styles.modalSafeArea, { backgroundColor: "#000" }]}>
             <SafeAreaView style={{ flex: 1 }}>
               <View style={styles.enhancedChatHeader}>
-
-
-<AnimatedBackButton onPress={handleBackFromChat} />
+                <AnimatedBackButton onPress={handleBackFromChat} />
 
                 <View style={{ flex: 1 }} />
                 <Pressable
@@ -2031,6 +2067,24 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontFamily: "HelveticaNeue-Bold",
   },
+  deleteRequestButton: {
+    backgroundColor: "#E74C3C",
+    padding: 6,
+    borderRadius: 50,
+    alignItems: "center",
+    justifyContent: "center",
+    width: 30,
+    height: 30,
+    position: "absolute",
+    top: 10,
+    right: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 5,
+  },
+
   chatHeaderSubTitle: {
     fontSize: 13,
     color: "#FFFFFF",
