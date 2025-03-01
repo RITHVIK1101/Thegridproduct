@@ -1,5 +1,3 @@
-// VerificationScreen.tsx
-
 import React, { useState, useRef, useContext } from "react";
 import {
   View,
@@ -63,11 +61,14 @@ const VerificationScreen: React.FC = () => {
   };
 
   const handleVerify = async () => {
+    setError(""); // Clear previous errors
     const code = codeDigits.join("");
+
     if (code.length < 6) {
       setError("Please enter a complete 6-digit code.");
       return;
     }
+
     try {
       const response = await fetch(`${NGROK_URL}/verify`, {
         method: "POST",
@@ -82,20 +83,52 @@ const VerificationScreen: React.FC = () => {
       }
 
       const data = await response.json();
+      console.log("Verification Response:", data); // Debugging
 
-      // Save the token and user ID to secure storage
-      await SecureStore.setItemAsync("userToken", data.token);
-      await SecureStore.setItemAsync("userId", data.userId);
+      // Extract user details from response
+      const {
+        token,
+        userId,
+        institution,
+        studentType,
+        firstName,
+        lastName,
+        profilePic,
+      } = data;
 
-      // Update the user context so that the navigator renders the authenticated branch.
+      // ✅ Use defaults to prevent `undefined` values from breaking the check
+      if (!token || !userId || !institution) {
+        setError("Invalid user data received. Please try again.");
+        return;
+      }
+
+      const validStudentType = studentType || "university"; // ✅ Ensure studentType is set
+      const validProfilePic = profilePic || null; // ✅ Default profilePic to null if missing
+
+      // Save data to SecureStore
+      await SecureStore.setItemAsync("userToken", token);
+      await SecureStore.setItemAsync("userId", userId);
+      await SecureStore.setItemAsync("firstName", firstName || "Unknown");
+      await SecureStore.setItemAsync("lastName", lastName || "User");
+      await SecureStore.setItemAsync("institution", institution);
+      await SecureStore.setItemAsync("studentType", validStudentType);
+      if (validProfilePic) {
+        await SecureStore.setItemAsync("profilePic", validProfilePic);
+      }
+
+      // Update the User Context
       setUser({
-        token: data.token,
-        userId: data.userId,
-        institution: data.institution,
-        studentType: data.studentType,
-        firstName: data.firstName,
-        lastName: data.lastName,
+        token,
+        userId,
+        institution,
+        studentType: validStudentType,
+        firstName: firstName || "Unknown",
+        lastName: lastName || "User",
+        profilePic: validProfilePic,
       });
+
+      // Navigate to Dashboard
+      navigation.navigate("Dashboard");
     } catch (err) {
       setError("An error occurred. Please try again.");
     }
@@ -132,7 +165,6 @@ const VerificationScreen: React.FC = () => {
       <TouchableOpacity style={styles.button} onPress={handleVerify}>
         <Text style={styles.buttonText}>Verify</Text>
       </TouchableOpacity>
-      {/* Optionally, add a "Resend Code" button here */}
     </View>
   );
 };
@@ -196,14 +228,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginBottom: 15,
-    backgroundColor: "rgba(167, 139, 250, 0.1)", // Light purple background
+    backgroundColor: "rgba(167, 139, 250, 0.1)",
     paddingVertical: 5,
     paddingHorizontal: 10,
     borderRadius: 10,
   },
 
   warningText: {
-    color: "#A78BFA", // Purple text
+    color: "#A78BFA",
     fontSize: 14,
     marginLeft: 6,
     fontWeight: "500",
