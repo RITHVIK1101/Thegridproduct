@@ -20,6 +20,8 @@ import {
   Easing,
   ScrollView,
   Alert,
+  Image,
+  ActivityIndicator,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -31,6 +33,8 @@ import DropDownPicker from "react-native-dropdown-picker";
 import { collegeList, College } from "./data/collegeList";
 import { highSchoolList, HighSchool } from "./data/highschoolList";
 import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
+import * as ImageManipulator from "expo-image-manipulator";
 
 console.log("Backend URL:", NGROK_URL);
 
@@ -38,44 +42,57 @@ type NavigationProp = NativeStackNavigationProp<RootStackParamList, "Login">;
 
 const { width } = Dimensions.get("window");
 
+// Two-step signup states:
+type SignupStep = "form" | "profilePic";
+
 const LoginScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const { setUser } = useContext(UserContext);
 
+  // Toggle between login & signup
   const [isLogin, setIsLogin] = useState(true);
-  const [toggleAnim] = useState(new Animated.Value(0));
+
+  // Form fields
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [isEmailFocused, setIsEmailFocused] = useState(false);
+  const [selectedInstitution, setSelectedInstitution] = useState("");
+  const [studentType, setStudentType] = useState<
+    "highschool" | "university" | null
+  >(null);
 
-  // Added state for toggling password visibility
+  // UI states
+  const [isEmailFocused, setIsEmailFocused] = useState(false);
+  const [error, setError] = useState<string>("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+  // Institutions list
   const [open, setOpen] = useState(false);
-  const [selectedInstitution, setSelectedInstitution] = useState("");
-  const [items, setItems] = useState<Array<{ label: string; value: string }>>(
+  const [items, setItems] = useState(
     collegeList.map((college: College) => ({
       label: college.institution,
       value: college.institution,
     }))
   );
 
-  const [studentType, setStudentType] = useState<
-    "highschool" | "university" | null
-  >(null);
-  const [error, setError] = useState<string>("");
+  // Signup step management
+  const [signupStep, setSignupStep] = useState<SignupStep>("form");
+
+  // Profile pic states
+  const [profilePic, setProfilePic] = useState<string | null>(null);
+  const [isUploadingProfilePic, setIsUploadingProfilePic] = useState(false);
 
   // Animations
+  const toggleAnim = useRef(new Animated.Value(0)).current;
   const formOpacity = useRef(new Animated.Value(0)).current;
   const headerScale = useRef(new Animated.Value(0.8)).current;
   const headerBounceAnim = useRef(new Animated.Value(1)).current;
 
+  // Reset fields & animate form on switch between login & signup
   useEffect(() => {
-    // Reset form fields when toggling between login and signup
     setEmail("");
     setPassword("");
     setConfirmPassword("");
@@ -85,8 +102,9 @@ const LoginScreen: React.FC = () => {
     setStudentType(null);
     setOpen(false);
     setError("");
+    setSignupStep("form"); // Always reset signup to the form step
 
-    // Animate form entrance
+    // Animate form fade in
     Animated.timing(formOpacity, {
       toValue: 1,
       duration: 500,
@@ -96,7 +114,7 @@ const LoginScreen: React.FC = () => {
   }, [isLogin]);
 
   useLayoutEffect(() => {
-    // Animate header scaling in
+    // Animate header scaling
     Animated.spring(headerScale, {
       toValue: 1,
       friction: 5,
@@ -105,7 +123,7 @@ const LoginScreen: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    // Animate the header logo bouncing indefinitely
+    // Infinite bounce on the logo
     Animated.loop(
       Animated.sequence([
         Animated.timing(headerBounceAnim, {
@@ -124,6 +142,7 @@ const LoginScreen: React.FC = () => {
     ).start();
   }, [headerBounceAnim]);
 
+  // Switch between login & signup
   const toggleForm = () => {
     setIsLogin(!isLogin);
     Animated.spring(toggleAnim, {
@@ -133,20 +152,16 @@ const LoginScreen: React.FC = () => {
     }).start();
   };
 
+  // Reusable function to call your backend
   const handleApiRequest = async (url: string, payload: object) => {
     try {
       const fullUrl = `${NGROK_URL}${url}`;
-
       const response = await fetch(fullUrl, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-
       const contentType = response.headers.get("content-type");
-
       if (!response.ok) {
         if (url === "/login") {
           setError("Incorrect email or password.");
@@ -160,7 +175,6 @@ const LoginScreen: React.FC = () => {
         setError("An unexpected error occurred. Please try again.");
         return null;
       }
-
       const data = await response.json();
       return data;
     } catch (error) {
@@ -169,6 +183,7 @@ const LoginScreen: React.FC = () => {
     }
   };
 
+  // ---------- LOGIN FLOW ----------
   const handleLogin = async () => {
     setError("");
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -176,10 +191,8 @@ const LoginScreen: React.FC = () => {
       setError("Please enter a valid email address.");
       return;
     }
-
     const payload = { email, password };
     const data = await handleApiRequest("/login", payload);
-
     if (data) {
       if (data.unverified) {
         Alert.alert(
@@ -195,14 +208,12 @@ const LoginScreen: React.FC = () => {
         );
         return;
       }
-
       const {
         token,
         userId,
         institution,
         studentType: responseStudentType,
       } = data;
-
       if (!institution) {
         setError("Institution information is missing.");
         return;
@@ -211,7 +222,6 @@ const LoginScreen: React.FC = () => {
         setError("Student type information is missing.");
         return;
       }
-
       if (
         responseStudentType !== "highschool" &&
         responseStudentType !== "university"
@@ -219,63 +229,72 @@ const LoginScreen: React.FC = () => {
         setError("Invalid student type from server.");
         return;
       }
-
       const mappedStudentType =
         responseStudentType === "highschool"
           ? StudentType.HighSchool
           : StudentType.University;
-
       await SecureStore.setItemAsync("userToken", token);
       await SecureStore.setItemAsync("userId", userId.toString());
-
       await saveUserData(token, userId, institution, mappedStudentType);
       navigation.navigate("Dashboard");
     }
   };
 
-  const handleSignup = async () => {
+  // ---------- SIGNUP FLOW ----------
+  // Step 1: "form" step => user enters info
+  // Step 2: "profilePic" step => user uploads a pic
+  // Final: calls the backend => navigates to verification
+  const handleSignupPress = async () => {
     setError("");
-
-    if (!firstName.trim() || !lastName.trim()) {
-      setError("Please enter your first and last name.");
-      return;
-    }
-
-    // Updated regex to allow only .edu, .org, or .college emails
-    const emailRegex = /^[^\s@]+@[^\s@]+\.(edu|org|college)$/;
-    if (!emailRegex.test(email)) {
-      setError("Please enter a valid .edu, .org, or .college email address.");
-      return;
-    }
-
-    if (password.length <= 6) {
-      setError("Password must be longer than 6 characters.");
-      return;
-    }
-    if (password !== confirmPassword) {
-      setError("Passwords do not match.");
-      return;
-    }
-    if (!studentType || !selectedInstitution) {
-      setError("Please select your student type and institution.");
-      return;
-    }
-
-    const payload = {
-      email,
-      password,
-      firstName,
-      lastName,
-      studentType,
-      institution: selectedInstitution,
-    };
-    const data = await handleApiRequest("/signup", payload);
-
-    if (data) {
-      navigation.navigate("Verification", { email });
+    if (signupStep === "form") {
+      // Validate form fields
+      if (!firstName.trim() || !lastName.trim()) {
+        setError("Please enter your first and last name.");
+        return;
+      }
+      const emailRegex = /^[^\s@]+@[^\s@]+\.(edu|org|college)$/;
+      if (!emailRegex.test(email)) {
+        setError("Please enter a valid .edu, .org, or .college email address.");
+        return;
+      }
+      if (password.length <= 6) {
+        setError("Password must be longer than 6 characters.");
+        return;
+      }
+      if (password !== confirmPassword) {
+        setError("Passwords do not match.");
+        return;
+      }
+      if (!studentType || !selectedInstitution) {
+        setError("Please select your student type and institution.");
+        return;
+      }
+      // All good => go to profile pic step
+      setSignupStep("profilePic");
+    } else {
+      // "profilePic" step
+      if (!profilePic) {
+        setError("Please upload a profile picture.");
+        return;
+      }
+      // Final signup request
+      const payload = {
+        email,
+        password,
+        firstName,
+        lastName,
+        studentType,
+        institution: selectedInstitution,
+        profilePic,
+      };
+      const data = await handleApiRequest("/signup", payload);
+      if (data) {
+        navigation.navigate("Verification", { email });
+      }
     }
   };
 
+  // Save user data to context
   const saveUserData = async (
     token: string,
     userId: string,
@@ -285,11 +304,70 @@ const LoginScreen: React.FC = () => {
     setUser({ userId, token, institution, studentType });
   };
 
+  // Cloudinary upload for profile pictures
+  const CLOUDINARY_URL =
+    "https://api.cloudinary.com/v1_1/ds0zpfht9/image/upload";
+  const UPLOAD_PRESET = "gridly_preset";
+
+  const pickProfilePicture = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1], // square
+        quality: 0.7,
+      });
+      if (!result.canceled && result.assets.length > 0) {
+        setIsUploadingProfilePic(true);
+        const asset = result.assets[0];
+        const uri = asset.uri;
+
+        // Resize image
+        const manipulatedImage = await ImageManipulator.manipulateAsync(
+          uri,
+          [{ resize: { width: 500 } }],
+          { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
+        );
+
+        // FormData for Cloudinary
+        const formData = new FormData();
+        formData.append("file", {
+          uri: manipulatedImage.uri,
+          type: "image/jpeg",
+          name: `profile_${Date.now()}.jpg`,
+        } as any);
+        formData.append("upload_preset", UPLOAD_PRESET);
+
+        // Upload
+        const response = await fetch(CLOUDINARY_URL, {
+          method: "POST",
+          body: formData,
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        });
+        const data = await response.json();
+        if (data.secure_url) {
+          setProfilePic(data.secure_url);
+        } else {
+          throw new Error("Failed to upload image.");
+        }
+      }
+    } catch (error) {
+      console.error("Image upload error:", error);
+      setError("Failed to upload profile picture.");
+    } finally {
+      setIsUploadingProfilePic(false);
+    }
+  };
+
+  // Show error if any
   const renderError = () => {
     if (!error) return null;
     return <Text style={styles.errorText}>{error}</Text>;
   };
 
+  // ---------- Render login form ----------
   const renderLoginForm = () => (
     <Animated.View style={{ opacity: formOpacity }}>
       <TextInput
@@ -300,10 +378,9 @@ const LoginScreen: React.FC = () => {
         onChangeText={setEmail}
         keyboardType="email-address"
         autoCapitalize="none"
-        textContentType="username" // Prevents bouncing by keeping autofill suggestions static
-        autoComplete="email" // Helps autofill and keeps it visible
+        textContentType="username"
+        autoComplete="email"
       />
-
       <View style={styles.inputContainer}>
         <TextInput
           style={styles.input}
@@ -327,10 +404,8 @@ const LoginScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
       {renderError()}
-      <TouchableOpacity
-        style={[styles.button, styles.simpleButton]}
-        onPress={handleLogin}
-      >
+      {/* Original login button inside form */}
+      <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
         <Text style={styles.buttonText}>Login</Text>
         <Ionicons
           name="log-in-outline"
@@ -342,6 +417,7 @@ const LoginScreen: React.FC = () => {
     </Animated.View>
   );
 
+  // ---------- Render signup form ----------
   const renderStudentTypeSelection = () => (
     <View style={styles.studentTypeContainer}>
       <Text style={styles.studentTypeTitle}>Select your student type</Text>
@@ -354,9 +430,9 @@ const LoginScreen: React.FC = () => {
           onPress={() => {
             setStudentType("highschool");
             setItems(
-              highSchoolList.map((highschool: HighSchool) => ({
-                label: highschool.institution,
-                value: highschool.institution,
+              highSchoolList.map((hs: HighSchool) => ({
+                label: hs.institution,
+                value: hs.institution,
               }))
             );
           }}
@@ -369,7 +445,6 @@ const LoginScreen: React.FC = () => {
           />
           <Text style={styles.studentTypeButtonText}>High School</Text>
         </TouchableOpacity>
-
         <TouchableOpacity
           style={[
             styles.studentTypeButton,
@@ -378,9 +453,9 @@ const LoginScreen: React.FC = () => {
           onPress={() => {
             setStudentType("university");
             setItems(
-              collegeList.map((college: College) => ({
-                label: college.institution,
-                value: college.institution,
+              collegeList.map((c: College) => ({
+                label: c.institution,
+                value: c.institution,
               }))
             );
           }}
@@ -397,145 +472,177 @@ const LoginScreen: React.FC = () => {
     </View>
   );
 
-  const renderSignupForm = () => (
-    <Animated.View style={{ opacity: formOpacity }}>
-      {!studentType && renderStudentTypeSelection()}
-      {studentType && (
-        <>
-          <TextInput
-            style={styles.input}
-            placeholder="First Name"
-            placeholderTextColor="#888"
-            value={firstName}
-            onChangeText={setFirstName}
-            autoCapitalize="words"
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Last Name"
-            placeholderTextColor="#888"
-            value={lastName}
-            onChangeText={setLastName}
-            autoCapitalize="words"
-          />
-
-          <TextInput
-            style={styles.input}
-            placeholder="Email"
-            placeholderTextColor="#888"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            onFocus={() => setIsEmailFocused(true)}
-            onBlur={() => setIsEmailFocused(false)}
-          />
-
-          {isEmailFocused && (
-            <Text style={styles.subtleHint}>Use a school email address</Text>
+  const renderSignupForm = () => {
+    // Step 1: "form" => normal signup
+    // Step 2: "profilePic" => upload pic
+    if (signupStep === "form") {
+      return (
+        <Animated.View style={{ opacity: formOpacity }}>
+          {!studentType && renderStudentTypeSelection()}
+          {studentType && (
+            <>
+              <TextInput
+                style={styles.input}
+                placeholder="First Name"
+                placeholderTextColor="#888"
+                value={firstName}
+                onChangeText={setFirstName}
+                autoCapitalize="words"
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Last Name"
+                placeholderTextColor="#888"
+                value={lastName}
+                onChangeText={setLastName}
+                autoCapitalize="words"
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Email"
+                placeholderTextColor="#888"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                onFocus={() => setIsEmailFocused(true)}
+                onBlur={() => setIsEmailFocused(false)}
+              />
+              {isEmailFocused && (
+                <Text style={styles.subtleHint}>
+                  Use a school email address
+                </Text>
+              )}
+              <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Password"
+                  placeholderTextColor="#888"
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry={!showPassword}
+                  autoCapitalize="none"
+                />
+                <TouchableOpacity
+                  style={styles.eyeIcon}
+                  onPress={() => setShowPassword(!showPassword)}
+                >
+                  <Ionicons
+                    name={showPassword ? "eye-off-outline" : "eye-outline"}
+                    size={20}
+                    color="#aaa"
+                  />
+                </TouchableOpacity>
+              </View>
+              <View style={styles.inputContainer}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Confirm Password"
+                  placeholderTextColor="#888"
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  secureTextEntry={!showConfirmPassword}
+                  autoCapitalize="none"
+                />
+                <TouchableOpacity
+                  style={styles.eyeIcon}
+                  onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                >
+                  <Ionicons
+                    name={
+                      showConfirmPassword ? "eye-off-outline" : "eye-outline"
+                    }
+                    size={20}
+                    color="#aaa"
+                  />
+                </TouchableOpacity>
+              </View>
+              {renderError()}
+              <View style={styles.dropdownContainer}>
+                <DropDownPicker
+                  open={open}
+                  value={selectedInstitution}
+                  items={items}
+                  setOpen={setOpen}
+                  setValue={setSelectedInstitution}
+                  setItems={setItems}
+                  searchable
+                  searchPlaceholder={
+                    studentType === "university"
+                      ? "Search your university..."
+                      : "Search your high school..."
+                  }
+                  placeholder={
+                    studentType === "university"
+                      ? "Select your university"
+                      : "Select your high school"
+                  }
+                  style={styles.dropdown}
+                  dropDownContainerStyle={styles.dropdownList}
+                  labelStyle={styles.dropdownLabel}
+                  placeholderStyle={styles.dropdownPlaceholder}
+                  selectedItemLabelStyle={styles.dropdownSelectedLabel}
+                  searchTextInputStyle={styles.searchInput}
+                  listMode="MODAL"
+                  modalProps={{ animationType: "slide" }}
+                  activityIndicatorColor="#A78BFA"
+                  theme="DARK"
+                  modalContentContainerStyle={styles.modalContentContainer}
+                  modalTitle={
+                    studentType === "university"
+                      ? "Select Your University"
+                      : "Select Your High School"
+                  }
+                  modalTitleStyle={styles.modalTitleStyle}
+                />
+              </View>
+              {/* The original signup button in step 1 => moves to profilePic step */}
+              <TouchableOpacity
+                style={[styles.button, styles.simpleButton]}
+                onPress={handleSignupPress}
+              >
+                <Text style={styles.buttonText}>Signup</Text>
+                <Ionicons
+                  name="person-add-outline"
+                  size={20}
+                  color="#fff"
+                  style={{ marginLeft: 8 }}
+                />
+              </TouchableOpacity>
+            </>
           )}
-
-          <View style={styles.inputContainer}>
-            <TextInput
-              style={styles.input}
-              placeholder="Password"
-              placeholderTextColor="#888"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry={!showPassword}
-              autoCapitalize="none"
-            />
-            <TouchableOpacity
-              style={styles.eyeIcon}
-              onPress={() => setShowPassword(!showPassword)}
-            >
-              <Ionicons
-                name={showPassword ? "eye-off-outline" : "eye-outline"}
-                size={20}
-                color="#aaa"
-              />
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.inputContainer}>
-            <TextInput
-              style={styles.input}
-              placeholder="Confirm Password"
-              placeholderTextColor="#888"
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              secureTextEntry={!showConfirmPassword}
-              autoCapitalize="none"
-            />
-            <TouchableOpacity
-              style={styles.eyeIcon}
-              onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-            >
-              <Ionicons
-                name={showConfirmPassword ? "eye-off-outline" : "eye-outline"}
-                size={20}
-                color="#aaa"
-              />
-            </TouchableOpacity>
-          </View>
-
+        </Animated.View>
+      );
+    } else {
+      // Step 2: "profilePic"
+      return (
+        <View style={styles.profileUploadContainer}>
+          <Text style={styles.stepTitle}>Upload Your Profile Picture</Text>
+          <TouchableOpacity
+            onPress={pickProfilePicture}
+            style={styles.profilePicContainer}
+          >
+            {profilePic ? (
+              <Image source={{ uri: profilePic }} style={styles.profilePic} />
+            ) : (
+              <Ionicons name="camera-outline" size={60} color="#888" />
+            )}
+          </TouchableOpacity>
+          {isUploadingProfilePic && (
+            <ActivityIndicator size="small" color="#A78BFA" />
+          )}
           {renderError()}
-
-          <View style={styles.dropdownContainer}>
-            <DropDownPicker
-              open={open}
-              value={selectedInstitution}
-              items={items}
-              setOpen={setOpen}
-              setValue={setSelectedInstitution}
-              setItems={setItems}
-              searchable
-              searchPlaceholder={
-                studentType === "university"
-                  ? "Search your university..."
-                  : "Search your high school..."
-              }
-              placeholder={
-                studentType === "university"
-                  ? "Select your university"
-                  : "Select your high school"
-              }
-              style={styles.dropdown}
-              dropDownContainerStyle={styles.dropdownList}
-              labelStyle={styles.dropdownLabel}
-              placeholderStyle={styles.dropdownPlaceholder}
-              selectedItemLabelStyle={styles.dropdownSelectedLabel}
-              searchTextInputStyle={styles.searchInput}
-              listMode="MODAL"
-              modalProps={{ animationType: "slide" }}
-              activityIndicatorColor="#A78BFA"
-              theme="DARK"
-              modalContentContainerStyle={styles.modalContentContainer}
-              modalTitle={
-                studentType === "university"
-                  ? "Select Your University"
-                  : "Select Your High School"
-              }
-              modalTitleStyle={styles.modalTitleStyle}
-            />
-          </View>
-
+          {/* Final signup button in step 2 => calls final backend signup */}
           <TouchableOpacity
             style={[styles.button, styles.simpleButton]}
-            onPress={handleSignup}
+            onPress={handleSignupPress}
           >
-            <Text style={styles.buttonText}>Signup</Text>
-            <Ionicons
-              name="person-add-outline"
-              size={20}
-              color="#fff"
-              style={{ marginLeft: 8 }}
-            />
+            <Text style={styles.buttonText}>Complete Signup</Text>
           </TouchableOpacity>
-        </>
-      )}
-    </Animated.View>
-  );
+        </View>
+      );
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -558,7 +665,6 @@ const LoginScreen: React.FC = () => {
                 ]}
               >
                 <Animated.Image
-                  // Updated the image source to a relative path.
                   source={require("./assets/logonobg.png")}
                   style={[
                     styles.logoIcon,
@@ -627,6 +733,7 @@ const LoginScreen: React.FC = () => {
                 />
               </View>
 
+              {/* The form card */}
               <View style={styles.formCard}>
                 {isLogin ? renderLoginForm() : renderSignupForm()}
               </View>
@@ -753,45 +860,13 @@ const styles = StyleSheet.create({
     right: 15,
     top: 15,
   },
-  dropdownContainer: {
-    marginBottom: 12,
-    zIndex: 1000,
-  },
-  dropdown: {
-    backgroundColor: "#1D1D1D",
-    borderColor: "#333",
-    height: 50,
-    borderRadius: 12,
-    paddingHorizontal: 10,
-  },
-  dropdownList: {
-    backgroundColor: "#1A1A1A",
-    borderColor: "#333",
-    borderRadius: 12,
-    paddingHorizontal: 10,
-  },
-  dropdownLabel: {
-    fontSize: 16,
-    color: "#fff",
-    fontFamily: Platform.OS === "ios" ? "HelveticaNeue" : "Roboto",
-  },
-  dropdownPlaceholder: {
-    fontSize: 16,
-    color: "#666",
-  },
-  dropdownSelectedLabel: {
-    color: "#A78BFA",
-    fontWeight: "600",
-  },
-  searchInput: {
-    height: 40,
-    borderColor: "#444",
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    fontSize: 16,
-    color: "#fff",
-    backgroundColor: "#111",
+  loginButton: {
+    backgroundColor: "#A78BFA",
+    paddingVertical: 12,
+    borderRadius: 30,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
   },
   button: {
     borderRadius: 30,
@@ -806,11 +881,22 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 30,
   },
+  searchInput: {
+    height: 40,
+    borderColor: "#444",
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    fontSize: 16,
+    color: "#fff",
+    backgroundColor: "#111",
+  },
   buttonText: {
     color: "#fff",
     fontWeight: "600",
     fontSize: 16,
     fontFamily: Platform.OS === "ios" ? "HelveticaNeue-Bold" : "Roboto",
+    marginHorizontal: 8,
   },
   modalContentContainer: {
     backgroundColor: "#1A1A1A",
@@ -872,5 +958,63 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     fontSize: 14,
     fontFamily: Platform.OS === "ios" ? "HelveticaNeue" : "Roboto",
+  },
+  profileUploadContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 30,
+  },
+  stepTitle: {
+    fontSize: 20,
+    fontWeight: "600",
+    color: "#fff",
+    marginBottom: 15,
+  },
+  profilePicContainer: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: "#1D1D1D",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 20,
+    overflow: "hidden",
+    borderWidth: 2,
+    borderColor: "#A78BFA",
+  },
+  dropdownContainer: {
+    marginBottom: 12,
+    zIndex: 1000,
+  },
+  dropdown: {
+    backgroundColor: "#1D1D1D",
+    borderColor: "#333",
+    height: 50,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+  },
+  dropdownList: {
+    backgroundColor: "#1A1A1A",
+    borderColor: "#333",
+    borderRadius: 12,
+    paddingHorizontal: 10,
+  },
+  dropdownLabel: {
+    fontSize: 16,
+    color: "#fff",
+    fontFamily: Platform.OS === "ios" ? "HelveticaNeue" : "Roboto",
+  },
+  dropdownPlaceholder: {
+    fontSize: 16,
+    color: "#666",
+  },
+  dropdownSelectedLabel: {
+    color: "#A78BFA",
+    fontWeight: "600",
+  },
+  profilePic: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 60,
   },
 });
