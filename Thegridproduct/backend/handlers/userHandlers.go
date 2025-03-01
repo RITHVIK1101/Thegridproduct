@@ -19,7 +19,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-// GetUserHandler handles fetching a user's details by ID
+// GetUserHandler handles fetching a user's details by ID, including profilePic
 func GetUserHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -42,18 +42,21 @@ func GetUserHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Define projection to include only required fields
+	// Define projection to include only required fields, including profilePic
 	projection := bson.M{
 		"firstName":   1,
 		"lastName":    1,
 		"email":       1,
 		"institution": 1,
+		"profilePic":  1, // Include profile picture
+		"studentType": 1,
 	}
 
 	findOptions := options.FindOne().SetProjection(projection)
 
 	var user models.User
 
+	// Try to fetch user from university_users collection
 	universityUsersCollection := db.GetCollection("gridlyapp", "university_users")
 	err = universityUsersCollection.FindOne(ctx, bson.M{"_id": userID}, findOptions).Decode(&user)
 	if err == nil {
@@ -66,11 +69,11 @@ func GetUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// If not found, try to find the user in the "highschool_users" collection
+	// If not found, try to fetch user from highschool_users collection
 	highSchoolUsersCollection := db.GetCollection("gridlyapp", "highschool_users")
 	err = highSchoolUsersCollection.FindOne(ctx, bson.M{"_id": userID}, findOptions).Decode(&user)
 	if err == nil {
-		// User found in "highschool_users" collection
+		// User found in highschool_users collection
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(user)
 		return
