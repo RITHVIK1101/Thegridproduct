@@ -6,7 +6,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-// User represents a user in the system.
 type User struct {
 	ID               primitive.ObjectID   `json:"id,omitempty" bson:"_id,omitempty"`
 	Email            string               `json:"email" bson:"email"`
@@ -15,6 +14,7 @@ type User struct {
 	LastName         string               `json:"lastName" bson:"lastName"`
 	StudentType      string               `json:"studentType" bson:"studentType"` // "highschool" or "university"
 	Institution      string               `json:"institution" bson:"institution"`
+	ProfilePic       string               `json:"profilePic,omitempty" bson:"profilePic,omitempty"` // New field
 	CreatedAt        time.Time            `json:"createdAt" bson:"createdAt"`
 	UpdatedAt        time.Time            `json:"updatedAt" bson:"updatedAt"`
 	StripeCustomerID string               `json:"stripeCustomerId,omitempty" bson:"stripeCustomerId,omitempty"`
