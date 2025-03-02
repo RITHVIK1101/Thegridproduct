@@ -511,3 +511,86 @@ func DeleteAccountHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(response)
 }
+
+// UpdateProfilePicHandler allows users to update their profile picture.
+func UpdateProfilePicHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method != http.MethodPut {
+		WriteJSONError(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Extract token from header.
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		WriteJSONError(w, "Authorization token required", http.StatusUnauthorized)
+		return
+	}
+
+	// Expecting "Bearer <token>"
+	tokenString := authHeader[len("Bearer "):]
+	jwtKey := []byte(os.Getenv("JWT_SECRET_KEY"))
+
+	// Parse and validate JWT.
+	claims := &Claims{}
+	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
+		return jwtKey, nil
+	})
+	if err != nil || !token.Valid {
+		WriteJSONError(w, "Invalid or expired token", http.StatusUnauthorized)
+		return
+	}
+
+	// Convert user ID from the token.
+	userID, err := primitive.ObjectIDFromHex(claims.UserID)
+	if err != nil {
+		WriteJSONError(w, "Invalid user ID", http.StatusBadRequest)
+		return
+	}
+
+	// Parse request body.
+	var req struct {
+		ProfilePic string `json:"profilePic"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		WriteJSONError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// Ensure profilePic URL is provided.
+	if req.ProfilePic == "" {
+		WriteJSONError(w, "Profile picture URL is required", http.StatusBadRequest)
+		return
+	}
+
+	// Determine the correct collection.
+	var userCollectionName string
+	if claims.StudentType == StudentTypeUniversity {
+		userCollectionName = "university_users"
+	} else {
+		userCollectionName = "highschool_users"
+	}
+	userCollection := db.GetCollection("gridlyapp", userCollectionName)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Update the user's profile picture.
+	update := bson.M{"$set": bson.M{"profilePic": req.ProfilePic}}
+	_, err = userCollection.UpdateOne(ctx, bson.M{"_id": userID}, update)
+	if err != nil {
+		log.Printf("Error updating profile picture: %v", err)
+		WriteJSONError(w, "Failed to update profile picture", http.StatusInternalServerError)
+		return
+	}
+
+	// Respond with success.
+	response := map[string]interface{}{
+		"message":    "Profile picture updated successfully.",
+		"profilePic": req.ProfilePic,
+	}
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(response)
+}
