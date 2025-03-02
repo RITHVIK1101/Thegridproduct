@@ -67,10 +67,6 @@ const categoriesFilter = [
   "Coding",
   "Other",
 ];
-
-/* ----------------- Helper Functions ----------------- */
-
-// Standard Fisher–Yates shuffle for randomizing every time the page loads.
 function shuffleArray<T>(array: T[]): T[] {
   const copy = array.slice();
   for (let i = copy.length - 1; i > 0; i--) {
@@ -80,13 +76,10 @@ function shuffleArray<T>(array: T[]): T[] {
   return copy;
 }
 
-// A simple seeded random generator
 function getSeededRandom(seed: number): number {
   const x = Math.sin(seed) * 10000;
   return x - Math.floor(x);
 }
-
-// Seeded shuffle to deterministically randomize the gigs based on the seed.
 function seededShuffle<T>(array: T[], seed: number): T[] {
   const copy = array.slice();
   let currentSeed = seed;
@@ -97,14 +90,10 @@ function seededShuffle<T>(array: T[], seed: number): T[] {
   }
   return copy;
 }
-
-// Get today's seed based on the current date (e.g. "20250214")
 function getTodaySeed(): number {
   const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
   return parseInt(today, 10);
 }
-
-// Select 3 featured gigs in a deterministic (seeded) way.
 function getFeaturedGigs(gigs: Gig[]): Gig[] {
   if (gigs.length === 0) return [];
   const seed = getTodaySeed();
@@ -134,11 +123,8 @@ const JobsScreen: React.FC = () => {
   const route = useRoute<JobsScreenRouteProp>();
   const { token } = useContext(UserContext);
 
-  // If gigs were pre-fetched and passed via route params, use them;
-  // otherwise, start with null.
   const preFetchedGigs: Gig[] | undefined = route.params?.preFetchedGigs;
   const [gigs, setGigs] = useState<Gig[] | null>(preFetchedGigs || null);
-  // We'll use a separate state for the randomized "all services" list.
   const [randomGigs, setRandomGigs] = useState<Gig[]>([]);
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -152,7 +138,6 @@ const JobsScreen: React.FC = () => {
     }
   }, []);
 
-  // Once gigs are loaded, randomize the "all services" list.
   useEffect(() => {
     if (gigs) {
       setRandomGigs(shuffleArray(gigs));
@@ -181,17 +166,15 @@ const JobsScreen: React.FC = () => {
     }
   };
 
-  // Compute featured gigs using the seeded shuffle (3 per day).
   const featuredGigs = gigs ? getFeaturedGigs(gigs) : [];
 
-  // Filtered gigs based on current filter and search query,
-  // using the randomized order from randomGigs.
   const filteredGigs = randomGigs.filter((gig) => {
     const matchSearch =
       gig.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       gig.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
       gig.description.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchCategory = currentFilter === "All" || gig.category === currentFilter;
+    const matchCategory =
+      currentFilter === "All" || gig.category === currentFilter;
     return matchSearch && matchCategory;
   });
 
@@ -214,7 +197,10 @@ const JobsScreen: React.FC = () => {
       <View style={styles.headerContainer}>
         <Text style={styles.headerTitle}>Explore Services</Text>
         <View style={styles.headerIcons}>
-          <TouchableOpacity onPress={toggleSearchBar} style={styles.headerIconButton}>
+          <TouchableOpacity
+            onPress={toggleSearchBar}
+            style={styles.headerIconButton}
+          >
             <Ionicons
               name={showSearchBar ? "close" : "search-outline"}
               size={24}

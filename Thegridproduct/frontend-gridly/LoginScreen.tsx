@@ -78,20 +78,15 @@ const LoginScreen: React.FC = () => {
     }))
   );
 
-  // Signup step management
   const [signupStep, setSignupStep] = useState<SignupStep>("form");
-
-  // Profile pic states
   const [profilePic, setProfilePic] = useState<string | null>(null);
   const [isUploadingProfilePic, setIsUploadingProfilePic] = useState(false);
 
-  // Animations
   const toggleAnim = useRef(new Animated.Value(0)).current;
   const formOpacity = useRef(new Animated.Value(0)).current;
   const headerScale = useRef(new Animated.Value(0.8)).current;
   const headerBounceAnim = useRef(new Animated.Value(1)).current;
 
-  // Reset fields & animate form on switch between login & signup
   useEffect(() => {
     setEmail("");
     setPassword("");
@@ -102,9 +97,8 @@ const LoginScreen: React.FC = () => {
     setStudentType(null);
     setOpen(false);
     setError("");
-    setSignupStep("form"); // Always reset signup to the form step
+    setSignupStep("form");
 
-    // Animate form fade in
     Animated.timing(formOpacity, {
       toValue: 1,
       duration: 500,
@@ -123,7 +117,6 @@ const LoginScreen: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    // Infinite bounce on the logo
     Animated.loop(
       Animated.sequence([
         Animated.timing(headerBounceAnim, {
@@ -142,7 +135,6 @@ const LoginScreen: React.FC = () => {
     ).start();
   }, [headerBounceAnim]);
 
-  // Switch between login & signup
   const toggleForm = () => {
     setIsLogin(!isLogin);
     Animated.spring(toggleAnim, {
@@ -152,7 +144,6 @@ const LoginScreen: React.FC = () => {
     }).start();
   };
 
-  // Reusable function to call your backend
   const handleApiRequest = async (url: string, payload: object) => {
     try {
       const fullUrl = `${NGROK_URL}${url}`;
@@ -240,14 +231,9 @@ const LoginScreen: React.FC = () => {
     }
   };
 
-  // ---------- SIGNUP FLOW ----------
-  // Step 1: "form" step => user enters info
-  // Step 2: "profilePic" step => user uploads a pic
-  // Final: calls the backend => navigates to verification
   const handleSignupPress = async () => {
     setError("");
     if (signupStep === "form") {
-      // Validate form fields
       if (!firstName.trim() || !lastName.trim()) {
         setError("Please enter your first and last name.");
         return;
@@ -272,12 +258,10 @@ const LoginScreen: React.FC = () => {
       // All good => go to profile pic step
       setSignupStep("profilePic");
     } else {
-      // "profilePic" step
       if (!profilePic) {
         setError("Please upload a profile picture.");
         return;
       }
-      // Final signup request
       const payload = {
         email,
         password,
@@ -294,7 +278,6 @@ const LoginScreen: React.FC = () => {
     }
   };
 
-  // Save user data to context
   const saveUserData = async (
     token: string,
     userId: string,

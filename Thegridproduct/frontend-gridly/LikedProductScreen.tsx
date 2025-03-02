@@ -41,7 +41,7 @@ const LikedProductScreen: React.FC = () => {
     token,
     likedProducts: likedProductIds,
     setLikedProducts,
-  } = useContext(UserContext); // Access token and likedProductIds from UserContext
+  } = useContext(UserContext);
   const [likedProductDetails, setLikedProductDetails] = useState<Product[]>([]); // Separate state for Product[]
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -67,8 +67,6 @@ const LikedProductScreen: React.FC = () => {
         }).start();
         return;
       }
-
-      // Fetch each product individually since we don't have a bulk endpoint
       const productPromises = likedProductIds.map((id) =>
         fetch(`${NGROK_URL}/products/${id}`, {
           method: "GET",
@@ -190,7 +188,6 @@ const LikedProductScreen: React.FC = () => {
 
   const renderSeparator = () => <View style={styles.separator} />;
 
-  // Render each liked product item
   const renderProductItem = ({ item }: { item: Product }) => {
     console.log("Rendering Product ID:", item.id); // Debugging log
     return (
@@ -227,7 +224,6 @@ const LikedProductScreen: React.FC = () => {
             style={styles.removeButton}
             accessibilityLabel={`Remove ${item.title} from Liked`}
           >
-            {/* Filled red heart icon to indicate 'liked', used for unlike action */}
             <Ionicons name="heart" size={24} color="#FF3B30" />
           </TouchableOpacity>
         </View>
@@ -235,7 +231,6 @@ const LikedProductScreen: React.FC = () => {
     );
   };
 
-  // Loading state
   if (loading) {
     return (
       <View style={styles.centered}>
@@ -245,7 +240,6 @@ const LikedProductScreen: React.FC = () => {
     );
   }
 
-  // Error state
   if (error) {
     return (
       <View style={styles.centered}>

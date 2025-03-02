@@ -45,7 +45,7 @@ type Gig = {
   category: string;
   description: string;
   coverImage: string;
-  price: string; // can be "Open to Communication" or something like "$25/hour"
+  price: string;
   availability: string;
   additionalLinks: string[];
   additionalDocuments: string[];

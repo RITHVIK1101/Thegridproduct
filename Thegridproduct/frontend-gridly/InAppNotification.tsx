@@ -1,18 +1,25 @@
 import React, { useEffect, useRef, useState } from "react";
-import { View, Text, StyleSheet, Animated, TouchableOpacity, PanResponder } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  Animated,
+  TouchableOpacity,
+  PanResponder,
+} from "react-native";
 import * as Notifications from "expo-notifications";
 import { navigationRef } from "./App"; // Ensure this path is correct
 
 const InAppNotification: React.FC = () => {
-  const [notification, setNotification] = useState<Notifications.Notification | null>(null);
+  const [notification, setNotification] =
+    useState<Notifications.Notification | null>(null);
   const [visible, setVisible] = useState(false);
   const slideAnim = useRef(new Animated.Value(-100)).current; // Start slightly above
-  const panY = useRef(new Animated.Value(0)).current; // For vertical swipe
-
-  // PanResponder for swipe-to-dismiss upward
+  const panY = useRef(new Animated.Value(0)).current;
   const panResponder = useRef(
     PanResponder.create({
-      onMoveShouldSetPanResponder: (_, gestureState) => Math.abs(gestureState.dy) > 5,
+      onMoveShouldSetPanResponder: (_, gestureState) =>
+        Math.abs(gestureState.dy) > 5,
       onPanResponderMove: (_, gestureState) => {
         panY.setValue(gestureState.dy);
       },
@@ -36,33 +43,35 @@ const InAppNotification: React.FC = () => {
   ).current;
 
   useEffect(() => {
-    const subscription = Notifications.addNotificationReceivedListener((notif) => {
-      // Check the current route; if on "Messaging", skip displaying the notification.
-      const currentRoute = navigationRef?.current?.getCurrentRoute()?.name;
-      if (currentRoute === "Messaging") {
-        return;
-      }
-      setNotification(notif);
-      setVisible(true);
-      // Slide the notification into view
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 250,
-        useNativeDriver: true,
-      }).start();
-
-      // Auto-hide after ~4.2 seconds
-      setTimeout(() => {
+    const subscription = Notifications.addNotificationReceivedListener(
+      (notif) => {
+        // Check the current route; if on "Messaging", skip displaying the notification.
+        const currentRoute = navigationRef?.current?.getCurrentRoute()?.name;
+        if (currentRoute === "Messaging") {
+          return;
+        }
+        setNotification(notif);
+        setVisible(true);
+        // Slide the notification into view
         Animated.timing(slideAnim, {
-          toValue: -100,
+          toValue: 0,
           duration: 250,
           useNativeDriver: true,
-        }).start(() => {
-          setVisible(false);
-          setNotification(null);
-        });
-      }, 3000);
-    });
+        }).start();
+
+        // Auto-hide after ~4.2 seconds
+        setTimeout(() => {
+          Animated.timing(slideAnim, {
+            toValue: -100,
+            duration: 250,
+            useNativeDriver: true,
+          }).start(() => {
+            setVisible(false);
+            setNotification(null);
+          });
+        }, 3000);
+      }
+    );
 
     return () => {
       subscription.remove();

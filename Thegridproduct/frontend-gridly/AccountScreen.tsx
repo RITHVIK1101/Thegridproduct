@@ -7,12 +7,15 @@ import {
   Alert,
   ScrollView,
   TouchableOpacity,
+  Image,
 } from "react-native";
-import { UserContext } from "./UserContext"; // Adjust the path if necessary
+
+import Ionicons from "react-native-vector-icons/Ionicons";
+import { UserContext } from "./UserContext"; // Adjust path if necessary
 import { NGROK_URL } from "@env";
 import { CommonActions, useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
-import { RootStackParamList } from "./navigationTypes"; // Adjust the path if necessary
+import { RootStackParamList } from "./navigationTypes"; // Adjust path if necessary
 
 type AccountScreenNavigationProp = StackNavigationProp<
   RootStackParamList,
@@ -43,7 +46,6 @@ const AccountScreen: React.FC = () => {
       });
 
       if (response.status === 401) {
-        // Unauthorized: Clear user data and navigate to Login
         Alert.alert(
           "Session Expired",
           "Your session has expired. Please log in again.",
@@ -83,41 +85,7 @@ const AccountScreen: React.FC = () => {
 
   useEffect(() => {
     fetchUserData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // Function to delete the user account
-  const handleDeleteAccount = async () => {
-    try {
-      const response = await fetch(`${NGROK_URL}/user/delete`, {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to delete account: ${errorText}`);
-      }
-
-      Alert.alert(
-        "Account Deleted",
-        "Your account has been successfully deleted."
-      );
-      await clearUser(); // Clear stored user data
-      navigation.dispatch(
-        CommonActions.reset({
-          index: 0,
-          routes: [{ name: "Login" }],
-        })
-      );
-    } catch (error) {
-      console.error("Error deleting account:", error);
-      Alert.alert("Error", "Failed to delete account. Please try again later.");
-    }
-  };
 
   if (loading) {
     return (
@@ -145,6 +113,27 @@ const AccountScreen: React.FC = () => {
       keyboardShouldPersistTaps="handled"
     >
       <Text style={styles.title}>My Account</Text>
+
+      {/* Profile Picture */}
+      <View style={styles.profileContainer}>
+        {userData.profilePic ? (
+          <Image
+            source={{ uri: userData.profilePic }}
+            style={styles.profilePic}
+          />
+        ) : (
+          <TouchableOpacity
+            style={styles.placeholder}
+            onPress={() => console.log("Add profile pic clicked")}
+          >
+            <Ionicons name="camera-outline" size={30} color="#666" />
+
+            <Text style={styles.placeholderText}>Add Profile Pic</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* User Details */}
       <View style={styles.infoRow}>
         <Text style={styles.label}>First Name:</Text>
         <Text style={styles.value}>{userData.firstName}</Text>
@@ -181,7 +170,38 @@ const AccountScreen: React.FC = () => {
                 {
                   text: "Delete",
                   style: "destructive",
-                  onPress: handleDeleteAccount,
+                  onPress: async () => {
+                    try {
+                      const response = await fetch(`${NGROK_URL}/user/delete`, {
+                        method: "DELETE",
+                        headers: {
+                          "Content-Type": "application/json",
+                          Authorization: `Bearer ${token}`,
+                        },
+                      });
+
+                      if (!response.ok) {
+                        throw new Error("Failed to delete account.");
+                      }
+
+                      Alert.alert(
+                        "Account Deleted",
+                        "Your account has been successfully deleted."
+                      );
+                      await clearUser();
+                      navigation.dispatch(
+                        CommonActions.reset({
+                          index: 0,
+                          routes: [{ name: "Login" }],
+                        })
+                      );
+                    } catch (error) {
+                      Alert.alert(
+                        "Error",
+                        "Failed to delete account. Please try again later."
+                      );
+                    }
+                  },
                 },
               ]
             )
@@ -242,6 +262,17 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 10,
   },
+  profileContainer: {
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  profilePic: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    borderWidth: 2,
+    borderColor: "#BB86FC",
+  },
   infoRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -263,6 +294,22 @@ const styles = StyleSheet.create({
     backgroundColor: "#333",
     marginVertical: 5,
   },
+  placeholder: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    borderWidth: 2,
+    borderColor: "#BB86FC",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#222",
+  },
+  placeholderText: {
+    fontSize: 14,
+    color: "#666",
+    marginTop: 5,
+  },
+
   note: {
     marginTop: 20,
     fontSize: 14,
