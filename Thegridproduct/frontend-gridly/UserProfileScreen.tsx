@@ -18,6 +18,7 @@ import { UserContext } from "./UserContext";
 import { NGROK_URL } from "@env";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Animatable from "react-native-animatable";
+import { Ionicons } from "@expo/vector-icons"; // Added import for Ionicons
 
 const { width } = Dimensions.get("window");
 const HEADER_MAX_HEIGHT = 200;
@@ -127,21 +128,19 @@ const UserProfileScreen: React.FC = () => {
           <Text style={styles.userInstitution}>
             {userProfile?.institution || "No Institution"}
           </Text>
-          <Text style={styles.userScore}>
-            Grid Score: {userProfile?.gridScore || "N/A"}
-          </Text>
+          {/* Grid Score Badge (similar to UserMenu) */}
+          <View style={styles.gridsBadge}>
+            <Ionicons name="grid-outline" size={16} color="#FFF" />
+            <Text style={styles.gridsText}>
+              {userProfile?.gridScore || "N/A"} Grids
+            </Text>
+          </View>
         </View>
       </View>
     </Animated.View>
   );
 
-  const renderProductItem = ({
-    item,
-    index,
-  }: {
-    item: any;
-    index: number;
-  }) => (
+  const renderProductItem = ({ item, index }: { item: any; index: number }) => (
     <Animatable.View
       animation="fadeInUp"
       delay={index * 100}
@@ -149,7 +148,10 @@ const UserProfileScreen: React.FC = () => {
     >
       <TouchableOpacity
         onPress={() =>
-          navigation.push("ProductDetail", { productId: item.id, hideProfileIcon: true })
+          navigation.push("ProductDetail", {
+            productId: item.id,
+            hideProfileIcon: true,
+          })
         }
       >
         <Image
@@ -205,17 +207,18 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#000000",
+    paddingTop: 28, // ✅ Pushes everything down slightly
   },
-  loadingContainer: {
-    flex: 1,
-    backgroundColor: "#000000",
-    justifyContent: "center",
-    alignItems: "center",
+  listHeader: {
+    marginTop: 29, // ✅ Moves just the header section down
+    marginBottom: 8,
   },
   header: {
     width: "100%",
     overflow: "hidden",
+    marginTop: 20, // ✅ Moves the animated header slightly lower
   },
+
   headerBackground: {
     ...StyleSheet.absoluteFillObject,
   },
@@ -271,8 +274,27 @@ const styles = StyleSheet.create({
     color: "#A18CD1",
     marginTop: 2,
   },
-  listHeader: {
-    marginBottom: 8,
+  // New styles for grid badge
+  gridsBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#7B61FF",
+    paddingHorizontal: 8, // ✅ Reduce horizontal padding to make it smaller
+    paddingVertical: 4, // ✅ Reduce height slightly
+    borderRadius: 15, // ✅ Keep it rounded
+    alignSelf: "flex-start", // ✅ Ensures it only takes the space it needs
+    marginTop: 10,
+    shadowColor: "#7B61FF",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+  },
+
+  gridsText: {
+    fontSize: 14,
+    color: "#FFFFFF",
+    fontWeight: "600",
+    marginLeft: 5,
   },
   listingsTitle: {
     fontSize: 22,

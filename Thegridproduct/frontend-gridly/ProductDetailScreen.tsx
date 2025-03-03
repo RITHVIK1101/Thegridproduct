@@ -31,8 +31,10 @@ const DESCRIPTION_LIMIT = 200; // character limit for description truncation
 
 const ProductDetailScreen: React.FC = () => {
   const route = useRoute();
-  const navigation = useNavigation<StackNavigationProp<RootStackParamList, "ProductDetail">>();
-  const { productId, hideProfileIcon } = route.params as ProductDetailRouteParams;
+  const navigation =
+    useNavigation<StackNavigationProp<RootStackParamList, "ProductDetail">>();
+  const { productId, hideProfileIcon } =
+    route.params as ProductDetailRouteParams;
   const { token, userId } = useContext(UserContext);
 
   const [product, setProduct] = useState<any>(null);
@@ -41,7 +43,8 @@ const ProductDetailScreen: React.FC = () => {
   const [isModalVisible, setIsModalVisible] = useState<boolean>(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [autoplay, setAutoplay] = useState<boolean>(true);
-  const [descriptionExpanded, setDescriptionExpanded] = useState<boolean>(false);
+  const [descriptionExpanded, setDescriptionExpanded] =
+    useState<boolean>(false);
   const [isRequesting, setIsRequesting] = useState<boolean>(false);
 
   // Fetch product details
@@ -177,7 +180,11 @@ const ProductDetailScreen: React.FC = () => {
 
   const renderImageItem = ({ item }: { item: string }) => (
     <TouchableOpacity activeOpacity={0.8} onPress={() => openImageModal(item)}>
-      <Image source={{ uri: item }} style={styles.swiperImage} resizeMode="cover" />
+      <Image
+        source={{ uri: item }}
+        style={styles.swiperImage}
+        resizeMode="cover"
+      />
       <View style={styles.imageOverlay}>
         <Ionicons name="expand-outline" size={30} color="#FFFFFF80" />
       </View>
@@ -262,7 +269,10 @@ const ProductDetailScreen: React.FC = () => {
         onRequestClose={closeImageModal}
         animationType="fade"
       >
-        <TouchableOpacity style={styles.modalBackground} onPress={closeImageModal}>
+        <TouchableOpacity
+          style={styles.modalBackground}
+          onPress={closeImageModal}
+        >
           {selectedImage && (
             <Image
               source={{ uri: selectedImage }}
@@ -278,8 +288,11 @@ const ProductDetailScreen: React.FC = () => {
         <View style={styles.headerRow}>
           <Text style={styles.title}>{product.title}</Text>
           <View style={styles.actionButtonsContainer}>
-            <TouchableOpacity style={styles.addToCartButton} onPress={addToCart}>
-              <Ionicons name="cart" size={20} color="#FFFFFF" />
+            <TouchableOpacity
+              style={styles.addToCartButton}
+              onPress={addToCart}
+            >
+              <Ionicons name="bag" size={20} color="#FFFFFF" />
             </TouchableOpacity>
             <LinearGradient
               colors={["rgb(168, 237, 234)", "rgb(254, 214, 227)"]}
@@ -305,7 +318,9 @@ const ProductDetailScreen: React.FC = () => {
         <View style={styles.additionalDetails}>
           <View style={styles.detailItem}>
             <Text style={styles.detailLabel}>Campus</Text>
-            <Text style={styles.detailValue}>{product.university || "N/A"}</Text>
+            <Text style={styles.detailValue}>
+              {product.university || "N/A"}
+            </Text>
           </View>
           <View style={styles.detailItem}>
             <Text style={styles.detailLabel}>Condition</Text>
@@ -328,7 +343,9 @@ const ProductDetailScreen: React.FC = () => {
         <Text style={styles.sectionHeader}>Description</Text>
         <Text style={styles.description}>{displayDescription}</Text>
         {product.description.length > DESCRIPTION_LIMIT && (
-          <TouchableOpacity onPress={() => setDescriptionExpanded(!descriptionExpanded)}>
+          <TouchableOpacity
+            onPress={() => setDescriptionExpanded(!descriptionExpanded)}
+          >
             <Text style={styles.readMoreText}>
               {descriptionExpanded ? "Show less" : "Read more"}
             </Text>
@@ -459,7 +476,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
   },
   addToCartButton: {
-    backgroundColor: "#388E3C",
+    backgroundColor: "#BB86FC",
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 50,

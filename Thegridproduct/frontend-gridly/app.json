@@ -11,9 +11,7 @@
       "resizeMode": "contain",
       "backgroundColor": "#000000"
     },
-    "extra": {
-      "NGROK_URL": "https://de17-71-197-245-145.ngrok-free.app"
-    },
+  
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
