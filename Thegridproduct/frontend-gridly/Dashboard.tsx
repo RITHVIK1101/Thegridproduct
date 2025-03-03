@@ -143,6 +143,10 @@ const Dashboard: React.FC<DashboardProps> = () => {
     null
   );
 
+  // New state for description expansion (Read More / Read Less)
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
+  const DESCRIPTION_LIMIT = 150;
+
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
 
   const campusOptions: Array<{ label: string; value: "In Campus" | "Both" }> = [
@@ -245,12 +249,17 @@ const Dashboard: React.FC<DashboardProps> = () => {
       }, 2500);
     });
   };
-  const onShowDescription = (product: Product) => {
+
+  // --- Updated: Always fetch product owner when showing description ---
+  const onShowDescription = async (product: Product) => {
+    // Clear any previous owner data
+    setSelectedProductOwner(null);
     if (product.userId) {
-      fetchProductOwner(product.userId); // Fetch owner first
+      await fetchProductOwner(product.userId);
     }
     setSelectedProduct(product);
     setIsDescriptionModalVisible(true);
+    setIsDescriptionExpanded(false);
   };
 
   const toggleFavorite = (productId: string) => {
@@ -260,11 +269,14 @@ const Dashboard: React.FC<DashboardProps> = () => {
       likeProduct(productId);
     }
   };
+
   const fetchProductOwner = async (ownerId: string) => {
-    if (!ownerId || !token) return;
+    if (!ownerId || !token) {
+      console.warn("No ownerId or token found!");
+      return;
+    }
     try {
       console.log("Fetching product owner for ID:", ownerId);
-
       const response = await fetch(`${NGROK_URL}/users/${ownerId}`, {
         method: "GET",
         headers: {
@@ -272,13 +284,11 @@ const Dashboard: React.FC<DashboardProps> = () => {
           Authorization: `Bearer ${token}`,
         },
       });
-
       if (!response.ok) {
-        throw new Error("Failed to fetch owner details.");
+        throw new Error(`Failed to fetch owner details. Status: ${response.status}`);
       }
-
       const ownerData: User = await response.json();
-      console.log("Fetched Owner Data:", ownerData); // ✅ Debugging Line
+      console.log("Fetched Owner Data:", ownerData);
       setSelectedProductOwner(ownerData);
     } catch (error) {
       console.error("Error fetching product owner:", error);
@@ -524,6 +534,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
       return () => clearTimeout(timer);
     }
   }, [cartUpdated]);
+  
 
   // ----- Fetch Products (Campus Mode Filtering) -----
   const fetchProducts = async () => {
@@ -1044,7 +1055,9 @@ const Dashboard: React.FC<DashboardProps> = () => {
                 <Text style={styles.requestedLabel}>Requested Products</Text>
                 <TouchableOpacity
                   style={styles.viewAllButton}
-                  onPress={() => navigation.navigate("RequestedProductsPage")}
+                  onPress={() =>
+                    navigation.navigate("RequestedProductsPage")
+                  }
                   accessibilityLabel="View All Requested Products"
                 >
                   <Text style={styles.viewAllText}>View All</Text>
@@ -1097,10 +1110,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
                     currentIndex={currentIndex}
                     onAddToCart={addToCart}
                     onToggleFavorite={toggleFavorite}
-                    onShowDescription={(prod) => {
-                      setSelectedProduct(prod);
-                      setIsDescriptionModalVisible(true);
-                    }}
+                    onShowDescription={onShowDescription}
                     onNextProduct={goToNextProduct}
                     isFavorite={likedProducts.includes(product.id)}
                     currentImageIndex={currentImageIndex}
@@ -1110,9 +1120,10 @@ const Dashboard: React.FC<DashboardProps> = () => {
             </View>
           )}
 
+          {/* ---------------------- Description Modal ---------------------- */}
           <Modal
             visible={isDescriptionModalVisible}
-            animationType="slide"
+            animationType="fade"
             transparent={true}
             onRequestClose={() => setIsDescriptionModalVisible(false)}
           >
@@ -1127,69 +1138,105 @@ const Dashboard: React.FC<DashboardProps> = () => {
                     showsVerticalScrollIndicator={false}
                     contentContainerStyle={styles.modalScrollContent}
                   >
-                    <View style={styles.modalContentContainer}>
-                      <View style={styles.profileContainer}>
-                        {/* Profile Picture */}
-                        {selectedProductOwner?.profilePicture ? (
-                          <Image
-                            source={{
-                              uri: selectedProductOwner.profilePicture,
-                            }}
-                            style={styles.profilePicture}
-                          />
-                        ) : (
-                          <Ionicons
-                            name="person-circle"
-                            size={50}
-                            color="#777"
-                          />
-                        )}
-
-                        {/* Name Container (New) */}
-                        <View style={styles.nameContainer}>
-                          <Text style={styles.sellerName}>
-                            {selectedProductOwner?.firstName}{" "}
-                            {selectedProductOwner?.lastName}
-                          </Text>
-                          <Text style={styles.sellerInstitution}>
-                            {selectedProductOwner?.institution}
-                          </Text>
-                        </View>
+                    {/* --- Product Owner Profile Section --- */}
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      onPress={() => {
+                        console.log("Profile tapped! Owner ID:", selectedProductOwner?.id);
+                        if (selectedProductOwner?.id) {
+                          setIsDescriptionModalVisible(false);
+                          setTimeout(() => {
+                            navigation.navigate("UserProfile", { userId: selectedProductOwner.id });
+                          }, 300);
+                        } else {
+                          console.warn("User profile ID is undefined, trying to fetch again...");
+                          if (selectedProduct?.userId) {
+                            fetchProductOwner(selectedProduct.userId);
+                          }
+                        }
+                      }}
+                      style={styles.profileContainer}
+                    >
+                      {selectedProductOwner?.profilePicture ? (
+                        <Image
+                          source={{ uri: selectedProductOwner.profilePicture }}
+                          style={styles.profilePicture}
+                        />
+                      ) : (
+                        <Ionicons name="person-circle" size={50} color="#777" />
+                      )}
+                      <View style={styles.nameContainer}>
+                        <Text style={styles.sellerName}>
+                          {selectedProductOwner?.firstName} {selectedProductOwner?.lastName}
+                        </Text>
+                        <Text style={styles.sellerInstitution}>
+                          {selectedProductOwner?.institution}
+                        </Text>
                       </View>
+                    </TouchableOpacity>
 
-                      {/* Product Title */}
-                      <Text style={styles.modalTitle}>
-                        {selectedProduct?.title}
+                    {/* --- Product Title --- */}
+                    <Text style={styles.modalTitle}>{selectedProduct.title}</Text>
+
+                    {/* --- Product Details Section --- */}
+                    <View style={styles.detailsContainer}>
+                      <Text style={styles.detailText}>Condition: {selectedProduct.quality}</Text>
+                      {selectedProduct.quality !== "New" &&
+                        selectedProduct.rating &&
+                        selectedProduct.rating > 0 && (
+                          <View style={styles.ratingContainer}>
+                            <Text style={styles.detailText}>Rating: </Text>
+                            {[...Array(selectedProduct.rating)].map((_, i) => (
+                              <Ionicons key={i} name="star" size={16} color="#FFD700" />
+                            ))}
+                          </View>
+                        )}
+                      <Text style={styles.detailText}>
+                        Price: $
+                        {institution.toLowerCase() === selectedProduct.university.toLowerCase()
+                          ? selectedProduct.price.toFixed(2)
+                          : (selectedProduct.outOfCampusPrice ?? selectedProduct.price).toFixed(2)}
                       </Text>
 
-                      {/* Product Details */}
-                      <Text style={styles.detailText}>
-                        Condition: {selectedProduct?.quality}
-                      </Text>
-                      <Text style={styles.detailText}>
-                        Price: ${selectedProduct?.price.toFixed(2)}
-                      </Text>
-                      <Text style={styles.detailText}>
-                        Seller's Campus: {selectedProduct?.university}
-                      </Text>
-
-                      {/* Description */}
-                      <Text style={styles.sectionHeader}>Description</Text>
-                      <Text style={styles.descriptionText}>
-                        {selectedProduct.description}
-                      </Text>
                     </View>
+
+                    {/* --- Description Section with Read More / Read Less --- */}
+                    <Text style={styles.sectionHeader}>Description</Text>
+                    {selectedProduct.description &&
+                    selectedProduct.description.length > DESCRIPTION_LIMIT &&
+                    !isDescriptionExpanded ? (
+                      <View>
+                        <Text style={styles.descriptionText}>
+                          {selectedProduct.description.substring(0, DESCRIPTION_LIMIT)}...
+                        </Text>
+                        <TouchableOpacity onPress={() => setIsDescriptionExpanded(true)}>
+                          <Text style={styles.readMoreText}>Read More</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : (
+                      <View>
+                        <Text style={styles.descriptionText}>{selectedProduct.description}</Text>
+                        {selectedProduct.description &&
+                          selectedProduct.description.length > DESCRIPTION_LIMIT && (
+                            <TouchableOpacity onPress={() => setIsDescriptionExpanded(false)}>
+                              <Text style={styles.readMoreText}>Read Less</Text>
+                            </TouchableOpacity>
+                          )}
+                      </View>
+                    )}
                   </RNScrollView>
                 )}
                 <TouchableOpacity
                   onPress={() => setIsDescriptionModalVisible(false)}
                   style={styles.modalClose}
+                  accessibilityLabel="Close Details Modal"
                 >
-                  <Ionicons name="close-outline" size={24} color="#FFFFFF" />
+                  <Ionicons name="close-outline" size={20} color="#FFFFFF" />
                 </TouchableOpacity>
               </View>
             </TouchableOpacity>
           </Modal>
+          {/* ---------------------------------------------------------------- */}
 
           <Modal
             visible={isFilterModalVisible}
@@ -1379,7 +1426,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
                     </View>
                   </RNScrollView>
                 ) : (
-                  // --- Grid view for search results ---
                   <FlatList
                     data={searchResults}
                     keyExtractor={(item) => item.id}
@@ -1389,8 +1435,8 @@ const Dashboard: React.FC<DashboardProps> = () => {
                       <TouchableOpacity
                         style={styles.searchResultItem}
                         onPress={() => {
-                          setCameFromSearch(true); // new state flag in Dashboard
-                          closeSearch(); // dismiss the modal
+                          setCameFromSearch(true);
+                          closeSearch();
                           navigation.push("ProductDetail", {
                             productId: item.id,
                           });
@@ -1577,33 +1623,29 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   profileContainer: {
-    flexDirection: "row", // Ensures items are placed horizontally
-    alignItems: "center", // Aligns items vertically in the center
-    marginBottom: 10, // Keep spacing below profile section
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 15,
   },
-
   profilePicture: {
     width: 50,
     height: 50,
     borderRadius: 25,
+    borderWidth: 2,
+    borderColor: "#555",
   },
-
   nameContainer: {
-    marginLeft: 10, // Adds space between image and name
-    color: "white",
+    marginLeft: 12,
   },
-
   sellerName: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "bold",
     color: "#FFFFFF",
   },
-
   sellerInstitution: {
     fontSize: 14,
     color: "#AAAAAA",
   },
-
   advancedSearchBar: {
     flexDirection: "row",
     alignItems: "center",
@@ -1703,6 +1745,11 @@ const styles = StyleSheet.create({
     borderRadius: 50,
     marginLeft: 10,
   },
+  ratingContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 6,
+  },
   imageIndicatorsContainer: {
     position: "absolute",
     top: 20,
@@ -1774,13 +1821,11 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   modalTitle: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: "bold",
     color: "#FFFFFF",
-    textAlign: "center",
-    alignSelf: "center",
-    marginBottom: 12,
-    width: "100%",
+    marginBottom: 10,
+    textAlign: "left",
   },
   divider: {
     backgroundColor: "#444",
@@ -1804,7 +1849,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   modalContentContainer: {
-    alignItems: "center",
+    alignItems: "flex-start",
     width: "100%",
   },
   filterModalOptionText: {
@@ -1852,7 +1897,7 @@ const styles = StyleSheet.create({
     right: 10,
     backgroundColor: "rgba(255,255,255,0.2)",
     borderRadius: 15,
-    padding: 1,
+    padding: 5,
   },
   detailsModalContent: {
     width: "90%",
@@ -1866,8 +1911,8 @@ const styles = StyleSheet.create({
   descriptionModalContent: {
     width: "90%",
     maxHeight: "80%",
-    backgroundColor: "#2C2C2E",
-    borderRadius: 20,
+    backgroundColor: "#1C1C1E",
+    borderRadius: 15,
     padding: 20,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 10 },
@@ -1875,6 +1920,13 @@ const styles = StyleSheet.create({
     shadowRadius: 20,
     elevation: 10,
     position: "relative",
+  },
+  detailsContainer: {
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#BB86FC",
+    marginBottom: 12,
   },
   modalScrollContent: {
     paddingRight: 10,
@@ -1889,12 +1941,17 @@ const styles = StyleSheet.create({
   detailText: {
     fontSize: 16,
     color: "#E5E5EA",
-    marginBottom: 8,
+    marginBottom: 6,
   },
   descriptionText: {
     fontSize: 14,
     color: "#D1D1D6",
     lineHeight: 20,
+  },
+  readMoreText: {
+    color: "#FF3B30",
+    fontSize: 14,
+    marginTop: 5,
   },
   requestedStoriesContainer: {
     position: "absolute",
@@ -1945,7 +2002,6 @@ const styles = StyleSheet.create({
   requestedScrollView: {
     height: 40,
   },
-  // --- Advanced Search Modal Styles ---
   searchBlurContainer: {
     flex: 1,
   },
@@ -1977,20 +2033,18 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     fontSize: 12,
   },
-  // --- New styles for grid view search results ---
   searchResultsContainer: {
     paddingHorizontal: 10,
     paddingTop: 10,
   },
   searchResultItem: {
-    width: SCREEN_WIDTH / 2 - 15, // Always keep space for 2 items
+    width: SCREEN_WIDTH / 2 - 15,
     margin: 5,
-    aspectRatio: 1, // Keeps it square
+    aspectRatio: 1,
     borderRadius: 10,
     overflow: "hidden",
     backgroundColor: "#eee",
   },
-
   searchResultImage: {
     width: "100%",
     height: "100%",
