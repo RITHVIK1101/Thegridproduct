@@ -575,25 +575,6 @@ const CartScreen: React.FC = () => {
                 ${calculateTotal().toFixed(2)}
               </Text>
             </View>
-            <TouchableOpacity
-              style={styles.messageAllButton}
-              onPress={messageAllProducts}
-              accessibilityLabel="Message All Sellers"
-              disabled={isMessaging}
-            >
-              {isMessaging ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <>
-                  <Text style={styles.messageAllButtonText}>Message All</Text>
-                  <Ionicons
-                    name="chatbubble-ellipses-outline"
-                    size={20}
-                    color="#fff"
-                  />
-                </>
-              )}
-            </TouchableOpacity>
           </View>
         </>
       ) : !isTransitioning ? (
