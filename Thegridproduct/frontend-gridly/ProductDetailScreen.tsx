@@ -22,6 +22,7 @@ import { LinearGradient } from "expo-linear-gradient";
 
 type ProductDetailRouteParams = {
   productId: string;
+  hideProfileIcon?: boolean; // new optional flag to hide the profile icon
 };
 
 const { width } = Dimensions.get("window");
@@ -31,7 +32,7 @@ const DESCRIPTION_LIMIT = 200; // character limit for description truncation
 const ProductDetailScreen: React.FC = () => {
   const route = useRoute();
   const navigation = useNavigation<StackNavigationProp<RootStackParamList, "ProductDetail">>();
-  const { productId } = route.params as ProductDetailRouteParams;
+  const { productId, hideProfileIcon } = route.params as ProductDetailRouteParams;
   const { token, userId } = useContext(UserContext);
 
   const [product, setProduct] = useState<any>(null);
@@ -75,9 +76,9 @@ const ProductDetailScreen: React.FC = () => {
     fetchProductDetails();
   }, [productId, token]);
 
-  // Fetch poster profile
+  // Fetch poster profile only if hideProfileIcon is not set (to avoid stacking screens)
   useEffect(() => {
-    if (product && product.userId) {
+    if (!hideProfileIcon && product && product.userId) {
       const fetchUserProfile = async () => {
         try {
           const response = await fetch(`${NGROK_URL}/users/${product.userId}`, {
@@ -99,7 +100,7 @@ const ProductDetailScreen: React.FC = () => {
 
       fetchUserProfile();
     }
-  }, [product, token]);
+  }, [product, token, hideProfileIcon]);
 
   // Add-to-Cart function
   const addToCart = async () => {
@@ -214,7 +215,7 @@ const ProductDetailScreen: React.FC = () => {
 
   return (
     <ScrollView style={styles.container}>
-      {/* Image Swiper with floating profile icon */}
+      {/* Image Swiper with optional floating profile icon */}
       <View style={styles.swiperContainer}>
         <SwiperFlatList
           autoplay={autoplay}
@@ -229,7 +230,8 @@ const ProductDetailScreen: React.FC = () => {
           renderItem={renderImageItem}
           keyExtractor={(_, index) => `${product.id}_image_${index}`}
         />
-        {posterProfile && (
+        {/* Only show the profile icon if hideProfileIcon is not true */}
+        {!hideProfileIcon && posterProfile && (
           <TouchableOpacity
             style={styles.floatingProfileIcon}
             onPress={() =>

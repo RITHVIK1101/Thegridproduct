@@ -20,7 +20,6 @@ import { LinearGradient } from "expo-linear-gradient";
 import * as Animatable from "react-native-animatable";
 
 const { width } = Dimensions.get("window");
-// Using original header sizes
 const HEADER_MAX_HEIGHT = 200;
 const HEADER_MIN_HEIGHT = 70;
 
@@ -93,7 +92,6 @@ const UserProfileScreen: React.FC = () => {
     );
   }
 
-  // Animated header height interpolation remains unchanged
   const headerHeight = scrollY.interpolate({
     inputRange: [0, HEADER_MAX_HEIGHT - HEADER_MIN_HEIGHT],
     outputRange: [HEADER_MAX_HEIGHT, HEADER_MIN_HEIGHT],
@@ -151,7 +149,7 @@ const UserProfileScreen: React.FC = () => {
     >
       <TouchableOpacity
         onPress={() =>
-          navigation.push("ProductDetail", { productId: item.id })
+          navigation.push("ProductDetail", { productId: item.id, hideProfileIcon: true })
         }
       >
         <Image
@@ -173,7 +171,6 @@ const UserProfileScreen: React.FC = () => {
     </Animatable.View>
   );
 
-  // List header remains the same (without any negative margins)
   const ListHeader = () => (
     <View style={styles.listHeader}>
       {renderHeader()}
@@ -194,7 +191,6 @@ const UserProfileScreen: React.FC = () => {
         )}
         scrollEventThrottle={16}
         ListHeaderComponent={ListHeader}
-        // Shift entire content upward without changing sizes
         contentContainerStyle={[styles.productsContainer, { marginTop: -55 }]}
         columnWrapperStyle={styles.columnWrapper}
         renderItem={renderProductItem}
