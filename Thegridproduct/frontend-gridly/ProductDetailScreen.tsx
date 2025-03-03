@@ -47,6 +47,27 @@ const ProductDetailScreen: React.FC = () => {
     useState<boolean>(false);
   const [isRequesting, setIsRequesting] = useState<boolean>(false);
 
+  // Function to render star rating
+  const renderStars = (rating: number): JSX.Element => {
+    const stars = [];
+    for (let i = 0; i < 5; i++) {
+      stars.push(
+        <Ionicons
+          key={i}
+          name={i < rating ? "star" : "star-outline"}
+          size={16}
+          color="#FFD700"
+          style={{ marginRight: 2 }}
+        />
+      );
+    }
+    return (
+      <View style={{ flexDirection: "row", alignItems: "center" }}>
+        {stars}
+      </View>
+    );
+  };
+
   // Fetch product details
   useEffect(() => {
     const fetchProductDetails = async () => {
@@ -324,8 +345,18 @@ const ProductDetailScreen: React.FC = () => {
           </View>
           <View style={styles.detailItem}>
             <Text style={styles.detailLabel}>Condition</Text>
-            <Text style={styles.detailValue}>{product.quality || "N/A"}</Text>
+            <Text style={styles.detailValue}>{product.condition || "N/A"}</Text>
           </View>
+          {product.condition?.toLowerCase() === "used" &&
+            product.rating > 0 && (
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>Rating</Text>
+                <View style={styles.detailValue}>
+                  {renderStars(product.rating)}
+                </View>
+              </View>
+            )}
+
           {product.rentPrice && product.rentPrice > 0 ? (
             <View style={styles.detailItem}>
               <Text style={styles.detailLabel}>Renting Price</Text>
@@ -526,5 +557,71 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 20,
     fontWeight: "bold",
+  },
+  gridsBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#7B61FF",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 15,
+    alignSelf: "flex-start",
+    marginTop: 10,
+    shadowColor: "#7B61FF",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+  },
+  gridsText: {
+    fontSize: 14,
+    color: "#FFFFFF",
+    fontWeight: "600",
+    marginLeft: 5,
+  },
+  listingsTitle: {
+    fontSize: 22,
+    fontWeight: "700",
+    color: "#FFFFFF",
+    textAlign: "center",
+    marginVertical: 16,
+  },
+  productsContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 20,
+    backgroundColor: "#000000",
+  },
+  columnWrapper: {
+    justifyContent: "space-between",
+    marginBottom: 16,
+  },
+  productCard: {
+    backgroundColor: "#121212",
+    borderRadius: 12,
+    overflow: "hidden",
+    width: (width - 48) / 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 6,
+  },
+  productImage: {
+    width: "100%",
+    height: 140,
+  },
+  productInfo: {
+    padding: 10,
+    backgroundColor: "#1C1C1E",
+  },
+  productTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#FFFFFF",
+  },
+  productPrice: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#A18CD1",
+    marginTop: 4,
   },
 });
