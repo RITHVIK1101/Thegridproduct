@@ -4,7 +4,6 @@ import Ionicons from "react-native-vector-icons/Ionicons";
 import { UserContext } from "./UserContext";
 
 const UserMenuScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
-  // Add profilePic here
   const {
     clearUser,
     firstName,
@@ -12,6 +11,7 @@ const UserMenuScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     institution,
     studentType,
     profilePic,
+    grids, // ✅ Fetch grids from context
   } = useContext(UserContext);
 
   const handleLogout = async () => {
@@ -52,6 +52,7 @@ const UserMenuScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           <Text style={styles.bottomSheetUserName}>
             {firstName} {lastName}
           </Text>
+
           {institution && (
             <Text style={styles.bottomSheetUserInstitution}>{institution}</Text>
           )}
@@ -60,6 +61,9 @@ const UserMenuScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
               {studentType.charAt(0).toUpperCase() + studentType.slice(1)}
             </Text>
           )}
+
+          {/* ✅ Display Grids count */}
+          <Text style={styles.bottomSheetGrids}>{grids} Grids</Text>
         </View>
 
         <View style={styles.bottomSheetOptions}>
@@ -142,7 +146,6 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     overflow: "hidden", // So image doesn't spill out
   },
-  // Add a style for the image
   menuProfileImage: {
     width: 60,
     height: 60,
@@ -155,6 +158,15 @@ const styles = StyleSheet.create({
   },
   bottomSheetUserName: { fontSize: 18, fontWeight: "700", color: "#FFFFFF" },
   bottomSheetUserInstitution: { fontSize: 14, color: "#CCCCCC", marginTop: 5 },
+
+  /* ✅ New Style for Grids */
+  bottomSheetGrids: {
+    fontSize: 14,
+    color: "#BBBBBB", // Subtle grayish color
+    marginTop: 5,
+    fontWeight: "500",
+  },
+
   bottomSheetOptions: { marginTop: 20, width: "100%" },
   bottomSheetOption: {
     flexDirection: "row",

@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"math/rand"
 	"net/http"
 	"time"
 
@@ -19,7 +20,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-// GetUserHandler handles fetching a user's details by ID, including profilePic
+// GetUserHandler handles fetching a user's details by ID, including profilePic and Grids
 func GetUserHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -42,7 +43,7 @@ func GetUserHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Define projection to include only required fields, including profilePic
+	// ✅ Include Grids in the projection
 	projection := bson.M{
 		"firstName":   1,
 		"lastName":    1,
@@ -50,6 +51,7 @@ func GetUserHandler(w http.ResponseWriter, r *http.Request) {
 		"institution": 1,
 		"profilePic":  1, // Include profile picture
 		"studentType": 1,
+		"grids":       1, // ✅ Now fetching Grids
 	}
 
 	findOptions := options.FindOne().SetProjection(projection)
@@ -155,4 +157,29 @@ func StorePushTokenHandler(w http.ResponseWriter, r *http.Request) {
 
 	// If user is found in neither collection
 	http.Error(w, "User not found in any collection", http.StatusNotFound)
+}
+func IncrementUserGrids(userID primitive.ObjectID, studentType string) error {
+	// Determine the correct collection based on student type.
+	var collectionName string
+	if studentType == StudentTypeUniversity {
+		collectionName = "university_users"
+	} else {
+		collectionName = "highschool_users"
+	}
+	userCollection := db.GetCollection("gridlyapp", collectionName)
+
+	// Generate a random increment between 4 and 10 inclusive.
+	// rand.Intn(n) returns a value in [0, n), so use rand.Intn(7) + 4.
+	increment := rand.Intn(7) + 4
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Use the $inc operator to increment the grids field.
+	update := bson.M{"$inc": bson.M{"grids": increment}}
+	_, err := userCollection.UpdateOne(ctx, bson.M{"_id": userID}, update)
+	if err != nil {
+		log.Printf("Error incrementing grids for user %s: %v", userID.Hex(), err)
+	}
+	return err
 }

@@ -9,13 +9,13 @@ import {
   TouchableOpacity,
   Image,
 } from "react-native";
-
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { UserContext } from "./UserContext"; // Adjust path if necessary
 import { NGROK_URL } from "@env";
 import { CommonActions, useNavigation } from "@react-navigation/native";
-import { StackNavigationProp } from "@react-navigation/stack";
+import { StackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "./navigationTypes"; // Adjust path if necessary
+import * as ImagePicker from "expo-image-picker";
 
 type AccountScreenNavigationProp = StackNavigationProp<
   RootStackParamList,
@@ -87,6 +87,76 @@ const AccountScreen: React.FC = () => {
     fetchUserData();
   }, []);
 
+  // Function to upload new profile pic (Cloudinary upload then PUT to backend)
+  const uploadProfilePic = async (uri: string) => {
+    try {
+      const CLOUDINARY_URL =
+        "https://api.cloudinary.com/v1_1/ds0zpfht9/image/upload";
+      const UPLOAD_PRESET = "gridly_preset";
+
+      const formData = new FormData();
+      formData.append("file", {
+        uri,
+        type: "image/jpeg",
+        name: `profile_${Date.now()}.jpg`,
+      } as any);
+      formData.append("upload_preset", UPLOAD_PRESET);
+
+      // Upload to Cloudinary
+      const cloudResponse = await fetch(CLOUDINARY_URL, {
+        method: "POST",
+        body: formData,
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+      const cloudData = await cloudResponse.json();
+      if (!cloudData.secure_url) {
+        throw new Error("Failed to upload image.");
+      }
+      const newProfilePicUrl = cloudData.secure_url;
+
+      // Update backend with the new profile pic URL using a PUT request
+      const updateResponse = await fetch(`${NGROK_URL}/user/update-profile`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ profilePic: newProfilePicUrl }),
+      });
+
+      if (!updateResponse.ok) {
+        throw new Error("Failed to update profile picture.");
+      }
+      const updateData = await updateResponse.json();
+
+      // Update local state with the new profilePic
+      setUserData((prevData: any) => ({
+        ...prevData,
+        profilePic: updateData.profilePic,
+      }));
+
+      Alert.alert("Success", "Profile picture updated!");
+    } catch (error) {
+      console.error("Profile pic upload error:", error);
+      Alert.alert("Error", "Failed to update profile picture.");
+    }
+  };
+
+  // Function to pick an image from the library
+  const pickImage = async () => {
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1], // Square crop
+      quality: 0.7,
+    });
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      await uploadProfilePic(result.assets[0].uri);
+    }
+  };
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -116,21 +186,19 @@ const AccountScreen: React.FC = () => {
 
       {/* Profile Picture */}
       <View style={styles.profileContainer}>
-        {userData.profilePic ? (
-          <Image
-            source={{ uri: userData.profilePic }}
-            style={styles.profilePic}
-          />
-        ) : (
-          <TouchableOpacity
-            style={styles.placeholder}
-            onPress={() => console.log("Add profile pic clicked")}
-          >
-            <Ionicons name="camera-outline" size={30} color="#666" />
-
-            <Text style={styles.placeholderText}>Add Profile Pic</Text>
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity onPress={pickImage}>
+          {userData.profilePic ? (
+            <Image
+              source={{ uri: userData.profilePic }}
+              style={styles.profilePic}
+            />
+          ) : (
+            <View style={styles.placeholder}>
+              <Ionicons name="camera-outline" size={30} color="#666" />
+              <Text style={styles.placeholderText}>Add Profile Pic</Text>
+            </View>
+          )}
+        </TouchableOpacity>
       </View>
 
       {/* User Details */}
@@ -179,11 +247,9 @@ const AccountScreen: React.FC = () => {
                           Authorization: `Bearer ${token}`,
                         },
                       });
-
                       if (!response.ok) {
                         throw new Error("Failed to delete account.");
                       }
-
                       Alert.alert(
                         "Account Deleted",
                         "Your account has been successfully deleted."
@@ -309,7 +375,6 @@ const styles = StyleSheet.create({
     color: "#666",
     marginTop: 5,
   },
-
   note: {
     marginTop: 20,
     fontSize: 14,

@@ -85,7 +85,7 @@ const VerificationScreen: React.FC = () => {
       const data = await response.json();
       console.log("Verification Response:", data); // Debugging
 
-      // Extract user details from response
+      // Extract user details from response, including `grids`
       const {
         token,
         userId,
@@ -94,18 +94,20 @@ const VerificationScreen: React.FC = () => {
         firstName,
         lastName,
         profilePic,
+        grids, // ✅ Get grids from response
       } = data;
 
-      // ✅ Use defaults to prevent `undefined` values from breaking the check
+      // ✅ Use defaults to prevent `undefined` values
       if (!token || !userId || !institution) {
         setError("Invalid user data received. Please try again.");
         return;
       }
 
-      const validStudentType = studentType || "university"; // ✅ Ensure studentType is set
-      const validProfilePic = profilePic || null; // ✅ Default profilePic to null if missing
+      const validStudentType = studentType || "university";
+      const validProfilePic = profilePic || null;
+      const validGrids = grids ?? 0; // ✅ Ensure grids defaults to 0 if missing
 
-      // Save data to SecureStore
+      // ✅ Store data in SecureStore
       await SecureStore.setItemAsync("userToken", token);
       await SecureStore.setItemAsync("userId", userId);
       await SecureStore.setItemAsync("firstName", firstName || "Unknown");
@@ -115,8 +117,9 @@ const VerificationScreen: React.FC = () => {
       if (validProfilePic) {
         await SecureStore.setItemAsync("profilePic", validProfilePic);
       }
+      await SecureStore.setItemAsync("grids", validGrids.toString()); // ✅ Store grids
 
-      // Update the User Context
+      // ✅ Update the User Context
       setUser({
         token,
         userId,
@@ -125,6 +128,7 @@ const VerificationScreen: React.FC = () => {
         firstName: firstName || "Unknown",
         lastName: lastName || "User",
         profilePic: validProfilePic,
+        grids: validGrids, // ✅ Include grids
       });
 
       // Navigate to Dashboard

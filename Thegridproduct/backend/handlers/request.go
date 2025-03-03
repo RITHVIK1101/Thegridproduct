@@ -40,7 +40,7 @@ func CreateProductRequestHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	// 🔥 Fetch the user's institution before saving the request
+	// 🔥 Fetch the user's details before saving the request
 	userCollection := db.GetCollection("gridlyapp", "university_users")
 	var user models.User
 	err = userCollection.FindOne(ctx, bson.M{"_id": userObjID}).Decode(&user)
@@ -89,6 +89,13 @@ func CreateProductRequestHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Error inserting product request: %v", err)
 		WriteJSONError(w, "Error creating product request", http.StatusInternalServerError)
 		return
+	}
+
+	// 🔥 Increment Grids after successful request creation
+	err = IncrementUserGrids(userObjID, user.StudentType)
+	if err != nil {
+		log.Printf("Failed to increment grids: %v", err)
+		// Optional: Continue execution even if grids update fails
 	}
 
 	// ✅ Respond with success message

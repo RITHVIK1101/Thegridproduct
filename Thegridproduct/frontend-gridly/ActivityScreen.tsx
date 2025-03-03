@@ -910,7 +910,7 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     paddingHorizontal: 20,
-    paddingBottom: 100, // prevent content from being hidden behind BottomNavBar
+    paddingBottom: 100,
     paddingTop: 10,
     flexGrow: 1,
   },

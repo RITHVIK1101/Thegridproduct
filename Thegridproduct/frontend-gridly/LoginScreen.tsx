@@ -258,10 +258,7 @@ const LoginScreen: React.FC = () => {
       // All good => go to profile pic step
       setSignupStep("profilePic");
     } else {
-      if (!profilePic) {
-        setError("Please upload a profile picture.");
-        return;
-      }
+      // Profile picture is now optional, so we remove the validation
       const payload = {
         email,
         password,
@@ -269,7 +266,7 @@ const LoginScreen: React.FC = () => {
         lastName,
         studentType,
         institution: selectedInstitution,
-        profilePic,
+        profilePic: profilePic || null, // Allow null if no profile pic uploaded
       };
       const data = await handleApiRequest("/signup", payload);
       if (data) {
@@ -600,7 +597,13 @@ const LoginScreen: React.FC = () => {
       // Step 2: "profilePic"
       return (
         <View style={styles.profileUploadContainer}>
-          <Text style={styles.stepTitle}>Upload Your Profile Picture</Text>
+          <Text style={styles.stepTitle}>
+            Upload Your Profile Picture{" "}
+            <Text style={{ color: "#A78BFA", textAlign: "center" }}>
+              (Optional)
+            </Text>
+          </Text>
+
           <TouchableOpacity
             onPress={pickProfilePicture}
             style={styles.profilePicContainer}
@@ -621,6 +624,12 @@ const LoginScreen: React.FC = () => {
             onPress={handleSignupPress}
           >
             <Text style={styles.buttonText}>Complete Signup</Text>
+            <Ionicons
+              name="checkmark-circle-outline"
+              size={20}
+              color="#fff"
+              style={{ marginLeft: 3, marginRight: 3 }}
+            />
           </TouchableOpacity>
         </View>
       );

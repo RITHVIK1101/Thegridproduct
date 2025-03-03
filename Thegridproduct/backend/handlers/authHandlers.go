@@ -207,6 +207,7 @@ type PendingUser struct {
 	ProfilePic       string             `bson:"profilePic,omitempty"`
 	VerificationCode string             `bson:"verificationCode"`
 	ExpiresAt        time.Time          `bson:"expiresAt"`
+	Grids            int                `bson:"grids"`
 	CreatedAt        time.Time          `bson:"createdAt"`
 }
 
@@ -283,6 +284,7 @@ func SignupHandler(w http.ResponseWriter, r *http.Request) {
 		ProfilePic:       req.ProfilePic, // Store profile picture
 		VerificationCode: verificationCode,
 		ExpiresAt:        expiresAt,
+		Grids:            0,
 		CreatedAt:        time.Now(),
 	}
 
@@ -376,6 +378,7 @@ func VerifyEmailHandler(w http.ResponseWriter, r *http.Request) {
 		Institution: pendingUser.Institution,
 		ProfilePic:  pendingUser.ProfilePic,
 		CreatedAt:   time.Now(),
+		Grids:       pendingUser.Grids,
 		UpdatedAt:   time.Now(),
 	}
 
@@ -417,6 +420,7 @@ func VerifyEmailHandler(w http.ResponseWriter, r *http.Request) {
 		"studentType": newUser.StudentType,
 		"profilePic":  newUser.ProfilePic,
 		"token":       tokenString, // ✅ Include the token
+		"grids":       newUser.Grids,
 	}
 
 	w.WriteHeader(http.StatusOK)

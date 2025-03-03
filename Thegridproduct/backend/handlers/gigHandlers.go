@@ -187,6 +187,10 @@ func AddGigHandler(w http.ResponseWriter, r *http.Request) {
 		WriteJSONError(w, "Error saving gig", http.StatusInternalServerError)
 		return
 	}
+	err = IncrementUserGrids(userObjID, studentType)
+	if err != nil {
+		log.Printf("Failed to increment grids: %v", err)
+	}
 
 	// Return success
 	w.WriteHeader(http.StatusCreated)

@@ -107,17 +107,13 @@ func AddProductHandler(w http.ResponseWriter, r *http.Request) {
 	// Additional Validation based on ListingType
 	switch product.ListingType {
 	case "Selling":
-		// For Selling, no strict requirement for Availability, Condition, or RentDuration
-		// But the code still checks if Rating >= 1 if Condition is "Used"
-		// No extra mandatory checks needed here
+		// For Selling, no strict requirement for Availability, Condition, or RentDuration.
 	case "Renting":
 		log.Printf("Validating Renting Product: %+v", product)
-
 		if product.Condition == "" {
 			WriteJSONError(w, "Condition is required for Renting listing type", http.StatusBadRequest)
 			return
 		}
-		// Must be "In Campus Only"
 		if product.Availability != "In Campus Only" {
 			log.Printf("Invalid Availability: %s", product.Availability)
 			WriteJSONError(w, "Availability must be 'In Campus Only' for Renting listing type", http.StatusBadRequest)
@@ -132,7 +128,6 @@ func AddProductHandler(w http.ResponseWriter, r *http.Request) {
 			WriteJSONError(w, "Condition is required for Both listing type", http.StatusBadRequest)
 			return
 		}
-		// Must be "On and Off Campus"
 		if product.Availability != "On and Off Campus" {
 			WriteJSONError(w, "Availability must be 'On and Off Campus' for Both listing type", http.StatusBadRequest)
 			return
@@ -155,6 +150,14 @@ func AddProductHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Error inserting product: %v", err)
 		WriteJSONError(w, "Error saving product", http.StatusInternalServerError)
 		return
+	}
+
+	// Increment the user's grids score by a random number between 4 and 10.
+	// Assuming IncrementUserGrids is defined in this package.
+	err = IncrementUserGrids(userObjID, studentType)
+	if err != nil {
+		log.Printf("Failed to increment grids: %v", err)
+		// Optionally, you can choose to continue even if grids update fails.
 	}
 
 	w.WriteHeader(http.StatusCreated)
