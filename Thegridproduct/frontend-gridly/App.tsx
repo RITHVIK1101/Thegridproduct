@@ -16,6 +16,7 @@ import {
 } from "react-native";
 import Icon from "react-native-vector-icons/MaterialIcons";
 import UserProfileScreen from "./UserProfileScreen";
+import { LinearGradient } from "expo-linear-gradient";
 import Ionicons from "react-native-vector-icons/Ionicons";
 
 import ProductDetailScreen from "./ProductDetailScreen";
@@ -222,7 +223,7 @@ const HeaderRightComponent = (
       style={styles.headerIcon}
       accessibilityLabel="Go to Cart"
     >
-      <Ionicons name="cart-outline" size={26} color="#FFFFFF" />
+      <Ionicons name="bag" size={26} color="#FFFFFF" />
     </TouchableOpacity>
     <UserAvatar
       firstName={firstName}
@@ -332,19 +333,19 @@ const AppNavigator: React.FC<AppNavigatorProps> = ({ firstRender }) => {
             }
           />
           <Stack.Screen
-  name="UserProfile"
-  component={UserProfileScreen}
-  options={({ navigation }) =>
-    getHeaderOptions(
-      navigation,
-      firstName,
-      lastName,
-      profilePic ?? undefined,
-      true, // show back button
-      true  // enable animation
-    )
-  }
-/>
+            name="UserProfile"
+            component={UserProfileScreen}
+            options={({ navigation }) =>
+              getHeaderOptions(
+                navigation,
+                firstName,
+                lastName,
+                profilePic ?? undefined,
+                true, // show back button
+                true // enable animation
+              )
+            }
+          />
 
           <Stack.Screen
             name="AddGig"
@@ -412,7 +413,6 @@ const AppNavigator: React.FC<AppNavigatorProps> = ({ firstRender }) => {
               )
             }
           />
-
 
           <Stack.Screen
             name="Cart"
