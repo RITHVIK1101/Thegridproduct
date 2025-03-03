@@ -82,6 +82,7 @@ type User = {
   firstName: string;
   lastName: string;
   institution: string;
+  profilePicture: string;
 };
 
 type CartItem = {
@@ -121,6 +122,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isDescriptionModalVisible, setIsDescriptionModalVisible] =
     useState(false);
+  const [cameFromSearch, setCameFromSearch] = useState(false);
 
   // --- Requested Products ---
   const [requestedProducts, setRequestedProducts] = useState<
@@ -132,8 +134,14 @@ const Dashboard: React.FC<DashboardProps> = () => {
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<Product[]>([]);
+  const [selectedProductOwner, setSelectedProductOwner] = useState<User | null>(
+    null
+  );
+
   // New state: if a suggestion bubble is tapped, store its category tag.
-  const [suggestionCategory, setSuggestionCategory] = useState<string | null>(null);
+  const [suggestionCategory, setSuggestionCategory] = useState<string | null>(
+    null
+  );
 
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
 
@@ -237,12 +245,43 @@ const Dashboard: React.FC<DashboardProps> = () => {
       }, 2500);
     });
   };
+  const onShowDescription = (product: Product) => {
+    if (product.userId) {
+      fetchProductOwner(product.userId); // Fetch owner first
+    }
+    setSelectedProduct(product);
+    setIsDescriptionModalVisible(true);
+  };
 
   const toggleFavorite = (productId: string) => {
     if (likedProducts.includes(productId)) {
       unlikeProduct(productId);
     } else {
       likeProduct(productId);
+    }
+  };
+  const fetchProductOwner = async (ownerId: string) => {
+    if (!ownerId || !token) return;
+    try {
+      console.log("Fetching product owner for ID:", ownerId);
+
+      const response = await fetch(`${NGROK_URL}/users/${ownerId}`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch owner details.");
+      }
+
+      const ownerData: User = await response.json();
+      console.log("Fetched Owner Data:", ownerData); // ✅ Debugging Line
+      setSelectedProductOwner(ownerData);
+    } catch (error) {
+      console.error("Error fetching product owner:", error);
     }
   };
 
@@ -653,7 +692,15 @@ const Dashboard: React.FC<DashboardProps> = () => {
       fetchLikedProducts();
     }, [token])
   );
-  
+  useFocusEffect(
+    React.useCallback(() => {
+      if (cameFromSearch) {
+        setIsSearchActive(true);
+        setCameFromSearch(false);
+      }
+    }, [cameFromSearch])
+  );
+
   useEffect(() => {
     fetchProducts();
     fetchCart();
@@ -673,7 +720,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
     }
   }, [searchQuery, allProducts]);
 
-  // When suggestionCategory is set, update the search results accordingly.
   useEffect(() => {
     if (suggestionCategory) {
       const results = allProducts.filter(
@@ -685,7 +731,6 @@ const Dashboard: React.FC<DashboardProps> = () => {
     }
   }, [suggestionCategory, allProducts, userId]);
 
-  // When opening search, no random images are selected now.
   const openSearch = () => {
     setIsSearchActive(true);
     setSearchQuery("");
@@ -765,7 +810,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
         );
       }
     }, [nextProduct]);
-    
+
     const SWIPE_THRESHOLD = 20;
     const onPanHandlerStateChange = (event: any) => {
       if (event.nativeEvent.state === GestureState.END) {
@@ -822,7 +867,12 @@ const Dashboard: React.FC<DashboardProps> = () => {
         : product.outOfCampusPrice ?? product.price;
 
     return (
-      <View style={[styles.stackedProduct, index === currentIndex ? styles.topProduct : styles.bottomProduct]}>
+      <View
+        style={[
+          styles.stackedProduct,
+          index === currentIndex ? styles.topProduct : styles.bottomProduct,
+        ]}
+      >
         <PanGestureHandler onHandlerStateChange={onPanHandlerStateChange}>
           <TapGestureHandler
             onHandlerStateChange={(event) => {
@@ -842,22 +892,64 @@ const Dashboard: React.FC<DashboardProps> = () => {
                 }
               }}
             >
-              <View style={{ width: SCREEN_WIDTH, height: PRODUCT_HEIGHT, backgroundColor: "#000" }}>
-                <View style={{ flexDirection: "row", width: SCREEN_WIDTH * 2, height: "100%", backgroundColor: "#000" }}>
+              <View
+                style={{
+                  width: SCREEN_WIDTH,
+                  height: PRODUCT_HEIGHT,
+                  backgroundColor: "#000",
+                }}
+              >
+                <View
+                  style={{
+                    flexDirection: "row",
+                    width: SCREEN_WIDTH * 2,
+                    height: "100%",
+                    backgroundColor: "#000",
+                  }}
+                >
                   <View style={{ width: SCREEN_WIDTH, height: "100%" }}>
-                    <LinearGradient colors={["rgba(0,0,0,0.5)", "transparent"]} style={styles.topGradientOverlay} />
-                    <Image source={{ uri: currentImageURI }} style={[styles.productImage, { backgroundColor: "#000" }]} fadeDuration={0} resizeMode="cover" />
-                    <LinearGradient colors={["transparent", "rgba(0,0,0,0.3)"]} style={styles.bottomGradientOverlay} />
+                    <LinearGradient
+                      colors={["rgba(0,0,0,0.5)", "transparent"]}
+                      style={styles.topGradientOverlay}
+                    />
+                    <Image
+                      source={{ uri: currentImageURI }}
+                      style={[styles.productImage, { backgroundColor: "#000" }]}
+                      fadeDuration={0}
+                      resizeMode="cover"
+                    />
+                    <LinearGradient
+                      colors={["transparent", "rgba(0,0,0,0.3)"]}
+                      style={styles.bottomGradientOverlay}
+                    />
                   </View>
                   <View style={{ width: SCREEN_WIDTH, height: "100%" }}>
-                    <LinearGradient colors={["rgba(0,0,0,0.5)", "transparent"]} style={styles.topGradientOverlay} />
-                    <Image source={{ uri: nextImageURI }} style={[styles.productImage, { backgroundColor: "#000" }]} fadeDuration={0} resizeMode="cover" />
-                    <LinearGradient colors={["transparent", "rgba(0,0,0,0.3)"]} style={styles.bottomGradientOverlay} />
+                    <LinearGradient
+                      colors={["rgba(0,0,0,0.5)", "transparent"]}
+                      style={styles.topGradientOverlay}
+                    />
+                    <Image
+                      source={{ uri: nextImageURI }}
+                      style={[styles.productImage, { backgroundColor: "#000" }]}
+                      fadeDuration={0}
+                      resizeMode="cover"
+                    />
+                    <LinearGradient
+                      colors={["transparent", "rgba(0,0,0,0.3)"]}
+                      style={styles.bottomGradientOverlay}
+                    />
                   </View>
                 </View>
                 <View style={styles.midImageIndicatorsContainer}>
                   {product.images.map((_, idx) => (
-                    <View key={idx} style={[styles.imageIndicatorDot, idx === currentImageIndex && styles.imageIndicatorDotActive]} />
+                    <View
+                      key={idx}
+                      style={[
+                        styles.imageIndicatorDot,
+                        idx === currentImageIndex &&
+                          styles.imageIndicatorDotActive,
+                      ]}
+                    />
                   ))}
                 </View>
               </View>
@@ -867,25 +959,50 @@ const Dashboard: React.FC<DashboardProps> = () => {
         {index === currentIndex && (
           <View style={styles.productInfoBubble}>
             <View style={styles.productInfoTextContainer}>
-              <TouchableOpacity onPress={() => setTitleExpanded(!titleExpanded)}>
-                <Text style={styles.productInfoTitle} numberOfLines={titleExpanded ? undefined : 1} ellipsizeMode="tail">
+              <TouchableOpacity
+                onPress={() => setTitleExpanded(!titleExpanded)}
+              >
+                <Text
+                  style={styles.productInfoTitle}
+                  numberOfLines={titleExpanded ? undefined : 1}
+                  ellipsizeMode="tail"
+                >
                   {product.title}
                 </Text>
               </TouchableOpacity>
               <Text style={styles.productInfoPrice}>
-                ${displayPrice.toFixed(2)} / {product.rentPrice && product.rentPrice > 0
-                  ? `Renting Price: $${product.rentPrice.toFixed(2)} (${product.rentDuration || "N/A"})`
+                ${displayPrice.toFixed(2)} /{" "}
+                {product.rentPrice && product.rentPrice > 0
+                  ? `Renting Price: $${product.rentPrice.toFixed(2)} (${
+                      product.rentDuration || "N/A"
+                    })`
                   : "Renting Unavailable"}
               </Text>
             </View>
             <View style={styles.productInfoActions}>
-              <TouchableOpacity style={styles.iconButton} onPress={() => onToggleFavorite(product.id)} accessibilityLabel="Toggle Favorite">
-                <Ionicons name={isFavorite ? "heart" : "heart-outline"} size={25} color={isFavorite ? "#FF3B30" : "#FFFFFF"} />
+              <TouchableOpacity
+                style={styles.iconButton}
+                onPress={() => onToggleFavorite(product.id)}
+                accessibilityLabel="Toggle Favorite"
+              >
+                <Ionicons
+                  name={isFavorite ? "heart" : "heart-outline"}
+                  size={25}
+                  color={isFavorite ? "#FF3B30" : "#FFFFFF"}
+                />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.iconButton} onPress={() => onShowDescription(product)} accessibilityLabel="Show Details">
+              <TouchableOpacity
+                style={styles.iconButton}
+                onPress={() => onShowDescription(product)}
+                accessibilityLabel="Show Details"
+              >
                 <Ionicons name="information-circle" size={25} color="#FFFFFF" />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.iconButton} onPress={() => onAddToCart(product)} accessibilityLabel="Add to Cart">
+              <TouchableOpacity
+                style={styles.iconButton}
+                onPress={() => onAddToCart(product)}
+                accessibilityLabel="Add to Cart"
+              >
                 <Ionicons name="cart" size={25} color="#34C759" />
               </TouchableOpacity>
             </View>
@@ -898,13 +1015,24 @@ const Dashboard: React.FC<DashboardProps> = () => {
   return (
     <View style={styles.rootContainer}>
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <LinearGradient colors={["#000000", "#000000"]} style={styles.gradientBackground}>
+        <LinearGradient
+          colors={["#000000", "#000000"]}
+          style={styles.gradientBackground}
+        >
           <View style={styles.topBar}>
             <View style={styles.topBarIconsContainer}>
-              <TouchableOpacity style={styles.topBarIconContainer} onPress={toggleFilterModal} accessibilityLabel="Filter">
+              <TouchableOpacity
+                style={styles.topBarIconContainer}
+                onPress={toggleFilterModal}
+                accessibilityLabel="Filter"
+              >
                 <Ionicons name="options-outline" size={22} color="#FFFFFF" />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.topBarIconContainer} onPress={openSearch} accessibilityLabel="Search">
+              <TouchableOpacity
+                style={styles.topBarIconContainer}
+                onPress={openSearch}
+                accessibilityLabel="Search"
+              >
                 <Ionicons name="search-outline" size={22} color="#FFFFFF" />
               </TouchableOpacity>
             </View>
@@ -914,11 +1042,20 @@ const Dashboard: React.FC<DashboardProps> = () => {
             <View style={styles.requestedStoriesContainer}>
               <View style={styles.requestedHeader}>
                 <Text style={styles.requestedLabel}>Requested Products</Text>
-                <TouchableOpacity style={styles.viewAllButton} onPress={() => navigation.navigate("RequestedProductsPage")} accessibilityLabel="View All Requested Products">
+                <TouchableOpacity
+                  style={styles.viewAllButton}
+                  onPress={() => navigation.navigate("RequestedProductsPage")}
+                  accessibilityLabel="View All Requested Products"
+                >
                   <Text style={styles.viewAllText}>View All</Text>
                 </TouchableOpacity>
               </View>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.requestedScrollView} contentContainerStyle={styles.requestedScrollContent}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.requestedScrollView}
+                contentContainerStyle={styles.requestedScrollContent}
+              >
                 {requestedProducts.map((req, idx) => (
                   <View key={idx} style={styles.storyItem}>
                     <Text style={styles.storyText}>{req.productName}</Text>
@@ -949,25 +1086,27 @@ const Dashboard: React.FC<DashboardProps> = () => {
             <View style={{ flex: 1, backgroundColor: "#000000" }} />
           ) : (
             <View style={styles.productStack}>
-              {filteredProducts.slice(currentIndex, currentIndex + 1).map((product, idx) => (
-                <ProductItem
-                  key={product.id}
-                  product={product}
-                  nextProduct={filteredProducts[currentIndex + 1] || null}
-                  index={currentIndex + idx}
-                  currentIndex={currentIndex}
-                  onAddToCart={addToCart}
-                  onToggleFavorite={toggleFavorite}
-                  onShowDescription={(prod) => {
-                    setSelectedProduct(prod);
-                    setIsDescriptionModalVisible(true);
-                  }}
-                  onNextProduct={goToNextProduct}
-                  isFavorite={likedProducts.includes(product.id)}
-                  currentImageIndex={currentImageIndex}
-                  setCurrentImageIndex={setCurrentImageIndex}
-                />
-              ))}
+              {filteredProducts
+                .slice(currentIndex, currentIndex + 1)
+                .map((product, idx) => (
+                  <ProductItem
+                    key={product.id}
+                    product={product}
+                    nextProduct={filteredProducts[currentIndex + 1] || null}
+                    index={currentIndex + idx}
+                    currentIndex={currentIndex}
+                    onAddToCart={addToCart}
+                    onToggleFavorite={toggleFavorite}
+                    onShowDescription={(prod) => {
+                      setSelectedProduct(prod);
+                      setIsDescriptionModalVisible(true);
+                    }}
+                    onNextProduct={goToNextProduct}
+                    isFavorite={likedProducts.includes(product.id)}
+                    currentImageIndex={currentImageIndex}
+                    setCurrentImageIndex={setCurrentImageIndex}
+                  />
+                ))}
             </View>
           )}
 
@@ -977,37 +1116,75 @@ const Dashboard: React.FC<DashboardProps> = () => {
             transparent={true}
             onRequestClose={() => setIsDescriptionModalVisible(false)}
           >
-            <TouchableOpacity style={styles.centerModalOverlay} activeOpacity={1} onPressOut={() => setIsDescriptionModalVisible(false)}>
+            <TouchableOpacity
+              style={styles.centerModalOverlay}
+              activeOpacity={1}
+              onPressOut={() => setIsDescriptionModalVisible(false)}
+            >
               <View style={styles.descriptionModalContent}>
                 {selectedProduct && (
-                  <RNScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScrollContent}>
+                  <RNScrollView
+                    showsVerticalScrollIndicator={false}
+                    contentContainerStyle={styles.modalScrollContent}
+                  >
                     <View style={styles.modalContentContainer}>
-                      <View style={{ alignItems: "center", width: "100%", marginBottom: 10 }}>
-                        <Text style={styles.modalTitle}>{selectedProduct?.title}</Text>
-                      </View>
-                      <View style={{ alignSelf: "flex-start", width: "100%" }}>
-                        <Text style={styles.detailText}>Condition: {selectedProduct?.quality}</Text>
-                        <Text style={styles.detailText}>Price: ${selectedProduct?.price.toFixed(2)}</Text>
-                        <Text style={styles.detailText}>Seller's Campus: {selectedProduct?.university}</Text> 
-                      </View>
-                    </View>
-                    {selectedProduct.quality !== "New" && (
-                      <>
-                        {selectedProduct.rating && selectedProduct.rating > 0 && (
-                          <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
-                            <Text style={styles.detailText}>Rating: </Text>
-                            {[...Array(selectedProduct.rating)].map((_, i) => (
-                              <Ionicons key={i} name="star" size={16} color="#FFD700" />
-                            ))}
-                          </View>
+                      <View style={styles.profileContainer}>
+                        {/* Profile Picture */}
+                        {selectedProductOwner?.profilePicture ? (
+                          <Image
+                            source={{
+                              uri: selectedProductOwner.profilePicture,
+                            }}
+                            style={styles.profilePicture}
+                          />
+                        ) : (
+                          <Ionicons
+                            name="person-circle"
+                            size={50}
+                            color="#777"
+                          />
                         )}
-                      </>
-                    )}
-                    <Text style={styles.sectionHeader}>Description</Text>
-                    <Text style={styles.descriptionText}>{selectedProduct.description}</Text>
+
+                        {/* Name Container (New) */}
+                        <View style={styles.nameContainer}>
+                          <Text style={styles.sellerName}>
+                            {selectedProductOwner?.firstName}{" "}
+                            {selectedProductOwner?.lastName}
+                          </Text>
+                          <Text style={styles.sellerInstitution}>
+                            {selectedProductOwner?.institution}
+                          </Text>
+                        </View>
+                      </View>
+
+                      {/* Product Title */}
+                      <Text style={styles.modalTitle}>
+                        {selectedProduct?.title}
+                      </Text>
+
+                      {/* Product Details */}
+                      <Text style={styles.detailText}>
+                        Condition: {selectedProduct?.quality}
+                      </Text>
+                      <Text style={styles.detailText}>
+                        Price: ${selectedProduct?.price.toFixed(2)}
+                      </Text>
+                      <Text style={styles.detailText}>
+                        Seller's Campus: {selectedProduct?.university}
+                      </Text>
+
+                      {/* Description */}
+                      <Text style={styles.sectionHeader}>Description</Text>
+                      <Text style={styles.descriptionText}>
+                        {selectedProduct.description}
+                      </Text>
+                    </View>
                   </RNScrollView>
                 )}
-                <TouchableOpacity onPress={() => setIsDescriptionModalVisible(false)} style={styles.modalClose} accessibilityLabel="Close Details Modal">
+                <TouchableOpacity
+                  onPress={() => setIsDescriptionModalVisible(false)}
+                  style={styles.modalClose}
+                >
                   <Ionicons name="close-outline" size={24} color="#FFFFFF" />
                 </TouchableOpacity>
               </View>
@@ -1020,7 +1197,11 @@ const Dashboard: React.FC<DashboardProps> = () => {
             transparent={true}
             onRequestClose={toggleFilterModal}
           >
-            <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPressOut={toggleFilterModal}>
+            <TouchableOpacity
+              style={styles.modalOverlay}
+              activeOpacity={1}
+              onPressOut={toggleFilterModal}
+            >
               <View style={styles.filterModalContainer}>
                 <Text style={styles.filterModalTitle}>Filters</Text>
                 <View style={styles.divider} />
@@ -1033,18 +1214,31 @@ const Dashboard: React.FC<DashboardProps> = () => {
                     <TouchableOpacity
                       style={[
                         styles.filterModalOption,
-                        selectedCategory === item && styles.filterModalOptionSelected,
+                        selectedCategory === item &&
+                          styles.filterModalOptionSelected,
                       ]}
                       onPress={() => setSelectedCategory(item)}
                       accessibilityLabel={`Filter by ${item}`}
                     >
                       <Ionicons
-                        name={selectedCategory === item ? "checkbox-outline" : "ellipse-outline"}
+                        name={
+                          selectedCategory === item
+                            ? "checkbox-outline"
+                            : "ellipse-outline"
+                        }
                         size={20}
-                        color={selectedCategory === item ? "#BB86FC" : "#FFFFFF"}
+                        color={
+                          selectedCategory === item ? "#BB86FC" : "#FFFFFF"
+                        }
                         style={{ marginRight: 10 }}
                       />
-                      <Text style={[styles.filterModalOptionText, selectedCategory === item && styles.filterModalOptionTextSelected]}>
+                      <Text
+                        style={[
+                          styles.filterModalOptionText,
+                          selectedCategory === item &&
+                            styles.filterModalOptionTextSelected,
+                        ]}
+                      >
                         {item === "#Everything" ? "All" : item.replace("#", "")}
                       </Text>
                     </TouchableOpacity>
@@ -1060,27 +1254,51 @@ const Dashboard: React.FC<DashboardProps> = () => {
                     <TouchableOpacity
                       style={[
                         styles.filterModalOption,
-                        campusMode === item.value && styles.filterModalOptionSelected,
+                        campusMode === item.value &&
+                          styles.filterModalOptionSelected,
                       ]}
                       onPress={() => setCampusMode(item.value)}
                       accessibilityLabel={`Filter by ${item.label}`}
                     >
                       <Ionicons
-                        name={campusMode === item.value ? "checkbox-outline" : "ellipse-outline"}
+                        name={
+                          campusMode === item.value
+                            ? "checkbox-outline"
+                            : "ellipse-outline"
+                        }
                         size={20}
-                        color={campusMode === item.value ? "#BB86FC" : "#FFFFFF"}
+                        color={
+                          campusMode === item.value ? "#BB86FC" : "#FFFFFF"
+                        }
                         style={{ marginRight: 10 }}
                       />
-                      <Text style={[styles.filterModalOptionText, campusMode === item.value && styles.filterModalOptionTextSelected]}>
+                      <Text
+                        style={[
+                          styles.filterModalOptionText,
+                          campusMode === item.value &&
+                            styles.filterModalOptionTextSelected,
+                        ]}
+                      >
                         {item.label}
                       </Text>
                     </TouchableOpacity>
                   )}
                 />
-                <TouchableOpacity style={styles.applyButton} onPress={() => { toggleFilterModal(); fetchProducts(); }} accessibilityLabel="Apply Filters">
+                <TouchableOpacity
+                  style={styles.applyButton}
+                  onPress={() => {
+                    toggleFilterModal();
+                    fetchProducts();
+                  }}
+                  accessibilityLabel="Apply Filters"
+                >
                   <Text style={styles.applyButtonText}>Apply Filters</Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={toggleFilterModal} style={styles.modalClose} accessibilityLabel="Close Filter Modal">
+                <TouchableOpacity
+                  onPress={toggleFilterModal}
+                  style={styles.modalClose}
+                  accessibilityLabel="Close Filter Modal"
+                >
                   <Ionicons name="close-circle" size={24} color="#FFFFFF" />
                 </TouchableOpacity>
               </View>
@@ -1088,12 +1306,26 @@ const Dashboard: React.FC<DashboardProps> = () => {
           </Modal>
 
           {/* --- Modern Advanced Search Modal --- */}
-          <Modal visible={isSearchActive} animationType="fade" transparent={true} onRequestClose={closeSearch}>
-            <BlurView intensity={100} tint="light" style={styles.searchBlurContainer}>
+          <Modal
+            visible={isSearchActive}
+            animationType="fade"
+            transparent={true}
+            onRequestClose={closeSearch}
+          >
+            <BlurView
+              intensity={100}
+              tint="light"
+              style={styles.searchBlurContainer}
+            >
               <View style={styles.advancedSearchContainer}>
                 <View style={styles.searchHeader}>
                   <View style={styles.advancedSearchBar}>
-                    <Ionicons name="search" size={20} color="#888" style={styles.searchIcon} />
+                    <Ionicons
+                      name="search"
+                      size={20}
+                      color="#888"
+                      style={styles.searchIcon}
+                    />
                     <TextInput
                       style={styles.advancedSearchInput}
                       placeholder="Search products..."
@@ -1103,17 +1335,26 @@ const Dashboard: React.FC<DashboardProps> = () => {
                       autoFocus
                     />
                     {searchQuery.length > 0 && (
-                      <TouchableOpacity onPress={() => setSearchQuery("")} style={styles.clearButton}>
+                      <TouchableOpacity
+                        onPress={() => setSearchQuery("")}
+                        style={styles.clearButton}
+                      >
                         <Ionicons name="close-circle" size={20} color="#888" />
                       </TouchableOpacity>
                     )}
                   </View>
-                  <TouchableOpacity onPress={closeSearch} style={styles.closeSearchButton}>
+                  <TouchableOpacity
+                    onPress={closeSearch}
+                    style={styles.closeSearchButton}
+                  >
                     <Ionicons name="close" size={24} color="#000" />
                   </TouchableOpacity>
                 </View>
                 {searchQuery === "" && !suggestionCategory ? (
-                  <RNScrollView contentContainerStyle={styles.suggestionsContainer} keyboardShouldPersistTaps="handled">
+                  <RNScrollView
+                    contentContainerStyle={styles.suggestionsContainer}
+                    keyboardShouldPersistTaps="handled"
+                  >
                     <View style={styles.staticSuggestions}>
                       <TouchableOpacity
                         style={styles.suggestionBox}
@@ -1125,7 +1366,9 @@ const Dashboard: React.FC<DashboardProps> = () => {
                         style={styles.suggestionBox}
                         onPress={() => setSuggestionCategory("#FemaleClothing")}
                       >
-                        <Text style={styles.suggestionText}>Female Clothing</Text>
+                        <Text style={styles.suggestionText}>
+                          Female Clothing
+                        </Text>
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={styles.suggestionBox}
@@ -1143,19 +1386,34 @@ const Dashboard: React.FC<DashboardProps> = () => {
                     numColumns={3}
                     contentContainerStyle={styles.searchResultsContainer}
                     renderItem={({ item }) => (
-                      <View style={styles.searchResultItem}>
+                      <TouchableOpacity
+                        style={styles.searchResultItem}
+                        onPress={() => {
+                          setCameFromSearch(true); // new state flag in Dashboard
+                          closeSearch(); // dismiss the modal
+                          navigation.push("ProductDetail", {
+                            productId: item.id,
+                          });
+                        }}
+                      >
                         <Image
-                          source={{ uri: item.images && item.images.length > 0 ? item.images[0] : "https://via.placeholder.com/150" }}
+                          source={{
+                            uri:
+                              item.images?.[0] ||
+                              "https://via.placeholder.com/150",
+                          }}
                           style={styles.searchResultImage}
                         />
                         <View style={styles.searchResultNameContainer}>
-                          <Text style={styles.searchResultName} numberOfLines={1}>{item.title}</Text>
+                          <Text
+                            style={styles.searchResultName}
+                            numberOfLines={1}
+                          >
+                            {item.title}
+                          </Text>
                         </View>
-                      </View>
+                      </TouchableOpacity>
                     )}
-                    ListEmptyComponent={
-                      <Text style={styles.noResultsText}>None</Text>
-                    }
                   />
                 )}
               </View>
@@ -1163,7 +1421,12 @@ const Dashboard: React.FC<DashboardProps> = () => {
           </Modal>
 
           {successMessage !== "" && (
-            <Animated.View style={[styles.successToastContainer, { opacity: successOpacity }]}>
+            <Animated.View
+              style={[
+                styles.successToastContainer,
+                { opacity: successOpacity },
+              ]}
+            >
               <Text style={styles.toastText}>{successMessage}</Text>
             </Animated.View>
           )}
@@ -1313,6 +1576,34 @@ const styles = StyleSheet.create({
     borderBottomColor: "#ddd",
     zIndex: 10,
   },
+  profileContainer: {
+    flexDirection: "row", // Ensures items are placed horizontally
+    alignItems: "center", // Aligns items vertically in the center
+    marginBottom: 10, // Keep spacing below profile section
+  },
+
+  profilePicture: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+  },
+
+  nameContainer: {
+    marginLeft: 10, // Adds space between image and name
+    color: "white",
+  },
+
+  sellerName: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#FFFFFF",
+  },
+
+  sellerInstitution: {
+    fontSize: 14,
+    color: "#AAAAAA",
+  },
+
   advancedSearchBar: {
     flexDirection: "row",
     alignItems: "center",
@@ -1699,7 +1990,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     backgroundColor: "#eee",
   },
-  
+
   searchResultImage: {
     width: "100%",
     height: "100%",

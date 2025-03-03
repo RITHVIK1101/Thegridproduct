@@ -15,7 +15,10 @@ import {
   Platform,
 } from "react-native";
 import Icon from "react-native-vector-icons/MaterialIcons";
+import UserProfileScreen from "./UserProfileScreen";
 import Ionicons from "react-native-vector-icons/Ionicons";
+
+import ProductDetailScreen from "./ProductDetailScreen";
 import { NavigationContainer } from "@react-navigation/native";
 import { Image } from "react-native";
 import * as Device from "expo-device";
@@ -380,6 +383,26 @@ const AppNavigator: React.FC<AppNavigatorProps> = ({ firstRender }) => {
               )
             }
           />
+          <Stack.Screen
+            name="ProductDetail"
+            component={ProductDetailScreen}
+            options={({ navigation }) =>
+              getHeaderOptions(
+                navigation,
+                firstName,
+                lastName,
+                profilePic ?? undefined,
+                true,
+                true
+              )
+            }
+          />
+          <Stack.Screen
+            name="UserProfile"
+            component={UserProfileScreen}
+            options={{ headerShown: true, title: "User Profile" }}
+          />
+
           <Stack.Screen
             name="Cart"
             component={CartScreen}

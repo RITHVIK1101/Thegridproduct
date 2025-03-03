@@ -281,7 +281,7 @@ const LoginScreen: React.FC = () => {
     institution: string,
     studentType: StudentType
   ) => {
-    setUser({ userId, token, institution, studentType });
+    setUser({ userId, token, institution, studentType, profilePic, grids: 0 });
   };
 
   // Cloudinary upload for profile pictures

@@ -35,4 +35,5 @@ export type RootStackParamList = {
   ProductDetails: { productId: string };
   RequestProduct: undefined;
   RequestedProductsPage: undefined;
+  ProductDetail: { productId: string; };
 };
