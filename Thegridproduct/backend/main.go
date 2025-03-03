@@ -77,10 +77,13 @@ func main() {
 	protected.HandleFunc("/api/test/push-notification", handlers.ManualPushNotificationHandler).Methods("POST")
 
 	protected.HandleFunc("/products/user", handlers.GetUserProductsHandler).Methods("GET")
+	router.HandleFunc("/products/user/{userId}", handlers.GetProductsByUserIDHandler).Methods("GET")
+
 	protected.HandleFunc("/products/all", handlers.GetAllProductsHandler).Methods("GET")
 	protected.HandleFunc("/products/by-ids", handlers.GetProductsByIDsHandler).Methods("GET")
 	protected.HandleFunc("/products/liked", handlers.GetLikedProductsHandler).Methods("GET")
 	protected.HandleFunc("/products/{id}", handlers.GetSingleProductHandler).Methods("GET")
+
 	protected.HandleFunc("/products/{id}", handlers.DeleteProductHandler).Methods("DELETE")
 	protected.HandleFunc("/products/{id}", handlers.UpdateProductHandler).Methods("PUT")
 

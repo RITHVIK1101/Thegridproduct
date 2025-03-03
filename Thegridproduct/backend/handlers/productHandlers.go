@@ -1261,3 +1261,56 @@ func GetLikedProductsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 }
+
+// GetProductsByUserIDHandler retrieves all products posted by a specific user,
+// where the user ID is provided in the URL (e.g., /products/user/{userId})
+func GetProductsByUserIDHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Extract the user ID from the URL parameters
+	vars := mux.Vars(r)
+	userId := vars["userId"]
+	if userId == "" {
+		WriteJSONError(w, "User ID is required", http.StatusBadRequest)
+		return
+	}
+
+	// Convert the user ID string to a MongoDB ObjectID
+	userObjID, err := primitive.ObjectIDFromHex(userId)
+	if err != nil {
+		WriteJSONError(w, "Invalid user ID format", http.StatusBadRequest)
+		return
+	}
+
+	// Set up a context with timeout for the database query
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Get the products collection
+	collection := db.GetCollection("gridlyapp", "products")
+
+	// Find all products where the userId field matches the provided user ID
+	cursor, err := collection.Find(ctx, bson.M{"userId": userObjID})
+	if err != nil {
+		log.Printf("Error retrieving products: %v", err)
+		WriteJSONError(w, "Error retrieving products", http.StatusInternalServerError)
+		return
+	}
+	defer cursor.Close(ctx)
+
+	// Decode the found products into a slice of Product models
+	var products []models.Product
+	if err = cursor.All(ctx, &products); err != nil {
+		log.Printf("Error decoding products: %v", err)
+		WriteJSONError(w, "Error decoding products", http.StatusInternalServerError)
+		return
+	}
+
+	// Respond with the list of products
+	w.WriteHeader(http.StatusOK)
+	if err := json.NewEncoder(w).Encode(products); err != nil {
+		log.Printf("Error encoding products to JSON: %v", err)
+		WriteJSONError(w, "Error encoding response", http.StatusInternalServerError)
+		return
+	}
+}
