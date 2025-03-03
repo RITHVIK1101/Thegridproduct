@@ -132,7 +132,7 @@ const UserProfileScreen: React.FC = () => {
           <View style={styles.gridsBadge}>
             <Ionicons name="grid-outline" size={16} color="#FFF" />
             <Text style={styles.gridsText}>
-              {userProfile?.gridScore || "N/A"} Grids
+              {userProfile?.gridScore || "0"} Grids
             </Text>
           </View>
         </View>

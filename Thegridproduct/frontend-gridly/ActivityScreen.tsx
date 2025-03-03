@@ -10,6 +10,7 @@ import {
   Alert,
   TextInput,
   ScrollView,
+  ActivityIndicator,
 } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import BottomNavBar from "./components/BottomNavbar";
@@ -94,6 +95,7 @@ const ActivityScreen: React.FC = () => {
   const [errorRequested, setErrorRequested] = useState<string | null>(null);
 
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [loading, setLoading] = useState<boolean>(false);
   const inputRef = useRef<TextInput>(null);
 
   // Fetch user products
@@ -259,6 +261,7 @@ const ActivityScreen: React.FC = () => {
 
   // Fetch data based on active segment
   const fetchData = async () => {
+    setLoading(true);
     if (activeSegment === "Products") {
       setErrorProducts(null);
       await fetchUserProducts();
@@ -269,6 +272,7 @@ const ActivityScreen: React.FC = () => {
       setErrorRequested(null);
       await fetchUserRequestedProducts();
     }
+    setLoading(false);
   };
 
   // Handle deletion of a product
@@ -604,6 +608,31 @@ const ActivityScreen: React.FC = () => {
     );
   };
 
+  const renderEmptyProducts = () => (
+    <View style={styles.emptyContainer}>
+      <Text style={styles.emptyText}>You haven't added any products yet.</Text>
+      <TouchableOpacity
+        style={styles.addButton}
+        onPress={() => navigation.navigate("AddProduct")} // ✅ Ensure this is the correct screen name
+        activeOpacity={0.7}
+      >
+        <Text style={styles.addButtonText}>Add Product</Text>
+      </TouchableOpacity>
+    </View>
+  );
+  const renderEmptyGigs = () => (
+    <View style={styles.emptyContainer}>
+      <Text style={styles.emptyText}>You haven't added any gigs yet.</Text>
+      <TouchableOpacity
+        style={styles.addButton}
+        onPress={() => navigation.navigate("AddGig")} // ✅ Ensure this is the correct route name
+        activeOpacity={0.7}
+      >
+        <Text style={styles.addButtonText}>Add Gig</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
   // Render a single requested product item
   const renderRequestedProduct = ({ item }: { item: ProductRequest }) => {
     const daysActive = calculateDaysActive(item.createdAt);
@@ -645,25 +674,32 @@ const ActivityScreen: React.FC = () => {
       </View>
     );
   };
-
-  // Render requested products using FlatList without a default empty message
-  const renderRequested = () => (
-    <FlatList
-      data={filteredRequestedProducts}
-      keyExtractor={(item) => item.id}
-      renderItem={renderRequestedProduct}
-      contentContainerStyle={styles.listContainer}
-      showsVerticalScrollIndicator={false}
-      onRefresh={handleRefresh}
-      refreshing={false}
-      ItemSeparatorComponent={renderSeparator}
-    />
+  const renderEmptyRequestedProducts = () => (
+    <View style={styles.emptyContainer}>
+      <Text style={styles.emptyText}>
+        You haven't requested any products yet.
+      </Text>
+      <TouchableOpacity
+        style={styles.addButton}
+        onPress={() => navigation.navigate("RequestProduct")} // ✅ Ensure this is the correct route name
+        activeOpacity={0.7}
+      >
+        <Text style={styles.addButtonText}>Request a Product</Text>
+      </TouchableOpacity>
+    </View>
   );
 
   const renderSeparator = () => <View style={styles.separator} />;
 
-  // Render list based on the active segment
   const renderList = () => {
+    if (loading) {
+      return (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#A18CD1" />
+        </View>
+      );
+    }
+
     if (activeSegment === "Products") {
       return (
         <FlatList
@@ -675,6 +711,11 @@ const ActivityScreen: React.FC = () => {
           onRefresh={handleRefresh}
           refreshing={false}
           ItemSeparatorComponent={renderSeparator}
+          ListEmptyComponent={
+            !loading && filteredProducts.length === 0
+              ? renderEmptyProducts
+              : null
+          } // ✅ Prevent flickering
         />
       );
     } else if (activeSegment === "Gigs") {
@@ -688,10 +729,29 @@ const ActivityScreen: React.FC = () => {
           onRefresh={handleRefresh}
           refreshing={false}
           ItemSeparatorComponent={renderSeparator}
+          ListEmptyComponent={
+            !loading && filteredGigs.length === 0 ? renderEmptyGigs : null
+          } // ✅ Prevent flickering
         />
       );
     } else if (activeSegment === "Requested") {
-      return renderRequested();
+      return (
+        <FlatList
+          data={filteredRequestedProducts}
+          keyExtractor={(item) => item.id}
+          renderItem={renderRequestedProduct}
+          contentContainerStyle={styles.listContainer}
+          showsVerticalScrollIndicator={false}
+          onRefresh={handleRefresh}
+          refreshing={false}
+          ItemSeparatorComponent={renderSeparator}
+          ListEmptyComponent={
+            !loading && filteredRequestedProducts.length === 0
+              ? renderEmptyRequestedProducts
+              : null
+          } // ✅ Prevent flickering
+        />
+      );
     }
   };
 
@@ -903,6 +963,33 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 20,
   },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    marginTop: 20, // ✅ Adjust spacing
+  },
+  emptyText: {
+    fontSize: 16,
+    color: "#BBBBBB",
+    textAlign: "center",
+    marginBottom: 10,
+  },
+  addButton: {
+    backgroundColor: "#BB86FC", // ✅ Purple button color
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    marginTop: 10,
+  },
+  addButtonText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+
   errorText: {
     color: "#FF3B30",
     fontSize: 14,
@@ -981,5 +1068,11 @@ const styles = StyleSheet.create({
   separator: {
     height: 1,
     backgroundColor: "#222",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#000",
   },
 });
