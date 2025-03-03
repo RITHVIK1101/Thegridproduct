@@ -31,19 +31,6 @@ type ListingType = "Selling" | "Renting" | "Both";
 type AvailabilityUI = "In Campus" | "Out of Campus" | "Both";
 type Condition = "New" | "Used";
 
-function mapAvailabilityToBackend(availability: AvailabilityUI): string {
-  switch (availability) {
-    case "In Campus":
-      return "In Campus Only";
-    case "Out of Campus":
-      return "Off Campus Only";
-    case "Both":
-      return "On and Off Campus";
-    default:
-      return "In Campus Only";
-  }
-}
-
 const availableTags = [
   "#FemaleClothing",
   "#MaleClothing",
@@ -75,7 +62,8 @@ const AddProduct: React.FC = () => {
   const [previewModalVisible, setPreviewModalVisible] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const navigation = useNavigation();
-  const { userId, token, institution, studentType } = useContext(UserContext);
+  const { userId, token, institution, studentType, refreshUserGrids } =
+    useContext(UserContext);
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -507,6 +495,7 @@ const AddProduct: React.FC = () => {
           isAvailableOutOfCampus: false,
           condition: undefined,
         });
+        await refreshUserGrids();
         setIsSuccessModalVisible(true);
         setTimeout(() => {
           setIsSuccessModalVisible(false);

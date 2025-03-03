@@ -55,7 +55,7 @@ const CLOUDINARY_UPLOAD_PRESET = "gridly_preset";
 
 const AddGig: React.FC = () => {
   const navigation = useNavigation();
-  const { userId, token, institution, studentType } = useContext(UserContext);
+  const { userId, token, refreshUserGrids } = useContext(UserContext);
 
   // Add a header back button (similar to AddProduct)
   useLayoutEffect(() => {
@@ -282,6 +282,7 @@ const AddGig: React.FC = () => {
         setNoDeliveryRequired(false);
         setNoExpiration(false);
         setCurrentStep(1);
+        await refreshUserGrids();
         setIsSuccessModalVisible(true);
 
         // Instead of navigating to the dashboard, go back to the previous screen

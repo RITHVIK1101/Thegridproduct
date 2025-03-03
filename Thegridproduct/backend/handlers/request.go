@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -95,13 +96,31 @@ func CreateProductRequestHandler(w http.ResponseWriter, r *http.Request) {
 	err = IncrementUserGrids(userObjID, user.StudentType)
 	if err != nil {
 		log.Printf("Failed to increment grids: %v", err)
-		// Optional: Continue execution even if grids update fails
 	}
 
-	// ✅ Respond with success message
+	// ✅ Fetch updated user details (including grids count)
+	req, _ := http.NewRequest("GET", fmt.Sprintf("https://thegridproduct-production.up.railway.app/users/%s", userId), nil)
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Printf("Error calling GetUserHandler: %v", err)
+		WriteJSONError(w, "Product request added but failed to retrieve updated user data", http.StatusOK)
+		return
+	}
+	defer resp.Body.Close()
+
+	var updatedUser models.User
+	if err := json.NewDecoder(resp.Body).Decode(&updatedUser); err != nil {
+		log.Printf("Error decoding GetUserHandler response: %v", err)
+		WriteJSONError(w, "Product request added but failed to retrieve updated user data", http.StatusOK)
+		return
+	}
+
+	// ✅ Return success message including updated grids count
 	response := map[string]interface{}{
 		"message": "Product request created successfully",
 		"id":      result.InsertedID.(primitive.ObjectID).Hex(),
+		"grids":   updatedUser.Grids, // ✅ Return updated grids count
 	}
 	WriteJSON(w, response, http.StatusCreated)
 }

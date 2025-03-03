@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -20,7 +21,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-// AddProductHandler handles the creation of a new product
 func AddProductHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -67,73 +67,62 @@ func AddProductHandler(w http.ResponseWriter, r *http.Request) {
 	product.StudentType = studentType
 	product.PostedDate = time.Now()
 	product.Expired = false
-	product.LikeCount = 0 // Initialize LikeCount to 0
+	product.LikeCount = 0
 
 	// **Initialize Workflow-Related Fields**
-	product.Status = "inshop" // Set default status to "inshop"
-	product.ChatCount = 0     // Initialize chatCount to 0
+	product.Status = "inshop"
+	product.ChatCount = 0
 
-	//----------------------------------------------------
-	// Map frontend availability to final stored field:
-	// "In Campus"      => "In Campus Only"
-	// "Out of Campus"  => "Off Campus Only"
-	// "Both"           => "On and Off Campus"
-	//----------------------------------------------------
-	var mappedAvailability string
+	// Map frontend availability to stored field
 	switch product.Availability {
 	case "In Campus":
-		mappedAvailability = "In Campus Only"
+		product.Availability = "In Campus Only"
 	case "Out of Campus":
-		mappedAvailability = "Off Campus Only"
+		product.Availability = "Off Campus Only"
 	case "Both":
-		mappedAvailability = "On and Off Campus"
-	default:
-		mappedAvailability = product.Availability
+		product.Availability = "On and Off Campus"
 	}
-	product.Availability = mappedAvailability
 
+	// Validate required fields
 	if product.Title == "" || product.Description == "" || len(product.SelectedTags) == 0 ||
 		len(product.Images) == 0 || (product.ListingType != "Renting" && product.Price == 0) {
 		WriteJSONError(w, "Missing required fields or invalid input", http.StatusBadRequest)
 		return
 	}
 
-	// ✅ Make rating optional: Only validate if it's provided and non-zero
+	// Validate optional rating
 	if product.Rating != 0 && (product.Rating < 1 || product.Rating > 5) {
 		WriteJSONError(w, "Rating must be between 1 and 5 if provided", http.StatusBadRequest)
 		return
 	}
 
-	// Additional Validation based on ListingType
+	// Additional validation based on ListingType
 	switch product.ListingType {
 	case "Selling":
-		// For Selling, no strict requirement for Availability, Condition, or RentDuration.
 	case "Renting":
-		log.Printf("Validating Renting Product: %+v", product)
 		if product.Condition == "" {
-			WriteJSONError(w, "Condition is required for Renting listing type", http.StatusBadRequest)
+			WriteJSONError(w, "Condition is required for Renting", http.StatusBadRequest)
 			return
 		}
 		if product.Availability != "In Campus Only" {
-			log.Printf("Invalid Availability: %s", product.Availability)
-			WriteJSONError(w, "Availability must be 'In Campus Only' for Renting listing type", http.StatusBadRequest)
+			WriteJSONError(w, "Availability must be 'In Campus Only' for Renting", http.StatusBadRequest)
 			return
 		}
 		if product.RentDuration == "" {
-			WriteJSONError(w, "Rent Duration is required for Renting listing type", http.StatusBadRequest)
+			WriteJSONError(w, "Rent Duration is required for Renting", http.StatusBadRequest)
 			return
 		}
 	case "Both":
 		if product.Condition == "" {
-			WriteJSONError(w, "Condition is required for Both listing type", http.StatusBadRequest)
+			WriteJSONError(w, "Condition is required for Both", http.StatusBadRequest)
 			return
 		}
 		if product.Availability != "On and Off Campus" {
-			WriteJSONError(w, "Availability must be 'On and Off Campus' for Both listing type", http.StatusBadRequest)
+			WriteJSONError(w, "Availability must be 'On and Off Campus' for Both", http.StatusBadRequest)
 			return
 		}
 		if product.RentDuration == "" {
-			WriteJSONError(w, "Rent Duration is required for Both listing type", http.StatusBadRequest)
+			WriteJSONError(w, "Rent Duration is required for Both", http.StatusBadRequest)
 			return
 		}
 	default:
@@ -143,7 +132,6 @@ func AddProductHandler(w http.ResponseWriter, r *http.Request) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-
 	collection := db.GetCollection("gridlyapp", "products")
 	result, err := collection.InsertOne(ctx, product)
 	if err != nil {
@@ -152,18 +140,44 @@ func AddProductHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Increment the user's grids score by a random number between 4 and 10.
-	// Assuming IncrementUserGrids is defined in this package.
+	// ✅ Increment the user's grids count
 	err = IncrementUserGrids(userObjID, studentType)
 	if err != nil {
 		log.Printf("Failed to increment grids: %v", err)
-		// Optionally, you can choose to continue even if grids update fails.
 	}
 
+	// ✅ Fetch the updated user data after incrementing grids
+	apiURL := fmt.Sprintf("%s/users/%s", os.Getenv("API_BASE_URL"), userId) // ✅ Use environment variable for API base URL
+	req, _ := http.NewRequest("GET", apiURL, nil)
+	client := &http.Client{}
+	resp, err := client.Do(req)
+
+	var updatedGrids int
+	if err != nil {
+		log.Printf("Error calling GetUserHandler: %v", err)
+	} else {
+		defer resp.Body.Close()
+
+		if resp.StatusCode == http.StatusOK {
+			var updatedUser models.User
+			if err := json.NewDecoder(resp.Body).Decode(&updatedUser); err == nil {
+				updatedGrids = updatedUser.Grids
+			} else {
+				log.Printf("Error decoding GetUserHandler response: %v", err)
+			}
+		} else if resp.StatusCode == http.StatusNotFound {
+			log.Printf("User not found when fetching updated grids")
+		} else {
+			log.Printf("Unexpected response from GetUserHandler: %d", resp.StatusCode)
+		}
+	}
+
+	// ✅ Return response with updated grids (if available)
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"message": "Product added successfully",
 		"id":      result.InsertedID,
+		"grids":   updatedGrids, // ✅ If grids update fails, default is 0
 	})
 }
 

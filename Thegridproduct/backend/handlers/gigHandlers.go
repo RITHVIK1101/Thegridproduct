@@ -128,7 +128,6 @@ func AddGigHandler(w http.ResponseWriter, r *http.Request) {
 	if strings.TrimSpace(gigReq.ExpirationDate) != "" {
 		parsedDate, err := time.Parse(time.RFC3339, gigReq.ExpirationDate)
 		if err != nil {
-			// Try alternate date format
 			parsedDate, err = time.Parse("2006-01-02 15:04", gigReq.ExpirationDate)
 			if err != nil {
 				WriteJSONError(w, "Invalid expiration date format. Use RFC3339 or 'YYYY-MM-DD HH:MM' format.", http.StatusBadRequest)
@@ -140,7 +139,7 @@ func AddGigHandler(w http.ResponseWriter, r *http.Request) {
 		expirationDate = time.Now().AddDate(0, 0, 30) // Default to 30 days from now
 	}
 
-	// **Check if the gig is already expired**
+	// Check if the gig is already expired
 	isExpired := time.Now().After(expirationDate)
 
 	// Validate campusPresence
@@ -150,13 +149,12 @@ func AddGigHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Prepare Gig model
-	// Set `isAnonymous` to false if it's not provided in the request
 	isAnonymous := false
 	if gigReq.IsAnonymous != nil {
 		isAnonymous = *gigReq.IsAnonymous
 	}
 
-	// Prepare Gig model
+	// Create the gig object
 	gig := models.Gig{
 		UserID:         userObjID,
 		University:     university,
@@ -169,7 +167,7 @@ func AddGigHandler(w http.ResponseWriter, r *http.Request) {
 		Images:         gigReq.Images,
 		ExpirationDate: expirationDate,
 		PostedDate:     time.Now(),
-		Expired:        isExpired, // Automatically set expired status
+		Expired:        isExpired,
 		Status:         "active",
 		LikeCount:      0,
 		CampusPresence: campusPresence,
@@ -179,7 +177,7 @@ func AddGigHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Insert into MongoDB
+	// Insert the gig into MongoDB
 	collection := db.GetCollection("gridlyapp", "gigs")
 	result, err := collection.InsertOne(ctx, gig)
 	if err != nil {
@@ -187,18 +185,40 @@ func AddGigHandler(w http.ResponseWriter, r *http.Request) {
 		WriteJSONError(w, "Error saving gig", http.StatusInternalServerError)
 		return
 	}
+
+	// ✅ Increment the user's grids count
 	err = IncrementUserGrids(userObjID, studentType)
 	if err != nil {
 		log.Printf("Failed to increment grids: %v", err)
 	}
 
-	// Return success
+	// ✅ Fetch updated user details (including grids count)
+	req, _ := http.NewRequest("GET", fmt.Sprintf("https://thegridproduct-production.up.railway.app/users/%s", userID), nil)
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Printf("Error calling GetUserHandler: %v", err)
+		WriteJSONError(w, "Gig added but failed to retrieve updated user data", http.StatusOK)
+		return
+	}
+	defer resp.Body.Close()
+
+	var updatedUser models.User
+	if err := json.NewDecoder(resp.Body).Decode(&updatedUser); err != nil {
+		log.Printf("Error decoding GetUserHandler response: %v", err)
+		WriteJSONError(w, "Gig added but failed to retrieve updated user data", http.StatusOK)
+		return
+	}
+
+	// ✅ Return success response including updated grids count
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"message": "Gig added successfully",
 		"id":      result.InsertedID,
+		"grids":   updatedUser.Grids, // ✅ Return updated grids count
 	})
 }
+
 func updateExpiredGigs() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

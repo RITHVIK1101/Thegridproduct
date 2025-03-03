@@ -39,7 +39,7 @@ interface UserContextProps {
   likedProducts: string[];
   setLikedProducts: React.Dispatch<React.SetStateAction<string[]>>;
   isLoading: boolean;
-
+  refreshUserGrids: () => Promise<void>;
   expoPushToken: string | null;
   setExpoPushToken: React.Dispatch<React.SetStateAction<string | null>>;
 
@@ -65,6 +65,7 @@ export const UserContext = createContext<UserContextProps>({
 
   setUser: async () => {},
   clearUser: async () => {},
+  refreshUserGrids: async () => {}, // ✅ Add this
 });
 
 /**
@@ -115,6 +116,17 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   const [expoPushToken, setExpoPushToken] = useState<string | null>(null);
+  const refreshUserGrids = async () => {
+    try {
+      if (!userId || !token) return;
+
+      const userProfile = await fetchFullUserProfile(userId, token);
+      setGrids(userProfile.grids); // ✅ Update grids in state
+      await SecureStore.setItemAsync("grids", userProfile.grids.toString()); // ✅ Store in SecureStore
+    } catch (error) {
+      console.error("Error refreshing grids:", error);
+    }
+  };
 
   useEffect(() => {
     const loadUserData = async () => {
@@ -206,6 +218,9 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
           expoPushToken
         );
       }
+
+      // ✅ Refresh grids after setting user
+      await refreshUserGrids();
     } catch (error) {
       console.error("Error setting user data:", error);
       throw new Error("Failed to set user data.");
@@ -289,6 +304,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     setExpoPushToken,
     setUser,
     clearUser,
+    refreshUserGrids,
   };
 
   return (

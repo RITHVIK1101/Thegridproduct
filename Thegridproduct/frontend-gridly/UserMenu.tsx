@@ -9,7 +9,6 @@ const UserMenuScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     firstName,
     lastName,
     institution,
-    studentType,
     profilePic,
     grids, // ✅ Fetch grids from context
   } = useContext(UserContext);
@@ -56,14 +55,12 @@ const UserMenuScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           {institution && (
             <Text style={styles.bottomSheetUserInstitution}>{institution}</Text>
           )}
-          {studentType && (
-            <Text style={styles.bottomSheetUserInstitution}>
-              {studentType.charAt(0).toUpperCase() + studentType.slice(1)}
-            </Text>
-          )}
 
-          {/* ✅ Display Grids count */}
-          <Text style={styles.bottomSheetGrids}>{grids} Grids</Text>
+          {/* ✅ Grids Badge UI */}
+          <View style={styles.gridsBadge}>
+            <Ionicons name="grid-outline" size={16} color="#FFF" />
+            <Text style={styles.gridsText}>{grids} Grids</Text>
+          </View>
         </View>
 
         <View style={styles.bottomSheetOptions}>
@@ -144,7 +141,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 10,
-    overflow: "hidden", // So image doesn't spill out
+    overflow: "hidden",
   },
   menuProfileImage: {
     width: 60,
@@ -159,12 +156,25 @@ const styles = StyleSheet.create({
   bottomSheetUserName: { fontSize: 18, fontWeight: "700", color: "#FFFFFF" },
   bottomSheetUserInstitution: { fontSize: 14, color: "#CCCCCC", marginTop: 5 },
 
-  /* ✅ New Style for Grids */
-  bottomSheetGrids: {
+  /* ✅ Grids Badge Style */
+  gridsBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#7B61FF", // Cool bluish-purple
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20, // Oval shape
+    marginTop: 10,
+    shadowColor: "#7B61FF",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+  },
+  gridsText: {
     fontSize: 14,
-    color: "#BBBBBB", // Subtle grayish color
-    marginTop: 5,
-    fontWeight: "500",
+    color: "#FFFFFF",
+    fontWeight: "600",
+    marginLeft: 5,
   },
 
   bottomSheetOptions: { marginTop: 20, width: "100%" },

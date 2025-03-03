@@ -21,7 +21,7 @@ import { UserContext } from "./UserContext"; // Import the UserContext
 
 const RequestProduct: React.FC = () => {
   const navigation = useNavigation();
-  const { token } = useContext(UserContext); // Access the token from UserContext
+  const { token, refreshUserGrids } = useContext(UserContext); // Access the token from UserContext
 
   const [productName, setProductName] = useState("");
   const [description, setDescription] = useState("");
@@ -87,6 +87,7 @@ const RequestProduct: React.FC = () => {
 
       const data = await response.json();
       setIsSubmitting(false);
+      await refreshUserGrids();
       setIsSuccessModalVisible(true);
       setProductName("");
       setDescription("");
