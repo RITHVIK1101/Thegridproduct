@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, useRef } from "react";
 import {
   View,
   Text,
@@ -7,10 +7,9 @@ import {
   TouchableOpacity,
   ScrollView,
   Modal,
-  KeyboardAvoidingView,
-  Platform,
-  Dimensions,
   Alert,
+  Dimensions,
+  Animated,
 } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -30,24 +29,8 @@ interface Gig {
   category: string;
   price: string;
   userId: string;
+  postedCampus?: string;
 }
-
-interface GigMatch {
-  id: string;
-  title: string;
-  description: string;
-  category: string;
-  price: string;
-  similarity: number;
-}
-
-const suggestionPhrases = [
-  "I need a logo designer",
-  "Looking for a web developer",
-  "Require tutoring in Physics",
-  "Need content writing services",
-  "Seeking a graphic designer",
-];
 
 const categoryIcons: { [key: string]: string } = {
   Tutoring: "school-outline",
@@ -58,7 +41,12 @@ const categoryIcons: { [key: string]: string } = {
   Other: "grid-outline",
 };
 
-const categoriesFilter = [
+const regionalIcons: { [key: string]: string } = {
+  Available: "checkmark-circle-outline",
+  "In Campus": "location-outline",
+};
+
+const categoryOptions = [
   "All",
   "Tutoring",
   "Design",
@@ -67,6 +55,9 @@ const categoriesFilter = [
   "Coding",
   "Other",
 ];
+
+const regionalOptions = ["Available", "In Campus"];
+
 function shuffleArray<T>(array: T[]): T[] {
   const copy = array.slice();
   for (let i = copy.length - 1; i > 0; i--) {
@@ -121,16 +112,18 @@ type JobsScreenNavigationProp = StackNavigationProp<RootStackParamList, "Jobs">;
 const JobsScreen: React.FC = () => {
   const navigation = useNavigation<JobsScreenNavigationProp>();
   const route = useRoute<JobsScreenRouteProp>();
-  const { token } = useContext(UserContext);
-
+  const { token, userCampus } = useContext(UserContext);
   const preFetchedGigs: Gig[] | undefined = route.params?.preFetchedGigs;
   const [gigs, setGigs] = useState<Gig[] | null>(preFetchedGigs || null);
   const [randomGigs, setRandomGigs] = useState<Gig[]>([]);
-
   const [searchQuery, setSearchQuery] = useState("");
-  const [showSearchBar, setShowSearchBar] = useState(false);
-  const [currentFilter, setCurrentFilter] = useState("All");
+  const [regionalFilter, setRegionalFilter] = useState("Available");
+  const [categoryFilter, setCategoryFilter] = useState("All");
   const [filterMenuVisible, setFilterMenuVisible] = useState<boolean>(false);
+
+  // Use an Animated.Value to control search bar expansion
+  const searchAnim = useRef(new Animated.Value(0)).current;
+  const [isSearchActive, setIsSearchActive] = useState(false);
 
   useEffect(() => {
     if (gigs === null) {
@@ -173,13 +166,35 @@ const JobsScreen: React.FC = () => {
       gig.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       gig.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
       gig.description.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchRegional =
+      regionalFilter === "Available"
+        ? true
+        : gig.postedCampus === userCampus;
     const matchCategory =
-      currentFilter === "All" || gig.category === currentFilter;
-    return matchSearch && matchCategory;
+      categoryFilter === "All" ? true : gig.category === categoryFilter;
+    return matchSearch && matchRegional && matchCategory;
   });
 
+  // Toggle search with an animated expansion effect
   const toggleSearchBar = () => {
-    setShowSearchBar(!showSearchBar);
+    if (isSearchActive) {
+      // Animate collapse
+      Animated.timing(searchAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: false,
+      }).start(() => {
+        setIsSearchActive(false);
+        setSearchQuery("");
+      });
+    } else {
+      setIsSearchActive(true);
+      Animated.timing(searchAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: false,
+      }).start();
+    }
   };
 
   const getDisplayedPrice = (price: string): string => {
@@ -191,18 +206,22 @@ const JobsScreen: React.FC = () => {
     return desc.slice(0, length) + "...";
   };
 
+  // Interpolate the animated value for height and opacity
+  const searchBarHeight = searchAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 50],
+  });
+  const searchBarOpacity = searchAnim;
+
   return (
     <View style={styles.container}>
-      {/* Header with Title, Search & Filter Icons */}
+      {/* Header with Title, Animated Search & Filter Icons */}
       <View style={styles.headerContainer}>
         <Text style={styles.headerTitle}>Explore Services</Text>
         <View style={styles.headerIcons}>
-          <TouchableOpacity
-            onPress={toggleSearchBar}
-            style={styles.headerIconButton}
-          >
+          <TouchableOpacity onPress={toggleSearchBar} style={styles.headerIconButton}>
             <Ionicons
-              name={showSearchBar ? "close" : "search-outline"}
+              name={isSearchActive ? "close" : "search-outline"}
               size={24}
               color="#BB86FC"
             />
@@ -212,29 +231,20 @@ const JobsScreen: React.FC = () => {
             onPress={() => setFilterMenuVisible(true)}
             accessibilityLabel="Filter Options"
           >
-            <Ionicons
-              name="filter-outline"
-              size={20}
-              color="#BB86FC"
-              style={{ marginRight: 5 }}
-            />
-            <Text style={styles.filterButtonText}>{currentFilter}</Text>
-            {currentFilter !== "All" && (
+            <Text style={styles.filterButtonText}>
+              {regionalFilter} - {categoryFilter}
+            </Text>
+            {(regionalFilter !== "Available" || categoryFilter !== "All") && (
               <Ionicons name="close-circle" size={18} color="#BB86FC" />
             )}
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Expanded Search Bar */}
-      {showSearchBar && (
-        <View style={styles.searchBarContainer}>
-          <Ionicons
-            name="search-outline"
-            size={20}
-            color="#BB86FC"
-            style={styles.searchIcon}
-          />
+      {/* Animated Search Bar */}
+      <Animated.View style={[styles.animatedSearchBar, { height: searchBarHeight, opacity: searchBarOpacity }]}>
+        <View style={styles.searchBarInner}>
+          <Ionicons name="search-outline" size={20} color="#BB86FC" style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
             placeholder="Search for services..."
@@ -248,7 +258,7 @@ const JobsScreen: React.FC = () => {
             </TouchableOpacity>
           )}
         </View>
-      )}
+      </Animated.View>
 
       {/* Filter Modal */}
       <Modal
@@ -263,33 +273,44 @@ const JobsScreen: React.FC = () => {
           onPressOut={() => setFilterMenuVisible(false)}
         >
           <View style={styles.filterModalContainer}>
-            <Text style={styles.filterModalTitle}>Select Category</Text>
-            {categoriesFilter.map((cat) => (
+            <Text style={styles.filterModalTitle}>Regionality</Text>
+            {regionalOptions.map((option) => (
               <TouchableOpacity
-                key={cat}
+                key={option}
                 style={styles.filterModalOption}
-                onPress={() => {
-                  setCurrentFilter(cat);
-                  setFilterMenuVisible(false);
-                }}
+                onPress={() => setRegionalFilter(option)}
               >
                 <Ionicons
-                  name={categoryIcons[cat] || "grid-outline"}
+                  name={regionalIcons[option] || "grid-outline"}
                   size={20}
                   color="#BB86FC"
                   style={{ marginRight: 10 }}
                 />
-                <Text style={styles.filterModalOptionText}>{cat}</Text>
+                <Text style={styles.filterModalOptionText}>{option}</Text>
+              </TouchableOpacity>
+            ))}
+            <View style={styles.separator} />
+            <Text style={styles.filterModalTitle}>Category</Text>
+            {categoryOptions.map((option) => (
+              <TouchableOpacity
+                key={option}
+                style={styles.filterModalOption}
+                onPress={() => setCategoryFilter(option)}
+              >
+                <Ionicons
+                  name={categoryIcons[option] || "grid-outline"}
+                  size={20}
+                  color="#BB86FC"
+                  style={{ marginRight: 10 }}
+                />
+                <Text style={styles.filterModalOptionText}>{option}</Text>
               </TouchableOpacity>
             ))}
           </View>
         </TouchableOpacity>
       </Modal>
 
-      <ScrollView
-        contentContainerStyle={styles.scrollContainer}
-        showsVerticalScrollIndicator={false}
-      >
+      <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
         {/* Featured Gigs */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Featured</Text>
@@ -303,9 +324,7 @@ const JobsScreen: React.FC = () => {
           {featuredGigs.map((gig) => (
             <TouchableOpacity
               key={gig.id}
-              onPress={() =>
-                navigation.navigate("JobDetail", { jobId: gig.id })
-              }
+              onPress={() => navigation.navigate("JobDetail", { jobId: gig.id })}
               activeOpacity={0.8}
             >
               <LinearGradient
@@ -333,16 +352,13 @@ const JobsScreen: React.FC = () => {
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>All Services</Text>
         </View>
-
         {filteredGigs.length > 0 ? (
           filteredGigs.map((gig) => {
             const displayedPrice = getDisplayedPrice(gig.price);
             return (
               <TouchableOpacity
                 key={gig.id}
-                onPress={() =>
-                  navigation.navigate("JobDetail", { jobId: gig.id })
-                }
+                onPress={() => navigation.navigate("JobDetail", { jobId: gig.id })}
                 activeOpacity={0.8}
               >
                 <View style={styles.gigCard}>
@@ -369,12 +385,11 @@ const JobsScreen: React.FC = () => {
           })
         ) : (
           <Text style={styles.noResultsText}>
-            No services found for "{currentFilter}"
+            No services found for the selected filters.
           </Text>
         )}
       </ScrollView>
 
-      {/* Bottom Navbar */}
       <BottomNavBar />
     </View>
   );
@@ -421,22 +436,21 @@ const styles = StyleSheet.create({
   },
   filterButtonText: {
     color: "#BB86FC",
-    fontSize: 14,
+    fontSize: 11,
     marginRight: 5,
   },
-  searchBarContainer: {
+  animatedSearchBar: {
+    backgroundColor: "#0B0B0B",
+    overflow: "hidden",
+    marginHorizontal: 16,
+    borderRadius: 25,
+    marginVertical: 8,
+  },
+  searchBarInner: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#0B0B0B",
-    marginHorizontal: 16,
-    marginVertical: 8,
-    borderRadius: 25,
     paddingHorizontal: 15,
-    paddingVertical: 8,
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
   },
   searchIcon: {
     marginRight: 10,
@@ -561,5 +575,10 @@ const styles = StyleSheet.create({
   filterModalOptionText: {
     fontSize: 14,
     color: "#FFFFFF",
+  },
+  separator: {
+    height: 1,
+    backgroundColor: "#333",
+    marginVertical: 12,
   },
 });
