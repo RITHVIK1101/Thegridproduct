@@ -971,49 +971,48 @@ const Dashboard: React.FC<DashboardProps> = () => {
             </View>
           )}
 
-<Modal
-  visible={isDescriptionModalVisible}
-  animationType="slide"
-  transparent={true}
-  onRequestClose={() => setIsDescriptionModalVisible(false)}
->
-  <TouchableOpacity style={styles.centerModalOverlay} activeOpacity={1} onPressOut={() => setIsDescriptionModalVisible(false)}>
-    <View style={styles.descriptionModalContent}>
-      {selectedProduct && (
-        <RNScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScrollContent}>
-          <View style={styles.modalContentContainer}>
-            <View style={{ alignItems: "center", width: "100%", marginBottom: 10 }}>
-              <Text style={styles.modalTitle}>{selectedProduct?.title}</Text>
-            </View>
-            <View style={{ alignSelf: "flex-start", width: "100%" }}>
-              <Text style={styles.detailText}>Condition: {selectedProduct?.quality}</Text>
-              <Text style={styles.detailText}>Price: ${selectedProduct?.price.toFixed(2)}</Text>
-              <Text style={styles.detailText}>Seller's Campus: {selectedProduct?.university}</Text> 
-            </View>
-          </View>
-          {selectedProduct.quality !== "New" && (
-            <>
-              {selectedProduct.rating && selectedProduct.rating > 0 && (
-                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
-                  <Text style={styles.detailText}>Rating: </Text>
-                  {[...Array(selectedProduct.rating)].map((_, i) => (
-                    <Ionicons key={i} name="star" size={16} color="#FFD700" />
-                  ))}
-                </View>
-              )}
-            </>
-          )}
-          <Text style={styles.sectionHeader}>Description</Text>
-          <Text style={styles.descriptionText}>{selectedProduct.description}</Text>
-        </RNScrollView>
-      )}
-      <TouchableOpacity onPress={() => setIsDescriptionModalVisible(false)} style={styles.modalClose} accessibilityLabel="Close Details Modal">
-        <Ionicons name="close-outline" size={24} color="#FFFFFF" />
-      </TouchableOpacity>
-    </View>
-  </TouchableOpacity>
-</Modal>
-
+          <Modal
+            visible={isDescriptionModalVisible}
+            animationType="slide"
+            transparent={true}
+            onRequestClose={() => setIsDescriptionModalVisible(false)}
+          >
+            <TouchableOpacity style={styles.centerModalOverlay} activeOpacity={1} onPressOut={() => setIsDescriptionModalVisible(false)}>
+              <View style={styles.descriptionModalContent}>
+                {selectedProduct && (
+                  <RNScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScrollContent}>
+                    <View style={styles.modalContentContainer}>
+                      <View style={{ alignItems: "center", width: "100%", marginBottom: 10 }}>
+                        <Text style={styles.modalTitle}>{selectedProduct?.title}</Text>
+                      </View>
+                      <View style={{ alignSelf: "flex-start", width: "100%" }}>
+                        <Text style={styles.detailText}>Condition: {selectedProduct?.quality}</Text>
+                        <Text style={styles.detailText}>Price: ${selectedProduct?.price.toFixed(2)}</Text>
+                        <Text style={styles.detailText}>Seller's Campus: {selectedProduct?.university}</Text> 
+                      </View>
+                    </View>
+                    {selectedProduct.quality !== "New" && (
+                      <>
+                        {selectedProduct.rating && selectedProduct.rating > 0 && (
+                          <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
+                            <Text style={styles.detailText}>Rating: </Text>
+                            {[...Array(selectedProduct.rating)].map((_, i) => (
+                              <Ionicons key={i} name="star" size={16} color="#FFD700" />
+                            ))}
+                          </View>
+                        )}
+                      </>
+                    )}
+                    <Text style={styles.sectionHeader}>Description</Text>
+                    <Text style={styles.descriptionText}>{selectedProduct.description}</Text>
+                  </RNScrollView>
+                )}
+                <TouchableOpacity onPress={() => setIsDescriptionModalVisible(false)} style={styles.modalClose} accessibilityLabel="Close Details Modal">
+                  <Ionicons name="close-outline" size={24} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
+          </Modal>
 
           <Modal
             visible={isFilterModalVisible}
@@ -1137,29 +1136,27 @@ const Dashboard: React.FC<DashboardProps> = () => {
                     </View>
                   </RNScrollView>
                 ) : (
-                  <RNScrollView contentContainerStyle={styles.resultsList}>
-                    {searchResults.length > 0 ? (
-                      searchResults.map((product) => (
-                        <TouchableOpacity
-                          key={product.id}
-                          style={styles.resultCard}
-                          onPress={() => {
-                            setSelectedProduct(product);
-                            setIsDescriptionModalVisible(true);
-                          }}
-                        >
-                          <Text style={styles.resultTitle}>{product.title}</Text>
-                          <Text style={styles.resultPrice}>
-                            ${institution.toLowerCase() === product.university.toLowerCase()
-                              ? product.price.toFixed(2)
-                              : (product.outOfCampusPrice ?? product.price).toFixed(2)}
-                          </Text>
-                        </TouchableOpacity>
-                      ))
-                    ) : (
-                      <Text style={styles.noResultsText}>None</Text>
+                  // --- Grid view for search results ---
+                  <FlatList
+                    data={searchResults}
+                    keyExtractor={(item) => item.id}
+                    numColumns={3}
+                    contentContainerStyle={styles.searchResultsContainer}
+                    renderItem={({ item }) => (
+                      <View style={styles.searchResultItem}>
+                        <Image
+                          source={{ uri: item.images && item.images.length > 0 ? item.images[0] : "https://via.placeholder.com/150" }}
+                          style={styles.searchResultImage}
+                        />
+                        <View style={styles.searchResultNameContainer}>
+                          <Text style={styles.searchResultName} numberOfLines={1}>{item.title}</Text>
+                        </View>
+                      </View>
                     )}
-                  </RNScrollView>
+                    ListEmptyComponent={
+                      <Text style={styles.noResultsText}>None</Text>
+                    }
+                  />
                 )}
               </View>
             </BlurView>
@@ -1681,7 +1678,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 12,
     borderRadius: 18,
-    minWidth: (SCREEN_WIDTH - 80) / 7, // Thinner bubble
+    minWidth: (SCREEN_WIDTH - 80) / 7,
     alignItems: "center",
   },
   suggestionText: {
@@ -1689,30 +1686,38 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     fontSize: 12,
   },
-  resultsList: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 40,
+  // --- New styles for grid view search results ---
+  searchResultsContainer: {
+    paddingHorizontal: 10,
+    paddingTop: 10,
   },
-  resultCard: {
-    backgroundColor: "#fff",
+  searchResultItem: {
+    width: SCREEN_WIDTH / 2 - 15, // Always keep space for 2 items
+    margin: 5,
+    aspectRatio: 1, // Keeps it square
     borderRadius: 10,
-    padding: 15,
-    marginBottom: 15,
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 3,
+    overflow: "hidden",
+    backgroundColor: "#eee",
   },
-  resultTitle: {
-    color: "#333",
-    fontSize: 18,
+  
+  searchResultImage: {
+    width: "100%",
+    height: "100%",
+    resizeMode: "cover",
+  },
+  searchResultNameContainer: {
+    position: "absolute",
+    top: 5,
+    right: 5,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    borderRadius: 5,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+  },
+  searchResultName: {
+    color: "#fff",
+    fontSize: 12,
     fontWeight: "600",
-  },
-  resultPrice: {
-    color: "#777",
-    fontSize: 16,
-    marginTop: 5,
   },
   noResultsText: {
     color: "#333",
