@@ -1,5 +1,6 @@
-import React, { useEffect, useState, useContext } from "react";
+import React, { useEffect, useState, useContext, useRef } from "react";
 import {
+  SafeAreaView,
   View,
   Text,
   Image,
@@ -8,27 +9,32 @@ import {
   StyleSheet,
   TouchableOpacity,
   Alert,
+  Dimensions,
+  Animated,
+  StatusBar,
 } from "react-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { UserContext } from "./UserContext";
-
 import { NGROK_URL } from "@env";
-import Ionicons from "react-native-vector-icons/Ionicons";
+import { LinearGradient } from "expo-linear-gradient";
+import * as Animatable from "react-native-animatable";
 
-type UserProfileRouteParams = {
-  userId: string;
-};
+const { width } = Dimensions.get("window");
+// Using original header sizes
+const HEADER_MAX_HEIGHT = 200;
+const HEADER_MIN_HEIGHT = 70;
 
 const UserProfileScreen: React.FC = () => {
   const route = useRoute();
-  const navigation = useNavigation(); // Navigation hook for navigation actions
-  const { userId } = route.params as UserProfileRouteParams;
+  const navigation = useNavigation();
+  const { userId } = route.params as { userId: string };
   const { token } = useContext(UserContext);
 
   const [userProfile, setUserProfile] = useState<any>(null);
   const [products, setProducts] = useState<any[]>([]);
-
   const [loading, setLoading] = useState(true);
+
+  const scrollY = useRef(new Animated.Value(0)).current;
 
   // Fetch user profile details
   useEffect(() => {
@@ -41,11 +47,9 @@ const UserProfileScreen: React.FC = () => {
             Authorization: `Bearer ${token}`,
           },
         });
-
         if (!response.ok) {
           throw new Error("Failed to fetch user profile.");
         }
-
         const data = await response.json();
         setUserProfile(data);
       } catch (error) {
@@ -53,7 +57,6 @@ const UserProfileScreen: React.FC = () => {
         Alert.alert("Error", "Failed to load user profile.");
       }
     };
-
     fetchUserProfile();
   }, [userId, token]);
 
@@ -68,11 +71,9 @@ const UserProfileScreen: React.FC = () => {
             Authorization: `Bearer ${token}`,
           },
         });
-
         if (!response.ok) {
           throw new Error("Failed to fetch user products.");
         }
-
         const data = await response.json();
         setProducts(data);
       } catch (error) {
@@ -81,92 +82,124 @@ const UserProfileScreen: React.FC = () => {
         setLoading(false);
       }
     };
-
     fetchUserProducts();
   }, [userId, token]);
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#BB86FC" />
-      </View>
+      <SafeAreaView style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#A18CD1" />
+      </SafeAreaView>
     );
   }
 
-  return (
-    <View style={styles.container}>
-      {/* Custom Back Button */}
-      <TouchableOpacity
-        onPress={() => navigation.goBack()}
-        style={styles.backButton}
-      >
-        <Ionicons name="chevron-back" size={28} color="white" />
-      </TouchableOpacity>
+  // Animated header height interpolation remains unchanged
+  const headerHeight = scrollY.interpolate({
+    inputRange: [0, HEADER_MAX_HEIGHT - HEADER_MIN_HEIGHT],
+    outputRange: [HEADER_MAX_HEIGHT, HEADER_MIN_HEIGHT],
+    extrapolate: "clamp",
+  });
 
-      {/* Profile Section */}
-      {userProfile && (
-        <View style={styles.profileHeader}>
-          {userProfile.profilePic ? (
+  const renderHeader = () => (
+    <Animated.View style={[styles.header, { height: headerHeight }]}>
+      <LinearGradient
+        colors={["#1B0035", "#000000"]}
+        style={styles.headerBackground}
+      />
+      <View style={styles.headerContent}>
+        <View style={styles.profileImageContainer}>
+          {userProfile?.profilePic ? (
             <Image
               source={{ uri: userProfile.profilePic }}
               style={styles.profileImage}
             />
           ) : (
-            <View style={styles.profilePlaceholder}>
+            <View style={styles.profileImagePlaceholder}>
               <Text style={styles.profileInitials}>
-                {userProfile.firstName?.charAt(0)}
-                {userProfile.lastName?.charAt(0)}
+                {userProfile?.firstName?.charAt(0)}
+                {userProfile?.lastName?.charAt(0)}
               </Text>
             </View>
           )}
-          <View>
-            <Text style={styles.profileName}>
-              {userProfile.firstName} {userProfile.lastName}
-            </Text>
-            <Text style={styles.institutionName}>
-              {userProfile.institution}
-            </Text>
-            <Text style={styles.gridScore}>
-              Grid Score: {userProfile.gridScore || "N/A"}
-            </Text>
-          </View>
         </View>
-      )}
+        <View style={styles.userInfo}>
+          <Text style={styles.userName}>
+            {userProfile?.firstName} {userProfile?.lastName}
+          </Text>
+          <Text style={styles.userInstitution}>
+            {userProfile?.institution || "No Institution"}
+          </Text>
+          <Text style={styles.userScore}>
+            Grid Score: {userProfile?.gridScore || "N/A"}
+          </Text>
+        </View>
+      </View>
+    </Animated.View>
+  );
 
-      {/* Product List */}
-      <Text style={styles.sectionTitle}>
-        Listings by {userProfile?.firstName}
-      </Text>
-      {products.length === 0 ? (
-        <Text style={styles.noProductsText}>No products listed.</Text>
-      ) : (
-        <FlatList
-          data={products}
-          keyExtractor={(item) => item.id}
-          numColumns={2}
-          contentContainerStyle={styles.productList}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={styles.productCard}
-              onPress={() =>
-                navigation.navigate("ProductDetail", { productId: item.id })
-              }
-            >
-              <Image
-                source={{
-                  uri: item.images?.[0] || "https://via.placeholder.com/150",
-                }}
-                style={styles.productImage}
-              />
-              <Text style={styles.productTitle} numberOfLines={1}>
-                {item.title}
-              </Text>
-              <Text style={styles.productPrice}>${item.price.toFixed(2)}</Text>
-            </TouchableOpacity>
-          )}
+  const renderProductItem = ({
+    item,
+    index,
+  }: {
+    item: any;
+    index: number;
+  }) => (
+    <Animatable.View
+      animation="fadeInUp"
+      delay={index * 100}
+      style={styles.productCard}
+    >
+      <TouchableOpacity
+        onPress={() =>
+          navigation.push("ProductDetail", { productId: item.id })
+        }
+      >
+        <Image
+          source={{
+            uri:
+              item.images?.[0] ||
+              "https://via.placeholder.com/150/FFFFFF/000000?text=No+Image",
+          }}
+          style={styles.productImage}
+          resizeMode="cover"
         />
-      )}
+        <View style={styles.productInfo}>
+          <Text style={styles.productTitle} numberOfLines={1}>
+            {item.title}
+          </Text>
+          <Text style={styles.productPrice}>${item.price.toFixed(2)}</Text>
+        </View>
+      </TouchableOpacity>
+    </Animatable.View>
+  );
+
+  // List header remains the same (without any negative margins)
+  const ListHeader = () => (
+    <View style={styles.listHeader}>
+      {renderHeader()}
+      <Text style={styles.listingsTitle}>Listings</Text>
     </View>
+  );
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="light-content" />
+      <Animated.FlatList
+        data={products}
+        keyExtractor={(item) => item.id}
+        numColumns={2}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: false }
+        )}
+        scrollEventThrottle={16}
+        ListHeaderComponent={ListHeader}
+        // Shift entire content upward without changing sizes
+        contentContainerStyle={[styles.productsContainer, { marginTop: -55 }]}
+        columnWrapperStyle={styles.columnWrapper}
+        renderItem={renderProductItem}
+      />
+    </SafeAreaView>
   );
 };
 
@@ -175,96 +208,120 @@ export default UserProfileScreen;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#000",
-    padding: 20,
+    backgroundColor: "#000000",
   },
   loadingContainer: {
     flex: 1,
+    backgroundColor: "#000000",
     justifyContent: "center",
     alignItems: "center",
   },
-  backButton: {
-    position: "absolute",
-    top: 50,
-    left: 15,
-    zIndex: 10,
+  header: {
+    width: "100%",
+    overflow: "hidden",
   },
-  profileHeader: {
+  headerBackground: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  headerContent: {
+    flex: 1,
     flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 20,
-    marginTop: 50, // Added margin for back button spacing
+    alignItems: "flex-end",
+    paddingHorizontal: 16,
+    paddingBottom: 10,
+    justifyContent: "center",
+  },
+  profileImageContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 2,
+    borderColor: "#A18CD1",
+    overflow: "hidden",
+    backgroundColor: "#1C1C1E",
+    marginRight: 16,
   },
   profileImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    marginRight: 10,
+    width: "100%",
+    height: "100%",
   },
-  profilePlaceholder: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: "#555",
+  profileImagePlaceholder: {
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#333333",
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 10,
   },
   profileInitials: {
-    color: "#fff",
+    fontSize: 30,
+    color: "#FFFFFF",
+    fontWeight: "bold",
+  },
+  userInfo: {
+    flex: 1,
+  },
+  userName: {
+    fontSize: 24,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  userInstitution: {
+    fontSize: 16,
+    color: "#A0A0A0",
+    marginTop: 4,
+  },
+  userScore: {
+    fontSize: 14,
+    color: "#A18CD1",
+    marginTop: 2,
+  },
+  listHeader: {
+    marginBottom: 8,
+  },
+  listingsTitle: {
     fontSize: 22,
-    fontWeight: "bold",
+    fontWeight: "700",
+    color: "#FFFFFF",
+    textAlign: "center",
+    marginVertical: 16,
   },
-  profileName: {
-    color: "#fff",
-    fontSize: 20,
-    fontWeight: "bold",
-  },
-  institutionName: {
-    color: "#ccc",
-    fontSize: 16,
-  },
-  gridScore: {
-    color: "#BB86FC",
-    fontSize: 16,
-    fontWeight: "bold",
-  },
-  sectionTitle: {
-    color: "#fff",
-    fontSize: 18,
-    fontWeight: "bold",
-    marginTop: 20,
-    marginBottom: 10,
-  },
-  productList: {
+  productsContainer: {
+    paddingHorizontal: 16,
     paddingBottom: 20,
+    backgroundColor: "#000000",
+  },
+  columnWrapper: {
+    justifyContent: "space-between",
+    marginBottom: 16,
   },
   productCard: {
-    backgroundColor: "#222",
-    borderRadius: 10,
-    margin: 5,
-    padding: 10,
-    alignItems: "center",
-    width: "48%",
+    backgroundColor: "#121212",
+    borderRadius: 12,
+    overflow: "hidden",
+    width: (width - 48) / 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 6,
   },
   productImage: {
     width: "100%",
-    height: 100,
-    borderRadius: 10,
-    marginBottom: 10,
+    height: 140,
+  },
+  productInfo: {
+    padding: 10,
+    backgroundColor: "#1C1C1E",
   },
   productTitle: {
-    color: "#fff",
     fontSize: 16,
-    fontWeight: "bold",
+    fontWeight: "600",
+    color: "#FFFFFF",
   },
   productPrice: {
-    color: "#BB86FC",
     fontSize: 14,
-  },
-  noProductsText: {
-    color: "#ccc",
-    textAlign: "center",
-    marginTop: 20,
+    fontWeight: "500",
+    color: "#A18CD1",
+    marginTop: 4,
   },
 });

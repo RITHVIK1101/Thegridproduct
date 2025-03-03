@@ -332,6 +332,21 @@ const AppNavigator: React.FC<AppNavigatorProps> = ({ firstRender }) => {
             }
           />
           <Stack.Screen
+  name="UserProfile"
+  component={UserProfileScreen}
+  options={({ navigation }) =>
+    getHeaderOptions(
+      navigation,
+      firstName,
+      lastName,
+      profilePic ?? undefined,
+      true, // show back button
+      true  // enable animation
+    )
+  }
+/>
+
+          <Stack.Screen
             name="AddGig"
             component={AddGigScreen}
             options={({ navigation }) =>
@@ -397,11 +412,7 @@ const AppNavigator: React.FC<AppNavigatorProps> = ({ firstRender }) => {
               )
             }
           />
-          <Stack.Screen
-            name="UserProfile"
-            component={UserProfileScreen}
-            options={{ headerShown: true, title: "User Profile" }}
-          />
+
 
           <Stack.Screen
             name="Cart"

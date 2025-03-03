@@ -33,6 +33,7 @@ export type RootStackParamList = {
   TermsOfService: undefined;
   LikedItems: undefined;
   ProductDetails: { productId: string };
+  UserProfile: { userId: string };
   RequestProduct: undefined;
   RequestedProductsPage: undefined;
   ProductDetail: { productId: string; };
