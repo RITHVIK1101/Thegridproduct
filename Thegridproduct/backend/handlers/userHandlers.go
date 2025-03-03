@@ -89,6 +89,74 @@ func GetUserHandler(w http.ResponseWriter, r *http.Request) {
 	WriteJSONError(w, "User not found", http.StatusNotFound)
 }
 
+// GetPublicUserHandler fetches a user's public details by ID, including profilePic and Grids, without requiring authentication.
+func GetPublicUserHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Ensure the request method is GET
+	if r.Method != http.MethodGet {
+		WriteJSONError(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Extract user ID from URL parameters
+	vars := mux.Vars(r)
+	id := vars["id"]
+
+	userID, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		WriteJSONError(w, "Invalid user ID format", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// ✅ Projection: Only public fields
+	projection := bson.M{
+		"firstName":   1,
+		"lastName":    1,
+		"profilePic":  1, // Keep profile picture
+		"institution": 1,
+		"studentType": 1,
+		"grids":       1, // ✅ Fetching Grids
+	}
+
+	findOptions := options.FindOne().SetProjection(projection)
+
+	var user models.User
+
+	// Try to fetch user from university_users collection
+	universityUsersCollection := db.GetCollection("gridlyapp", "university_users")
+	err = universityUsersCollection.FindOne(ctx, bson.M{"_id": userID}, findOptions).Decode(&user)
+	if err == nil {
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(user)
+		return
+	} else if err != mongo.ErrNoDocuments {
+		log.Printf("Error fetching user from university_users: %v", err)
+		WriteJSONError(w, "Error fetching user data", http.StatusInternalServerError)
+		return
+	}
+
+	// If not found, try to fetch user from highschool_users collection
+	highSchoolUsersCollection := db.GetCollection("gridlyapp", "highschool_users")
+	err = highSchoolUsersCollection.FindOne(ctx, bson.M{"_id": userID}, findOptions).Decode(&user)
+	if err == nil {
+		// User found in highschool_users collection
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(user)
+		return
+	} else if err != mongo.ErrNoDocuments {
+		log.Printf("Error fetching user from highschool_users: %v", err)
+		WriteJSONError(w, "Error fetching user data", http.StatusInternalServerError)
+		return
+	}
+
+	// User not found in either collection
+	WriteJSONError(w, "User not found", http.StatusNotFound)
+}
+
 func StorePushTokenHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
