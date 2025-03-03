@@ -35,6 +35,60 @@ const UserProfileScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   const scrollY = useRef(new Animated.Value(0)).current;
+  const fetchUserProducts = async () => {
+    if (!userId || !token) {
+      Alert.alert("Error", "User not authenticated.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await fetch(`${NGROK_URL}/products/user/${userId}`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const contentType = response.headers.get("content-type");
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Error fetching user products:", errorText);
+        throw new Error("Failed to fetch user's products.");
+      } else if (!contentType || !contentType.includes("application/json")) {
+        const errorText = await response.text();
+        console.error("Unexpected content-type:", contentType, errorText);
+        throw new Error("Unexpected response format.");
+      }
+
+      let data = await response.json();
+
+      // Ensure data is an array
+      if (!Array.isArray(data)) {
+        console.warn("Unexpected response format:", data);
+        data = [];
+      }
+
+      // Sort products by `postedDate` (newest first)
+      data = data.sort(
+        (a, b) =>
+          new Date(b.postedDate).getTime() - new Date(a.postedDate).getTime()
+      );
+
+      setProducts(data);
+    } catch (error) {
+      console.error("Error fetching products:", error);
+      Alert.alert(
+        "Error",
+        error instanceof Error
+          ? error.message
+          : "An unexpected error occurred while fetching products."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Fetch user profile details
   useEffect(() => {
@@ -58,32 +112,8 @@ const UserProfileScreen: React.FC = () => {
       }
     };
     fetchUserProfile();
-  }, [userId, token]);
-
-  // Fetch products listed by this user
-  useEffect(() => {
-    const fetchUserProducts = async () => {
-      try {
-        const response = await fetch(`${NGROK_URL}/products/user`, {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        });
-        if (!response.ok) {
-          throw new Error("Failed to fetch user products.");
-        }
-        const data = await response.json();
-        setProducts(data);
-      } catch (error) {
-        console.error("Error fetching user products:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchUserProducts();
-  }, [userId, token]);
+  }, [userId]);
 
   if (loading) {
     return (

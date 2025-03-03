@@ -78,7 +78,6 @@ func main() {
 
 	protected.HandleFunc("/products/user", handlers.GetUserProductsHandler).Methods("GET")
 	router.HandleFunc("/products/user/{userId}", handlers.GetProductsByUserIDHandler).Methods("GET")
-
 	router.HandleFunc("/public/users/{id}", handlers.GetPublicUserHandler).Methods("GET")
 	protected.HandleFunc("/products/all", handlers.GetAllProductsHandler).Methods("GET")
 	protected.HandleFunc("/products/by-ids", handlers.GetProductsByIDsHandler).Methods("GET")
