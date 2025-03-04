@@ -63,25 +63,29 @@ func (e *AppError) Error() string {
 	return e.Message
 }
 
-// GetChatHandler fetches chat details by chat ID.
+// GetChatHandler fetches chat details by reference ID (product or gig).
 func GetChatHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-
-	// Extract chatId from the URL path
-	chatIDStr, ok := vars["chatId"]
-	if !ok || chatIDStr == "" {
-		WriteJSONError(w, "Chat ID is required", http.StatusBadRequest)
+	referenceIDStr, ok := vars["referenceId"] // Can be either ProductID or GigID
+	if !ok || referenceIDStr == "" {
+		WriteJSONError(w, "Reference ID is required", http.StatusBadRequest)
 		return
 	}
 
-	// Fetch chat from MongoDB using chatId
-	chat, err := db.GetChatByID(chatIDStr)
+	referenceType, ok := vars["referenceType"]
+	if !ok || (referenceType != "product" && referenceType != "gig" && referenceType != "product_request") {
+		WriteJSONError(w, "Valid referenceType (product, gig, or product_request) is required", http.StatusBadRequest)
+		return
+	}
+
+	// Fetch chat from MongoDB
+	chat, err := db.GetChatByReferenceID(referenceIDStr, referenceType)
 	if err != nil {
 		WriteJSONError(w, "Chat not found", http.StatusNotFound)
 		return
 	}
 
-	// Fetch Firestore messages
+	// Use global Firestore client
 	ctx := context.Background()
 	chatDocRef := fsClient.Collection("chatRooms").Doc(chat.ID.Hex())
 
@@ -99,6 +103,7 @@ func GetChatHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Extract messages from Firestore
 	messages, _ := firestoreData["messages"].([]interface{})
 
 	// Construct response

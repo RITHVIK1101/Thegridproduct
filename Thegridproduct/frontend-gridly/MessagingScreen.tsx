@@ -305,8 +305,11 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
               `chat_last_message_${chat.chatID}`
             );
             const parsed = saved ? JSON.parse(saved) : {};
+            // Map backend field names to our chat object (if necessary)
             return {
               ...chat,
+              sellerId: chat.seller_id, // map backend seller_id to sellerId
+              buyerId: chat.buyer_id, // map backend buyer_id to buyerId
               ...parsed,
               latestMessage: parsed.latestMessage || chat.latestMessage || "",
               referenceTitle: chat.referenceTitle || "Unnamed Item",
@@ -318,6 +321,7 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
           }
         })
       );
+
       setChats(mergedChats);
       await AsyncStorage.setItem("cachedChats", JSON.stringify(mergedChats));
       if (route?.params?.chatId) {
@@ -440,12 +444,25 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
   const openChat = async (chat: Chat) => {
     setLoading(true);
     try {
+      console.log(
+        "Opening chat: Seller ID:",
+        chat.sellerId,
+        "Buyer ID:",
+        chat.buyerId
+      );
+
       setSelectedChat((prev) =>
         prev && prev.chatID === chat.chatID ? prev : { ...chat, messages: [] }
       );
 
       const messages = await getMessages(chat.chatID, token);
       setSelectedChat({ ...chat, messages });
+
+      // Additional log after setting the chat
+      console.log("Selected Chat Details:", {
+        sellerId: chat.sellerId,
+        buyerId: chat.buyerId,
+      });
 
       await updateLastRead(chat.chatID);
       setChatModalVisible(true);
@@ -652,7 +669,6 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
           },
         }
       );
-      console.log("Fetched Requests:", response.data);
       if (response.status === 200) {
         let { incomingRequests, outgoingRequests } = response.data;
         // Default to empty arrays if null:

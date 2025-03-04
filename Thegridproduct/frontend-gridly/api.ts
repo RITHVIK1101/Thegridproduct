@@ -3,17 +3,18 @@
 import { NGROK_URL, ABLY_API_KEY } from "@env"; // Ensure NGROK_URL and ABLY_API_KEY are defined in your .env file
 import { Conversation, Message } from "./types"; // Import necessary types
 
-// Fetch user conversations
 export const fetchConversations = async (
   userId: string,
   token: string,
-  chatId?: string // Optional parameter
+  chatId?: string
 ): Promise<Conversation[]> => {
   try {
-    // If chatId is provided, fetch a specific chat
+    // If chatId is provided, fetch that specific chat
     const url = chatId
       ? `${NGROK_URL}/chats/${chatId}`
       : `${NGROK_URL}/chats/user/${userId}`;
+
+    console.log("Fetching chats from:", url); // Log the API being called
 
     const response = await fetch(url, {
       method: "GET",
@@ -24,10 +25,16 @@ export const fetchConversations = async (
     });
 
     if (!response.ok) {
-      throw new Error("Failed to fetch conversations");
+      throw new Error(`Failed to fetch conversations: ${response.status}`);
     }
 
     const data = await response.json();
+    console.log("Chat API response:", JSON.stringify(data, null, 2)); // Log full response
+
+    // If fetching a single chat, return an array with that chat
+    if (chatId) {
+      return [data]; // Since the API returns a single chat object, wrap it in an array
+    }
 
     if (!Array.isArray(data.conversations)) {
       console.warn("Unexpected response format for conversations:", data);
@@ -40,6 +47,7 @@ export const fetchConversations = async (
     throw error;
   }
 };
+
 
 export const postMessage = async (
   chatId: string,
