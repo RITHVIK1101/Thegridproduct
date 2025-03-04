@@ -25,6 +25,8 @@ export interface Conversation {
   messages?: Message[];
   referenceType?: "products" | "gigs";
   referenceTitle?: string; // ✅ Added to store either a productTitle or a gigTitle
+  sellerId?: string;
+  buyerId?: string;
 }
 
 

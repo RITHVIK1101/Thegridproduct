@@ -1479,18 +1479,47 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                 {selectedChat && (
                   <View style={styles.enhancedChatHeader}>
                     <AnimatedBackButton onPress={handleBackFromChat} />
-
                     <View style={styles.chatHeaderInfo}>
-                      <View style={styles.headerProfilePicPlaceholder}>
-                        <Text style={styles.headerProfilePicInitials}>
-                          {selectedChat.user.firstName.charAt(0).toUpperCase()}
-                          {selectedChat.user.lastName.charAt(0).toUpperCase()}
-                        </Text>
-                      </View>
+                      <Pressable
+                        onPress={() => {
+                          // Determine the other user's ID based on buyerId and sellerId
+                          const otherUserId =
+                            userId === selectedChat?.buyerId
+                              ? selectedChat?.sellerId
+                              : selectedChat?.buyerId;
+
+                          console.log("Buyer ID:", selectedChat?.buyerId);
+                          console.log("Seller ID:", selectedChat?.sellerId);
+                          console.log("Current User ID:", userId);
+                          console.log("Other User ID:", otherUserId);
+
+                          if (otherUserId && otherUserId !== userId) {
+                            navigation.push("UserProfile", {
+                              userId: otherUserId,
+                            });
+                          } else {
+                            console.warn(
+                              "No other user found or trying to view own profile."
+                            );
+                          }
+                        }}
+                      >
+                        <View style={styles.headerProfilePicPlaceholder}>
+                          <Text style={styles.headerProfilePicInitials}>
+                            {selectedChat?.user.firstName
+                              .charAt(0)
+                              .toUpperCase()}
+                            {selectedChat?.user.lastName
+                              .charAt(0)
+                              .toUpperCase()}
+                          </Text>
+                        </View>
+                      </Pressable>
+
                       <View style={styles.chatHeaderTextContainer}>
                         <Text style={styles.chatHeaderUserName}>
-                          {selectedChat.user.firstName}{" "}
-                          {selectedChat.user.lastName}
+                          {selectedChat?.user.firstName}{" "}
+                          {selectedChat?.user.lastName}
                         </Text>
                         <Text style={styles.chatHeaderSubTitle}>
                           {selectedChat?.referenceType
@@ -1509,8 +1538,10 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
                       onPress={handleReportPress}
                       style={styles.reportButton}
                       accessibilityLabel="Report User"
-                    ></Pressable>
+                    />
+                    {/* Seller-only actions if applicable */}
                     {selectedChat?.referenceType === "product" &&
+                      userId === selectedChat.sellerId &&
                       (selectedChat.sold ? (
                         <View style={styles.productActionButtons}>
                           <Text style={styles.soldLabel}>Product Sold</Text>
