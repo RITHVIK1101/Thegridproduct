@@ -17,7 +17,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-// CreateProductRequestHandler handles the creation of a new product request.
 func CreateProductRequestHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 

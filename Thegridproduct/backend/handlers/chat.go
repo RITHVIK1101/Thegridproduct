@@ -613,6 +613,13 @@ func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 func AcceptChatRequestHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
+	// Assume a middleware already put the current user's ID in context with key "userIDKey"
+	currentUserID, ok := r.Context().Value(userIDKey).(string)
+	if !ok || currentUserID == "" {
+		WriteJSONError(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	var req struct {
 		RequestID string `json:"requestId"`
 	}
@@ -633,7 +640,9 @@ func AcceptChatRequestHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer session.EndSession(context.Background())
 
-	var newChat *models.Chat
+	var acceptedRequest models.ChatRequest // capture the chat request that gets accepted
+	var newChat *models.Chat               // capture the new chat room
+
 	callback := func(sessCtx mongo.SessionContext) (interface{}, error) {
 		chatRequests := db.GetCollection("gridlyapp", "chat_requests")
 		chatsCol := db.GetCollection("gridlyapp", "chats")
@@ -663,6 +672,9 @@ func AcceptChatRequestHandler(w http.ResponseWriter, r *http.Request) {
 			return nil, err
 		}
 
+		// Save the accepted request for later use.
+		acceptedRequest = chatReq
+
 		// Check if a chat already exists
 		var existingChat models.Chat
 		err = chatsCol.FindOne(sessCtx, bson.M{
@@ -677,12 +689,13 @@ func AcceptChatRequestHandler(w http.ResponseWriter, r *http.Request) {
 			return nil, err
 		}
 
-		// ✅ Create the new chat
+		// Create the new chat
 		newChat = models.NewChat(chatReq.ReferenceID, chatReq.ReferenceType, chatReq.BuyerID, chatReq.SellerID)
-		_, err = chatsCol.InsertOne(sessCtx, newChat)
+		res, err := chatsCol.InsertOne(sessCtx, newChat)
 		if err != nil {
 			return nil, err
 		}
+		newChat.ID = res.InsertedID.(primitive.ObjectID)
 
 		return nil, nil
 	}
@@ -698,16 +711,30 @@ func AcceptChatRequestHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// ✅ Create Firestore chat room asynchronously
-	go func() {
-		log.Printf("Attempting to create Firestore chat room for chat: %s", newChat.ID.Hex())
-		err := createFirestoreChatRoom(newChat.ID.Hex(), newChat.BuyerID.Hex(), newChat.SellerID.Hex(), newChat.ReferenceID.Hex(), newChat.ReferenceType)
-		if err != nil {
-			log.Printf("🔥 Firestore chat room creation failed for chat %s: %v", newChat.ID.Hex(), err)
-		} else {
-			log.Printf("✅ Firestore chat room successfully created for chat: %s", newChat.ID.Hex())
+	var recipientID string
+	if acceptedRequest.BuyerID.Hex() == currentUserID {
+		recipientID = acceptedRequest.SellerID.Hex()
+	} else {
+		recipientID = acceptedRequest.BuyerID.Hex()
+	}
+
+	// Fetch recipient details (using your db.GetUserByID function)
+	recipient, err := db.GetUserByID(recipientID)
+	if err != nil {
+		log.Printf("❌ Failed to fetch recipient details for userID %s: %v", recipientID, err)
+	} else if recipient.ExpoPushToken != "" {
+		// Customize the notification title and body as needed.
+		notificationTitle := "Chat Request Accepted"
+		notificationBody := "Your chat request has been accepted."
+		data := map[string]string{
+			"chatId": newChat.ID.Hex(),
 		}
-	}()
+		if err := SendPushNotification(recipient.ExpoPushToken, notificationTitle, notificationBody, data); err != nil {
+			log.Printf("Error sending push notification: %v", err)
+		}
+	} else {
+		log.Println("🚫 Recipient does not have a push token; skipping notification.")
+	}
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{
@@ -716,7 +743,7 @@ func AcceptChatRequestHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// RejectChatRequestHandler rejects a pending chat request.
+// RejectChatRequestHandler rejects a pending chat request and sends a push notification to the other party.
 func RejectChatRequestHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -731,6 +758,16 @@ func RejectChatRequestHandler(w http.ResponseWriter, r *http.Request) {
 		WriteJSONError(w, "Request ID is required", http.StatusBadRequest)
 		return
 	}
+
+	// Get the current user ID from the request context (assumes middleware has set this)
+	currentUserID, ok := r.Context().Value(userIDKey).(string)
+	if !ok || currentUserID == "" {
+		WriteJSONError(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// We'll capture the rejected request here so we can use its data after the transaction.
+	var rejectedRequest models.ChatRequest
 
 	session, err := db.MongoDBClient.StartSession()
 	if err != nil {
@@ -763,27 +800,30 @@ func RejectChatRequestHandler(w http.ResponseWriter, r *http.Request) {
 			return nil, &AppError{Message: "Chat request is not pending", StatusCode: http.StatusBadRequest}
 		}
 
-		// Update chat request status to "rejected"
+		// Update the request status to "rejected"
 		update := bson.M{"$set": bson.M{"status": models.ChatRequestStatusRejected}}
 		_, err = chatRequests.UpdateOne(sessCtx, bson.M{"_id": requestObjID}, update)
 		if err != nil {
 			return nil, err
 		}
 
+		// Capture the rejected request for later use.
+		rejectedRequest = chatReq
+
+		// Decrease the chat count for the referenced item
 		var collection *mongo.Collection
-		if chatReq.ReferenceType == "product" {
+		switch chatReq.ReferenceType {
+		case "product":
 			collection = productsCol
-		} else if chatReq.ReferenceType == "gig" {
+		case "gig":
 			collection = gigsCol
-		} else if chatReq.ReferenceType == "product_request" {
+		case "product_request":
 			collection = db.GetCollection("gridlyapp", "product_requests")
-		} else {
+		default:
 			return nil, &AppError{Message: "Invalid reference type", StatusCode: http.StatusInternalServerError}
 		}
 
-		// Decrease chat count for the referenced item (product or gig)
-		_, err = collection.UpdateOne(
-			sessCtx,
+		_, err = collection.UpdateOne(sessCtx,
 			bson.M{"_id": chatReq.ReferenceID},
 			bson.M{"$inc": bson.M{"chatCount": -1}},
 		)
@@ -803,6 +843,31 @@ func RejectChatRequestHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Transaction error in RejectChatRequestHandler: %v", err)
 		WriteJSONError(w, "Internal server error", http.StatusInternalServerError)
 		return
+	}
+
+	// --- After the transaction, send a push notification to the other party ---
+	var recipientID string
+	// Determine the recipient: if the current user is the buyer, then the recipient is the seller, and vice versa.
+	if rejectedRequest.BuyerID.Hex() == currentUserID {
+		recipientID = rejectedRequest.SellerID.Hex()
+	} else {
+		recipientID = rejectedRequest.BuyerID.Hex()
+	}
+
+	recipient, err := db.GetUserByID(recipientID)
+	if err != nil {
+		log.Printf("❌ Failed to fetch recipient details for userID %s: %v", recipientID, err)
+	} else if recipient.ExpoPushToken != "" {
+		notificationTitle := "Chat Request Rejected"
+		notificationBody := "Your chat request has been rejected."
+		data := map[string]string{
+			"requestId": rejectedRequest.ID.Hex(),
+		}
+		if err := SendPushNotification(recipient.ExpoPushToken, notificationTitle, notificationBody, data); err != nil {
+			log.Printf("Error sending push notification: %v", err)
+		}
+	} else {
+		log.Println("🚫 Recipient does not have a push token; skipping notification.")
 	}
 
 	w.WriteHeader(http.StatusOK)
