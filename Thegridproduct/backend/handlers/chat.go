@@ -609,7 +609,6 @@ func RequestChatHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(res)
 }
-
 func AcceptChatRequestHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -689,7 +688,7 @@ func AcceptChatRequestHandler(w http.ResponseWriter, r *http.Request) {
 			return nil, err
 		}
 
-		// Create the new chat
+		// Create the new chat in MongoDB
 		newChat = models.NewChat(chatReq.ReferenceID, chatReq.ReferenceType, chatReq.BuyerID, chatReq.SellerID)
 		res, err := chatsCol.InsertOne(sessCtx, newChat)
 		if err != nil {
@@ -709,6 +708,19 @@ func AcceptChatRequestHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Transaction error in AcceptChatRequestHandler: %v", err)
 		WriteJSONError(w, "Internal server error", http.StatusInternalServerError)
 		return
+	}
+
+	// Create the corresponding Firestore chat room
+	err = createFirestoreChatRoom(
+		newChat.ID.Hex(),
+		newChat.BuyerID.Hex(),
+		newChat.SellerID.Hex(),
+		newChat.ReferenceID.Hex(),
+		newChat.ReferenceType,
+	)
+	if err != nil {
+		log.Printf("Chat created in MongoDB but failed to create Firestore chat room: %v", err)
+		// Optionally, you can handle this error differently if needed.
 	}
 
 	var recipientID string
