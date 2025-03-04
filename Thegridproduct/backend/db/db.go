@@ -224,22 +224,24 @@ func AddMessageToChat(chatID string, message models.Message) error {
 	}
 	return nil
 }
-
-// GetChatByProductID loads the chat that references a specific product ID (string)
-func GetChatByProductID(productID string) (*models.Chat, error) {
+func GetChatByID(chatID string) (*models.Chat, error) {
 	col := GetCollection("gridlyapp", "chats")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+	// Convert chatID from string to ObjectID
+	objectID, err := primitive.ObjectIDFromHex(chatID)
+	if err != nil {
+		log.Printf("Invalid chat ID format '%s': %v", chatID, err)
+		return nil, fmt.Errorf("invalid chat ID format: %v", err)
+	}
 
-	filter := bson.M{"productId": productID}
+	// Define a Chat model
 	var chat models.Chat
-	if err := col.FindOne(ctx, filter).Decode(&chat); err != nil {
+	if err := col.FindOne(context.TODO(), bson.M{"_id": objectID}).Decode(&chat); err != nil {
 		if err == mongo.ErrNoDocuments {
-			log.Printf("Chat with productId '%s' not found", productID)
+			log.Printf("Chat with ID '%s' not found", chatID)
 			return nil, errors.New("chat not found")
 		}
-		log.Printf("Error fetching chat by productId '%s': %v", productID, err)
+		log.Printf("Error fetching chat with ID '%s': %v", chatID, err)
 		return nil, fmt.Errorf("error fetching chat: %v", err)
 	}
 	return &chat, nil
