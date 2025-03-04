@@ -165,6 +165,11 @@ const MessagingScreen: React.FC<MessagingScreenProps> = ({ route }) => {
       return chatsToFilter.filter((c) => c.referenceType === "gig");
     return chatsToFilter.filter((c) => c.referenceType === f);
   };
+  useEffect(() => {
+    if (userId && token) {
+      fetchUserRequests();
+    }
+  }, [userId, token]);
 
   useEffect(() => {
     const filtered = applyFilter(chats, filter);

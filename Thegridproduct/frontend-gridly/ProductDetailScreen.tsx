@@ -46,6 +46,7 @@ const ProductDetailScreen: React.FC = () => {
   const [descriptionExpanded, setDescriptionExpanded] =
     useState<boolean>(false);
   const [isRequesting, setIsRequesting] = useState<boolean>(false);
+  const [showConfirmModal, setShowConfirmModal] = useState<boolean>(false);
 
   // Function to render star rating
   const renderStars = (rating: number): JSX.Element => {
@@ -304,6 +305,40 @@ const ProductDetailScreen: React.FC = () => {
         </TouchableOpacity>
       </Modal>
 
+      {/* Confirmation Modal */}
+      <Modal
+        visible={showConfirmModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowConfirmModal(false)}
+      >
+        <View style={styles.confirmModalContainer}>
+          <View style={styles.confirmModalContent}>
+            <Text style={styles.modalTitle}>Confirm Request</Text>
+            <Text style={styles.modalMessage}>
+              Are you sure you want to send this request?
+            </Text>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => setShowConfirmModal(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.confirmButton}
+                onPress={async () => {
+                  setShowConfirmModal(false);
+                  await requestProduct();
+                }}
+              >
+                <Text style={styles.confirmButtonText}>Confirm</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* Product Details */}
       <View style={styles.detailsContainer}>
         <View style={styles.headerRow}>
@@ -323,7 +358,7 @@ const ProductDetailScreen: React.FC = () => {
             >
               <TouchableOpacity
                 style={styles.requestButton}
-                onPress={requestProduct}
+                onPress={() => setShowConfirmModal(true)}
                 disabled={isRequesting}
               >
                 <Text style={styles.requestButtonText}>
@@ -623,5 +658,60 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     color: "#A18CD1",
     marginTop: 4,
+  },
+  confirmModalContainer: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  confirmModalContent: {
+    backgroundColor: "#1C1C1E",
+    padding: 20,
+    borderRadius: 10,
+    width: "80%",
+    alignItems: "center",
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#FFFFFF",
+    marginBottom: 10,
+  },
+  modalMessage: {
+    fontSize: 16,
+    color: "#E0E0E0",
+    textAlign: "center",
+    marginBottom: 20,
+  },
+  modalButtons: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    width: "100%",
+  },
+  cancelButton: {
+    flex: 1,
+    backgroundColor: "#555555",
+    paddingVertical: 10,
+    marginRight: 5,
+    borderRadius: 5,
+    alignItems: "center",
+  },
+  cancelButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+  },
+  confirmButton: {
+    flex: 1,
+    backgroundColor: "#BB86FC",
+    paddingVertical: 10,
+    marginLeft: 5,
+    borderRadius: 5,
+    alignItems: "center",
+  },
+  confirmButtonText: {
+    color: "black",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });
