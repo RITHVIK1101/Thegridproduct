@@ -1,7 +1,7 @@
 // api.ts
 
-import { NGROK_URL, ABLY_API_KEY } from "@env"; // Ensure NGROK_URL and ABLY_API_KEY are defined in your .env file
-import { Conversation, Message } from "./types"; // Import necessary types
+import { NGROK_URL, ABLY_API_KEY } from "@env"; 
+import { Conversation, Message } from "./types";
 
 export const fetchConversations = async (
   userId: string,
@@ -9,12 +9,11 @@ export const fetchConversations = async (
   chatId?: string
 ): Promise<Conversation[]> => {
   try {
-    // If chatId is provided, fetch that specific chat
     const url = chatId
       ? `${NGROK_URL}/chats/${chatId}`
       : `${NGROK_URL}/chats/user/${userId}`;
 
-    console.log("Fetching chats from:", url); // Log the API being called
+    console.log("Fetching chats from:", url);
 
     const response = await fetch(url, {
       method: "GET",
@@ -29,11 +28,9 @@ export const fetchConversations = async (
     }
 
     const data = await response.json();
-    console.log("Chat API response:", JSON.stringify(data, null, 2)); // Log full response
-
-    // If fetching a single chat, return an array with that chat
+    console.log("Chat API response:", JSON.stringify(data, null, 2)); 
     if (chatId) {
-      return [data]; // Since the API returns a single chat object, wrap it in an array
+      return [data]; 
     }
 
     if (!Array.isArray(data.conversations)) {
@@ -63,8 +60,8 @@ export const postMessage = async (
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        chatId: chatId,       // This field is optional if your endpoint doesn't need it in the body
-        senderId: userId,     // Make sure this field matches what your handler expects
+        chatId: chatId,      
+        senderId: userId,    
         content: message,
       }),
     });
@@ -83,8 +80,6 @@ export const postMessage = async (
   }
 };
 
-
-// Get messages for a specific chat from MongoDB
 export const getMessages = async (
   chatId: string,
   token: string
@@ -109,7 +104,7 @@ export const getMessages = async (
       return [];
     }
 
-    return data; // data is validated as an array
+    return data; 
   } catch (error) {
     console.error("getMessages error:", error);
     throw error;
