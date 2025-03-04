@@ -115,25 +115,33 @@ const Dashboard: React.FC<DashboardProps> = () => {
     "#Tickets",
     "#Other",
   ];
-  const [selectedCategory, setSelectedCategory] = useState<string>("#Everything");
+  const [selectedCategory, setSelectedCategory] =
+    useState<string>("#Everything");
   const [isFilterModalVisible, setIsFilterModalVisible] = useState(false);
 
   // --- Description Modal ---
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [isDescriptionModalVisible, setIsDescriptionModalVisible] = useState(false);
+  const [isDescriptionModalVisible, setIsDescriptionModalVisible] =
+    useState(false);
   const [cameFromSearch, setCameFromSearch] = useState(false);
 
   // --- Requested Products ---
-  const [requestedProducts, setRequestedProducts] = useState<RequestedProduct[]>([]);
+  const [requestedProducts, setRequestedProducts] = useState<
+    RequestedProduct[]
+  >([]);
 
   // --- Search Modal States ---
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<Product[]>([]);
-  const [selectedProductOwner, setSelectedProductOwner] = useState<User | null>(null);
+  const [selectedProductOwner, setSelectedProductOwner] = useState<User | null>(
+    null
+  );
 
   // For suggestion bubble
-  const [suggestionCategory, setSuggestionCategory] = useState<string | null>(null);
+  const [suggestionCategory, setSuggestionCategory] = useState<string | null>(
+    null
+  );
 
   // For description expansion (Read More / Read Less)
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
@@ -194,8 +202,10 @@ const Dashboard: React.FC<DashboardProps> = () => {
       const updated = [...seenProducts, productId];
       setSeenProducts(updated);
       if (userId) {
-        AsyncStorage.setItem(`seenProducts_${userId}`, JSON.stringify(updated))
-          .catch((err) => console.error("Error saving seen products:", err));
+        AsyncStorage.setItem(
+          `seenProducts_${userId}`,
+          JSON.stringify(updated)
+        ).catch((err) => console.error("Error saving seen products:", err));
       }
     }
   };
@@ -226,8 +236,10 @@ const Dashboard: React.FC<DashboardProps> = () => {
 
   useEffect(() => {
     if (userId) {
-      AsyncStorage.setItem(`visitedHistory_${userId}`, JSON.stringify(visitedHistory))
-        .catch((err) => console.error("Error saving visited history:", err));
+      AsyncStorage.setItem(
+        `visitedHistory_${userId}`,
+        JSON.stringify(visitedHistory)
+      ).catch((err) => console.error("Error saving visited history:", err));
     }
   }, [visitedHistory, userId]);
 
@@ -307,7 +319,9 @@ const Dashboard: React.FC<DashboardProps> = () => {
         },
       });
       if (!response.ok) {
-        throw new Error(`Failed to fetch owner details. Status: ${response.status}`);
+        throw new Error(
+          `Failed to fetch owner details. Status: ${response.status}`
+        );
       }
       const ownerData: User = await response.json();
       console.log("Fetched Owner Data:", ownerData);
@@ -333,7 +347,9 @@ const Dashboard: React.FC<DashboardProps> = () => {
             text: "OK",
             onPress: async () => {
               await clearUser();
-              navigation.dispatch(CommonActions.reset({ index: 0, routes: [{ name: "Login" }] }));
+              navigation.dispatch(
+                CommonActions.reset({ index: 0, routes: [{ name: "Login" }] })
+              );
             },
           },
         ]);
@@ -374,13 +390,16 @@ const Dashboard: React.FC<DashboardProps> = () => {
 
   const unlikeProduct = async (productId: string) => {
     try {
-      const response = await fetch(`${NGROK_URL}/products/${productId}/unlike`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const response = await fetch(
+        `${NGROK_URL}/products/${productId}/unlike`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
       if (!response.ok) {
         throw new Error("Failed to unlike product");
       }
@@ -408,7 +427,9 @@ const Dashboard: React.FC<DashboardProps> = () => {
             text: "OK",
             onPress: async () => {
               await clearUser();
-              navigation.dispatch(CommonActions.reset({ index: 0, routes: [{ name: "Login" }] }));
+              navigation.dispatch(
+                CommonActions.reset({ index: 0, routes: [{ name: "Login" }] })
+              );
             },
           },
         ]);
@@ -446,7 +467,9 @@ const Dashboard: React.FC<DashboardProps> = () => {
             text: "OK",
             onPress: async () => {
               await clearUser();
-              navigation.dispatch(CommonActions.reset({ index: 0, routes: [{ name: "Login" }] }));
+              navigation.dispatch(
+                CommonActions.reset({ index: 0, routes: [{ name: "Login" }] })
+              );
             },
           },
         ]);
@@ -483,7 +506,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
     }
     await fetchCart();
     if (cartItems.some((item) => item.productId === product.id)) {
-      showSuccess("Added to cart!");
+      showSuccess("Added to bag!");
       return;
     }
     try {
@@ -501,14 +524,16 @@ const Dashboard: React.FC<DashboardProps> = () => {
             text: "OK",
             onPress: async () => {
               await clearUser();
-              navigation.dispatch(CommonActions.reset({ index: 0, routes: [{ name: "Login" }] }));
+              navigation.dispatch(
+                CommonActions.reset({ index: 0, routes: [{ name: "Login" }] })
+              );
             },
           },
         ]);
         return;
       }
       if (response.status === 409) {
-        showSuccess("Added to cart!");
+        showSuccess("Added to bag!");
         return;
       }
       if (!response.ok) {
@@ -516,7 +541,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
         throw new Error(errorData.message || "Failed to add item.");
       }
       await fetchCart();
-      showSuccess("Added to cart!");
+      showSuccess("Added to bag!");
       setCartUpdated(true);
     } catch (err) {
       console.error("Add to Cart Error:", err);
@@ -535,8 +560,8 @@ const Dashboard: React.FC<DashboardProps> = () => {
     let unseen = filtered.filter((p) => !seenProducts.includes(p.id));
     if (filtered.length > 0 && unseen.length === 0) {
       setSeenProducts([]);
-      AsyncStorage.setItem(`seenProducts_${userId}`, JSON.stringify([])).catch((err) =>
-        console.error("Error resetting seen products:", err)
+      AsyncStorage.setItem(`seenProducts_${userId}`, JSON.stringify([])).catch(
+        (err) => console.error("Error resetting seen products:", err)
       );
       unseen = filtered;
     }
@@ -624,7 +649,9 @@ const Dashboard: React.FC<DashboardProps> = () => {
             text: "OK",
             onPress: async () => {
               await clearUser();
-              navigation.dispatch(CommonActions.reset({ index: 0, routes: [{ name: "Login" }] }));
+              navigation.dispatch(
+                CommonActions.reset({ index: 0, routes: [{ name: "Login" }] })
+              );
             },
           },
         ]);
@@ -788,7 +815,8 @@ const Dashboard: React.FC<DashboardProps> = () => {
     setSuggestionCategory(null);
   };
 
-  const toggleFilterModal = () => setIsFilterModalVisible(!isFilterModalVisible);
+  const toggleFilterModal = () =>
+    setIsFilterModalVisible(!isFilterModalVisible);
 
   // ----- ProductItem Component -----
   type ProductItemProps = {
@@ -904,27 +932,52 @@ const Dashboard: React.FC<DashboardProps> = () => {
                 }
               }}
             >
-              <View style={{ width: SCREEN_WIDTH, height: PRODUCT_HEIGHT, backgroundColor: "#000" }}>
-                <View style={{ flexDirection: "row", width: SCREEN_WIDTH * 2, height: "100%", backgroundColor: "#000" }}>
+              <View
+                style={{
+                  width: SCREEN_WIDTH,
+                  height: PRODUCT_HEIGHT,
+                  backgroundColor: "#000",
+                }}
+              >
+                <View
+                  style={{
+                    flexDirection: "row",
+                    width: SCREEN_WIDTH * 2,
+                    height: "100%",
+                    backgroundColor: "#000",
+                  }}
+                >
                   <View style={{ width: SCREEN_WIDTH, height: "100%" }}>
-                    <LinearGradient colors={["rgba(0,0,0,0.5)", "transparent"]} style={styles.topGradientOverlay} />
+                    <LinearGradient
+                      colors={["rgba(0,0,0,0.5)", "transparent"]}
+                      style={styles.topGradientOverlay}
+                    />
                     <Image
                       source={{ uri: currentImageURI }}
                       style={[styles.productImage, { backgroundColor: "#000" }]}
                       fadeDuration={0}
                       resizeMode="cover"
                     />
-                    <LinearGradient colors={["transparent", "rgba(0,0,0,0.3)"]} style={styles.bottomGradientOverlay} />
+                    <LinearGradient
+                      colors={["transparent", "rgba(0,0,0,0.3)"]}
+                      style={styles.bottomGradientOverlay}
+                    />
                   </View>
                   <View style={{ width: SCREEN_WIDTH, height: "100%" }}>
-                    <LinearGradient colors={["rgba(0,0,0,0.5)", "transparent"]} style={styles.topGradientOverlay} />
+                    <LinearGradient
+                      colors={["rgba(0,0,0,0.5)", "transparent"]}
+                      style={styles.topGradientOverlay}
+                    />
                     <Image
                       source={{ uri: nextImageURI }}
                       style={[styles.productImage, { backgroundColor: "#000" }]}
                       fadeDuration={0}
                       resizeMode="cover"
                     />
-                    <LinearGradient colors={["transparent", "rgba(0,0,0,0.3)"]} style={styles.bottomGradientOverlay} />
+                    <LinearGradient
+                      colors={["transparent", "rgba(0,0,0,0.3)"]}
+                      style={styles.bottomGradientOverlay}
+                    />
                   </View>
                 </View>
                 <View style={styles.midImageIndicatorsContainer}>
@@ -933,7 +986,8 @@ const Dashboard: React.FC<DashboardProps> = () => {
                       key={idx}
                       style={[
                         styles.imageIndicatorDot,
-                        idx === currentImageIndex && styles.imageIndicatorDotActive,
+                        idx === currentImageIndex &&
+                          styles.imageIndicatorDotActive,
                       ]}
                     />
                   ))}
@@ -945,28 +999,52 @@ const Dashboard: React.FC<DashboardProps> = () => {
         {index === currentIndex && (
           <View style={styles.productInfoBubble}>
             <View style={styles.productInfoTextContainer}>
-              <TouchableOpacity onPress={() => setTitleExpanded(!titleExpanded)}>
-                <Text style={styles.productInfoTitle} numberOfLines={titleExpanded ? undefined : 1} ellipsizeMode="tail">
+              <TouchableOpacity
+                onPress={() => setTitleExpanded(!titleExpanded)}
+              >
+                <Text
+                  style={styles.productInfoTitle}
+                  numberOfLines={titleExpanded ? undefined : 1}
+                  ellipsizeMode="tail"
+                >
                   {product.title}
                 </Text>
               </TouchableOpacity>
               <Text style={styles.productInfoPrice}>
                 ${displayPrice.toFixed(2)} /{" "}
                 {product.rentPrice && product.rentPrice > 0
-                  ? `Renting Price: $${product.rentPrice.toFixed(2)} (${product.rentDuration || "N/A"})`
+                  ? `Renting Price: $${product.rentPrice.toFixed(2)} (${
+                      product.rentDuration || "N/A"
+                    })`
                   : "Renting Unavailable"}
               </Text>
             </View>
             <View style={styles.productInfoActions}>
               {/* Back button (swipe down or press button) */}
-              <TouchableOpacity style={styles.iconButton} onPress={() => onToggleFavorite(product.id)} accessibilityLabel="Toggle Favorite">
-                <Ionicons name={isFavorite ? "heart" : "heart-outline"} size={25} color={isFavorite ? "#FF3B30" : "#FFFFFF"} />
+              <TouchableOpacity
+                style={styles.iconButton}
+                onPress={() => onToggleFavorite(product.id)}
+                accessibilityLabel="Toggle Favorite"
+              >
+                <Ionicons
+                  name={isFavorite ? "heart" : "heart-outline"}
+                  size={25}
+                  color={isFavorite ? "#FF3B30" : "#FFFFFF"}
+                />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.iconButton} onPress={() => onShowDescription(product)} accessibilityLabel="Show Details">
+              <TouchableOpacity
+                style={styles.iconButton}
+                onPress={() => onShowDescription(product)}
+                accessibilityLabel="Show Details"
+              >
                 <Ionicons name="information-circle" size={25} color="#FFFFFF" />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.iconButton} onPress={() => onAddToCart(product)} accessibilityLabel="Add to Cart">
-                <Ionicons name="cart" size={25} color="#34C759" />
+              <TouchableOpacity
+                style={styles.iconButton}
+                onPress={() => onAddToCart(product)}
+                accessibilityLabel="Add to Cart"
+              >
+                <Ionicons name="bag" size={25} color="#34C759" />
               </TouchableOpacity>
             </View>
           </View>
@@ -978,13 +1056,24 @@ const Dashboard: React.FC<DashboardProps> = () => {
   return (
     <View style={styles.rootContainer}>
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <LinearGradient colors={["#000000", "#000000"]} style={styles.gradientBackground}>
+        <LinearGradient
+          colors={["#000000", "#000000"]}
+          style={styles.gradientBackground}
+        >
           <View style={styles.topBar}>
             <View style={styles.topBarIconsContainer}>
-              <TouchableOpacity style={styles.topBarIconContainer} onPress={toggleFilterModal} accessibilityLabel="Filter">
+              <TouchableOpacity
+                style={styles.topBarIconContainer}
+                onPress={toggleFilterModal}
+                accessibilityLabel="Filter"
+              >
                 <Ionicons name="options-outline" size={22} color="#FFFFFF" />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.topBarIconContainer} onPress={openSearch} accessibilityLabel="Search">
+              <TouchableOpacity
+                style={styles.topBarIconContainer}
+                onPress={openSearch}
+                accessibilityLabel="Search"
+              >
                 <Ionicons name="search-outline" size={22} color="#FFFFFF" />
               </TouchableOpacity>
             </View>
@@ -994,11 +1083,20 @@ const Dashboard: React.FC<DashboardProps> = () => {
             <View style={styles.requestedStoriesContainer}>
               <View style={styles.requestedHeader}>
                 <Text style={styles.requestedLabel}>Requested Products</Text>
-                <TouchableOpacity style={styles.viewAllButton} onPress={() => navigation.navigate("RequestedProductsPage")} accessibilityLabel="View All Requested Products">
+                <TouchableOpacity
+                  style={styles.viewAllButton}
+                  onPress={() => navigation.navigate("RequestedProductsPage")}
+                  accessibilityLabel="View All Requested Products"
+                >
                   <Text style={styles.viewAllText}>View All</Text>
                 </TouchableOpacity>
               </View>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.requestedScrollView} contentContainerStyle={styles.requestedScrollContent}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.requestedScrollView}
+                contentContainerStyle={styles.requestedScrollContent}
+              >
                 {requestedProducts.map((req, idx) => (
                   <View key={idx} style={styles.storyItem}>
                     <Text style={styles.storyText}>{req.productName}</Text>
@@ -1029,44 +1127,65 @@ const Dashboard: React.FC<DashboardProps> = () => {
             <View style={{ flex: 1, backgroundColor: "#000000" }} />
           ) : (
             <View style={styles.productStack}>
-              {filteredProducts.slice(currentIndex, currentIndex + 1).map((product, idx) => (
-                <ProductItem
-                  key={product.id}
-                  product={product}
-                  nextProduct={filteredProducts[currentIndex + 1] || null}
-                  index={currentIndex + idx}
-                  currentIndex={currentIndex}
-                  onAddToCart={addToCart}
-                  onToggleFavorite={toggleFavorite}
-                  onShowDescription={onShowDescription}
-                  onNextProduct={goToNextProduct}
-                  onPreviousProduct={goToPreviousProduct}
-                  isFavorite={likedProducts.includes(product.id)}
-                  currentImageIndex={currentImageIndex}
-                  setCurrentImageIndex={setCurrentImageIndex}
-                />
-              ))}
+              {filteredProducts
+                .slice(currentIndex, currentIndex + 1)
+                .map((product, idx) => (
+                  <ProductItem
+                    key={product.id}
+                    product={product}
+                    nextProduct={filteredProducts[currentIndex + 1] || null}
+                    index={currentIndex + idx}
+                    currentIndex={currentIndex}
+                    onAddToCart={addToCart}
+                    onToggleFavorite={toggleFavorite}
+                    onShowDescription={onShowDescription}
+                    onNextProduct={goToNextProduct}
+                    onPreviousProduct={goToPreviousProduct}
+                    isFavorite={likedProducts.includes(product.id)}
+                    currentImageIndex={currentImageIndex}
+                    setCurrentImageIndex={setCurrentImageIndex}
+                  />
+                ))}
             </View>
           )}
 
           {/* Description Modal */}
-          <Modal visible={isDescriptionModalVisible} animationType="fade" transparent={true} onRequestClose={() => setIsDescriptionModalVisible(false)}>
-            <TouchableOpacity style={styles.centerModalOverlay} activeOpacity={1} onPressOut={() => setIsDescriptionModalVisible(false)}>
+          <Modal
+            visible={isDescriptionModalVisible}
+            animationType="fade"
+            transparent={true}
+            onRequestClose={() => setIsDescriptionModalVisible(false)}
+          >
+            <TouchableOpacity
+              style={styles.centerModalOverlay}
+              activeOpacity={1}
+              onPressOut={() => setIsDescriptionModalVisible(false)}
+            >
               <View style={styles.descriptionModalContent}>
                 {selectedProduct && (
-                  <RNScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalScrollContent}>
+                  <RNScrollView
+                    showsVerticalScrollIndicator={false}
+                    contentContainerStyle={styles.modalScrollContent}
+                  >
                     {/* Product Owner Profile Section */}
                     <TouchableOpacity
                       activeOpacity={0.7}
                       onPress={() => {
-                        console.log("Profile tapped! Owner ID:", selectedProductOwner?.id);
+                        console.log(
+                          "Profile tapped! Owner ID:",
+                          selectedProductOwner?.id
+                        );
                         if (selectedProductOwner?.id) {
                           setIsDescriptionModalVisible(false);
                           setTimeout(() => {
-                            navigation.navigate("UserProfile", { userId: selectedProductOwner.id });
+                            navigation.navigate("UserProfile", {
+                              userId: selectedProductOwner.id,
+                            });
                           }, 300);
                         } else {
-                          console.warn("User profile ID is undefined, trying to fetch again...");
+                          console.warn(
+                            "User profile ID is undefined, trying to fetch again..."
+                          );
                           if (selectedProduct?.userId) {
                             fetchProductOwner(selectedProduct.userId);
                           }
@@ -1075,33 +1194,56 @@ const Dashboard: React.FC<DashboardProps> = () => {
                       style={styles.profileContainer}
                     >
                       {selectedProductOwner?.profilePicture ? (
-                        <Image source={{ uri: selectedProductOwner.profilePicture }} style={styles.profilePicture} />
+                        <Image
+                          source={{ uri: selectedProductOwner.profilePicture }}
+                          style={styles.profilePicture}
+                        />
                       ) : (
                         <Ionicons name="person-circle" size={50} color="#777" />
                       )}
                       <View style={styles.nameContainer}>
-                        <Text style={styles.sellerName}>{selectedProductOwner?.firstName} {selectedProductOwner?.lastName}</Text>
-                        <Text style={styles.sellerInstitution}>{selectedProductOwner?.institution}</Text>
+                        <Text style={styles.sellerName}>
+                          {selectedProductOwner?.firstName}{" "}
+                          {selectedProductOwner?.lastName}
+                        </Text>
+                        <Text style={styles.sellerInstitution}>
+                          {selectedProductOwner?.institution}
+                        </Text>
                       </View>
                     </TouchableOpacity>
                     {/* Product Title */}
-                    <Text style={styles.modalTitle}>{selectedProduct.title}</Text>
+                    <Text style={styles.modalTitle}>
+                      {selectedProduct.title}
+                    </Text>
                     {/* Product Details Section */}
                     <View style={styles.detailsContainer}>
-                      <Text style={styles.detailText}>Condition: {selectedProduct.quality}</Text>
-                      {selectedProduct.quality !== "New" && selectedProduct.rating && selectedProduct.rating > 0 && (
-                        <View style={styles.ratingContainer}>
-                          <Text style={styles.detailText}>Rating: </Text>
-                          {[...Array(selectedProduct.rating)].map((_, i) => (
-                            <Ionicons key={i} name="star" size={16} color="#FFD700" />
-                          ))}
-                        </View>
-                      )}
+                      <Text style={styles.detailText}>
+                        Condition: {selectedProduct.quality}
+                      </Text>
+                      {selectedProduct.quality !== "New" &&
+                        selectedProduct.rating &&
+                        selectedProduct.rating > 0 && (
+                          <View style={styles.ratingContainer}>
+                            <Text style={styles.detailText}>Rating: </Text>
+                            {[...Array(selectedProduct.rating)].map((_, i) => (
+                              <Ionicons
+                                key={i}
+                                name="star"
+                                size={16}
+                                color="#FFD700"
+                              />
+                            ))}
+                          </View>
+                        )}
                       <Text style={styles.detailText}>
                         Price: $
-                        {institution.toLowerCase() === selectedProduct.university.toLowerCase()
+                        {institution.toLowerCase() ===
+                        selectedProduct.university.toLowerCase()
                           ? selectedProduct.price.toFixed(2)
-                          : (selectedProduct.outOfCampusPrice ?? selectedProduct.price).toFixed(2)}
+                          : (
+                              selectedProduct.outOfCampusPrice ??
+                              selectedProduct.price
+                            ).toFixed(2)}
                       </Text>
                     </View>
                     {/* Description Section with Read More / Read Less */}
@@ -1111,33 +1253,58 @@ const Dashboard: React.FC<DashboardProps> = () => {
                     !isDescriptionExpanded ? (
                       <View>
                         <Text style={styles.descriptionText}>
-                          {selectedProduct.description.substring(0, DESCRIPTION_LIMIT)}...
+                          {selectedProduct.description.substring(
+                            0,
+                            DESCRIPTION_LIMIT
+                          )}
+                          ...
                         </Text>
-                        <TouchableOpacity onPress={() => setIsDescriptionExpanded(true)}>
+                        <TouchableOpacity
+                          onPress={() => setIsDescriptionExpanded(true)}
+                        >
                           <Text style={styles.readMoreText}>Read More</Text>
                         </TouchableOpacity>
                       </View>
                     ) : (
                       <View>
-                        <Text style={styles.descriptionText}>{selectedProduct.description}</Text>
-                        {selectedProduct.description && selectedProduct.description.length > DESCRIPTION_LIMIT && (
-                          <TouchableOpacity onPress={() => setIsDescriptionExpanded(false)}>
-                            <Text style={styles.readMoreText}>Read Less</Text>
-                          </TouchableOpacity>
-                        )}
+                        <Text style={styles.descriptionText}>
+                          {selectedProduct.description}
+                        </Text>
+                        {selectedProduct.description &&
+                          selectedProduct.description.length >
+                            DESCRIPTION_LIMIT && (
+                            <TouchableOpacity
+                              onPress={() => setIsDescriptionExpanded(false)}
+                            >
+                              <Text style={styles.readMoreText}>Read Less</Text>
+                            </TouchableOpacity>
+                          )}
                       </View>
                     )}
                   </RNScrollView>
                 )}
-                <TouchableOpacity onPress={() => setIsDescriptionModalVisible(false)} style={styles.modalClose} accessibilityLabel="Close Details Modal">
+                <TouchableOpacity
+                  onPress={() => setIsDescriptionModalVisible(false)}
+                  style={styles.modalClose}
+                  accessibilityLabel="Close Details Modal"
+                >
                   <Ionicons name="close-outline" size={20} color="#FFFFFF" />
                 </TouchableOpacity>
               </View>
             </TouchableOpacity>
           </Modal>
           {/* Filter Modal */}
-          <Modal visible={isFilterModalVisible} animationType="slide" transparent={true} onRequestClose={toggleFilterModal}>
-            <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPressOut={toggleFilterModal}>
+          <Modal
+            visible={isFilterModalVisible}
+            animationType="slide"
+            transparent={true}
+            onRequestClose={toggleFilterModal}
+          >
+            <TouchableOpacity
+              style={styles.modalOverlay}
+              activeOpacity={1}
+              onPressOut={toggleFilterModal}
+            >
               <View style={styles.filterModalContainer}>
                 <Text style={styles.filterModalTitle}>Filters</Text>
                 <View style={styles.divider} />
@@ -1147,9 +1314,34 @@ const Dashboard: React.FC<DashboardProps> = () => {
                   keyExtractor={(item) => item}
                   style={{ width: "100%", marginBottom: 10 }}
                   renderItem={({ item }) => (
-                    <TouchableOpacity style={[styles.filterModalOption, selectedCategory === item && styles.filterModalOptionSelected]} onPress={() => setSelectedCategory(item)} accessibilityLabel={`Filter by ${item}`}>
-                      <Ionicons name={selectedCategory === item ? "checkbox-outline" : "ellipse-outline"} size={20} color={selectedCategory === item ? "#BB86FC" : "#FFFFFF"} style={{ marginRight: 10 }} />
-                      <Text style={[styles.filterModalOptionText, selectedCategory === item && styles.filterModalOptionTextSelected]}>
+                    <TouchableOpacity
+                      style={[
+                        styles.filterModalOption,
+                        selectedCategory === item &&
+                          styles.filterModalOptionSelected,
+                      ]}
+                      onPress={() => setSelectedCategory(item)}
+                      accessibilityLabel={`Filter by ${item}`}
+                    >
+                      <Ionicons
+                        name={
+                          selectedCategory === item
+                            ? "checkbox-outline"
+                            : "ellipse-outline"
+                        }
+                        size={20}
+                        color={
+                          selectedCategory === item ? "#BB86FC" : "#FFFFFF"
+                        }
+                        style={{ marginRight: 10 }}
+                      />
+                      <Text
+                        style={[
+                          styles.filterModalOptionText,
+                          selectedCategory === item &&
+                            styles.filterModalOptionTextSelected,
+                        ]}
+                      >
                         {item === "#Everything" ? "All" : item.replace("#", "")}
                       </Text>
                     </TouchableOpacity>
@@ -1162,30 +1354,80 @@ const Dashboard: React.FC<DashboardProps> = () => {
                   keyExtractor={(item) => item.value}
                   style={{ width: "100%", marginBottom: 10 }}
                   renderItem={({ item }) => (
-                    <TouchableOpacity style={[styles.filterModalOption, campusMode === item.value && styles.filterModalOptionSelected]} onPress={() => setCampusMode(item.value)} accessibilityLabel={`Filter by ${item.label}`}>
-                      <Ionicons name={campusMode === item.value ? "checkbox-outline" : "ellipse-outline"} size={20} color={campusMode === item.value ? "#BB86FC" : "#FFFFFF"} style={{ marginRight: 10 }} />
-                      <Text style={[styles.filterModalOptionText, campusMode === item.value && styles.filterModalOptionTextSelected]}>
+                    <TouchableOpacity
+                      style={[
+                        styles.filterModalOption,
+                        campusMode === item.value &&
+                          styles.filterModalOptionSelected,
+                      ]}
+                      onPress={() => setCampusMode(item.value)}
+                      accessibilityLabel={`Filter by ${item.label}`}
+                    >
+                      <Ionicons
+                        name={
+                          campusMode === item.value
+                            ? "checkbox-outline"
+                            : "ellipse-outline"
+                        }
+                        size={20}
+                        color={
+                          campusMode === item.value ? "#BB86FC" : "#FFFFFF"
+                        }
+                        style={{ marginRight: 10 }}
+                      />
+                      <Text
+                        style={[
+                          styles.filterModalOptionText,
+                          campusMode === item.value &&
+                            styles.filterModalOptionTextSelected,
+                        ]}
+                      >
                         {item.label}
                       </Text>
                     </TouchableOpacity>
                   )}
                 />
-                <TouchableOpacity style={styles.applyButton} onPress={() => { toggleFilterModal(); fetchProducts(); }} accessibilityLabel="Apply Filters">
+                <TouchableOpacity
+                  style={styles.applyButton}
+                  onPress={() => {
+                    toggleFilterModal();
+                    fetchProducts();
+                  }}
+                  accessibilityLabel="Apply Filters"
+                >
                   <Text style={styles.applyButtonText}>Apply Filters</Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={toggleFilterModal} style={styles.modalClose} accessibilityLabel="Close Filter Modal">
+                <TouchableOpacity
+                  onPress={toggleFilterModal}
+                  style={styles.modalClose}
+                  accessibilityLabel="Close Filter Modal"
+                >
                   <Ionicons name="close-circle" size={24} color="#FFFFFF" />
                 </TouchableOpacity>
               </View>
             </TouchableOpacity>
           </Modal>
           {/* Search Modal */}
-          <Modal visible={isSearchActive} animationType="fade" transparent={true} onRequestClose={closeSearch}>
-            <BlurView intensity={100} tint="light" style={styles.searchBlurContainer}>
+          <Modal
+            visible={isSearchActive}
+            animationType="fade"
+            transparent={true}
+            onRequestClose={closeSearch}
+          >
+            <BlurView
+              intensity={100}
+              tint="light"
+              style={styles.searchBlurContainer}
+            >
               <View style={styles.advancedSearchContainer}>
                 <View style={styles.searchHeader}>
                   <View style={styles.advancedSearchBar}>
-                    <Ionicons name="search" size={20} color="#888" style={styles.searchIcon} />
+                    <Ionicons
+                      name="search"
+                      size={20}
+                      color="#888"
+                      style={styles.searchIcon}
+                    />
                     <TextInput
                       style={styles.advancedSearchInput}
                       placeholder="Search products..."
@@ -1195,25 +1437,45 @@ const Dashboard: React.FC<DashboardProps> = () => {
                       autoFocus
                     />
                     {searchQuery.length > 0 && (
-                      <TouchableOpacity onPress={() => setSearchQuery("")} style={styles.clearButton}>
+                      <TouchableOpacity
+                        onPress={() => setSearchQuery("")}
+                        style={styles.clearButton}
+                      >
                         <Ionicons name="close-circle" size={20} color="#888" />
                       </TouchableOpacity>
                     )}
                   </View>
-                  <TouchableOpacity onPress={closeSearch} style={styles.closeSearchButton}>
+                  <TouchableOpacity
+                    onPress={closeSearch}
+                    style={styles.closeSearchButton}
+                  >
                     <Ionicons name="close" size={24} color="#000" />
                   </TouchableOpacity>
                 </View>
                 {searchQuery === "" && !suggestionCategory ? (
-                  <RNScrollView contentContainerStyle={styles.suggestionsContainer} keyboardShouldPersistTaps="handled">
+                  <RNScrollView
+                    contentContainerStyle={styles.suggestionsContainer}
+                    keyboardShouldPersistTaps="handled"
+                  >
                     <View style={styles.staticSuggestions}>
-                      <TouchableOpacity style={styles.suggestionBox} onPress={() => setSuggestionCategory("#MaleClothing")}>
+                      <TouchableOpacity
+                        style={styles.suggestionBox}
+                        onPress={() => setSuggestionCategory("#MaleClothing")}
+                      >
                         <Text style={styles.suggestionText}>Male Clothing</Text>
                       </TouchableOpacity>
-                      <TouchableOpacity style={styles.suggestionBox} onPress={() => setSuggestionCategory("#FemaleClothing")}>
-                        <Text style={styles.suggestionText}>Female Clothing</Text>
+                      <TouchableOpacity
+                        style={styles.suggestionBox}
+                        onPress={() => setSuggestionCategory("#FemaleClothing")}
+                      >
+                        <Text style={styles.suggestionText}>
+                          Female Clothing
+                        </Text>
                       </TouchableOpacity>
-                      <TouchableOpacity style={styles.suggestionBox} onPress={() => setSuggestionCategory("#Tickets")}>
+                      <TouchableOpacity
+                        style={styles.suggestionBox}
+                        onPress={() => setSuggestionCategory("#Tickets")}
+                      >
                         <Text style={styles.suggestionText}>Tickets</Text>
                       </TouchableOpacity>
                     </View>
@@ -1230,12 +1492,24 @@ const Dashboard: React.FC<DashboardProps> = () => {
                         onPress={() => {
                           setCameFromSearch(true);
                           closeSearch();
-                          navigation.push("ProductDetail", { productId: item.id });
+                          navigation.push("ProductDetail", {
+                            productId: item.id,
+                          });
                         }}
                       >
-                        <Image source={{ uri: item.images?.[0] || "https://via.placeholder.com/150" }} style={styles.searchResultImage} />
+                        <Image
+                          source={{
+                            uri:
+                              item.images?.[0] ||
+                              "https://via.placeholder.com/150",
+                          }}
+                          style={styles.searchResultImage}
+                        />
                         <View style={styles.searchResultNameContainer}>
-                          <Text style={styles.searchResultName} numberOfLines={1}>
+                          <Text
+                            style={styles.searchResultName}
+                            numberOfLines={1}
+                          >
                             {item.title}
                           </Text>
                         </View>
@@ -1247,7 +1521,12 @@ const Dashboard: React.FC<DashboardProps> = () => {
             </BlurView>
           </Modal>
           {successMessage !== "" && (
-            <Animated.View style={[styles.successToastContainer, { opacity: successOpacity }]}>
+            <Animated.View
+              style={[
+                styles.successToastContainer,
+                { opacity: successOpacity },
+              ]}
+            >
               <Text style={styles.toastText}>{successMessage}</Text>
             </Animated.View>
           )}
@@ -1262,101 +1541,464 @@ export default Dashboard;
 
 const styles = StyleSheet.create({
   rootContainer: { flex: 1, backgroundColor: "#000" },
-  gradientBackground: { flex: 1, backgroundColor: "#000", paddingBottom: NAV_BAR_HEIGHT },
-  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.3)", justifyContent: "flex-end" },
-  centerModalOverlay: { flex: 1, backgroundColor: "transparent", justifyContent: "center", alignItems: "center" },
-  smallToastContainer: { position: "absolute", top: 10, right: 10, paddingVertical: 6, paddingHorizontal: 12, borderRadius: 20, justifyContent: "center", alignItems: "center", zIndex: 9999 },
-  toastText: { color: "#fff", fontWeight: "600", fontSize: 12, textAlign: "center" },
-  successToastContainer: { position: "absolute", top: PRODUCT_HEIGHT / 2 - 230, alignSelf: "center", backgroundColor: "#34C759", paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20, zIndex: 10000 },
-  topBar: { position: "absolute", top: Platform.OS === "ios" ? 66 : 40, left: 20, zIndex: 10 },
+  gradientBackground: {
+    flex: 1,
+    backgroundColor: "#000",
+    paddingBottom: NAV_BAR_HEIGHT,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.3)",
+    justifyContent: "flex-end",
+  },
+  centerModalOverlay: {
+    flex: 1,
+    backgroundColor: "transparent",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  smallToastContainer: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 9999,
+  },
+  toastText: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 12,
+    textAlign: "center",
+  },
+  successToastContainer: {
+    position: "absolute",
+    top: PRODUCT_HEIGHT / 2 - 230,
+    alignSelf: "center",
+    backgroundColor: "#34C759",
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    zIndex: 10000,
+  },
+  topBar: {
+    position: "absolute",
+    top: Platform.OS === "ios" ? 66 : 40,
+    left: 20,
+    zIndex: 10,
+  },
   topBarIconsContainer: { flexDirection: "row" },
-  topBarIconContainer: { padding: 6, backgroundColor: "transparent", borderRadius: 8, marginRight: 10 },
+  topBarIconContainer: {
+    padding: 6,
+    backgroundColor: "transparent",
+    borderRadius: 8,
+    marginRight: 10,
+  },
   productStack: { flex: 1, justifyContent: "center", alignItems: "center" },
-  stackedProduct: { position: "absolute", width: SCREEN_WIDTH, height: PRODUCT_HEIGHT, backgroundColor: "transparent", overflow: "hidden", zIndex: 1 },
+  stackedProduct: {
+    position: "absolute",
+    width: SCREEN_WIDTH,
+    height: PRODUCT_HEIGHT,
+    backgroundColor: "transparent",
+    overflow: "hidden",
+    zIndex: 1,
+  },
   topProduct: { zIndex: 2, transform: [{ scale: 1 }] },
-  bottomProduct: { zIndex: 1, opacity: 0, transform: [{ scale: 0.95 }, { translateY: 20 }] },
-  productImage: { width: "100%", height: "100%", resizeMode: "cover", backgroundColor: "#000" },
-  topGradientOverlay: { position: "absolute", top: 0, width: "100%", height: 150, zIndex: 2 },
-  bottomGradientOverlay: { position: "absolute", bottom: 0, width: "100%", height: 100, zIndex: 2 },
-  productInfoBubble: { position: "absolute", bottom: 20, left: 12, right: 12, flexDirection: "row", alignItems: "center", justifyContent: "space-between", zIndex: 3, backgroundColor: "rgba(0,0,0,0.3)", borderRadius: 10, padding: 10 },
+  bottomProduct: {
+    zIndex: 1,
+    opacity: 0,
+    transform: [{ scale: 0.95 }, { translateY: 20 }],
+  },
+  productImage: {
+    width: "100%",
+    height: "100%",
+    resizeMode: "cover",
+    backgroundColor: "#000",
+  },
+  topGradientOverlay: {
+    position: "absolute",
+    top: 0,
+    width: "100%",
+    height: 150,
+    zIndex: 2,
+  },
+  bottomGradientOverlay: {
+    position: "absolute",
+    bottom: 0,
+    width: "100%",
+    height: 100,
+    zIndex: 2,
+  },
+  productInfoBubble: {
+    position: "absolute",
+    bottom: 20,
+    left: 12,
+    right: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    zIndex: 3,
+    backgroundColor: "rgba(0,0,0,0.3)",
+    borderRadius: 10,
+    padding: 10,
+  },
   productInfoTextContainer: { flex: 1, marginRight: 10 },
-  fixedSearchBar: { position: "absolute", top: 80, left: 0, right: 0, flexDirection: "row", alignItems: "center", backgroundColor: "#fff", paddingHorizontal: 20, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: "#ddd", zIndex: 10 },
-  profileContainer: { flexDirection: "row", alignItems: "center", marginBottom: 15 },
-  profilePicture: { width: 50, height: 50, borderRadius: 25, borderWidth: 2, borderColor: "#555" },
+  fixedSearchBar: {
+    position: "absolute",
+    top: 80,
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#ddd",
+    zIndex: 10,
+  },
+  profileContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 15,
+  },
+  profilePicture: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    borderWidth: 2,
+    borderColor: "#555",
+  },
   nameContainer: { marginLeft: 12 },
   sellerName: { fontSize: 18, fontWeight: "bold", color: "#FFFFFF" },
   sellerInstitution: { fontSize: 14, color: "#AAAAAA" },
-  advancedSearchBar: { flexDirection: "row", alignItems: "center", backgroundColor: "#fff", borderRadius: 30, paddingHorizontal: 15, paddingVertical: 8, shadowColor: "#000", shadowOpacity: 0.1, shadowOffset: { width: 0, height: 2 }, elevation: 5, flex: 1 },
-  searchHeader: { flexDirection: "row", alignItems: "center", paddingHorizontal: 20, paddingTop: 40 },
+  advancedSearchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderRadius: 30,
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 5,
+    flex: 1,
+  },
+  searchHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingTop: 40,
+  },
   searchIcon: { marginRight: 10 },
   advancedSearchInput: { flex: 1, height: 40, color: "#333", fontSize: 16 },
   clearButton: { marginLeft: 10 },
-  closeSearchButton: { marginLeft: 10, padding: 6, backgroundColor: "#fff", borderRadius: 20 },
-  fixedSearchInput: { flex: 1, height: 40, borderColor: "#ccc", borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, color: "#000", backgroundColor: "#fff" },
+  closeSearchButton: {
+    marginLeft: 10,
+    padding: 6,
+    backgroundColor: "#fff",
+    borderRadius: 20,
+  },
+  fixedSearchInput: {
+    flex: 1,
+    height: 40,
+    borderColor: "#ccc",
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    color: "#000",
+    backgroundColor: "#fff",
+  },
   fixedCloseButton: { marginLeft: 10 },
   fullWidthResultsContainer: { marginTop: 20, paddingHorizontal: 20 },
-  fullWidthResultItem: { backgroundColor: "transparent", paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: "#eee", width: "100%" },
+  fullWidthResultItem: {
+    backgroundColor: "transparent",
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+    width: "100%",
+  },
   fullWidthResultTitle: { color: "#333", fontSize: 18, fontWeight: "600" },
   fullWidthResultPrice: { color: "#777", fontSize: 16, marginTop: 5 },
-  noSearchResultsText: { color: "#333", textAlign: "center", marginTop: 20, fontSize: 16 },
-  productInfoTitle: { color: "#FFFFFF", fontSize: 16, fontWeight: "700", marginBottom: 2 },
+  noSearchResultsText: {
+    color: "#333",
+    textAlign: "center",
+    marginTop: 20,
+    fontSize: 16,
+  },
+  productInfoTitle: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "700",
+    marginBottom: 2,
+  },
   productInfoPrice: { color: "#A1A1A1", fontSize: 16, fontWeight: "600" },
-  productInfoActions: { flexDirection: "row", alignItems: "center", marginLeft: 12 },
-  iconButton: { backgroundColor: "rgba(50,50,50,0.6)", padding: 8, borderRadius: 50, marginLeft: 10 },
-  ratingContainer: { flexDirection: "row", alignItems: "center", marginBottom: 6 },
-  imageIndicatorsContainer: { position: "absolute", top: 20, flexDirection: "row", alignSelf: "center", zIndex: 3 },
-  midImageIndicatorsContainer: { position: "absolute", top: PRODUCT_HEIGHT / 2 - 270, flexDirection: "row", alignSelf: "center", zIndex: 4 },
-  imageIndicatorDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: "#AAAAAA", marginHorizontal: 3 },
+  productInfoActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginLeft: 12,
+  },
+  iconButton: {
+    backgroundColor: "rgba(50,50,50,0.6)",
+    padding: 8,
+    borderRadius: 50,
+    marginLeft: 10,
+  },
+  ratingContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 6,
+  },
+  imageIndicatorsContainer: {
+    position: "absolute",
+    top: 20,
+    flexDirection: "row",
+    alignSelf: "center",
+    zIndex: 3,
+  },
+  midImageIndicatorsContainer: {
+    position: "absolute",
+    top: PRODUCT_HEIGHT / 2 - 270,
+    flexDirection: "row",
+    alignSelf: "center",
+    zIndex: 4,
+  },
+  imageIndicatorDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: "#AAAAAA",
+    marginHorizontal: 3,
+  },
   imageIndicatorDotActive: { backgroundColor: "#FFFFFF" },
-  errorContainer: { flex: 1, justifyContent: "center", alignItems: "center", paddingHorizontal: 15 },
-  errorText: { color: "#FF3B30", fontSize: 16, textAlign: "center", marginBottom: 8 },
-  retryButton: { backgroundColor: "#007AFF", paddingVertical: 10, paddingHorizontal: 20, borderRadius: 25 },
+  errorContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 15,
+  },
+  errorText: {
+    color: "#FF3B30",
+    fontSize: 16,
+    textAlign: "center",
+    marginBottom: 8,
+  },
+  retryButton: {
+    backgroundColor: "#007AFF",
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 25,
+  },
   retryButtonText: { color: "#FFFFFF", fontSize: 16, fontWeight: "500" },
-  noProductsContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
+  noProductsContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   noProductsText: { color: "#FFFFFF", fontSize: 18 },
-  filterModalContainer: { backgroundColor: "#1A1A1A", borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 16, maxHeight: "80%" },
-  filterModalTitle: { fontSize: 20, fontWeight: "700", color: "#FFFFFF", marginBottom: 12, textAlign: "center" },
-  modalTitle: { fontSize: 22, fontWeight: "bold", color: "#FFFFFF", marginBottom: 10, textAlign: "left" },
-  divider: { backgroundColor: "#444", height: 1, width: "100%", marginVertical: 10 },
-  sectionTitle: { fontSize: 16, color: "#FFFFFF", marginBottom: 5, fontWeight: "600" },
-  filterModalOption: { flexDirection: "row", alignItems: "center", paddingVertical: 10 },
+  filterModalContainer: {
+    backgroundColor: "#1A1A1A",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 16,
+    maxHeight: "80%",
+  },
+  filterModalTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#FFFFFF",
+    marginBottom: 12,
+    textAlign: "center",
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: "bold",
+    color: "#FFFFFF",
+    marginBottom: 10,
+    textAlign: "left",
+  },
+  divider: {
+    backgroundColor: "#444",
+    height: 1,
+    width: "100%",
+    marginVertical: 10,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    color: "#FFFFFF",
+    marginBottom: 5,
+    fontWeight: "600",
+  },
+  filterModalOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 10,
+  },
   filterModalOptionSelected: { backgroundColor: "#BB86FC20", borderRadius: 10 },
   modalContentContainer: { alignItems: "flex-start", width: "100%" },
   filterModalOptionText: { fontSize: 14, color: "#FFFFFF" },
   filterModalOptionTextSelected: { color: "#BB86FC", fontWeight: "600" },
-  applyButton: { backgroundColor: "#BB86FC", paddingVertical: 12, borderRadius: 25, marginTop: 15, alignItems: "center" },
-  titleContainer: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
-  newBadgeContainer: { backgroundColor: "#34C759", borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4, marginRight: 26, marginTop: -18 },
+  applyButton: {
+    backgroundColor: "#BB86FC",
+    paddingVertical: 12,
+    borderRadius: 25,
+    marginTop: 15,
+    alignItems: "center",
+  },
+  titleContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+  newBadgeContainer: {
+    backgroundColor: "#34C759",
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginRight: 26,
+    marginTop: -18,
+  },
   newBadgeText: { color: "#FFFFFF", fontSize: 14, fontWeight: "bold" },
   applyButtonText: { color: "#FFFFFF", fontSize: 16, fontWeight: "600" },
-  modalClose: { position: "absolute", top: 10, right: 10, backgroundColor: "rgba(255,255,255,0.2)", borderRadius: 15, padding: 5 },
-  detailsModalContent: { width: "90%", backgroundColor: "#1E1E1E", borderRadius: 15, padding: 20, alignItems: "center", maxHeight: "70%", position: "relative" },
-  descriptionModalContent: { width: "90%", maxHeight: "80%", backgroundColor: "#1C1C1E", borderRadius: 15, padding: 20, shadowColor: "#000", shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 10, position: "relative" },
-  detailsContainer: { paddingVertical: 8, paddingHorizontal: 10, borderBottomWidth: 1, borderBottomColor: "#BB86FC", marginBottom: 12 },
+  modalClose: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    borderRadius: 15,
+    padding: 5,
+  },
+  detailsModalContent: {
+    width: "90%",
+    backgroundColor: "#1E1E1E",
+    borderRadius: 15,
+    padding: 20,
+    alignItems: "center",
+    maxHeight: "70%",
+    position: "relative",
+  },
+  descriptionModalContent: {
+    width: "90%",
+    maxHeight: "80%",
+    backgroundColor: "#1C1C1E",
+    borderRadius: 15,
+    padding: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
+    position: "relative",
+  },
+  detailsContainer: {
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#BB86FC",
+    marginBottom: 12,
+  },
   modalScrollContent: { paddingRight: 10 },
-  sectionHeader: { fontSize: 18, fontWeight: "600", color: "#F2F2F7", marginTop: 15, marginBottom: 5 },
+  sectionHeader: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#F2F2F7",
+    marginTop: 15,
+    marginBottom: 5,
+  },
   detailText: { fontSize: 16, color: "#E5E5EA", marginBottom: 6 },
   descriptionText: { fontSize: 14, color: "#D1D1D6", lineHeight: 20 },
   readMoreText: { color: "#FF3B30", fontSize: 14, marginTop: 5 },
-  requestedStoriesContainer: { position: "absolute", top: PRODUCT_HEIGHT / 2 - 280, left: 0, right: 0, paddingHorizontal: 10, zIndex: 11 },
-  requestedHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4, paddingHorizontal: 4 },
+  requestedStoriesContainer: {
+    position: "absolute",
+    top: PRODUCT_HEIGHT / 2 - 280,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 10,
+    zIndex: 11,
+  },
+  requestedHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 4,
+    paddingHorizontal: 4,
+  },
   requestedLabel: { color: "#FFFFFF", fontSize: 10, fontWeight: "bold" },
   viewAllButton: { padding: 4 },
   viewAllText: { color: "#FFFFFF", fontSize: 10, fontWeight: "bold" },
-  storyItem: { backgroundColor: "rgba(0,0,0,0.5)", paddingVertical: 4, paddingHorizontal: 8, borderRadius: 12, marginRight: 8 },
-  storyText: { color: "#FFFFFF", fontSize: 10, fontWeight: "bold", textAlign: "center" },
-  requestedScrollContent: { flexDirection: "row", alignItems: "center", paddingHorizontal: 4 },
+  storyItem: {
+    backgroundColor: "rgba(0,0,0,0.5)",
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    marginRight: 8,
+  },
+  storyText: {
+    color: "#FFFFFF",
+    fontSize: 10,
+    fontWeight: "bold",
+    textAlign: "center",
+  },
+  requestedScrollContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 4,
+  },
   requestedScrollView: { height: 40 },
   searchBlurContainer: { flex: 1 },
-  advancedSearchContainer: { flex: 1, backgroundColor: "rgba(255,255,255,0.97)", paddingTop: 20 },
-  suggestionsContainer: { paddingHorizontal: 20, paddingBottom: 40, marginTop: 30 },
-  staticSuggestions: { flexDirection: "row", justifyContent: "space-around", marginTop: -20 },
-  suggestionBox: { backgroundColor: "#F0F0F0", paddingVertical: 10, paddingHorizontal: 12, borderRadius: 18, minWidth: (SCREEN_WIDTH - 80) / 7, alignItems: "center" },
+  advancedSearchContainer: {
+    flex: 1,
+    backgroundColor: "rgba(255,255,255,0.97)",
+    paddingTop: 20,
+  },
+  suggestionsContainer: {
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+    marginTop: 30,
+  },
+  staticSuggestions: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    marginTop: -20,
+  },
+  suggestionBox: {
+    backgroundColor: "#F0F0F0",
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 18,
+    minWidth: (SCREEN_WIDTH - 80) / 7,
+    alignItems: "center",
+  },
   suggestionText: { color: "#555", fontWeight: "500", fontSize: 12 },
   searchResultsContainer: { paddingHorizontal: 10, paddingTop: 10 },
-  searchResultItem: { width: SCREEN_WIDTH / 2 - 15, margin: 5, aspectRatio: 1, borderRadius: 10, overflow: "hidden", backgroundColor: "#eee" },
+  searchResultItem: {
+    width: SCREEN_WIDTH / 2 - 15,
+    margin: 5,
+    aspectRatio: 1,
+    borderRadius: 10,
+    overflow: "hidden",
+    backgroundColor: "#eee",
+  },
   searchResultImage: { width: "100%", height: "100%", resizeMode: "cover" },
-  searchResultNameContainer: { position: "absolute", top: 5, right: 5, backgroundColor: "rgba(0,0,0,0.5)", borderRadius: 5, paddingHorizontal: 5, paddingVertical: 2 },
+  searchResultNameContainer: {
+    position: "absolute",
+    top: 5,
+    right: 5,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    borderRadius: 5,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+  },
   searchResultName: { color: "#fff", fontSize: 12, fontWeight: "600" },
-  noResultsText: { color: "#333", textAlign: "center", marginTop: 20, fontSize: 16 },
+  noResultsText: {
+    color: "#333",
+    textAlign: "center",
+    marginTop: 20,
+    fontSize: 16,
+  },
 });
