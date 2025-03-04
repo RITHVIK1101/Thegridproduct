@@ -1,5 +1,12 @@
-import React, { useContext, memo } from "react";
-import { View, TouchableOpacity, Text, StyleSheet, Image } from "react-native";
+import React, { useContext, memo, useState } from "react";
+import { 
+  View, 
+  TouchableOpacity, 
+  Text, 
+  StyleSheet, 
+  Image, 
+  Modal 
+} from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { UserContext } from "./UserContext";
 
@@ -12,6 +19,8 @@ const UserMenuScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
     profilePic,
     grids, // ✅ Fetch grids from context
   } = useContext(UserContext);
+
+  const [isGridsModalVisible, setIsGridsModalVisible] = useState(false);
 
   const handleLogout = async () => {
     try {
@@ -51,16 +60,19 @@ const UserMenuScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           <Text style={styles.bottomSheetUserName}>
             {firstName} {lastName}
           </Text>
-
           {institution && (
             <Text style={styles.bottomSheetUserInstitution}>{institution}</Text>
           )}
 
-          {/* ✅ Grids Badge UI */}
-          <View style={styles.gridsBadge}>
+          {/* ✅ Grids Badge UI wrapped in a Touchable */}
+          <TouchableOpacity 
+            style={styles.gridsBadge}
+            onPress={() => setIsGridsModalVisible(true)}
+            accessibilityLabel="Show Grids Explanation"
+          >
             <Ionicons name="grid-outline" size={16} color="#FFF" />
             <Text style={styles.gridsText}>{grids} Grids</Text>
-          </View>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.bottomSheetOptions}>
@@ -114,6 +126,32 @@ const UserMenuScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* Grids Explanation Modal */}
+      <Modal
+        visible={isGridsModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsGridsModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>What are Grids?</Text>
+            <Text style={styles.modalBody}>
+              Grids are a score that represents your activity and engagement on the platform. 
+              You earn Grids when you post a product, request a product, or create a gig. 
+              Your current Grid count is {grids}.
+            </Text>
+            <TouchableOpacity
+              style={styles.closeModalButton}
+              onPress={() => setIsGridsModalVisible(false)}
+              accessibilityLabel="Close Grids Info"
+            >
+              <Text style={styles.closeModalButtonText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -155,15 +193,14 @@ const styles = StyleSheet.create({
   },
   bottomSheetUserName: { fontSize: 18, fontWeight: "700", color: "#FFFFFF" },
   bottomSheetUserInstitution: { fontSize: 14, color: "#CCCCCC", marginTop: 5 },
-
   /* ✅ Grids Badge Style */
   gridsBadge: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#7B61FF", // Cool bluish-purple
+    backgroundColor: "#7B61FF",
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 20, // Oval shape
+    borderRadius: 20,
     marginTop: 10,
     shadowColor: "#7B61FF",
     shadowOffset: { width: 0, height: 3 },
@@ -176,7 +213,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     marginLeft: 5,
   },
-
   bottomSheetOptions: { marginTop: 20, width: "100%" },
   bottomSheetOption: {
     flexDirection: "row",
@@ -186,6 +222,51 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   bottomSheetOptionText: { color: "#FFFFFF", fontSize: 16 },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.85)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: "#1E1E1E",
+    padding: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    width: "85%",
+    borderWidth: 1,
+    borderColor: "#7B61FF",
+    shadowColor: "#7B61FF",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: "700",
+    color: "#FFFFFF",
+    marginBottom: 15,
+    textAlign: "center",
+  },
+  modalBody: {
+    fontSize: 16,
+    color: "#CCCCCC",
+    textAlign: "center",
+    marginBottom: 20,
+  },
+  closeModalButton: {
+    backgroundColor: "#7B61FF",
+    paddingVertical: 12,
+    paddingHorizontal: 30,
+    borderRadius: 10,
+  },
+  closeModalButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
+  },
 });
 
 export default memo(UserMenuScreen);

@@ -1,5 +1,3 @@
-// CartScreen.js
-
 import React, { useEffect, useState, useContext } from "react";
 import {
   View,
@@ -20,7 +18,6 @@ import { CommonActions, useNavigation } from "@react-navigation/native";
 import { StackNavigationProp } from "@react-navigation/stack";
 import { RootStackParamList } from "./navigationTypes";
 import { NGROK_URL } from "@env";
-
 import { LinearGradient } from "expo-linear-gradient";
 
 type CartItem = {
@@ -66,23 +63,20 @@ type CartProduct = {
 
 const { width } = Dimensions.get("window");
 
-// Initialize cartProducts as an empty array to avoid undefined
 const CartScreen: React.FC = () => {
   const [cartProducts, setCartProducts] = useState<CartProduct[]>([]);
   const [error, setError] = useState<string | null>(null);
-
-  // State for delete confirmation
   const [itemToDelete, setItemToDelete] = useState<CartProduct | null>(null);
   const [isTransitioning, setIsTransitioning] = useState<boolean>(false);
-
   const [isDeleteModalVisible, setIsDeleteModalVisible] =
     useState<boolean>(false);
-
-  // State for message popup
+  // New state for message confirmation
+  const [isMessageConfirmModalVisible, setIsMessageConfirmModalVisible] =
+    useState<boolean>(false);
+  const [productToMessage, setProductToMessage] =
+    useState<CartProduct | null>(null);
   const [messagePopupVisible, setMessagePopupVisible] =
     useState<boolean>(false);
-
-  // State for loading indicators
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isMessaging, setIsMessaging] = useState<boolean>(false);
 
@@ -92,7 +86,7 @@ const CartScreen: React.FC = () => {
   const fetchCart = async () => {
     if (!userId || !token) {
       setError("User not logged in.");
-      setCartProducts([]); // Ensure cartProducts is an empty array
+      setCartProducts([]);
       return;
     }
 
@@ -137,11 +131,10 @@ const CartScreen: React.FC = () => {
         !Array.isArray(cartData.items) ||
         cartData.items.length === 0
       ) {
-        setCartProducts([]); // Set to empty array if no items
+        setCartProducts([]);
         return;
       }
 
-      // Gather product IDs
       const productIds = cartData.items
         .map((item) => item.productId)
         .filter(Boolean);
@@ -150,7 +143,6 @@ const CartScreen: React.FC = () => {
         return;
       }
 
-      // Fetch product details
       const productsResponse = await fetch(
         `${NGROK_URL}/products/by-ids?ids=${productIds.join(",")}`,
         {
@@ -186,7 +178,6 @@ const CartScreen: React.FC = () => {
         return;
       }
 
-      // Merge cart items with product details
       const combinedCartProducts: CartProduct[] = cartData.items.map((item) => {
         if (!item || !item.productId) {
           return {
@@ -201,7 +192,6 @@ const CartScreen: React.FC = () => {
             quality: "",
           };
         }
-
         const product = productsData.find((p) => p.id === item.productId);
         if (!product) {
           return {
@@ -216,7 +206,6 @@ const CartScreen: React.FC = () => {
             quality: "",
           };
         }
-
         return {
           id: product.id,
           title: product.title,
@@ -233,7 +222,6 @@ const CartScreen: React.FC = () => {
         };
       });
 
-      // Remove items with unknown sellers
       const validCartProducts = combinedCartProducts.filter(
         (cp) => cp.sellerId !== "unknown-seller"
       );
@@ -242,19 +230,17 @@ const CartScreen: React.FC = () => {
     } catch (err: any) {
       console.error("Fetch Cart Error:", err);
       setError(err.message || "An unexpected error occurred.");
-      setCartProducts([]); // Set to empty array on error
+      setCartProducts([]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Confirm removal (trigger modal)
   const confirmRemoveFromCart = (product: CartProduct) => {
     setItemToDelete(product);
     setIsDeleteModalVisible(true);
   };
 
-  // Actually remove item
   const handleDelete = async () => {
     if (!itemToDelete) return;
 
@@ -291,7 +277,6 @@ const CartScreen: React.FC = () => {
         throw new Error(errorData.message || "Failed to remove item.");
       }
 
-      // Remove locally
       setCartProducts((prev) => prev.filter((p) => p.id !== itemToDelete.id));
     } catch (err: any) {
       console.error("Remove from Cart Error:", err);
@@ -305,7 +290,14 @@ const CartScreen: React.FC = () => {
     }
   };
 
-  const messageProduct = async (product: CartProduct) => {
+  // New: When a user taps the Message button, show confirmation modal
+  const onMessagePress = (product: CartProduct) => {
+    setProductToMessage(product);
+    setIsMessageConfirmModalVisible(true);
+  };
+
+  const messageProduct = async (product: CartProduct | null) => {
+    if (!product) return;
     if (!userId) {
       Alert.alert("Error", "User not authenticated.");
       return;
@@ -316,7 +308,7 @@ const CartScreen: React.FC = () => {
     }
 
     setIsMessaging(true);
-    setIsTransitioning(true); // Set transitioning state
+    setIsTransitioning(true);
 
     const payload = {
       referenceId: product.id,
@@ -338,18 +330,13 @@ const CartScreen: React.FC = () => {
       const data = await response.json();
 
       if (response.ok) {
-        // Show popup first
         setMessagePopupVisible(true);
-
-        // Remove product after a short delay
         setTimeout(() => {
           setCartProducts((prev) => prev.filter((p) => p.id !== product.id));
         }, 100);
-
-        // Hide popup after showing for 2 seconds
         setTimeout(() => {
           setMessagePopupVisible(false);
-          setIsTransitioning(false); // Reset transitioning state
+          setIsTransitioning(false);
         }, 2000);
       } else {
         throw new Error(data.message || "Failed to send chat request.");
@@ -357,13 +344,12 @@ const CartScreen: React.FC = () => {
     } catch (error: any) {
       console.error("🚨 Error sending chat request:", error);
       Alert.alert("Error", error.message || "Failed to send request.");
-      setIsTransitioning(false); // Reset transitioning state on error
+      setIsTransitioning(false);
     } finally {
       setIsMessaging(false);
     }
   };
 
-  // Handle Message All
   const messageAllProducts = async () => {
     if (!userId) {
       Alert.alert("Error", "User not authenticated.");
@@ -376,7 +362,6 @@ const CartScreen: React.FC = () => {
 
     setIsMessaging(true);
     try {
-      // Prepare chat requests with buyerId and sellerId
       const chatRequests = cartProducts.map((product) =>
         fetch(`${NGROK_URL}/chat/request`, {
           method: "POST",
@@ -385,16 +370,16 @@ const CartScreen: React.FC = () => {
             Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
-            productId: product.id, // Send only productId
-            buyerId: userId, // Included buyerId
-            sellerId: product.sellerId, // Included sellerId
+            productId: product.id,
+            buyerId: userId,
+            sellerId: product.sellerId,
           }),
         })
       );
 
       const responses = await Promise.all(chatRequests);
 
-      const failedRequests: string[] = []; // Explicitly define as string[]
+      const failedRequests: string[] = [];
       const successfullyMessagedProducts: string[] = [];
 
       for (let i = 0; i < responses.length; i++) {
@@ -427,14 +412,12 @@ const CartScreen: React.FC = () => {
       }
 
       if (successfullyMessagedProducts.length > 0) {
-        // Remove successfully messaged products from the local cart state
         setCartProducts(
           (prev) =>
             prev.filter((p) => !successfullyMessagedProducts.includes(p.id)) ||
             []
         );
 
-        // Show quick confirmation popup
         setMessagePopupVisible(true);
         setTimeout(() => {
           setMessagePopupVisible(false);
@@ -485,10 +468,10 @@ const CartScreen: React.FC = () => {
           style={styles.messageButtonGradient}
         >
           <TouchableOpacity
-            onPress={() => messageProduct(item)}
+            onPress={() => onMessagePress(item)}
             style={styles.messageButton}
             accessibilityLabel={`Message about ${item.title}`}
-            disabled={isMessaging} // Disable while sending request
+            disabled={isMessaging}
           >
             {isMessaging ? (
               <ActivityIndicator size="small" color="black" />
@@ -509,7 +492,7 @@ const CartScreen: React.FC = () => {
           onPress={() => confirmRemoveFromCart(item)}
           style={styles.removeButton}
           accessibilityLabel={`Remove ${item.title} from Cart`}
-          disabled={isMessaging} // Optionally disable during messaging
+          disabled={isMessaging}
         >
           <Ionicons name="trash-outline" size={22} color="#FF3B30" />
         </TouchableOpacity>
@@ -517,13 +500,6 @@ const CartScreen: React.FC = () => {
     </View>
   );
 
-  /**
-   * RENDER
-   * - If `isLoading`, show loading indicator.
-   * - If `error`, show error UI.
-   * - If `cartProducts` is an empty array, show empty cart.
-   * - Else, show cart items.
-   */
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
@@ -554,10 +530,8 @@ const CartScreen: React.FC = () => {
     );
   }
 
-  // Otherwise, we have cart items
   return (
     <View style={styles.container}>
-      {/* Show cart content or empty state */}
       {cartProducts.length > 0 ? (
         <>
           <FlatList
@@ -633,7 +607,60 @@ const CartScreen: React.FC = () => {
         </TouchableWithoutFeedback>
       </Modal>
 
-      {/* Message Confirmation Popup (no animation, just appear/disappear) */}
+      {/* Message Confirmation Modal */}
+      <Modal
+        transparent={true}
+        animationType="fade"
+        visible={isMessageConfirmModalVisible}
+        onRequestClose={() => {
+          setIsMessageConfirmModalVisible(false);
+          setProductToMessage(null);
+        }}
+      >
+        <TouchableWithoutFeedback
+          onPress={() => {
+            setIsMessageConfirmModalVisible(false);
+            setProductToMessage(null);
+          }}
+        >
+          <View style={styles.modalOverlay}>
+            <TouchableWithoutFeedback>
+              <View style={styles.modalContainer}>
+                <Ionicons name="chatbubble-ellipses-outline" size={40} color="#BB86FC" />
+                <Text style={styles.modalTitle}>Confirm Request</Text>
+                <Text style={styles.modalMessage}>
+                  Send request about "{productToMessage?.title}"?
+                </Text>
+                <View style={styles.modalButtons}>
+                  <TouchableOpacity
+                    style={styles.modalButtonNo}
+                    onPress={() => {
+                      setIsMessageConfirmModalVisible(false);
+                      setProductToMessage(null);
+                    }}
+                    accessibilityLabel="Cancel Message"
+                  >
+                    <Text style={styles.modalButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.modalButtonYes}
+                    onPress={async () => {
+                      setIsMessageConfirmModalVisible(false);
+                      await messageProduct(productToMessage);
+                      setProductToMessage(null);
+                    }}
+                    accessibilityLabel="Confirm Message"
+                  >
+                    <Text style={styles.modalButtonText}>Confirm</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
+      {/* Message Confirmation Popup */}
       <Modal
         transparent={true}
         animationType="none"
@@ -659,7 +686,6 @@ const CartScreen: React.FC = () => {
 
 export default CartScreen;
 
-/** STYLES **/
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -706,7 +732,7 @@ const styles = StyleSheet.create({
   messageButtonGradient: {
     borderRadius: 8,
     marginRight: 10,
-    marginTop: 4, // Move the button lower
+    marginTop: 4,
     shadowColor: "#888",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.4,
@@ -733,7 +759,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#2C2C2C",
     marginVertical: 5,
   },
-  /** Error State **/
   errorContainer: {
     flex: 1,
     justifyContent: "center",
@@ -762,7 +787,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     marginLeft: 8,
   },
-  /** Empty Cart **/
   emptyContainer: {
     flex: 1,
     justifyContent: "center",
@@ -778,7 +802,6 @@ const styles = StyleSheet.create({
   listContainer: {
     paddingBottom: 150,
   },
-  /** Footer/Message All **/
   footer: {
     position: "absolute",
     bottom: 20,
@@ -830,7 +853,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginRight: 6,
   },
-  /** Modal Styles **/
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
@@ -845,15 +867,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   modalTitle: {
-    color: "#fff",
-    fontSize: 18,
-    fontWeight: "600",
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#FFFFFF",
     marginTop: 10,
     marginBottom: 5,
   },
   modalMessage: {
+    fontSize: 16,
     color: "#bbb",
-    fontSize: 14,
     textAlign: "center",
     marginBottom: 15,
   },
@@ -883,7 +905,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
   },
-  /** Message Popup **/
   buyPopupOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0)",
@@ -905,7 +926,6 @@ const styles = StyleSheet.create({
     marginLeft: 10,
     fontWeight: "500",
   },
-  /** Loading Indicators **/
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
@@ -919,3 +939,5 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 });
+
+
