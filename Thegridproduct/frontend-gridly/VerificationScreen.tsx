@@ -5,6 +5,7 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
+  ActivityIndicator,
   Alert,
 } from "react-native";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
@@ -40,6 +41,7 @@ const VerificationScreen: React.FC = () => {
     "",
   ]);
   const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false); // Loading state
 
   // Create refs for each of the 6 TextInputs
   const inputRefs = useRef<Array<TextInput | null>>([]);
@@ -62,10 +64,12 @@ const VerificationScreen: React.FC = () => {
 
   const handleVerify = async () => {
     setError(""); // Clear previous errors
+    setIsLoading(true); // Start loading
     const code = codeDigits.join("");
 
     if (code.length < 6) {
       setError("Please enter a complete 6-digit code.");
+      setIsLoading(false);
       return;
     }
 
@@ -79,13 +83,14 @@ const VerificationScreen: React.FC = () => {
       if (!response.ok) {
         const errorText = await response.text();
         setError(errorText || "Verification failed");
+        setIsLoading(false);
         return;
       }
 
       const data = await response.json();
-      console.log("Verification Response:", data); // Debugging
+      console.log("Verification Response:", data);
 
-      // Extract user details from response, including `grids`
+      // Extract user details from response, including grids
       const {
         token,
         userId,
@@ -94,20 +99,20 @@ const VerificationScreen: React.FC = () => {
         firstName,
         lastName,
         profilePic,
-        grids, // ✅ Get grids from response
+        grids,
       } = data;
 
-      // ✅ Use defaults to prevent `undefined` values
       if (!token || !userId || !institution) {
         setError("Invalid user data received. Please try again.");
+        setIsLoading(false);
         return;
       }
 
       const validStudentType = studentType || "university";
       const validProfilePic = profilePic || null;
-      const validGrids = grids ?? 0; // ✅ Ensure grids defaults to 0 if missing
+      const validGrids = grids ?? 0; // Default grids to 0 if missing
 
-      // ✅ Store data in SecureStore
+      // Store data in SecureStore
       await SecureStore.setItemAsync("userToken", token);
       await SecureStore.setItemAsync("userId", userId);
       await SecureStore.setItemAsync("firstName", firstName || "Unknown");
@@ -117,9 +122,9 @@ const VerificationScreen: React.FC = () => {
       if (validProfilePic) {
         await SecureStore.setItemAsync("profilePic", validProfilePic);
       }
-      await SecureStore.setItemAsync("grids", validGrids.toString()); // ✅ Store grids
+      await SecureStore.setItemAsync("grids", validGrids.toString());
 
-      // ✅ Update the User Context
+      // Update the User Context
       setUser({
         token,
         userId,
@@ -128,13 +133,15 @@ const VerificationScreen: React.FC = () => {
         firstName: firstName || "Unknown",
         lastName: lastName || "User",
         profilePic: validProfilePic,
-        grids: validGrids, // ✅ Include grids
+        grids: validGrids,
       });
 
       // Navigate to Dashboard
       navigation.navigate("Dashboard");
     } catch (err) {
       setError("An error occurred. Please try again.");
+    } finally {
+      setIsLoading(false); // Stop loading
     }
   };
 
@@ -166,8 +173,16 @@ const VerificationScreen: React.FC = () => {
         ))}
       </View>
       {error ? <Text style={styles.error}>{error}</Text> : null}
-      <TouchableOpacity style={styles.button} onPress={handleVerify}>
-        <Text style={styles.buttonText}>Verify</Text>
+      <TouchableOpacity
+        style={[styles.button, isLoading && styles.disabledButton]}
+        onPress={handleVerify}
+        disabled={isLoading}
+      >
+        {isLoading ? (
+          <ActivityIndicator size="small" color="#fff" />
+        ) : (
+          <Text style={styles.buttonText}>Verify</Text>
+        )}
       </TouchableOpacity>
     </View>
   );
@@ -219,6 +234,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderRadius: 30,
   },
+  disabledButton: {
+    backgroundColor: "#6D28D9",
+  },
   buttonText: {
     color: "#fff",
     fontSize: 16,
@@ -237,7 +255,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     borderRadius: 10,
   },
-
   warningText: {
     color: "#A78BFA",
     fontSize: 14,
