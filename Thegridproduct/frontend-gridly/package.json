@@ -45,6 +45,7 @@
     "firebase": "^10.14.1",
     "getenv": "^1.0.0",
     "hoist-non-react-statics": "^3.3.2",
+    "lottie-react-native": "^7.2.2",
     "node-fetch": "^3.3.2",
     "react": "18.3.1",
     "react-dom": "18.3.1",
