@@ -5,7 +5,7 @@ export default {
     name: "Gridly",
     slug: "your-app-slug",
     owner: "rithvik1101",
-    version: "1.0.0",
+    version: "1.0.1",
     orientation: "portrait",
     icon: "./assets/icon.jpg",
     splash: {
@@ -20,6 +20,7 @@ export default {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.gridly.mobile",
+      buildNumber: "6",
       infoPlist: {
         NSPhotoLibraryUsageDescription: "Gridly needs access to your photo library to allow you to upload images when creating service listings. These images will be publicly visible to potential customers browsing your offerings.",
         NSCameraUsageDescription: "Gridly requires access to your camera so that you can take pictures of the products you're listing. These photos will be shown to other users, helping them better understand the product you are offering.",
@@ -27,6 +28,7 @@ export default {
       }
     },
     android: {
+      versionCode: 6,
       adaptiveIcon: {
         foregroundImage: "./assets/adaptive-icon.png",
         backgroundColor: "#ffffff"
