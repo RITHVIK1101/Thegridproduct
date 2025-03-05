@@ -3,7 +3,7 @@ import 'dotenv/config';
 export default {
   expo: {
     name: "Gridly",
-    slug: "gridly-app",
+    slug: "your-app-slug",
     owner: "rithvik1101",
     version: "1.0.2",
     orientation: "portrait",
