@@ -173,7 +173,12 @@ const RequestProduct: React.FC = () => {
         </ScrollView>
       </TouchableWithoutFeedback>
 
-      <Modal transparent visible={isSuccessModalVisible} animationType="fade">
+      <Modal
+        transparent
+        visible={isSuccessModalVisible}
+        animationType="fade"
+        presentationStyle="overFullScreen"
+      >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Ionicons name="checkmark-circle" size={60} color="#9C27B0" />
