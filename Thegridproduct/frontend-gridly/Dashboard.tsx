@@ -779,6 +779,13 @@ const Dashboard: React.FC<DashboardProps> = () => {
     fetchLikedProducts();
   }, []);
 
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchUserInfo();
+    }, [token])
+  );
+  
+
   // --- Search Handling ---
   useEffect(() => {
     if (searchQuery !== "") {

@@ -3,9 +3,9 @@ import 'dotenv/config';
 export default {
   expo: {
     name: "Gridly",
-    slug: "your-app-slug",
+    slug: "gridly-app",
     owner: "rithvik1101",
-    version: "1.0.1",
+    version: "1.0.2",
     orientation: "portrait",
     icon: "./assets/icon.jpg",
     splash: {
@@ -20,15 +20,15 @@ export default {
     ios: {
       supportsTablet: true,
       bundleIdentifier: "com.gridly.mobile",
-      buildNumber: "6",
+      buildNumber: "7",
       infoPlist: {
-        NSPhotoLibraryUsageDescription: "Gridly needs access to your photo library to allow you to upload images when creating service listings. These images will be publicly visible to potential customers browsing your offerings.",
-        NSCameraUsageDescription: "Gridly requires access to your camera so that you can take pictures of the products you're listing. These photos will be shown to other users, helping them better understand the product you are offering.",
+        NSPhotoLibraryUsageDescription: "Gridly needs access to your photo library to allow you to upload images when creating service listings.",
+        NSCameraUsageDescription: "Gridly requires access to your camera so you can take pictures of the products you're listing.",
         ITSAppUsesNonExemptEncryption: false
       }
     },
     android: {
-      versionCode: 6,
+      versionCode: 7,
       adaptiveIcon: {
         foregroundImage: "./assets/adaptive-icon.png",
         backgroundColor: "#ffffff"
