@@ -36,6 +36,7 @@ import { BlurView } from "expo-blur";
 import BottomNavBar from "./components/BottomNavbar";
 import { NGROK_URL } from "@env";
 import { UserContext } from "./UserContext";
+import ZoomableImage from "./ZoomableImage";
 import { RootStackParamList } from "./navigationTypes";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
@@ -959,12 +960,12 @@ const Dashboard: React.FC<DashboardProps> = () => {
                       colors={["rgba(0,0,0,0.5)", "transparent"]}
                       style={styles.topGradientOverlay}
                     />
-                    <Image
-                      source={{ uri: currentImageURI }}
-                      style={[styles.productImage, { backgroundColor: "#000" }]}
-                      fadeDuration={0}
-                      resizeMode="cover"
-                    />
+                    <View
+                      style={{ width: SCREEN_WIDTH, height: PRODUCT_HEIGHT }}
+                    >
+                      <ZoomableImage imageUri={currentImageURI} />
+                    </View>
+
                     <LinearGradient
                       colors={["transparent", "rgba(0,0,0,0.3)"]}
                       style={styles.bottomGradientOverlay}
