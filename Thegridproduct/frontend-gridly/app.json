@@ -1,9 +1,9 @@
 {
   "expo": {
     "name": "GridlyApp",
-    "slug": "GridlyApp",
-    "owner": "rithvik1101", 
-    "version": "1.0.0",
+    "slug": "your-app-slug",
+    "owner": "rithvik1101",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/icon.jpg",
     "userInterfaceStyle": "light",
@@ -11,15 +11,16 @@
       "resizeMode": "contain",
       "backgroundColor": "#000000"
     },
-  
     "ios": {
       "supportsTablet": true,
+      "buildNumber": "6",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Gridly needs access to your photo library to allow you to upload images when creating service listings. These images will be publicly visible to potential customers browsing your offerings.",
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
+      "versionCode": 6,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#000000"
